@@ -1,0 +1,88 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?>
+<!DOCTYPE mapper
+    PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+    "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+
+<mapper namespace="com.abc.sample.userAccount">
+
+	<!-- 사용자 계정 search list -->
+    <select id="search" resultType="record" parameterType="params">
+        SELECT  USER_ID AS "userId"
+               ,ACCT_NO AS "acctNo"
+               ,USER_NAME AS "userName"
+               ,REG_DATE AS "regDate"
+               ,UPDT_DT AS "updtDt"
+          FROM TB_USER_ACCOUNT A
+         WHERE (0=0)
+               <if test="userId == null or userId == '')">AND USER_ID = #{userId} </if>
+               <if test="acctNo == null or acctNo == '')">AND ACCT_NO = #{acctNo} </if>
+               <if test="userName == null or userName == '')">AND USER_NAME = #{userName} </if>
+               <if test="regDate == null or regDate == '')">AND REG_DATE = #{regDate} </if>
+               <if test="updtDt == null or updtDt == '')">AND UPDT_DT = #{updtDt} </if>
+         ORDER 
+            BY UPDT_DT DESC
+    </select>
+	<!-- 사용자 계정 search list count -->
+    <select id="searchCount" resultType="int" parameterType="params">
+        SELECT COUNT(1) 
+          FROM TB_USER_ACCOUNT A
+         WHERE (0=0)
+               <if test="userId == null or userId == ''">AND USER_ID = #{userId}</if>
+               <if test="acctNo == null or acctNo == ''">AND ACCT_NO = #{acctNo}</if>
+               <if test="userName == null or userName == ''">AND USER_NAME = #{userName}</if>
+               <if test="regDate == null or regDate == ''">AND REG_DATE = #{regDate}</if>
+               <if test="updtDt == null or updtDt == ''">AND UPDT_DT = #{updtDt}</if>
+    </select>
+
+	<!-- 사용자 계정 select one -->
+    <select id="select" resultType="record" parameterType="params">
+        SELECT  USER_ID AS "userId"
+               ,ACCT_NO AS "acctNo"
+               ,USER_NAME AS "userName"
+               ,REG_DATE AS "regDate"
+               ,UPDT_DT AS "updtDt"
+          FROM TB_USER_ACCOUNT A
+         WHERE USER_ID = #{userId}
+           AND ACCT_NO = #{acctNo}
+    </select>
+
+	<!-- 사용자 계정 insert -->
+    <insert id="insert" parameterType="params">
+        INSERT 
+          INTO TB_USER_ACCOUNT 
+             (
+               USER_ID
+              ,ACCT_NO
+              ,USER_NAME
+              ,REG_DATE
+              ,UPDT_DT  
+             )
+        VALUES
+             (
+               #{userId}
+              ,#{acctNo}
+              ,#{userName}
+              ,CURRENT_DATE()
+              ,#{updtDt}  
+             )
+    </insert>
+
+	<!-- 사용자 계정 update -->
+    <update id="update" parameterType="params">
+        UPDATE TB_USER_ACCOUNT 
+           SET  USER_NAME = #{userName}
+               ,REG_DATE = #{regDate}
+               ,UPDT_DT = #{updtDt}  
+         WHERE USER_ID = #{userId}
+           AND ACCT_NO = #{acctNo}
+    </update>
+
+	<!-- 사용자 계정 delete -->
+    <delete id="delete" parameterType="params">
+        DELETE 
+          FROM TB_USER_ACCOUNT 
+         WHERE USER_ID = #{userId}
+           AND ACCT_NO = #{acctNo}
+    </delete> 
+
+</mapper>

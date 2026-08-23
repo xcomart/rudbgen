@@ -1,0 +1,62 @@
+import comart.tools.jdbgen.template.TemplateManager;
+import comart.tools.jdbgen.types.JDBAbbr;
+import comart.tools.jdbgen.types.JDBGenConfig;
+import java.util.*;
+
+/** Renders the compatibility oddities so the Rust port can be pinned to them. */
+public class QuirkMain {
+    static String esc(String s) {
+        StringBuilder sb = new StringBuilder();
+        for (char c: s.toCharArray()) {
+            switch (c) {
+                case '\n': sb.append("\\n"); break;
+                case '\r': sb.append("\\r"); break;
+                case '\t': sb.append("\\t"); break;
+                default: sb.append(c);
+            }
+        }
+        return sb.toString();
+    }
+    public static void main(String[] args) throws Exception {
+        JDBGenConfig conf = JDBGenConfig.getInstance(true);
+        conf.setApplyAbbr(false);
+        conf.setAbbrs(new ArrayList<>());
+        JDBAbbr.buildMap();
+
+        Map<String,Object> row1 = new HashMap<>(); row1.put("name", "a");
+        Map<String,Object> row2 = new HashMap<>(); row2.put("name", "A");
+        Map<String,Object> model = new HashMap<>();
+        model.put("name", "abc_def");
+        model.put("rows", new ArrayList<>(Arrays.asList(row1, row2)));
+        Map<String,String> customs = new HashMap<>();
+        customs.put("author", "John Doe");
+
+        String[] templates = {
+            "${item:key=name, prepend='}'}",
+            "${if:key=name, equals='abc_def'}a${ELSE}b${endif}",
+            "abc${",
+            "[${'  '}]",
+            "${ item : key = name }",
+            "${item:key=name, prepend='a', prepend='b'}",
+            "${name.replace('_','-').upper}",
+            "${for:key=rows, skipList='A'}${item:key=name}${endfor}",
+            "[${item:key=NAME}]",
+            "${'a'}${'b'}",
+            "${item:key=name, padSize=-5}",
+            "${item:key=name, padDir='LEFT', padSize=10}",
+            "${author:prepend='<', postpend='>'}",
+            "${for:key=rows, instr='\\n', indent=0}${item:key=name}${endfor}",
+            "${name.suffix.suffix}",
+            "${'unclosed}",
+        };
+        for (String t: templates) {
+            String res;
+            try {
+                res = new TemplateManager(t, customs).applyMapper(model);
+                System.out.println(esc(t) + "\t=>\t[" + esc(res) + "]");
+            } catch (Throwable e) {
+                System.out.println(esc(t) + "\t!!\t" + e.getClass().getSimpleName() + ": " + esc(String.valueOf(e.getMessage())));
+            }
+        }
+    }
+}

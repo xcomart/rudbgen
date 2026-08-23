@@ -1,0 +1,38 @@
+package com.abc.sample.userAccount;
+
+import javax.validation.constraints.NotBlank;
+import javax.validation.constraints.Size;
+
+import lombok.Data;
+import org.apache.ibatis.type.Alias;
+
+/**
+ * 사용자 계정 model class
+ * 
+ * @ClassName UserAccount.java
+ * @Description 사용자 계정 model class
+ * @author tester
+ * @since 2026. 8. 23.
+ *
+ */
+@Data
+@Alias("user_account")
+public class UserAccountModel
+{
+    // 사용자 ID
+    @NotBlank(message="사용자 ID: Required Item.")
+    private String     userId;
+    // 계정 번호
+    @NotBlank(message="계정 번호: Required Item.")
+    private java.math.BigDecimal acctNo;
+    
+
+    // 이름
+    private String     userName;
+    // 등록 일시
+    private java.sql.Timestamp regDate;
+    // 수정 일시
+    @NotBlank(message="수정 일시: Required Item.")
+    private java.sql.Timestamp updtDt;
+    
+}

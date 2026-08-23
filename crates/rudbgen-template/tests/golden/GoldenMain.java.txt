@@ -1,0 +1,86 @@
+import comart.tools.jdbgen.template.TemplateManager;
+import comart.tools.jdbgen.types.JDBAbbr;
+import comart.tools.jdbgen.types.JDBGenConfig;
+import comart.tools.jdbgen.types.db.DBColumn;
+import comart.tools.jdbgen.types.db.DBTable;
+import java.io.IOException;
+import java.nio.charset.StandardCharsets;
+import java.nio.file.*;
+import java.text.SimpleDateFormat;
+import java.util.*;
+
+/** Renders the shipped templates against a fixed fixture, for the Rust port to match. */
+public class GoldenMain {
+
+    static DBColumn column(String name, String typeName, int length, short nullable,
+                           String remarks, String javaType, boolean key) {
+        DBColumn c = new DBColumn();
+        c.setCatalog(null);
+        c.setSchema("PUBLIC");
+        c.setTable("TB_USER_ACCOUNT");
+        c.setColumn(name);
+        c.setName(name);
+        c.setTypeName(typeName);
+        c.setLength(length);
+        c.setNullable(nullable);
+        c.setRemarks(remarks);
+        c.setJavaType(javaType);
+        c.setKey(key);
+        c.setTypeString(typeName.toUpperCase() + (typeName.toUpperCase().contains("CHAR") ? "("+length+")" : ""));
+        return c;
+    }
+
+    public static void main(String[] args) throws Exception {
+        Path out = Paths.get(args[0]);
+        Files.createDirectories(out);
+
+        JDBGenConfig conf = JDBGenConfig.getInstance(true);
+        conf.setApplyAbbr(false);
+        conf.setAbbrs(new ArrayList<>());
+        JDBAbbr.buildMap();
+
+        DBTable table = new DBTable();
+        table.setCatalog(null);
+        table.setSchema("PUBLIC");
+        table.setTable("TB_USER_ACCOUNT");
+        table.setName("TB_USER_ACCOUNT");
+        table.setType("TABLE");
+        table.setRemarks("사용자 계정");
+
+        List<DBColumn> columns = new ArrayList<>(Arrays.asList(
+            column("USER_ID"  , "VARCHAR"  , 20, (short)0, "사용자 ID" , "String"               , true ),
+            column("ACCT_NO"  , "DECIMAL"  , 18, (short)0, "계정 번호" , "java.math.BigDecimal" , true ),
+            column("USER_NAME", "VARCHAR"  , 50, (short)1, "이름"      , "String"               , false),
+            column("REG_DATE" , "TIMESTAMP",  0, (short)1, "등록 일시" , "java.sql.Timestamp"   , false),
+            column("UPDT_DT"  , "TIMESTAMP",  0, (short)0, "수정 일시" , "java.sql.Timestamp"   , false)
+        ));
+        List<DBColumn> keys = new ArrayList<>();
+        List<DBColumn> notKeys = new ArrayList<>();
+        for (DBColumn c: columns) {
+            if (c.isKey()) keys.add(c); else notKeys.add(c);
+        }
+        table.setColumns(columns);
+        table.setKeys(keys);
+        table.setNotKeys(notKeys);
+
+        Map<String,String> customs = new HashMap<>();
+        customs.put("author", "John Doe");
+
+        SimpleDateFormat stamp = new SimpleDateFormat("yyyy-MM-dd HH:mm:ss");
+        String before = stamp.format(new Date());
+
+        String[] names = { "java_model.java", "mybatis_mapper.xml", "php_ci.php" };
+        for (String name: names) {
+            Path src = Paths.get(args[1], name);
+            String tpl = new String(Files.readAllBytes(src), StandardCharsets.UTF_8);
+            String res = new TemplateManager(tpl, customs).applyMapper(table);
+            Files.write(out.resolve(name + ".expected"), res.getBytes(StandardCharsets.UTF_8));
+        }
+
+        String after = stamp.format(new Date());
+        if (!before.equals(after))
+            throw new IllegalStateException("the clock moved while rendering, run again");
+        Files.write(out.resolve("now.txt"), before.getBytes(StandardCharsets.UTF_8));
+        System.out.println("rendered at " + before + " as " + System.getProperty("user.name"));
+    }
+}

@@ -1,0 +1,70 @@
+<?php
+
+/**
+ * CI model for 사용자 계정.
+ * Title: 사용자 계정
+ * User: tester
+ * Date: 2026-08-23 10:22:39
+ */
+class UserAccount_Model extends CI_Model {
+
+    public $table = 'TB_USER_ACCOUNT';
+
+    public USER_ID; // 사용자 ID
+    public ACCT_NO; // 계정 번호
+    
+    
+    public function __construct() {
+    }
+
+    // 사용자 계정 get detail
+    public function get() {
+        
+        $this->db->where('USER_ID'      , $_POST['USER_ID'      ]);
+        $this->db->where('ACCT_NO'      , $_POST['ACCT_NO'      ]);
+        $query = $this->db->get($table);
+        return $query->result();
+    }
+
+    // 사용자 계정 list
+    public function getList() {
+        $query = $this->db->get($table);
+        return $query->result();
+    }
+    
+    // 사용자 계정 input values
+    public function getData() {
+        return array(
+            
+            'USER_ID'            => $_POST['USER_ID'],
+            'ACCT_NO'            => $_POST['ACCT_NO'],
+            'USER_NAME'          => $_POST['USER_NAME'],
+            'REG_DATE'           => $_POST['REG_DATE'],
+            'UPDT_DT'            => $_POST['UPDT_DT']
+        );
+    }
+
+    // 사용자 계정 insert
+    public function insert() {
+        $data = getData();
+        $this->db->insert($table, $data);
+    }
+
+    // 사용자 계정 modify
+    public function update() {
+        $data = getData();
+        
+        $this->db->where('USER_ID'      , $_POST['USER_ID'      ]);
+        $this->db->where('ACCT_NO'      , $_POST['ACCT_NO'      ]);
+        $this->db->update($table, data);
+    }
+
+    // 사용자 계정 delete
+    public function delete() {
+        $data = getData();
+        
+        $this->db->where('USER_ID'      , $_POST['USER_ID'      ]);
+        $this->db->where('ACCT_NO'      , $_POST['ACCT_NO'      ]);
+        $this->db->delete($table);
+    }
+}

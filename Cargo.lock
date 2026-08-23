@@ -5763,15 +5763,19 @@ name = "rudbgen-app"
 version = "0.1.0"
 dependencies = [
  "anyhow",
+ "async-trait",
  "directories",
  "env_logger",
  "futures",
  "gpui",
  "gpui_platform",
  "log",
+ "parking_lot",
  "raw-window-handle",
  "ring",
  "rudbgen-core",
+ "rudbgen-jdbc",
+ "rudbgen-ssh",
  "rudbgen-ui",
  "rust-i18n",
  "serde_json",
@@ -5817,6 +5821,18 @@ dependencies = [
  "parking_lot",
  "rudbgen-core",
  "serde",
+ "serde_json",
+ "thiserror 2.0.20",
+]
+
+[[package]]
+name = "rudbgen-meta"
+version = "0.1.0"
+dependencies = [
+ "log",
+ "rudbgen-core",
+ "rudbgen-jdbc",
+ "rudbgen-template",
  "serde_json",
  "thiserror 2.0.20",
 ]

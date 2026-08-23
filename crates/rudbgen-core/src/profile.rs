@@ -1215,13 +1215,10 @@ const MSSQL_TABLE_COMMENTS_SQL: &str = "SELECT OBJNAME, cast(value as varchar(80
 
 /// SQL Server's column comments, from jdbgen's stock configuration.
 ///
-/// Off for the reason [`MSSQL_TABLE_COMMENTS_SQL`] is, and for one more: it is
-/// jdbgen's two-column shape — the column name and the comment, with the table
-/// named by a `${table}` the statement is re-run for — where
-/// [`CustomQueries::column_comments`] is read as three columns, the table name
-/// first. Switching it on unedited would read the comment out of a column that
-/// is not there. It is kept as the starting point it is, not as a query that
-/// runs.
+/// Off for the reason [`MSSQL_TABLE_COMMENTS_SQL`] is. Its shape is the one
+/// [`CustomQueryKind::ColumnComments`] reads — the column name and the
+/// comment, re-run per table with `${table}` filled in — so it works unedited
+/// the moment a user switches it on.
 const MSSQL_COLUMN_COMMENTS_SQL: &str = "SELECT OBJNAME, cast(value as varchar(8000)) as VALUE \nFROM fn_listextendedproperty ('MS_DESCRIPTION','schema','${schema}','table','${table}','column',null)";
 
 /// Built-in driver definitions, in the order the picker shows them.

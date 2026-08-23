@@ -1,0 +1,28 @@
+[package]
+name = "rudbgen-meta"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+authors.workspace = true
+repository.workspace = true
+description = "the table model: DESCRIBE and the custom queries turned into a template model"
+
+[dependencies]
+# The three crates this one is allowed to know (architecture.md §3):
+#
+# * `rudbgen-jdbc` answers `DESCRIBE` and runs the custom queries,
+# * `rudbgen-core` holds the driver definition those queries live in,
+# * `rudbgen-template` is what the model is built *for* — `Model` is
+#   implemented here so that a table can be rendered without a copy step.
+#
+# `gpui` is not among them and must never be: the whole point of this crate is
+# that the metadata model is testable against a real H2 without a window.
+rudbgen-core.workspace = true
+rudbgen-jdbc.workspace = true
+# Not in `[workspace.dependencies]`: `rudbgen-template` is written to build on
+# its own (see its manifest), and this is its first internal consumer.
+rudbgen-template = { path = "../rudbgen-template" }
+
+log.workspace = true
+serde_json.workspace = true
+thiserror.workspace = true

@@ -1,0 +1,267 @@
+# Interface strings, compiled into the binary by `rust_i18n::i18n!` in
+# `src/main.rs`. This file is the source of truth: every other locale mirrors
+# its keys, and a key missing from a translation falls back to the value here.
+#
+# Not translated anywhere, on purpose: the "rudbgen" and "jdbgen" wordmarks
+# themselves, element ids, gpui key names, theme ids, the licence identifier,
+# and the `Cmd`/`Ctrl` modifier names.
+#
+# This is the M0 set: the application shell and nothing that is not on screen
+# yet. The connection dialog, the explorer tree, the Generate tab and the
+# template editor bring their own namespaces as they arrive.
+_version: 1
+
+# What this language calls itself, for the settings dialog's language list.
+# Written in the language of this file and never translated into another one:
+# a user who has landed in a language they cannot read has to be able to find
+# their own in the list. Every locale file must define it — the list of shipped
+# languages is derived from these files, and this key is what names each entry.
+language:
+  name: English
+
+# Shared by more than one dialog.
+common:
+  cancel: Cancel
+  save: Save
+  close: Close
+
+# The in-app dropdown menu, and the macOS menu bar below it. The two differ
+# only in capitalisation in English, but a translation may need to distinguish
+# them, so they are separate keys.
+#
+# An ellipsis marks a row that asks something before it acts, which is every
+# row here except "About" and "Quit".
+menu:
+  new_connection: New connection…
+  settings: Settings…
+  # Shows and hides the explorer sidebar, which only a connection puts on
+  # screen; greyed until then.
+  toggle_explorer: Explorer
+  about: About rudbgen
+  # Both the in-app row and the macOS menu-bar item, and also the title of the
+  # dialog it opens — so no trailing ellipsis, which would read oddly as a
+  # heading.
+  check_updates: Check for updates
+  quit: Quit
+  # Name of the macOS menu bar's second menu, the one holding the commands that
+  # act on connections.
+  connection: Connection
+  # Name of its third, holding what changes the layout of the window.
+  view: View
+  # Hover label of the button that opens the in-app menu.
+  tip_menu: Menu
+  mac:
+    new_connection: New Connection…
+    quit: Quit rudbgen
+
+# The title bar: the connection selector and the two buttons beside it.
+# The selector reads `no_connection` until a session is open, which in M0 is
+# always.
+titlebar:
+  no_connection: No connection
+  tip_settings: Settings
+  tip_help: Help
+
+# The welcome screen: the whole body of the window while no connection is
+# open. The name, what the application is for, the three ways in, and the
+# connections already saved.
+welcome:
+  # The line under the application's name.
+  tagline: Point it at a database, pick tables and templates, and it writes the code.
+  # Shown under the buttons once something is saved. `%{shortcut}` is "Cmd+N"
+  # or "Ctrl+N"; neither is translated.
+  hint: Press %{shortcut} to open a new connection.
+  # The three buttons. Each takes the ellipsis for the same reason the menu
+  # rows do: they ask before they act.
+  new_connection: New connection…
+  import_jdbgen: Import from jdbgen…
+  open_template: Open a template…
+  # Heading of the saved list, and what stands in its place on a first run.
+  saved: Saved connections
+  empty: No connections saved yet.
+  # Hover label of a button whose milestone has not arrived. Said plainly:
+  # a button that looks live and does nothing is worse than one that says so.
+  tip_soon: Not built yet.
+
+# The bar along the bottom. It reports the connection and the arithmetic of
+# the run — tables × templates → files — and in M0 there is neither.
+statusbar:
+  no_connection: no connection
+  no_selection: nothing to generate
+
+# The about box. The version, the licence name and the names of the libraries
+# are values, not words, and are never translated.
+about:
+  title: About rudbgen
+  version: "Version %{version}"
+  tagline: A database code generator that renders jdbgen's templates in Rust and draws its interface with gpui.
+  license: "Licensed under %{license}."
+  credits: Built with gpui (vendored and patched).
+
+# The settings dialog and the theme editor inside it.
+#
+# Never translated: hex colour values, the `#RRGGBB` notation, JVM flags and
+# the slot keys of a theme file. The slot *labels* below are translated — they
+# name what a colour is for, not what the file calls it.
+settings:
+  title: Settings
+  # Heads both dropdowns, and doubles as their placeholder so a trigger reads
+  # the same whether or not its list is open.
+  system_default: Use the system setting
+  save_failed: "The settings could not be saved: %{error}"
+
+  section:
+    appearance: Appearance
+    window: Window
+    language: Language
+    generation: Generation
+    jvm: Java virtual machine
+
+  ui_theme: Interface theme
+  editor_theme: Editor theme
+  editor_follows_ui: Match the editor theme to the interface theme
+  ui_font_size: Interface size
+  editor_font: Editor font
+  editor_font_size: Editor size
+  # Unit hint after a narrow field. A range, so it reads the same everywhere.
+  font_size_hint: 6 – 32 pt
+
+  opacity: Opacity
+  opacity_hint: "% — below 100 lets the desktop show through"
+  blur: Blur the desktop behind the window
+  titlebar: Title bar
+  titlebar_custom: Drawn by rudbgen
+  titlebar_system: Drawn by the system
+
+  language: Interface language
+  language_hint: Menus and dialogs are re-drawn in the chosen language as soon as the settings are saved.
+
+  # The default of the overwrite policy (architecture document, D11). The
+  # three answers are the three variants of `OverwritePolicy`.
+  overwrite_policy: When a file already exists
+  overwrite_overwrite: Overwrite
+  overwrite_skip: Skip
+  overwrite_ask: Ask
+  overwrite_hint: Where a run starts; the Generate tab can still choose differently for one run.
+
+  jvm_heap: Java heap
+  jvm_heap_hint: MB — the -Xmx a driver runs under
+  jvm_args: Extra arguments
+  jvm_hint: The heap is what a JDBC driver and the metadata reader run under. Both settings take effect the next time rudbgen starts. Extra arguments are separated by spaces.
+
+  # The row of buttons under each theme picker.
+  manage:
+    duplicate: Duplicate…
+    edit: Edit…
+    delete: Delete
+    # Both open a platform file dialog, hence the ellipsis.
+    import: Import…
+    export: Export…
+    # Confirmation button of the file dialog the import opens.
+    import_select: Import
+    # Nothing could be read: the file is missing, unreadable, or not JSON at
+    # all. The error comes from the reader and is not translated.
+    import_unreadable: "“%{file}” could not be read: %{error}"
+    # It is a theme file — of the other kind. The two formats look alike enough
+    # that picking the wrong row is the mistake most easily made, so the message
+    # says which row would have taken it.
+    import_not_a_theme: "“%{file}” is an editor theme. Import it under Editor theme."
+    import_not_an_editor_theme: "“%{file}” is an interface theme. Import it under Interface theme."
+    # The right kind of file, with a colour in it that is not #RRGGBB.
+    import_bad_color: "“%{file}” has no usable colour for %{slot}."
+    # Some of the chosen files were installed and some were not. Only the ones
+    # that failed are counted; the ones that worked are already in the picker.
+    import_skipped: "%{count} files were skipped."
+    # Name given to the copy. Has to carry the original's name, or duplicating
+    # twice would produce two entries that read identically.
+    copy_name: "%{name} (copy)"
+    delete_theme_confirm: "Delete the theme “%{name}”?"
+    delete_editor_theme_confirm: "Delete the editor theme “%{name}”?"
+    write_failed: "The file could not be written: %{error}"
+    delete_failed: "The file could not be removed: %{error}"
+
+  # The colour editor the management row opens.
+  editor:
+    theme_title: Edit interface theme
+    editor_theme_title: Edit editor theme
+    name: Name
+    dark: This is a dark palette
+    invalid: "Every colour has to be written as #RRGGBB."
+    # The five grid colours a theme file may leave out. The table inspector and
+    # the custom-query test result are drawn with them.
+    grid_group: Result grid — left out of the file unless a colour is given
+    automatic: Automatic
+    # How an automatic slot's own label reads while it is being derived.
+    automatic_slot: "%{name} (automatic)"
+
+    # The eleven required slots of an interface theme, plus the five grid ones.
+    slot:
+      background: Window
+      surface: Panels
+      surface_hover: Hovered
+      surface_active: Pressed
+      border: Separators
+      text: Text
+      text_muted: Muted text
+      accent: Accent
+      danger: Errors
+      success: Success
+      overlay: Dialog backdrop
+      grid_header: Grid header
+      grid_row_alt: Alternate row
+      grid_selection: Grid selection
+      grid_null: NULL marker
+      grid_pk: Primary key
+
+    # The nineteen slots of an editor theme. `background` is shared with the
+    # list above; the rest name what the template and SQL highlighters hand out.
+    code:
+      foreground: Text
+      cursor: Caret
+      selection: Selection
+      line_highlight: Current line
+      gutter: Line numbers
+      gutter_active: Current line number
+      keyword: Keywords
+      string: Strings
+      number: Numbers
+      comment: Comments
+      function: Functions
+      type: Type names
+      operator: Operators
+      identifier: Identifiers
+      punctuation: Punctuation
+      bracket_match: Matching bracket
+      error: Errors
+      warning: Warnings
+
+# The update dialog, in all of its states: the announcement the start-up check
+# puts up when GitHub has a newer release than the running build, the manual
+# check from the menu, and the download that installs it. Both version numbers
+# are values, not words, and the name `rudbgen` is not translated either.
+update:
+  title: Update available
+  available: "rudbgen %{version} is available."
+  # Second line, quieter than the first: which build the user is looking at
+  # right now, so the offer means something without them going to the about box.
+  installed: "You are currently running %{version}."
+  # Downloads the release built for this platform and restarts into it. Falls
+  # back to opening the release page where the project publishes no such build.
+  update: Update
+  # Never mention *this* release again. A later one still announces itself, so
+  # the wording has to name the version rather than promise silence in general.
+  ignore: Ignore this version
+  # A check the user asked for, before the answer arrives. The start-up check
+  # shows nothing at all until it has one.
+  checking: Checking for updates…
+  # The answer no other path ever shows: the start-up check stays silent here.
+  up_to_date: You are up to date.
+  # The two halves of an install, shown above the progress bar.
+  downloading: Downloading…
+  installing: Installing…
+  # Heading of the error state. The detail printed underneath it comes from the
+  # operating system, from `tar`, or from the server, and is not translated.
+  failed: The update failed.
+  # The way out of the error state, and of a release with no build for this
+  # platform: the browser, and the user takes it from there.
+  open_release: Open the release page

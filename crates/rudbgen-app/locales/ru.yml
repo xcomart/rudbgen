@@ -1,0 +1,170 @@
+# Русский перевод. Структура ключей повторяет en.yml.
+_version: 1
+
+language:
+  name: Русский
+
+common:
+  cancel: Отмена
+  save: Сохранить
+  close: Закрыть
+
+menu:
+  new_connection: Новое подключение…
+  settings: Настройки…
+  toggle_explorer: Обозреватель
+  about: О программе rudbgen
+  check_updates: Проверить обновления
+  quit: Выход
+  connection: Подключение
+  view: Вид
+  tip_menu: Меню
+  mac:
+    new_connection: Новое подключение…
+    quit: Завершить rudbgen
+
+titlebar:
+  no_connection: Нет подключения
+  tip_settings: Настройки
+  tip_help: Справка
+
+welcome:
+  tagline: Укажите базу данных, выберите таблицы и шаблоны — код будет написан.
+  hint: Нажмите %{shortcut}, чтобы открыть новое подключение.
+  new_connection: Новое подключение…
+  import_jdbgen: Импорт из jdbgen…
+  open_template: Открыть шаблон…
+  saved: Сохранённые подключения
+  empty: Сохранённых подключений пока нет.
+  tip_soon: Ещё не реализовано.
+
+statusbar:
+  no_connection: нет подключения
+  no_selection: нечего генерировать
+
+about:
+  title: О программе rudbgen
+  version: "Версия %{version}"
+  tagline: "Генератор кода по базе данных: шаблоны jdbgen отрисовываются на Rust, интерфейс — на gpui."
+  license: "Распространяется по лицензии %{license}."
+  credits: Собран на основе gpui (встроенного и пропатченного).
+
+settings:
+  title: Настройки
+  system_default: Как в системе
+  save_failed: "Не удалось сохранить настройки: %{error}"
+
+  section:
+    appearance: Внешний вид
+    window: Окно
+    language: Язык
+    generation: Генерация
+    jvm: Виртуальная машина Java
+
+  ui_theme: Тема интерфейса
+  editor_theme: Тема редактора
+  editor_follows_ui: Подбирать тему редактора под тему интерфейса
+  ui_font_size: Размер шрифта интерфейса
+  editor_font: Шрифт редактора
+  editor_font_size: Размер шрифта редактора
+  font_size_hint: 6 – 32 pt
+
+  opacity: Непрозрачность
+  opacity_hint: "% — меньше 100 — и сквозь окно виден рабочий стол"
+  blur: Размывать рабочий стол за окном
+  titlebar: Заголовок окна
+  titlebar_custom: Рисует rudbgen
+  titlebar_system: Рисует система
+
+  language: Язык интерфейса
+  language_hint: Меню и диалоги перерисовываются на выбранном языке сразу после сохранения настроек.
+
+  overwrite_policy: Если файл уже существует
+  overwrite_overwrite: Перезаписать
+  overwrite_skip: Пропустить
+  overwrite_ask: Спрашивать
+  overwrite_hint: Значение по умолчанию для запуска; на вкладке «Генерация» его можно изменить для одного прогона.
+
+  jvm_heap: Куча Java
+  jvm_heap_hint: МБ — значение -Xmx, с которым работает драйвер
+  jvm_args: Дополнительные аргументы
+  jvm_hint: В куче работают JDBC-драйвер и чтение метаданных. Обе настройки вступают в силу при следующем запуске rudbgen. Дополнительные аргументы разделяются пробелами.
+
+  manage:
+    duplicate: Дублировать…
+    edit: Изменить…
+    delete: Удалить
+    import: Импорт…
+    export: Экспорт…
+    import_select: Импортировать
+    import_unreadable: "Не удалось прочитать «%{file}»: %{error}"
+    import_not_a_theme: "«%{file}» — это тема редактора. Импортируйте её в разделе «Тема редактора»."
+    import_not_an_editor_theme: "«%{file}» — это тема интерфейса. Импортируйте её в разделе «Тема интерфейса»."
+    import_bad_color: "В «%{file}» нет пригодного цвета для %{slot}."
+    import_skipped: "Пропущено файлов: %{count}."
+    copy_name: "%{name} (копия)"
+    delete_theme_confirm: "Удалить тему «%{name}»?"
+    delete_editor_theme_confirm: "Удалить тему редактора «%{name}»?"
+    write_failed: "Не удалось записать файл: %{error}"
+    delete_failed: "Не удалось удалить файл: %{error}"
+
+  editor:
+    theme_title: Изменение темы интерфейса
+    editor_theme_title: Изменение темы редактора
+    name: Название
+    dark: Это тёмная палитра
+    invalid: "Каждый цвет записывается как #RRGGBB."
+    grid_group: Таблица результатов — без указанного цвета в файл не записывается
+    automatic: Автоматически
+    automatic_slot: "%{name} (автоматически)"
+
+    slot:
+      background: Окно
+      surface: Панели
+      surface_hover: Под курсором
+      surface_active: Нажатое
+      border: Разделители
+      text: Текст
+      text_muted: Приглушённый текст
+      accent: Акцент
+      danger: Ошибки
+      success: Успех
+      overlay: Фон диалога
+      grid_header: Заголовок таблицы
+      grid_row_alt: Чередующаяся строка
+      grid_selection: Выделение в таблице
+      grid_null: Отметка NULL
+      grid_pk: Первичный ключ
+
+    code:
+      foreground: Текст
+      cursor: Каретка
+      selection: Выделение
+      line_highlight: Текущая строка
+      gutter: Номера строк
+      gutter_active: Номер текущей строки
+      keyword: Ключевые слова
+      string: Строки
+      number: Числа
+      comment: Комментарии
+      function: Функции
+      type: Имена типов
+      operator: Операторы
+      identifier: Идентификаторы
+      punctuation: Пунктуация
+      bracket_match: Парная скобка
+      error: Ошибки
+      warning: Предупреждения
+
+update:
+  title: Доступно обновление
+  available: "Доступна версия rudbgen %{version}."
+  installed: "Сейчас у вас запущена версия %{version}."
+  update: Обновить
+  ignore: Игнорировать эту версию
+  checking: Проверка обновлений…
+  up_to_date: У вас последняя версия.
+  downloading: Загрузка…
+  installing: Установка…
+  failed: Не удалось выполнить обновление.
+  open_release: Открыть страницу выпуска

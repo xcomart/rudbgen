@@ -1,0 +1,170 @@
+# 简体中文翻译。键结构与 en.yml 完全一致。
+_version: 1
+
+language:
+  name: 简体中文
+
+common:
+  cancel: 取消
+  save: 保存
+  close: 关闭
+
+menu:
+  new_connection: 新建连接…
+  settings: 设置…
+  toggle_explorer: 资源管理器
+  about: 关于 rudbgen
+  check_updates: 检查更新
+  quit: 退出
+  connection: 连接
+  view: 视图
+  tip_menu: 菜单
+  mac:
+    new_connection: 新建连接…
+    quit: 退出 rudbgen
+
+titlebar:
+  no_connection: 无连接
+  tip_settings: 设置
+  tip_help: 帮助
+
+welcome:
+  tagline: 指向一个数据库，选择表和模板，它就会生成代码。
+  hint: 按 %{shortcut} 即可打开新连接。
+  new_connection: 新建连接…
+  import_jdbgen: 从 jdbgen 导入…
+  open_template: 打开模板…
+  saved: 已保存的连接
+  empty: 尚未保存任何连接。
+  tip_soon: 尚未实现。
+
+statusbar:
+  no_connection: 无连接
+  no_selection: 没有可生成的内容
+
+about:
+  title: 关于 rudbgen
+  version: "版本 %{version}"
+  tagline: 一个数据库代码生成器：用 Rust 渲染 jdbgen 的模板，用 gpui 绘制界面。
+  license: "以 %{license} 许可证发布。"
+  credits: 基于 gpui（已内置并打补丁）构建。
+
+settings:
+  title: 设置
+  system_default: 跟随系统设置
+  save_failed: "无法保存设置：%{error}"
+
+  section:
+    appearance: 外观
+    window: 窗口
+    language: 语言
+    generation: 生成
+    jvm: Java 虚拟机
+
+  ui_theme: 界面主题
+  editor_theme: 编辑器主题
+  editor_follows_ui: 让编辑器主题跟随界面主题
+  ui_font_size: 界面字号
+  editor_font: 编辑器字体
+  editor_font_size: 编辑器字号
+  font_size_hint: 6 – 32 pt
+
+  opacity: 不透明度
+  opacity_hint: "% — 低于 100 时可以透出桌面"
+  blur: 模糊窗口背后的桌面
+  titlebar: 标题栏
+  titlebar_custom: 由 rudbgen 绘制
+  titlebar_system: 由系统绘制
+
+  language: 界面语言
+  language_hint: 保存设置后，菜单和对话框会用所选语言重新绘制。
+
+  overwrite_policy: 当文件已存在时
+  overwrite_overwrite: 覆盖
+  overwrite_skip: 跳过
+  overwrite_ask: 询问
+  overwrite_hint: 每次运行的起点；“生成”标签页仍可为单次运行另作选择。
+
+  jvm_heap: Java 堆
+  jvm_heap_hint: MB — 驱动运行时的 -Xmx
+  jvm_args: 附加参数
+  jvm_hint: 堆是 JDBC 驱动和元数据读取运行的空间。两项设置都在 rudbgen 下次启动时生效。附加参数以空格分隔。
+
+  manage:
+    duplicate: 复制…
+    edit: 编辑…
+    delete: 删除
+    import: 导入…
+    export: 导出…
+    import_select: 导入
+    import_unreadable: "无法读取“%{file}”：%{error}"
+    import_not_a_theme: "“%{file}”是编辑器主题。请在“编辑器主题”中导入。"
+    import_not_an_editor_theme: "“%{file}”是界面主题。请在“界面主题”中导入。"
+    import_bad_color: "“%{file}”中%{slot}的颜色无法使用。"
+    import_skipped: "已跳过 %{count} 个文件。"
+    copy_name: "%{name}（副本）"
+    delete_theme_confirm: "要删除主题“%{name}”吗？"
+    delete_editor_theme_confirm: "要删除编辑器主题“%{name}”吗？"
+    write_failed: "无法写入文件：%{error}"
+    delete_failed: "无法删除文件：%{error}"
+
+  editor:
+    theme_title: 编辑界面主题
+    editor_theme_title: 编辑编辑器主题
+    name: 名称
+    dark: 这是一套深色配色
+    invalid: "每种颜色都必须写成 #RRGGBB。"
+    grid_group: 结果网格 — 未指定颜色时不会写入文件
+    automatic: 自动
+    automatic_slot: "%{name}（自动）"
+
+    slot:
+      background: 窗口
+      surface: 面板
+      surface_hover: 悬停
+      surface_active: 按下
+      border: 分隔线
+      text: 文字
+      text_muted: 次要文字
+      accent: 强调色
+      danger: 错误
+      success: 成功
+      overlay: 对话框背景
+      grid_header: 网格表头
+      grid_row_alt: 交替行
+      grid_selection: 网格选区
+      grid_null: NULL 标记
+      grid_pk: 主键
+
+    code:
+      foreground: 文字
+      cursor: 光标
+      selection: 选区
+      line_highlight: 当前行
+      gutter: 行号
+      gutter_active: 当前行号
+      keyword: 关键字
+      string: 字符串
+      number: 数字
+      comment: 注释
+      function: 函数
+      type: 类型名
+      operator: 运算符
+      identifier: 标识符
+      punctuation: 标点
+      bracket_match: 匹配括号
+      error: 错误
+      warning: 警告
+
+update:
+  title: 有可用更新
+  available: "rudbgen %{version} 已发布。"
+  installed: "当前运行的是 %{version}。"
+  update: 更新
+  ignore: 忽略此版本
+  checking: 正在检查更新…
+  up_to_date: 已是最新版本。
+  downloading: 正在下载…
+  installing: 正在安装…
+  failed: 更新失败。
+  open_release: 打开发布页面

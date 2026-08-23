@@ -1,0 +1,9 @@
+/target
+**/*.rs.bk
+*.pdb
+.DS_Store
+.claude
+/runtime
+/bridge/build
+/bridge/.gradle
+/bridge/bin

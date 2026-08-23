@@ -1,0 +1,170 @@
+# Deutsche Übersetzung. Die Schlüsselstruktur entspricht der von en.yml.
+_version: 1
+
+language:
+  name: Deutsch
+
+common:
+  cancel: Abbrechen
+  save: Speichern
+  close: Schließen
+
+menu:
+  new_connection: Neue Verbindung…
+  settings: Einstellungen…
+  toggle_explorer: Explorer
+  about: Über rudbgen
+  check_updates: Nach Updates suchen
+  quit: Beenden
+  connection: Verbindung
+  view: Ansicht
+  tip_menu: Menü
+  mac:
+    new_connection: Neue Verbindung…
+    quit: rudbgen beenden
+
+titlebar:
+  no_connection: Keine Verbindung
+  tip_settings: Einstellungen
+  tip_help: Hilfe
+
+welcome:
+  tagline: Auf eine Datenbank zeigen, Tabellen und Vorlagen wählen — der Code wird geschrieben.
+  hint: Drücken Sie %{shortcut}, um eine neue Verbindung zu öffnen.
+  new_connection: Neue Verbindung…
+  import_jdbgen: Aus jdbgen importieren…
+  open_template: Vorlage öffnen…
+  saved: Gespeicherte Verbindungen
+  empty: Noch keine Verbindungen gespeichert.
+  tip_soon: Noch nicht gebaut.
+
+statusbar:
+  no_connection: keine Verbindung
+  no_selection: nichts zu erzeugen
+
+about:
+  title: Über rudbgen
+  version: "Version %{version}"
+  tagline: Ein Datenbank-Codegenerator, der jdbgens Vorlagen in Rust rendert und seine Oberfläche mit gpui zeichnet.
+  license: "Lizenziert unter %{license}."
+  credits: Erstellt mit gpui (eingebunden und gepatcht).
+
+settings:
+  title: Einstellungen
+  system_default: Systemeinstellung verwenden
+  save_failed: "Die Einstellungen konnten nicht gespeichert werden: %{error}"
+
+  section:
+    appearance: Darstellung
+    window: Fenster
+    language: Sprache
+    generation: Erzeugung
+    jvm: Java-VM
+
+  ui_theme: Oberflächen-Thema
+  editor_theme: Editor-Thema
+  editor_follows_ui: Editor-Thema an das Oberflächen-Thema anpassen
+  ui_font_size: Schriftgröße der Oberfläche
+  editor_font: Editor-Schriftart
+  editor_font_size: Schriftgröße im Editor
+  font_size_hint: 6 – 32 pt
+
+  opacity: Deckkraft
+  opacity_hint: "% — unter 100 scheint der Schreibtisch durch"
+  blur: Hintergrund hinter dem Fenster weichzeichnen
+  titlebar: Titelleiste
+  titlebar_custom: Von rudbgen gezeichnet
+  titlebar_system: Vom System gezeichnet
+
+  language: Sprache der Oberfläche
+  language_hint: Menüs und Dialoge werden in der gewählten Sprache neu gezeichnet, sobald die Einstellungen gespeichert sind.
+
+  overwrite_policy: Wenn eine Datei bereits vorhanden ist
+  overwrite_overwrite: Überschreiben
+  overwrite_skip: Überspringen
+  overwrite_ask: Nachfragen
+  overwrite_hint: Der Ausgangswert eines Laufs; der Reiter „Erzeugen“ kann für einen Lauf anders wählen.
+
+  jvm_heap: Java-Heap
+  jvm_heap_hint: MB — das -Xmx, unter dem ein Treiber läuft
+  jvm_args: Zusätzliche Argumente
+  jvm_hint: Der Heap ist der Speicher, in dem ein JDBC-Treiber und das Auslesen der Metadaten laufen. Beide Einstellungen wirken erst beim nächsten Start von rudbgen. Zusätzliche Argumente werden durch Leerzeichen getrennt.
+
+  manage:
+    duplicate: Duplizieren…
+    edit: Bearbeiten…
+    delete: Löschen
+    import: Importieren…
+    export: Exportieren…
+    import_select: Importieren
+    import_unreadable: "„%{file}“ konnte nicht gelesen werden: %{error}"
+    import_not_a_theme: "„%{file}“ ist ein Editor-Thema. Importieren Sie es unter „Editor-Thema“."
+    import_not_an_editor_theme: "„%{file}“ ist ein Oberflächen-Thema. Importieren Sie es unter „Oberflächen-Thema“."
+    import_bad_color: "„%{file}“ hat keine brauchbare Farbe für %{slot}."
+    import_skipped: "%{count} Dateien wurden übersprungen."
+    copy_name: "%{name} (Kopie)"
+    delete_theme_confirm: "Thema „%{name}“ löschen?"
+    delete_editor_theme_confirm: "Editor-Thema „%{name}“ löschen?"
+    write_failed: "Die Datei konnte nicht geschrieben werden: %{error}"
+    delete_failed: "Die Datei konnte nicht entfernt werden: %{error}"
+
+  editor:
+    theme_title: Oberflächen-Thema bearbeiten
+    editor_theme_title: Editor-Thema bearbeiten
+    name: Name
+    dark: Dies ist eine dunkle Palette
+    invalid: "Jede Farbe muss als #RRGGBB geschrieben werden."
+    grid_group: Ergebnisraster — ohne angegebene Farbe bleibt es aus der Datei heraus
+    automatic: Automatisch
+    automatic_slot: "%{name} (automatisch)"
+
+    slot:
+      background: Fenster
+      surface: Bereiche
+      surface_hover: Überfahren
+      surface_active: Gedrückt
+      border: Trennlinien
+      text: Text
+      text_muted: Gedämpfter Text
+      accent: Akzent
+      danger: Fehler
+      success: Erfolg
+      overlay: Dialoghintergrund
+      grid_header: Rasterkopf
+      grid_row_alt: Wechselnde Zeile
+      grid_selection: Rasterauswahl
+      grid_null: NULL-Kennzeichnung
+      grid_pk: Primärschlüssel
+
+    code:
+      foreground: Text
+      cursor: Schreibmarke
+      selection: Auswahl
+      line_highlight: Aktuelle Zeile
+      gutter: Zeilennummern
+      gutter_active: Aktuelle Zeilennummer
+      keyword: Schlüsselwörter
+      string: Zeichenketten
+      number: Zahlen
+      comment: Kommentare
+      function: Funktionen
+      type: Typnamen
+      operator: Operatoren
+      identifier: Bezeichner
+      punctuation: Satzzeichen
+      bracket_match: Passende Klammer
+      error: Fehler
+      warning: Warnungen
+
+update:
+  title: Update verfügbar
+  available: "rudbgen %{version} ist verfügbar."
+  installed: "Sie verwenden derzeit %{version}."
+  update: Aktualisieren
+  ignore: Diese Version ignorieren
+  checking: Suche nach Updates…
+  up_to_date: Sie verwenden die neueste Version.
+  downloading: Wird heruntergeladen…
+  installing: Wird installiert…
+  failed: Das Update ist fehlgeschlagen.
+  open_release: Release-Seite öffnen

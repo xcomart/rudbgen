@@ -1,0 +1,171 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 256 256">
+  <!--
+    rudbgen app icon.
+
+    A sheet of generated source, corner folded, with `</>` on it, on a One Dark
+    tile.
+
+    One subject, filling the tile. 16 px is where this is judged — a taskbar
+    and a window list are what an app icon is mostly seen in — and at that
+    size an icon has room for exactly one shape. A page is the thing this
+    program makes: point it at a schema and it writes files, one per table per
+    template, and the mark is one of them.
+
+    The colours are the application's own, from `crates/rudbgen-ui/src/
+    theme.rs`, and they are rudbman's two colours swapped. rudbman is a blue
+    cylinder wearing a `grid_pk` gold cap — a keyed store. Here the gold
+    (#e5c07b) is the whole subject, because the file coming out is the whole
+    point, and the `accent` blue (#61afef) is the code written on it. Two
+    programs from one lineage, told apart at 16 px by which colour holds the
+    silhouette: blue there, gold here.
+
+    Not green, though green is in the palette: `theme.rs` binds green to
+    `success`. It already means "that worked" everywhere in the UI, and a
+    colour cannot be both a transient state and the application's name.
+
+    The second colour is inside the silhouette rather than beside it, the way
+    it is in the sibling mark. A second *shape* would have to be given its own
+    room and would break the mark into two masses at 16 px; here the glyph is
+    printed on the page, so there is one object and the blue is a marking on
+    it. Gold under blue also keeps a brightness step between the two, which is
+    what a hue change alone cannot do.
+
+    Why a folded corner. A plain rectangle at 16 px is a rectangle; the fold
+    is the one detail that says "sheet of paper" at every size, and it is
+    geometry rather than shading, so it survives where the modelling below
+    does not. It is cut *out* of the silhouette — the flap is a separate,
+    darker plane turned away from the light — so the outline itself carries
+    the reading even in a pure alpha mask.
+
+    Why `</>`. It is the only glyph that means "source code" without a
+    legend, and it is three strokes, which is what a 16 px page has room for.
+    It is drawn with round caps and joins at a weight that survives the
+    smallest render: below about 20 px the three strokes merge into one dark
+    band across the page, which still reads as "written on", never as noise.
+
+    The modelling. One light, above and a little to the left, as in the
+    sibling mark. The page is shaded across its width — dark left edge,
+    highlight about a fifth of the way across, falling away on the right —
+    which is what makes a flat panel read as a lit surface rather than a
+    swatch; a top-to-bottom fade only ever reads as a gradient. Over that sit
+    a soft specular streak where the highlight peaks, a darkening toward the
+    base where the sheet turns from the light, and a shadow under the fold
+    that seats the flap on the page instead of leaving it pasted on. The sheet
+    drops a blurred pool of shadow on the tile, which is what lifts it off the
+    plate. Every one of these is a translucent overlay on the base fill, not a
+    new shape: below about 24 px they dissolve back into the page and the
+    silhouette is all that is left, so the depth costs the small sizes
+    nothing.
+
+    The plate. Byte for byte the sibling's, and deliberately: the tile is the
+    family, the subject is the program. The tile's gradient is steep enough to
+    be seen as one — One Dark greys, a clear step from lit top to dark base.
+    Its border is drawn twice: a dark crease at the very edge that cuts the
+    tile out of whatever it sits on, and a mid-grey ring inside it that stays
+    legible on both light and dark backdrops. The emboss lives in that ring
+    itself: its gradient runs from lit grey at the top to shadowed grey at the
+    base — the same overhead light that models the sheet catching the plate's
+    frame — so the tile reads as a raised plate while the ring keeps one
+    geometric width all the way round.
+
+    Master file. `assets/icon-128.png`, `icon-256.png`, `icon.ico` and
+    `icon.icns` are all rasterised from this one by `assets/render.py`, each
+    size drawn from the vector rather than scaled down from a larger bitmap.
+    Edit this, then re-run that script; do not edit the raster files.
+  -->
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#3a4150"/>
+      <stop offset="0.55" stop-color="#242933"/>
+      <stop offset="1" stop-color="#15181d"/>
+    </linearGradient>
+    <!-- the border ring is itself the emboss: lit on top, in shadow below -->
+    <linearGradient id="ring" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#8b97ae"/>
+      <stop offset="0.5" stop-color="#5b6474"/>
+      <stop offset="1" stop-color="#343a44"/>
+    </linearGradient>
+    <!-- across the sheet: edge, highlight, local colour, far edge -->
+    <linearGradient id="page" x1="0" y1="0" x2="1" y2="0">
+      <stop offset="0" stop-color="#c2974f"/>
+      <stop offset="0.20" stop-color="#f7e5b1"/>
+      <stop offset="0.55" stop-color="#e5c07b"/>
+      <stop offset="1" stop-color="#b98d46"/>
+    </linearGradient>
+    <!-- the sheet turning away from the light toward its base -->
+    <linearGradient id="depth" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0.5" stop-color="#1b1f24" stop-opacity="0"/>
+      <stop offset="1" stop-color="#1b1f24" stop-opacity="0.30"/>
+    </linearGradient>
+    <!-- the folded flap: a second plane, turned away from the same light -->
+    <linearGradient id="flap" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#8d6a2e"/>
+      <stop offset="1" stop-color="#c2974f"/>
+    </linearGradient>
+    <filter id="blur5" x="-30%" y="-30%" width="160%" height="160%">
+      <feGaussianBlur stdDeviation="5"/>
+    </filter>
+    <filter id="blur3" x="-30%" y="-30%" width="160%" height="160%">
+      <feGaussianBlur stdDeviation="3"/>
+    </filter>
+    <!-- overlays laid on the sheet would poke past its edges, so everything
+         drawn on it is clipped to it -->
+    <clipPath id="sheet">
+      <path d="M 74 36 L 150 36 L 196 82 L 196 210 A 12 12 0 0 1 184 222
+               L 74 222 A 12 12 0 0 1 62 210 L 62 48 A 12 12 0 0 1 74 36 Z"/>
+    </clipPath>
+  </defs>
+
+  <!-- tile: dark crease at the edge, then one embossed ring of constant width -->
+  <rect x="8" y="8" width="240" height="240" rx="56" fill="url(#bg)"
+        stroke="#0c0e11" stroke-width="2"/>
+  <rect x="12" y="12" width="232" height="232" rx="52" fill="none"
+        stroke="url(#ring)" stroke-width="5"/>
+
+  <!-- the pool of shadow that lifts the sheet off the plate -->
+  <ellipse cx="129" cy="222" rx="62" ry="11" fill="#06090c" opacity="0.45"
+           filter="url(#blur5)"/>
+
+  <!-- the sheet, its top-right corner cut away for the fold -->
+  <path d="M 74 36 L 150 36 L 196 82 L 196 210 A 12 12 0 0 1 184 222
+           L 74 222 A 12 12 0 0 1 62 210 L 62 48 A 12 12 0 0 1 74 36 Z"
+        fill="url(#page)"/>
+
+  <g clip-path="url(#sheet)">
+    <!-- base turning from the light -->
+    <path d="M 74 36 L 150 36 L 196 82 L 196 210 A 12 12 0 0 1 184 222
+             L 74 222 A 12 12 0 0 1 62 210 L 62 48 A 12 12 0 0 1 74 36 Z"
+          fill="url(#depth)"/>
+
+    <!-- specular streak where the across-the-sheet highlight peaks -->
+    <rect x="78" y="52" width="16" height="152" rx="8" fill="#ffffff"
+          opacity="0.20" filter="url(#blur3)"/>
+
+    <!-- the flap seated on the sheet: its cast shadow -->
+    <path d="M 150 36 L 196 82 L 150 82 Z" fill="#1b1f24" opacity="0.32"
+          filter="url(#blur3)"/>
+  </g>
+
+  <!-- the fold itself: the corner turned back, lit from the other side -->
+  <path d="M 150 36 L 196 82 L 162 82 A 12 12 0 0 1 150 70 Z"
+        fill="url(#flap)"/>
+  <path d="M 150 37 L 195 82" fill="none" stroke="#fff6da"
+        stroke-opacity="0.45" stroke-width="2.5"/>
+
+  <!--
+    `</>`, printed on the page in the interface's accent blue. Round caps and
+    joins, and a weight that still holds a row of pixels at 16 px.
+  -->
+  <g fill="none" stroke="#3f8ecb" stroke-width="12" stroke-linecap="round"
+     stroke-linejoin="round" opacity="0.35" transform="translate(0,3)">
+    <path d="M 110 128 L 90 150 L 110 172"/>
+    <path d="M 138 120 L 120 180"/>
+    <path d="M 148 128 L 168 150 L 148 172"/>
+  </g>
+  <g fill="none" stroke="#61afef" stroke-width="12" stroke-linecap="round"
+     stroke-linejoin="round">
+    <path d="M 110 128 L 90 150 L 110 172"/>
+    <path d="M 138 120 L 120 180"/>
+    <path d="M 148 128 L 168 150 L 148 172"/>
+  </g>
+</svg>

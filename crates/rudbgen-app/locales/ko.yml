@@ -1,0 +1,170 @@
+# 한국어 번역. 키 구조는 en.yml을 그대로 따른다.
+_version: 1
+
+language:
+  name: 한국어
+
+common:
+  cancel: 취소
+  save: 저장
+  close: 닫기
+
+menu:
+  new_connection: 새 연결…
+  settings: 설정…
+  toggle_explorer: 탐색기
+  about: rudbgen 정보
+  check_updates: 업데이트 확인
+  quit: 종료
+  connection: 연결
+  view: 보기
+  tip_menu: 메뉴
+  mac:
+    new_connection: 새 연결…
+    quit: rudbgen 종료
+
+titlebar:
+  no_connection: 연결 없음
+  tip_settings: 설정
+  tip_help: 도움말
+
+welcome:
+  tagline: 데이터베이스를 지정하고 테이블과 템플릿을 고르면 코드를 만들어 냅니다.
+  hint: "%{shortcut} 키를 누르면 새 연결을 열 수 있습니다."
+  new_connection: 새 연결…
+  import_jdbgen: jdbgen에서 가져오기…
+  open_template: 템플릿 열기…
+  saved: 저장된 연결
+  empty: 저장된 연결이 없습니다.
+  tip_soon: 아직 만들어지지 않았습니다.
+
+statusbar:
+  no_connection: 연결 없음
+  no_selection: 생성할 것 없음
+
+about:
+  title: rudbgen 정보
+  version: "버전 %{version}"
+  tagline: jdbgen의 템플릿을 Rust로 렌더링하고 gpui로 화면을 그리는 데이터베이스 코드 생성기.
+  license: "%{license} 라이선스로 배포됩니다."
+  credits: gpui(벤더링 및 패치)로 만들었습니다.
+
+settings:
+  title: 설정
+  system_default: 시스템 설정 따름
+  save_failed: "설정을 저장하지 못했습니다: %{error}"
+
+  section:
+    appearance: 모양
+    window: 창
+    language: 언어
+    generation: 생성
+    jvm: 자바 가상 머신
+
+  ui_theme: 인터페이스 테마
+  editor_theme: 에디터 테마
+  editor_follows_ui: 에디터 테마를 인터페이스 테마에 맞춤
+  ui_font_size: 인터페이스 크기
+  editor_font: 에디터 글꼴
+  editor_font_size: 에디터 크기
+  font_size_hint: 6 – 32 pt
+
+  opacity: 불투명도
+  opacity_hint: "% — 100 미만이면 바탕 화면이 비칩니다"
+  blur: 창 뒤의 바탕 화면을 흐리게
+  titlebar: 제목 표시줄
+  titlebar_custom: rudbgen이 그림
+  titlebar_system: 시스템이 그림
+
+  language: 인터페이스 언어
+  language_hint: 설정을 저장하면 메뉴와 대화 상자가 선택한 언어로 다시 그려집니다.
+
+  overwrite_policy: 파일이 이미 있을 때
+  overwrite_overwrite: 덮어쓰기
+  overwrite_skip: 건너뛰기
+  overwrite_ask: 물어보기
+  overwrite_hint: 생성을 시작할 때의 기본값입니다. 생성 탭에서 한 번만 다르게 고를 수 있습니다.
+
+  jvm_heap: 자바 힙
+  jvm_heap_hint: MB — 드라이버가 사용하는 -Xmx
+  jvm_args: 추가 인수
+  jvm_hint: 힙은 JDBC 드라이버와 메타데이터 조회가 돌아가는 공간입니다. 두 설정 모두 rudbgen을 다시 시작할 때 적용됩니다. 추가 인자는 공백으로 구분합니다.
+
+  manage:
+    duplicate: 복제…
+    edit: 편집…
+    delete: 삭제
+    import: 가져오기…
+    export: 내보내기…
+    import_select: 가져오기
+    import_unreadable: "“%{file}”을(를) 읽지 못했습니다: %{error}"
+    import_not_a_theme: "“%{file}”은(는) 에디터 테마입니다. 에디터 테마에서 가져오세요."
+    import_not_an_editor_theme: "“%{file}”은(는) 인터페이스 테마입니다. 인터페이스 테마에서 가져오세요."
+    import_bad_color: "“%{file}”의 %{slot} 색을 쓸 수 없습니다."
+    import_skipped: "%{count}개 파일을 건너뛰었습니다."
+    copy_name: "%{name} (복사본)"
+    delete_theme_confirm: "테마 “%{name}”을(를) 삭제할까요?"
+    delete_editor_theme_confirm: "에디터 테마 “%{name}”을(를) 삭제할까요?"
+    write_failed: "파일을 쓰지 못했습니다: %{error}"
+    delete_failed: "파일을 지우지 못했습니다: %{error}"
+
+  editor:
+    theme_title: 인터페이스 테마 편집
+    editor_theme_title: 에디터 테마 편집
+    name: 이름
+    dark: 어두운 팔레트입니다
+    invalid: "모든 색은 #RRGGBB 형식으로 써야 합니다."
+    grid_group: 결과 그리드 — 색을 지정하지 않으면 파일에서 생략됩니다
+    automatic: 자동
+    automatic_slot: "%{name} (자동)"
+
+    slot:
+      background: 창
+      surface: 패널
+      surface_hover: 가리킴
+      surface_active: 눌림
+      border: 구분선
+      text: 텍스트
+      text_muted: 흐린 텍스트
+      accent: 강조
+      danger: 오류
+      success: 성공
+      overlay: 대화 상자 배경
+      grid_header: 그리드 머리글
+      grid_row_alt: 교차 행
+      grid_selection: 그리드 선택
+      grid_null: NULL 표시
+      grid_pk: 기본 키
+
+    code:
+      foreground: 텍스트
+      cursor: 캐럿
+      selection: 선택 영역
+      line_highlight: 현재 줄
+      gutter: 줄 번호
+      gutter_active: 현재 줄 번호
+      keyword: 키워드
+      string: 문자열
+      number: 숫자
+      comment: 주석
+      function: 함수
+      type: 타입 이름
+      operator: 연산자
+      identifier: 식별자
+      punctuation: 구두점
+      bracket_match: 짝 괄호
+      error: 오류
+      warning: 경고
+
+update:
+  title: 업데이트 있음
+  available: "rudbgen %{version}을(를) 사용할 수 있습니다."
+  installed: "현재 실행 중인 버전은 %{version}입니다."
+  update: 업데이트
+  ignore: 이 버전 무시
+  checking: 업데이트를 확인하는 중…
+  up_to_date: 최신 버전입니다.
+  downloading: 다운로드 중…
+  installing: 설치하는 중…
+  failed: 업데이트에 실패했습니다.
+  open_release: 릴리스 페이지 열기

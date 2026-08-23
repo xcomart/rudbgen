@@ -11,8 +11,9 @@ description = "jdbgen's template engine, ported to Rust and byte-compatible with
 # glob picks it up unchanged once there is one.
 
 [dependencies]
-# EUC-KR byte counting for padding and indentation, jdbgen's column width.
-encoding_rs = "0.8"
+# Display column width for padding and indentation - see architecture.md
+# §7.4 for why this, and not jdbgen's EUC-KR byte count, is the measure.
+unicode-width = "0.2"
 # the 'matches'/'notmatches' conditions of an if statement.
 regex = "1"
 # ${date} formatting.

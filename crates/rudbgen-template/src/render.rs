@@ -245,7 +245,8 @@ impl<'a> Renderer<'a> {
 
     /// Append a value with the decorations of its statement: `prepend` and
     /// `postpend` - both defaulting to `quote` - surround it, `padSize`
-    /// together with `padDir` pads it to a fixed width in EUC-KR bytes.
+    /// together with `padDir` pads it to a fixed width in display columns -
+    /// see architecture.md §7.4.
     fn decorated(
         &mut self,
         attrs: &Attrs,
@@ -282,7 +283,7 @@ impl<'a> Renderer<'a> {
         }
         if pad_size > 0 {
             // a value wider than the padding is never cut off
-            let fill = (pad_size - strutil::euckr_len(&text) as i64).max(0);
+            let fill = (pad_size - strutil::display_width(&text) as i64).max(0);
             self.out.push_str(&strutil::spaces(fill as usize));
         }
         if pad_left {
@@ -355,7 +356,7 @@ impl<'a> Renderer<'a> {
 
         // the separator is re-indented to the column the loop starts in
         let column_start = self.out.rfind('\n').map(|idx| idx + 1).unwrap_or(0);
-        let column = strutil::euckr_len(&self.out[column_start..]) as i64 + indent;
+        let column = strutil::display_width(&self.out[column_start..]) as i64 + indent;
         let prepend = strutil::spaces(column.max(0) as usize);
 
         let mut no = 0usize;

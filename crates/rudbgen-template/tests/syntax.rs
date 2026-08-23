@@ -158,7 +158,7 @@ fn quote_surrounds_the_value_and_is_overridden_per_side() {
 
 #[test]
 fn padding_counts_double_byte_characters_twice() {
-    // two Hangul syllables, four EUC-KR bytes
+    // two Hangul syllables, four display columns
     let model = Fixture::new().with("name", "가나");
     assert_eq!(
         render("${item:key=name, padSize=10}", &model),

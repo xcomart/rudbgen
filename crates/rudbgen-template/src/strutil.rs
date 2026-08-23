@@ -6,6 +6,8 @@
 //! quotes along with the white space - that is how a quoted attribute value
 //! loses its quotes, so it is load bearing rather than cosmetic.
 
+use unicode_width::UnicodeWidthStr;
+
 /// Characters jdbgen counts as generic space: blank, tab, CR and LF.
 const SPACE_CHARS: [char; 4] = [' ', '\t', '\r', '\n'];
 
@@ -136,24 +138,17 @@ pub(crate) fn to_skewer_case(s: &str) -> String {
     to_snake_case(s).replace('_', "-")
 }
 
-/// Width of `s` in EUC-KR bytes, jdbgen's column count.
+/// Width of `s` in display columns - see architecture.md §7.4.
 ///
-/// A character EUC-KR cannot hold counts as one byte, which is what Java's
-/// encoder does when it falls back to `?`. The ASCII fast path is not an
-/// optimisation only: it keeps the encoder out of the way of the common case.
-pub(crate) fn euckr_len(s: &str) -> usize {
-    let mut len = 0;
-    for c in s.chars() {
-        if c.is_ascii() {
-            len += 1;
-        } else {
-            let mut buf = [0u8; 4];
-            let text = c.encode_utf8(&mut buf);
-            let (encoded, _, had_errors) = encoding_rs::EUC_KR.encode(text);
-            len += if had_errors { 1 } else { encoded.len() };
-        }
-    }
-    len
+/// This is [`UnicodeWidthStr::width`], the same wcwidth-compatible table a
+/// terminal lays cells out by, not jdbgen's EUC-KR byte count: the two agree
+/// on ASCII, Hangul and Hanja, which is every character the shipped templates
+/// and golden fixtures contain, but part on what EUC-KR encodes as two bytes
+/// and a terminal draws in one column (Cyrillic, Greek), and on what EUC-KR
+/// cannot encode at all (emoji), where the column count is the one the
+/// generated file is actually viewed in. Zero-width characters count zero.
+pub(crate) fn display_width(s: &str) -> usize {
+    UnicodeWidthStr::width(s)
 }
 
 /// Java's `String.equalsIgnoreCase`, which folds the case of every character
@@ -225,11 +220,29 @@ mod tests {
     }
 
     #[test]
-    fn a_double_byte_character_is_two_columns_wide() {
-        assert_eq!(euckr_len("abc"), 3);
-        assert_eq!(euckr_len("가나"), 4);
-        // EUC-KR cannot hold this one, so it counts as the single '?' Java
-        // would have written
-        assert_eq!(euckr_len("\u{1F600}"), 1);
+    fn a_hangul_syllable_is_two_columns_wide() {
+        assert_eq!(display_width("abc"), 3);
+        // two Hangul syllables, four display columns - the same count EUC-KR
+        // bytes would have given, which is why the golden fixtures don't
+        // notice the switch from one measure to the other
+        assert_eq!(display_width("가나"), 4);
+    }
+
+    #[test]
+    fn a_cyrillic_letter_is_one_column_wide_unlike_its_euckr_byte_count() {
+        // EUC-KR would have encoded 'п' as two bytes, but a terminal draws it
+        // in a single column
+        assert_eq!(display_width("п"), 1);
+    }
+
+    #[test]
+    fn an_emoji_is_two_columns_wide_though_euckr_cannot_encode_it_at_all() {
+        assert_eq!(display_width("\u{1F600}"), 2);
+    }
+
+    #[test]
+    fn a_combining_character_is_zero_columns_wide() {
+        // 'e' followed by a combining acute accent (U+0301)
+        assert_eq!(display_width("e\u{0301}"), 1);
     }
 }

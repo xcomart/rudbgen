@@ -45,9 +45,11 @@
 //! Every rendered value then passes the same decorations: `prepend` and
 //! `postpend` - both defaulting to `quote` - surround it, and `padSize`
 //! together with `padDir` (`left` or the default `right`) pads it. Padding and
-//! the `indent` of a loop count **EUC-KR bytes**, so that a double byte
-//! character takes the two columns it occupies in a fixed width font, and a
-//! value wider than the padding is never cut off.
+//! the `indent` of a loop count **display columns** - the same wcwidth-style
+//! measure a terminal lays cells out by, not jdbgen's EUC-KR byte count (see
+//! `docs/architecture.md` §7.4 for where the two diverge) - so that a double
+//! width character takes the two columns it occupies in a fixed width font,
+//! and a value wider than the padding is never cut off.
 //!
 //! The ten conditions of an `if` are `equals`/`value`, `notEquals`,
 //! `contains`, `notContains`, `startsWith`, `notStartsWith`, `endsWith`,

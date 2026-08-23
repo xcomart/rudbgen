@@ -934,12 +934,21 @@ impl Workspace {
         let Some((handle, driver, epoch)) = self.meta_context() else {
             return;
         };
-        let reference = rudbgen_meta::TableRef {
-            catalog: key.catalog.clone(),
-            schema: key.schema.clone(),
-            name: key.name.clone(),
-            ..rudbgen_meta::TableRef::default()
-        };
+        // The row the table list produced, not one built from the key: the
+        // reader copies the kind, the comment and the position off what it is
+        // handed rather than reading them again. A key nothing has listed —
+        // which nothing on screen can produce — still gets described, with
+        // those three left as the defaults.
+        let reference = self
+            .explorer
+            .read(cx)
+            .table_ref(&key, cx)
+            .unwrap_or_else(|| rudbgen_meta::TableRef {
+                catalog: key.catalog.clone(),
+                schema: key.schema.clone(),
+                name: key.name.clone(),
+                ..rudbgen_meta::TableRef::default()
+            });
         cx.spawn(async move |this, cx| {
             let outcome = cx
                 .background_executor()
@@ -3326,10 +3335,7 @@ mod tests {
             .expect("the window is open");
         assert_eq!(
             keys.iter().map(|key| key.name.clone()).collect::<Vec<_>>(),
-            vec![
-                "T_SAMPLE_ALBUM".to_string(),
-                "T_SAMPLE_ARTIST".to_string()
-            ]
+            vec!["T_SAMPLE_ALBUM".to_string(), "T_SAMPLE_ARTIST".to_string()]
         );
         let album = keys
             .into_iter()

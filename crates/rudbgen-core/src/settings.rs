@@ -58,9 +58,10 @@ const MAX_EXPLORER_WIDTH: f32 = 720.0;
 /// Width of the inspector panel on a first run, in logical pixels.
 ///
 /// Wider than the explorer's default: the explorer holds one name per row and
-/// the inspector holds a column's name, type, nullability, default and
-/// comment side by side.
-const DEFAULT_INSPECTOR_WIDTH: f32 = 320.0;
+/// the inspector holds a column's name, type, nullability, default and comment
+/// side by side. Chosen so that the two columns a reader actually reads down —
+/// the name and the type — both fit without being dragged.
+const DEFAULT_INSPECTOR_WIDTH: f32 = 360.0;
 
 /// Narrowest the inspector may be dragged.
 ///
@@ -716,7 +717,7 @@ mod tests {
 
         settings.inspector_width = f32::NAN;
         settings.sanitize();
-        assert_eq!(settings.inspector_width, 320.0);
+        assert_eq!(settings.inspector_width, 360.0);
     }
 
     #[test]

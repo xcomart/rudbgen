@@ -12,7 +12,7 @@ common:
 # Тело окна, когда сеанс открыт. Обозреватель, инспектор и рабочая область
 # между ними появятся следующими.
 workarea:
-  next: Вкладка «Генерация» появится на следующем этапе; обозреватель и инспектор уже здесь.
+  next: Редактор шаблонов появится на следующем этапе; вкладка «Генерация» рядом уже здесь.
 
 explorer:
   title: Обозреватель
@@ -221,6 +221,10 @@ menu:
   quit: Выход
   connection: Подключение
   view: Вид
+  preview: Предпросмотр
+  dry_run: Пробный запуск
+  generate: Сгенерировать
+  generate_menu: Генерация
   tip_menu: Меню
   mac:
     new_connection: Новое подключение…
@@ -249,12 +253,88 @@ statusbar:
   no_connection: нет подключения
   no_selection: нечего генерировать
   tables_selected: "Выбрано таблиц: %{count}"
+  run: "таблиц %{tables} · шаблонов %{templates} → файлов %{files} в %{dir}"
+  run_nowhere: "таблиц %{tables} · шаблонов %{templates} → файлов %{files}, каталог вывода не выбран"
   # Три состояния левой ячейки после запроса подключения. `%{product}` —
   # это значение, а не слово.
   connecting: "подключение к %{name}…"
   connected: "%{name} · %{product}"
   failed: "%{name} — нет подключения"
   unknown_product: неизвестный продукт
+
+generate:
+  tab: Генерация
+  template_set: Набор шаблонов
+  set_custom: Свой
+  save_as_set: Сохранить как набор…
+  set_name: Имя
+  templates: Шаблоны
+  no_templates: Шаблонов пока нет — добавьте один, и запуску будет что писать.
+  add_template: Добавить шаблон…
+  add_template_select: Выберите файлы шаблонов
+  template_name: имя
+  out_template: имя файла на выходе
+  tip_edit: Изменить шаблон
+  tip_remove: Убрать из списка
+  options: Параметры
+  output_dir: Вывод
+  output_placeholder: куда попадут созданные файлы
+  output_select: Выберите каталог вывода
+  browse: "…"
+  author: Автор
+  author_placeholder: значение, которое читает элемент author каждого шаблона
+  variables: Переменные
+  var_key: имя
+  var_value: значение
+  apply_abbreviations: Применять правила сокращений
+  rules: Правила…
+  tip_rules_soon: Редактор правил ещё не сделан.
+  preview: Предпросмотр
+  dry_run: Пробный запуск
+  run: Сгенерировать
+  preview_table: Таблица
+  preview_template: Шаблон
+  preview_empty: Пока ничего не отрисовано.
+  dry_exists: заменит
+  dry_new: новый
+  dry_bytes: "%{bytes} Б"
+  diagnostics: "предупреждений: %{count}"
+  at_line: "строка %{line}"
+  read_failed: "не удалось прочитать %{table}: %{reason}"
+  blocked_connection: Сначала откройте подключение.
+  blocked_tables: Отметьте хотя бы одну таблицу в обозревателе.
+  blocked_templates: Отметьте хотя бы один шаблон.
+  blocked_output: Сначала выберите каталог вывода.
+  blocked_running: Запуск уже идёт.
+
+progress:
+  title: Генерация…
+  started: "начинаем, файлов: %{count}"
+  parsed: "разобрано шаблонов: %{count}"
+  read_table: "прочитана %{table}"
+  written: "записан %{path}"
+  skipped: "оставлен %{path}"
+  failed: "%{path} — ошибка: %{reason}"
+  conflict: "%{path} уже существует"
+  cancelling: отмена…
+  count: "%{done} из %{total}"
+
+summary:
+  title: Итог
+  done: Всё, о чём просил запуск, записано.
+  with_failures: Запуск завершился с ошибками.
+  cancelled: Запуск отменён; ниже то, что успело записаться.
+  counts: "записано %{written} · пропущено %{skipped} · с ошибкой %{failed} · предупреждений %{warnings}"
+  written: Записано
+  skipped: Пропущено
+  failed: С ошибкой
+  open_output: Открыть каталог вывода
+  conflict_title: Файл уже существует
+  conflict_body: Заменить, оставить — или ответить сразу за весь остаток запуска.
+  overwrite: Заменить
+  skip: Пропустить
+  overwrite_all: Заменить все
+  skip_all: Пропустить все
 
 about:
   title: О программе rudbgen

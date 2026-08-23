@@ -12,7 +12,7 @@ common:
 # セッションが開いているときのウィンドウ本体。エクスプローラー、インスペクター、
 # その間の作業領域は次に来る。
 workarea:
-  next: 生成タブは次のマイルストーンで加わります。エクスプローラーとインスペクターはすでにここにあります。
+  next: テンプレートエディターは次のマイルストーンで加わります。隣の生成タブはすでにここにあります。
 
 explorer:
   title: エクスプローラー
@@ -220,6 +220,10 @@ menu:
   quit: 終了
   connection: 接続
   view: 表示
+  preview: プレビュー
+  dry_run: ドライラン
+  generate: 生成
+  generate_menu: 生成
   tip_menu: メニュー
   mac:
     new_connection: 新規接続…
@@ -248,11 +252,87 @@ statusbar:
   no_connection: 接続なし
   no_selection: 生成するものがありません
   tables_selected: "%{count} 件のテーブルを選択"
+  run: "テーブル %{tables} · テンプレート %{templates} → %{files} 件を %{dir} へ"
+  run_nowhere: "テーブル %{tables} · テンプレート %{templates} → %{files} 件、出力先が未設定"
   # 接続を求めたあとの左セルの 3 つの状態。`%{product}` は語ではなく値。
   connecting: "%{name} に接続中…"
   connected: "%{name} · %{product}"
   failed: "%{name} — 未接続"
   unknown_product: 不明な製品
+
+generate:
+  tab: 生成
+  template_set: テンプレートセット
+  set_custom: カスタム
+  save_as_set: セットとして保存…
+  set_name: 名前
+  templates: テンプレート
+  no_templates: テンプレートがまだありません。追加すれば実行が書くものを持てます。
+  add_template: テンプレートを追加…
+  add_template_select: テンプレートファイルを選択
+  template_name: 名前
+  out_template: 出力名
+  tip_edit: テンプレートを編集
+  tip_remove: 一覧から削除
+  options: オプション
+  output_dir: 出力先
+  output_placeholder: 生成したファイルの置き場所
+  output_select: 出力ディレクトリを選択
+  browse: "…"
+  author: 作成者
+  author_placeholder: 各テンプレートの author 項目が読む値
+  variables: 変数
+  var_key: 名前
+  var_value: 値
+  apply_abbreviations: 略語規則を適用
+  rules: 規則…
+  tip_rules_soon: 規則エディターはまだ作られていません。
+  preview: プレビュー
+  dry_run: ドライラン
+  run: 生成
+  preview_table: テーブル
+  preview_template: テンプレート
+  preview_empty: まだ何もレンダリングされていません。
+  dry_exists: 置換
+  dry_new: 新規
+  dry_bytes: "%{bytes} B"
+  diagnostics: "警告 %{count} 件"
+  at_line: "%{line} 行目"
+  read_failed: "%{table} を読み取れません: %{reason}"
+  blocked_connection: 先に接続を開いてください。
+  blocked_tables: エクスプローラーでテーブルを 1 つ以上選んでください。
+  blocked_templates: テンプレートを 1 つ以上選んでください。
+  blocked_output: 先に出力ディレクトリを選んでください。
+  blocked_running: すでに実行中です。
+
+progress:
+  title: 生成中…
+  started: "%{count} 件のファイルから開始"
+  parsed: "テンプレート %{count} 件を解析"
+  read_table: "%{table} を読み取り"
+  written: "%{path} を書き込み"
+  skipped: "%{path} を保持"
+  failed: "%{path} が失敗: %{reason}"
+  conflict: "%{path} はすでに存在します"
+  cancelling: キャンセル中…
+  count: "%{total} 件中 %{done} 件"
+
+summary:
+  title: 結果
+  done: 実行が求めたものはすべて書き込まれました。
+  with_failures: 実行は失敗を含んで終わりました。
+  cancelled: 実行は取り消されました。書き込み済みのものは以下のとおりです。
+  counts: "書き込み %{written} · スキップ %{skipped} · 失敗 %{failed} · 警告 %{warnings}"
+  written: 書き込み
+  skipped: スキップ
+  failed: 失敗
+  open_output: 出力ディレクトリを開く
+  conflict_title: ファイルはすでに存在します
+  conflict_body: 置き換えるか、残すか、あるいは以降の実行全体をここで決めてください。
+  overwrite: 上書き
+  skip: スキップ
+  overwrite_all: すべて上書き
+  skip_all: すべてスキップ
 
 about:
   title: rudbgen について

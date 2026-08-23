@@ -11,7 +11,7 @@ common:
 
 # 会话打开后的窗口主体。浏览器、检查器和它们之间的工作区将在下一步加入。
 workarea:
-  next: 「生成」标签页将在下一个里程碑加入；浏览器和检查器已经在这里了。
+  next: 模板编辑器将在下一个里程碑加入；旁边的「生成」标签页已经在这里了。
 
 explorer:
   title: 浏览器
@@ -219,6 +219,10 @@ menu:
   quit: 退出
   connection: 连接
   view: 视图
+  preview: 预览
+  dry_run: 试运行
+  generate: 生成
+  generate_menu: 生成
   tip_menu: 菜单
   mac:
     new_connection: 新建连接…
@@ -246,16 +250,92 @@ statusbar:
   no_connection: 无连接
   no_selection: 没有可生成的内容
   tables_selected: "已选择 %{count} 张表"
+  run: "%{tables} 张表 · %{templates} 个模板 → %{files} 个文件到 %{dir}"
+  run_nowhere: "%{tables} 张表 · %{templates} 个模板 → %{files} 个文件，尚未选择输出目录"
   # 请求连接之后左侧单元格的三种状态。`%{product}` 是值，不是词。
   connecting: "正在连接 %{name}…"
   connected: "%{name} · %{product}"
   failed: "%{name} — 未连接"
   unknown_product: 未知产品
 
+generate:
+  tab: 生成
+  template_set: 模板集
+  set_custom: 自定义
+  save_as_set: 另存为模板集…
+  set_name: 名称
+  templates: 模板
+  no_templates: 还没有模板 —— 添加一个，这次运行才有东西可写。
+  add_template: 添加模板…
+  add_template_select: 选择模板文件
+  template_name: 名称
+  out_template: 输出文件名
+  tip_edit: 编辑模板
+  tip_remove: 从列表中移除
+  options: 选项
+  output_dir: 输出
+  output_placeholder: 生成的文件放到哪里
+  output_select: 选择输出目录
+  browse: "…"
+  author: 作者
+  author_placeholder: 每个模板的 author 项读取的值
+  variables: 变量
+  var_key: 名称
+  var_value: 值
+  apply_abbreviations: 应用缩写规则
+  rules: 规则…
+  tip_rules_soon: 规则编辑器尚未构建。
+  preview: 预览
+  dry_run: 试运行
+  run: 生成
+  preview_table: 表
+  preview_template: 模板
+  preview_empty: 尚未渲染任何内容。
+  dry_exists: 将覆盖
+  dry_new: 新建
+  dry_bytes: "%{bytes} B"
+  diagnostics: "%{count} 条警告"
+  at_line: "第 %{line} 行"
+  read_failed: "无法读取 %{table}：%{reason}"
+  blocked_connection: 请先打开一个连接。
+  blocked_tables: 请在资源管理器中至少勾选一张表。
+  blocked_templates: 请至少勾选一个模板。
+  blocked_output: 请先选择输出目录。
+  blocked_running: 已有一次运行正在进行。
+
+progress:
+  title: 正在生成…
+  started: "开始处理 %{count} 个文件"
+  parsed: "已解析 %{count} 个模板"
+  read_table: "已读取 %{table}"
+  written: "已写入 %{path}"
+  skipped: "已保留 %{path}"
+  failed: "%{path} 失败：%{reason}"
+  conflict: "%{path} 已存在"
+  cancelling: 正在取消…
+  count: "%{total} 中的 %{done}"
+
+summary:
+  title: 结果
+  done: 这次运行要求的内容都已写入。
+  with_failures: 这次运行以失败告终。
+  cancelled: 运行已取消；下面是已经写入的内容。
+  counts: "写入 %{written} · 跳过 %{skipped} · 失败 %{failed} · 警告 %{warnings}"
+  written: 已写入
+  skipped: 已跳过
+  failed: 失败
+  open_output: 打开输出目录
+  conflict_title: 文件已存在
+  conflict_body: 替换它、保留它，或者一次性决定这次运行的其余部分。
+  overwrite: 覆盖
+  skip: 跳过
+  overwrite_all: 全部覆盖
+  skip_all: 全部跳过
+
 about:
   title: 关于 rudbgen
   version: "版本 %{version}"
-  tagline: 一个数据库代码生成器：用 Rust 渲染 jdbgen 的模板，用 gpui 绘制界面。
+  tagline: "一个数据库代码生成器：用 Rust 渲染 jdbgen 的模板，用 gpui 绘制界面。"
   license: "以 %{license} 许可证发布。"
   credits: 基于 gpui（已内置并打补丁）构建。
 

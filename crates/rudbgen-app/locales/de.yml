@@ -12,7 +12,7 @@ common:
 # Der Fensterkörper, sobald eine Sitzung offen ist. Explorer, Inspektor und
 # der Arbeitsbereich dazwischen kommen als Nächstes.
 workarea:
-  next: Der Generieren-Tab kommt im nächsten Meilenstein; der Explorer und der Inspektor sind schon da.
+  next: Der Vorlageneditor kommt im nächsten Meilenstein; der Generieren-Tab daneben ist schon da.
 
 explorer:
   title: Explorer
@@ -221,6 +221,10 @@ menu:
   quit: Beenden
   connection: Verbindung
   view: Ansicht
+  preview: Vorschau
+  dry_run: Probelauf
+  generate: Erzeugen
+  generate_menu: Erzeugen
   tip_menu: Menü
   mac:
     new_connection: Neue Verbindung…
@@ -249,12 +253,88 @@ statusbar:
   no_connection: keine Verbindung
   no_selection: nichts zu erzeugen
   tables_selected: "%{count} Tabellen ausgewählt"
+  run: "%{tables} Tabellen · %{templates} Vorlagen → %{files} Dateien nach %{dir}"
+  run_nowhere: "%{tables} Tabellen · %{templates} Vorlagen → %{files} Dateien, noch kein Zielordner"
   # Die drei Zustände der linken Zelle, sobald eine Verbindung angefordert
   # wurde. `%{product}` ist ein Wert, kein Wort.
   connecting: "verbinde mit %{name}…"
   connected: "%{name} · %{product}"
   failed: "%{name} — nicht verbunden"
   unknown_product: unbekanntes Produkt
+
+generate:
+  tab: Erzeugen
+  template_set: Vorlagensatz
+  set_custom: Eigene
+  save_as_set: Als Satz speichern…
+  set_name: Name
+  templates: Vorlagen
+  no_templates: Noch keine Vorlagen — fügen Sie eine hinzu, damit der Lauf etwas zu schreiben hat.
+  add_template: Vorlage hinzufügen…
+  add_template_select: Vorlagendateien wählen
+  template_name: Name
+  out_template: Ausgabename
+  tip_edit: Vorlage bearbeiten
+  tip_remove: Aus der Liste entfernen
+  options: Optionen
+  output_dir: Ausgabe
+  output_placeholder: wohin die erzeugten Dateien gehen
+  output_select: Zielordner wählen
+  browse: "…"
+  author: Autor
+  author_placeholder: der Wert, den das author-Element jeder Vorlage liest
+  variables: Variablen
+  var_key: Name
+  var_value: Wert
+  apply_abbreviations: Abkürzungsregeln anwenden
+  rules: Regeln…
+  tip_rules_soon: Der Regeleditor ist noch nicht gebaut.
+  preview: Vorschau
+  dry_run: Probelauf
+  run: Erzeugen
+  preview_table: Tabelle
+  preview_template: Vorlage
+  preview_empty: Noch nichts gerendert.
+  dry_exists: ersetzt
+  dry_new: neu
+  dry_bytes: "%{bytes} B"
+  diagnostics: "%{count} Warnungen"
+  at_line: "Zeile %{line}"
+  read_failed: "%{table} konnte nicht gelesen werden: %{reason}"
+  blocked_connection: Öffnen Sie zuerst eine Verbindung.
+  blocked_tables: Wählen Sie mindestens eine Tabelle im Explorer.
+  blocked_templates: Wählen Sie mindestens eine Vorlage.
+  blocked_output: Wählen Sie zuerst einen Zielordner.
+  blocked_running: Ein Lauf läuft bereits.
+
+progress:
+  title: Wird erzeugt…
+  started: "beginne mit %{count} Dateien"
+  parsed: "%{count} Vorlagen gelesen"
+  read_table: "%{table} gelesen"
+  written: "%{path} geschrieben"
+  skipped: "%{path} behalten"
+  failed: "%{path} fehlgeschlagen: %{reason}"
+  conflict: "%{path} ist bereits vorhanden"
+  cancelling: wird abgebrochen…
+  count: "%{done} von %{total}"
+
+summary:
+  title: Ergebnis
+  done: Alles, worum der Lauf gebeten wurde, ist geschrieben.
+  with_failures: Der Lauf endete mit Fehlern.
+  cancelled: Der Lauf wurde abgebrochen; was bereits geschrieben war, steht unten.
+  counts: "%{written} geschrieben · %{skipped} übersprungen · %{failed} fehlgeschlagen · %{warnings} Warnungen"
+  written: Geschrieben
+  skipped: Übersprungen
+  failed: Fehlgeschlagen
+  open_output: Zielordner öffnen
+  conflict_title: Die Datei ist bereits vorhanden
+  conflict_body: Ersetzen, behalten — oder den Rest des Laufs auf einmal beantworten.
+  overwrite: Überschreiben
+  skip: Überspringen
+  overwrite_all: Alle überschreiben
+  skip_all: Alle überspringen
 
 about:
   title: Über rudbgen

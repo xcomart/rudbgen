@@ -12,7 +12,7 @@ common:
 # El cuerpo de la ventana una vez que hay una sesión abierta. El explorador,
 # el inspector y el área de trabajo entre ellos llegan después.
 workarea:
-  next: La pestaña Generar llega en el próximo hito; el explorador y el inspector ya están aquí.
+  next: El editor de plantillas llega en el próximo hito; la pestaña Generar de al lado ya está aquí.
 
 explorer:
   title: Explorador
@@ -221,6 +221,10 @@ menu:
   quit: Salir
   connection: Conexión
   view: Ver
+  preview: Vista previa
+  dry_run: Simulación
+  generate: Generar
+  generate_menu: Generar
   tip_menu: Menú
   mac:
     new_connection: Nueva conexión…
@@ -249,12 +253,88 @@ statusbar:
   no_connection: sin conexión
   no_selection: nada que generar
   tables_selected: "%{count} tablas seleccionadas"
+  run: "%{tables} tablas · %{templates} plantillas → %{files} archivos en %{dir}"
+  run_nowhere: "%{tables} tablas · %{templates} plantillas → %{files} archivos, sin carpeta de destino"
   # Los tres estados de la celda izquierda una vez pedida una conexión.
   # `%{product}` es un valor, no una palabra.
   connecting: "conectando con %{name}…"
   connected: "%{name} · %{product}"
   failed: "%{name} — sin conexión"
   unknown_product: producto desconocido
+
+generate:
+  tab: Generar
+  template_set: Conjunto de plantillas
+  set_custom: Personalizado
+  save_as_set: Guardar como conjunto…
+  set_name: Nombre
+  templates: Plantillas
+  no_templates: "Aún no hay plantillas: añada una y la ejecución tendrá algo que escribir."
+  add_template: Añadir plantilla…
+  add_template_select: Elija archivos de plantilla
+  template_name: nombre
+  out_template: nombre de salida
+  tip_edit: Editar la plantilla
+  tip_remove: Quitar de la lista
+  options: Opciones
+  output_dir: Salida
+  output_placeholder: adónde van los archivos generados
+  output_select: Elija la carpeta de salida
+  browse: "…"
+  author: Autor
+  author_placeholder: el valor que lee el elemento author de cada plantilla
+  variables: Variables
+  var_key: nombre
+  var_value: valor
+  apply_abbreviations: Aplicar reglas de abreviatura
+  rules: Reglas…
+  tip_rules_soon: El editor de reglas aún no está construido.
+  preview: Vista previa
+  dry_run: Simulación
+  run: Generar
+  preview_table: Tabla
+  preview_template: Plantilla
+  preview_empty: Todavía no se ha renderizado nada.
+  dry_exists: reemplaza
+  dry_new: nuevo
+  dry_bytes: "%{bytes} B"
+  diagnostics: "%{count} advertencias"
+  at_line: "línea %{line}"
+  read_failed: "no se pudo leer %{table}: %{reason}"
+  blocked_connection: Abra primero una conexión.
+  blocked_tables: Marque al menos una tabla en el explorador.
+  blocked_templates: Marque al menos una plantilla.
+  blocked_output: Elija primero una carpeta de salida.
+  blocked_running: Ya hay una ejecución en marcha.
+
+progress:
+  title: Generando…
+  started: "empezando con %{count} archivos"
+  parsed: "%{count} plantillas leídas"
+  read_table: "leída %{table}"
+  written: "escrito %{path}"
+  skipped: "conservado %{path}"
+  failed: "%{path} falló: %{reason}"
+  conflict: "%{path} ya existe"
+  cancelling: cancelando…
+  count: "%{done} de %{total}"
+
+summary:
+  title: Resultado
+  done: Se escribió todo lo que la ejecución pedía.
+  with_failures: La ejecución terminó con fallos.
+  cancelled: La ejecución se canceló; lo que había escrito está abajo.
+  counts: "%{written} escritos · %{skipped} omitidos · %{failed} fallidos · %{warnings} advertencias"
+  written: Escritos
+  skipped: Omitidos
+  failed: Fallidos
+  open_output: Abrir carpeta de salida
+  conflict_title: El archivo ya existe
+  conflict_body: Reemplácelo, consérvelo o responda de una vez por el resto de la ejecución.
+  overwrite: Sobrescribir
+  skip: Omitir
+  overwrite_all: Sobrescribir todo
+  skip_all: Omitir todo
 
 about:
   title: Acerca de rudbgen

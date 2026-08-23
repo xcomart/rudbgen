@@ -12,7 +12,7 @@ common:
 # Le corps de la fenêtre une fois qu'une session est ouverte. L'explorateur,
 # l'inspecteur et la zone de travail entre les deux arrivent ensuite.
 workarea:
-  next: L'onglet Générer arrive au prochain jalon ; l'explorateur et l'inspecteur sont déjà là.
+  next: L'éditeur de modèles arrive au prochain jalon ; l'onglet Générer, à côté, est déjà là.
 
 explorer:
   title: Explorateur
@@ -221,6 +221,10 @@ menu:
   quit: Quitter
   connection: Connexion
   view: Affichage
+  preview: Aperçu
+  dry_run: Simulation
+  generate: Générer
+  generate_menu: Génération
   tip_menu: Menu
   mac:
     new_connection: Nouvelle connexion…
@@ -249,12 +253,88 @@ statusbar:
   no_connection: aucune connexion
   no_selection: rien à générer
   tables_selected: "%{count} tables sélectionnées"
+  run: "%{tables} tables · %{templates} modèles → %{files} fichiers dans %{dir}"
+  run_nowhere: "%{tables} tables · %{templates} modèles → %{files} fichiers, aucun dossier de sortie"
   # Les trois états de la cellule de gauche une fois une connexion demandée.
   # `%{product}` est une valeur, pas un mot.
   connecting: "connexion à %{name}…"
   connected: "%{name} · %{product}"
   failed: "%{name} — non connecté"
   unknown_product: produit inconnu
+
+generate:
+  tab: Générer
+  template_set: Jeu de modèles
+  set_custom: Personnalisé
+  save_as_set: Enregistrer comme jeu…
+  set_name: Nom
+  templates: Modèles
+  no_templates: Aucun modèle pour l'instant — ajoutez-en un, et l'exécution aura de quoi écrire.
+  add_template: Ajouter un modèle…
+  add_template_select: Choisir des fichiers de modèle
+  template_name: nom
+  out_template: nom de sortie
+  tip_edit: Modifier le modèle
+  tip_remove: Retirer de la liste
+  options: Options
+  output_dir: Sortie
+  output_placeholder: où vont les fichiers générés
+  output_select: Choisir le dossier de sortie
+  browse: "…"
+  author: Auteur
+  author_placeholder: la valeur que lit l'élément author de chaque modèle
+  variables: Variables
+  var_key: nom
+  var_value: valeur
+  apply_abbreviations: Appliquer les règles d'abréviation
+  rules: Règles…
+  tip_rules_soon: L'éditeur de règles n'est pas encore construit.
+  preview: Aperçu
+  dry_run: Simulation
+  run: Générer
+  preview_table: Table
+  preview_template: Modèle
+  preview_empty: Rien n'a encore été rendu.
+  dry_exists: remplace
+  dry_new: nouveau
+  dry_bytes: "%{bytes} o"
+  diagnostics: "%{count} avertissements"
+  at_line: "ligne %{line}"
+  read_failed: "%{table} n'a pas pu être lue : %{reason}"
+  blocked_connection: Ouvrez d'abord une connexion.
+  blocked_tables: Cochez au moins une table dans l'explorateur.
+  blocked_templates: Cochez au moins un modèle.
+  blocked_output: Choisissez d'abord un dossier de sortie.
+  blocked_running: Une exécution est déjà en cours.
+
+progress:
+  title: Génération…
+  started: "début sur %{count} fichiers"
+  parsed: "%{count} modèles analysés"
+  read_table: "%{table} lue"
+  written: "%{path} écrit"
+  skipped: "%{path} conservé"
+  failed: "échec de %{path} : %{reason}"
+  conflict: "%{path} existe déjà"
+  cancelling: annulation…
+  count: "%{done} sur %{total}"
+
+summary:
+  title: Résultat
+  done: Tout ce que l'exécution demandait a été écrit.
+  with_failures: L'exécution s'est terminée avec des échecs.
+  cancelled: L'exécution a été annulée ; ce qui avait été écrit figure ci-dessous.
+  counts: "%{written} écrits · %{skipped} ignorés · %{failed} échecs · %{warnings} avertissements"
+  written: Écrits
+  skipped: Ignorés
+  failed: Échecs
+  open_output: Ouvrir le dossier de sortie
+  conflict_title: Le fichier existe déjà
+  conflict_body: Remplacez-le, gardez-le, ou répondez d'un coup pour le reste de l'exécution.
+  overwrite: Remplacer
+  skip: Ignorer
+  overwrite_all: Tout remplacer
+  skip_all: Tout ignorer
 
 about:
   title: À propos de rudbgen

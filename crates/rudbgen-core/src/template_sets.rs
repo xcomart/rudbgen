@@ -77,6 +77,15 @@ pub struct TemplateSetStore {
     pub version: u32,
     /// Sets in the order the selector shows them.
     pub sets: Vec<TemplateSet>,
+    /// Whether the built-in sets have already been offered once.
+    ///
+    /// A field of its own rather than a marker inside a set, because it has to
+    /// survive the sets themselves: a user who deletes "Java + MyBatis" has
+    /// said they do not want it, and an application that seeds an empty store
+    /// would hand it straight back on the next launch. The app layer writes it
+    /// the first time it seeds (see `builtin_templates`), and never reads a
+    /// seeded store again.
+    pub builtins_seeded: bool,
     /// Top-level keys this build does not know, kept verbatim.
     ///
     /// The same round-tripping [`AppSettings::extra`](crate::AppSettings) does,
@@ -91,6 +100,7 @@ impl Default for TemplateSetStore {
         Self {
             version: Self::CURRENT_VERSION,
             sets: Vec::new(),
+            builtins_seeded: false,
             extra: BTreeMap::new(),
         }
     }
@@ -262,6 +272,39 @@ mod tests {
         assert_eq!(store.remove(edited.id), Some(edited.clone()));
         assert_eq!(store.remove(edited.id), None);
         assert_eq!(store.get(edited.id), None);
+    }
+
+    #[test]
+    fn the_seeded_flag_survives_a_round_trip_without_the_sets() {
+        // The whole point of the flag: a user who deletes every built-in set
+        // must not be handed them back on the next launch.
+        let dir = tempfile::tempdir().expect("tempdir");
+        let path = dir.path().join("template-sets.json");
+
+        let mut store = TemplateSetStore {
+            builtins_seeded: true,
+            ..TemplateSetStore::default()
+        };
+        store.upsert(sample("mine"));
+        store.save_to(&path).expect("save");
+
+        let mut loaded = TemplateSetStore::load_from(&path).expect("load");
+        assert!(loaded.builtins_seeded);
+        loaded.sets.clear();
+        loaded.save_to(&path).expect("save");
+        let empty = TemplateSetStore::load_from(&path).expect("reload");
+        assert!(empty.sets.is_empty());
+        assert!(empty.builtins_seeded, "the flag went with the sets");
+    }
+
+    #[test]
+    fn a_store_written_before_the_flag_existed_reads_as_unseeded() {
+        // A file from an older build has no `builtins_seeded`, and the first
+        // run of a newer one has to offer the built-ins rather than assume it
+        // already did.
+        let store: TemplateSetStore =
+            serde_json::from_str(r#"{"version":1,"sets":[]}"#).expect("parse");
+        assert!(!store.builtins_seeded);
     }
 
     #[test]

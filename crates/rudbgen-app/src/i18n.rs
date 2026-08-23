@@ -162,7 +162,7 @@ mod tests {
 
     /// One key per top-level namespace of `en.yml`, chosen so that no
     /// translation of it legitimately coincides with the English wording.
-    const PROBES: [&str; 15] = [
+    const PROBES: [&str; 18] = [
         "language.name",
         "common.close",
         "menu.new_connection",
@@ -170,6 +170,12 @@ mod tests {
         "welcome.saved",
         "statusbar.no_connection",
         "workarea.next",
+        // Not `generate.options` or `generate.tab`: several languages keep
+        // "Options" as it stands, and the tab is the same word as the button.
+        // The template list's heading is translated everywhere rudbgen ships.
+        "generate.templates",
+        "progress.title",
+        "summary.written",
         // Not `explorer.title` or `inspector.title`: several languages keep
         // both words as they stand, so a leak there would look like a
         // translation. These two are translated everywhere rudbgen ships.

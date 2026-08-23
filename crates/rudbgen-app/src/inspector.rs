@@ -334,6 +334,27 @@ impl Inspector {
         }
     }
 
+    /// The table `key` names, if it has already been described.
+    ///
+    /// A run needs every ticked table in full, and walking the explorer has
+    /// usually described most of them already — so this is what keeps a
+    /// generate over a schema the user has been reading from asking for it all
+    /// over again. The cache is here rather than in `rudbgen-meta` because only
+    /// the application knows what a refresh means (see the module docs).
+    pub fn cached(&self, key: &TableKey) -> Option<Rc<Table>> {
+        self.cache.get(key).cloned()
+    }
+
+    /// Puts a table somebody else read into the cache.
+    ///
+    /// The run reads the tables it is missing on its own background task; the
+    /// answers are as good as the ones a walk of the tree produces, and
+    /// dropping them would mean describing the same table twice for the sake of
+    /// where the request came from.
+    pub fn remember(&mut self, key: TableKey, table: Table) {
+        self.cache.insert(key, Rc::new(table));
+    }
+
     /// Asks the database again about the table on screen.
     pub fn refresh(&mut self, cx: &mut Context<Self>) {
         let Some(key) = self.target.clone() else {

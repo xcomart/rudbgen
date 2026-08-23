@@ -30,7 +30,7 @@ common:
 # connected window says which database it is holding and what is still to
 # come, rather than showing an empty three-column frame.
 workarea:
-  next: The Generate tab arrives in the next milestone; the explorer and the inspector are already here.
+  next: The template editor arrives in the next milestone; the Generate tab beside this one is already here.
 
 # The explorer: the tree of tables down the left, and the ticks that say which
 # of them the generator will be run over.
@@ -312,6 +312,10 @@ menu:
   connection: Connection
   # Name of its third, holding what changes the layout of the window.
   view: View
+  preview: Preview
+  dry_run: Dry run
+  generate: Generate
+  generate_menu: Generate
   # Hover label of the button that opens the in-app menu.
   tip_menu: Menu
   mac:
@@ -361,12 +365,106 @@ statusbar:
   # it with the Generate tab. Quoted, so the leading interpolation cannot be
   # read as YAML's own syntax.
   tables_selected: "%{count} tables selected"
+  run: "%{tables} tables · %{templates} templates → %{files} files into %{dir}"
+  run_nowhere: "%{tables} tables · %{templates} templates → %{files} files, no output directory yet"
   # The three states of the left cell once a connection has been asked for.
   # `%{product}` is what SESSION_INFO named, which is a value and not a word.
   connecting: "connecting to %{name}…"
   connected: "%{name} · %{product}"
   failed: "%{name} — not connected"
   unknown_product: unknown product
+
+# The Generate tab (§4.4): the template set, the template list and the
+# options. The template *names* are not here — they are the user's, saved in
+# `connections.json`, and a label that changed with the interface language
+# would leave a profile carrying a name from whichever language it was saved
+# in.
+generate:
+  # What the permanent tab is called on the strip.
+  tab: Generate
+  template_set: Template set
+  # Shown while the list matches no saved set (§4.4).
+  set_custom: Custom
+  save_as_set: Save as set…
+  set_name: Name
+  templates: Templates
+  no_templates: No templates yet — add one, and the run has something to write.
+  add_template: Add template…
+  add_template_select: Choose template files
+  template_name: name
+  out_template: output name
+  tip_edit: Edit the template
+  tip_remove: Remove from the list
+  options: Options
+  output_dir: Output
+  output_placeholder: where the generated files go
+  output_select: Choose the output directory
+  # The `...` chooser beside the output field. Quoted: a bare ellipsis is
+  # punctuation, not a word, and YAML would be within its rights to read it
+  # as something else.
+  browse: "…"
+  author: Author
+  author_placeholder: the value every template's author item reads
+  variables: Variables
+  var_key: name
+  var_value: value
+  apply_abbreviations: Apply abbreviation rules
+  rules: Rules…
+  tip_rules_soon: The rules editor is not built yet.
+  preview: Preview
+  dry_run: Dry run
+  run: Generate
+  preview_table: Table
+  preview_template: Template
+  preview_empty: Nothing rendered yet.
+  dry_exists: replaces
+  dry_new: new
+  dry_bytes: "%{bytes} B"
+  diagnostics: "%{count} warnings"
+  at_line: "line %{line}"
+  # A table the run could not describe. `%{reason}` is the driver's own
+  # words and is not translated.
+  read_failed: "%{table} could not be read: %{reason}"
+  # The four reasons the Generate button is greyed, in the order §4.2 checks
+  # them: the tooltip names the first thing missing, not all four.
+  blocked_connection: Open a connection first.
+  blocked_tables: Tick at least one table in the explorer.
+  blocked_templates: Tick at least one template.
+  blocked_output: Choose an output directory first.
+  blocked_running: A run is already going.
+
+# The progress dialog of a run (D11). Every line here is one row of its log,
+# so they are worded as a log is: lower case, no full stop.
+progress:
+  title: Generating…
+  started: "starting on %{count} files"
+  parsed: "%{count} templates parsed"
+  read_table: "read %{table}"
+  written: "wrote %{path}"
+  skipped: "kept %{path}"
+  failed: "%{path} failed: %{reason}"
+  conflict: "%{path} is already there"
+  cancelling: cancelling…
+  count: "%{done} of %{total}"
+
+# The result summary, and the overwrite question a run under the *ask* policy
+# stops on.
+summary:
+  title: Result
+  done: Everything the run asked for was written.
+  with_failures: The run finished with failures.
+  cancelled: The run was cancelled; what it had written is below.
+  counts: "%{written} written · %{skipped} skipped · %{failed} failed · %{warnings} warnings"
+  written: Written
+  skipped: Skipped
+  failed: Failed
+  open_output: Open output directory
+  conflict_title: The file is already there
+  conflict_body: Replace it, keep it, or answer for the rest of the run at once.
+  overwrite: Overwrite
+  skip: Skip
+  overwrite_all: Overwrite all
+  skip_all: Skip all
 
 # The about box. The version, the licence name and the names of the libraries
 # are values, not words, and are never translated.

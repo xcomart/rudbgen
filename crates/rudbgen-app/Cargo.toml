@@ -45,6 +45,11 @@ rudbgen-meta.workspace = true
 # already lays a header, resizable columns and a virtualised body out, and a
 # column list is exactly what it draws.
 rudbgen-grid.workspace = true
+# The generation job behind the Generate tab: `Plan`, `generate`, `dry_run` and
+# `preview`. It knows nothing of gpui by design, so the shell is what puts the
+# run on a background thread, pumps its `Progress` into the progress dialog and
+# answers its overwrite question from a modal.
+rudbgen-gen.workspace = true
 # Local port forwarding through a bastion, for the connection dialog's tunnel
 # block. Set up before the session opens and taken down after it closes; see
 # `src/connection.rs`.

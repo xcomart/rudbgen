@@ -60,7 +60,11 @@
 //! An editor with no highlighter is a plain-text editor, and that is what
 //! [`EditorView::new`] makes. [`CompositeHighlighter`] is how a template that
 //! is *also* a Java or an XML file gets both: the base language underneath, the
-//! template statements painted over it.
+//! template statements painted over it. [`mod@lang`] is where those base
+//! languages live -- one [`Highlighter`] per extension the generator targets --
+//! and [`lang::template_highlighter_for_path`] is what turns a template's path
+//! into the right composite, or the template language alone when the
+//! extension is not one this crate has a base lexer for.
 //!
 //! # Out of scope, deliberately
 //!
@@ -86,6 +90,7 @@ pub mod element;
 pub mod find;
 pub mod highlight;
 pub mod history;
+pub mod lang;
 pub mod sql_syntax;
 pub mod syntax;
 pub mod template_syntax;
@@ -97,6 +102,7 @@ pub use element::EditorElement;
 pub use find::{FindState, find_all};
 pub use highlight::{Highlighter, LineState, Span, SyntaxCache, Token};
 pub use history::{Edit, EditKind, History, SelectionState, Transaction};
+pub use lang::{highlighter_for_extension, template_highlighter_for_path};
 pub use sql_syntax::SqlHighlighter;
 pub use syntax::StatementSpan;
 pub use template_syntax::TemplateHighlighter;

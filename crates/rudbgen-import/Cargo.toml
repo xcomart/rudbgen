@@ -1,0 +1,40 @@
+[package]
+name = "rudbgen-import"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+authors.workspace = true
+repository.workspace = true
+description = "reads a jdbgen config.json: its two encryption schemes, and the mapping onto rudbgen's stores (architecture.md D5)"
+
+[dependencies]
+# The one rudbgen crate this one is allowed to know (architecture.md §3): the
+# stores an import writes into. There is no gpui here and there never may be —
+# the wizard is the app's, and everything this crate decides has to be provable
+# in a temporary directory without a window.
+rudbgen-core.workspace = true
+
+# `directories` finds jdbgen's data directory, whose rule — `%APPDATA%\jdbgen`,
+# `~/Library/Application Support/jdbgen`, `$XDG_CONFIG_HOME/jdbgen` — is
+# `BaseDirs::config_dir()` on all three platforms.
+directories.workspace = true
+log.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+thiserror.workspace = true
+# New identifiers for the drivers and template sets an import creates. jdbgen
+# names its entries and nothing more, so an id has to be invented here.
+uuid.workspace = true
+
+# jdbgen's encryption, read-only. See the block in the workspace manifest for
+# what each of them decodes.
+aes.workspace = true
+aes-gcm.workspace = true
+base64.workspace = true
+cbc.workspace = true
+pbkdf2.workspace = true
+sha2.workspace = true
+zeroize.workspace = true
+
+[dev-dependencies]
+tempfile.workspace = true

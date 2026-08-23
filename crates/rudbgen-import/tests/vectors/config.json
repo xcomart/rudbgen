@@ -1,0 +1,125 @@
+{
+    "isDarkUI": true,
+    "applyAbbr": true,
+    "language": "ko",
+    "mainWindow": { "width": 1200, "height": 800, "maximized": false },
+    "maven": { "urlBase": "https://search.maven.org" },
+    "drivers": [
+        {
+            "stockItem": true,
+            "name": "H2 Embedded",
+            "driverClass": "org.h2.Driver",
+            "urlTemplate": "jdbc:h2:<database file>",
+            "mavenArtifact": "com.h2database:h2:2.4.240",
+            "jdbcJar": "drivers/h2-2.4.240.jar",
+            "noAuth": true,
+            "icon": "stock:h2.png",
+            "useTables": true,
+            "tablesSql": "select 1 from information_schema.tables",
+            "props": { "MODE": "Oracle" }
+        },
+        {
+            "stockItem": true,
+            "name": "PostgreSQL",
+            "driverClass": "org.postgresql.Driver",
+            "urlTemplate": "jdbc:postgresql://<databaseHost>:5432/<database>",
+            "mavenArtifact": "org.postgresql:postgresql:42.7.13",
+            "icon": "stock:postgresql.png",
+            "props": {}
+        },
+        {
+            "stockItem": true,
+            "name": "Oracle",
+            "driverClass": "oracle.jdbc.OracleDriver",
+            "urlTemplate": "jdbc:oracle:thin:@//<databaseHost>:1521/<database>",
+            "icon": "stock:oracle.png"
+        },
+        {
+            "stockItem": false,
+            "name": "Our Warehouse",
+            "driverClass": "com.example.warehouse.Driver",
+            "urlTemplate": "jdbc:example://<databaseHost>:7777/<warehouse>",
+            "jdbcJar": "drivers/warehouse-1.0.jar",
+            "mavenArtifact": "com.example:warehouse-jdbc:1.0",
+            "icon": "fa:database",
+            "useColumns": true,
+            "columnsSql": "select * from wh_columns where t = '${table}'",
+            "props": { "compress": "true" }
+        },
+        {
+            "stockItem": true,
+            "name": "Gone Product",
+            "driverClass": "com.gone.Driver",
+            "urlTemplate": "jdbc:gone:<databaseHost>"
+        }
+    ],
+    "connections": [
+        {
+            "name": "Sample H2",
+            "icon": "stock:h2.png",
+            "driverType": "H2 Embedded",
+            "connectionUrl": "ENC2:Q/FZSU7XiCRIxzrmWhfWoY3z+Emh+b6RTY3urjXF6l8JFI/6MjxV/kwsFe3TwglPelZ6QlbxECv4eeQYTWbmLr8I",
+            "userName": "ENC2:Q/FZSU7XiCRIxzrmWhfWoXAJ4Z5EUaXJ2v08RCOZboKL0znCyD2m9himlDyWdQ==",
+            "userPassword": "",
+            "connectionProps": {},
+            "outputDir": "out",
+            "author": "comart",
+            "customVars": { "package": "com.abc.sample", "vendor": "acme" },
+            "templates": [
+                { "name": "Java Model", "templateFile": "templates/java_model.java", "outTemplate": "${table:camel}Model.java", "selected": true },
+                { "name": "Mapper XML", "templateFile": "templates/mybatis_mapper.xml", "outTemplate": "${table:camel}-mapper.xml", "selected": false }
+            ]
+        },
+        {
+            "name": "Warehouse",
+            "driverType": "PostgreSQL",
+            "connectionUrl": "9wxM3LJISsM1n2cs/9SjD6rLqI5IBomuHDeAOYaACRYUEef4Fk6OaCPTUJTx65S5",
+            "userName": "g4B4T/2iPN2kFFMtF67nUw==",
+            "userPassword": "J3/kDf82GpB0v2PmVcYQcQ==",
+            "connectionProps": { "ApplicationName": "jdbgen" },
+            "useKeepAlive": true,
+            "keepAliveSec": "120",
+            "keepAliveQuery": "select 1",
+            "outputDir": "/tmp/warehouse-out",
+            "author": "alice",
+            "templates": []
+        },
+        {
+            "name": "Legacy Oracle",
+            "driverType": "Oracle",
+            "connectionUrl": "ENC2:Q/FZSU7XiCRIxzrmWhfWoTF2KJxUajNISEwyHXxVyqbft8K3h1r2aiMmSlYaPhthCuF+I0ExozhaLmrZg3N3ony3FmkgGCmxAeKMebeRPr2F77T19KRWPQc=",
+            "userName": "WLUHkAVMmJvqc2CMNNO+nQ==",
+            "userPassword": "ENC2:Q/FZSU7XiCRIxzrmWhfWoVJc8ViOV40r8uF7Ka/ZyT1tLPDzSeCcDml4icfgh/Ckdg==",
+            "useKeepAlive": true,
+            "keepAliveSec": "30 sec",
+            "keepAliveQuery": "select 1 from dual"
+        },
+        {
+            "name": "Nowhere",
+            "driverType": "Retired Product",
+            "connectionUrl": "ENC2:Q/FZSU7XiCRIxzrmWhfWobQDBIEcDjRGod/SclCXskZYSImcZVVEtNCUsKM3hnQV2Jc8L6cdd79FHSTgpNxOhdqeLSbCEiLbioYfkzNsHSoEI6iebJ44yw==",
+            "userName": "ENC2:Q/FZSU7XiCRIxzrmWhfWoT6nPKQgFL5PxiSFcn1HpbK9KIaokcwf2pMyr9lH4Q==",
+            "userPassword": "ENC2:Q/FZSU7XiCRIxzrmWhfWobRR1clVMoYRwkLT4prG2O7phEb6ZxaiNchTU2W3LPnE/eQ3DSGksDVmAN0P0xd34g==",
+            "outputDir": "never-copied/out",
+            "templates": [
+                { "name": "Missing", "templateFile": "templates/never-copied.tpl", "outTemplate": "${table}.txt", "selected": true }
+            ]
+        }
+    ],
+    "presets": [
+        {
+            "name": "Java + MyBatis",
+            "icon": "stock:h2.png",
+            "templates": [
+                { "name": "Java Model", "templateFile": "templates/java_model.java", "outTemplate": "${table:camel}Model.java", "selected": true },
+                { "name": "Mapper XML", "templateFile": "templates/mybatis_mapper.xml", "outTemplate": "${table:camel}-mapper.xml", "selected": true }
+            ]
+        }
+    ],
+    "abbrs": [
+        { "check": true, "totalName": false, "abbr": "emp", "replaceTo": "Employee" },
+        { "check": true, "totalName": true, "abbr": "T_ORG", "replaceTo": "Organisation" },
+        { "check": false, "abbr": "no", "replaceTo": "Number" },
+        { "abbr": "qty", "replaceTo": "Quantity" }
+    ]
+}

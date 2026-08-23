@@ -1,0 +1,47 @@
+{
+  "_source": "Produced by jdbgen's own comart.utils.StrUtils.encrypt for the ENC2 column and by the legacyEncrypt recipe of jdbgen's src/test/java/comart/utils/EncryptionTest.java for the legacy one, run against /home/comart/Work/jdbgen/build/classes/java/main. jdbgen's own tests fix no ciphertext of their own - every value there is encrypted and decrypted in the same run - so the vectors had to be drawn from the implementation rather than copied from the suite.",
+  "master": "correct horse battery staple",
+  "wrong_master": "not the master password",
+  "values": [
+    {
+      "plain": "jdbc:postgresql://db.example.com:5432/app",
+      "v2": "ENC2:DJYoBWfgTsYHUF5OreZ3xBDNLl/lPBWeqXqAYQqwN/Yn1XYHedtnUJpIoGkAsesEOFVE2lo6TH+aALcWo25yXh7DLcCuItwUVCsKI2OOAhHLOU96HA==",
+      "legacy": "9wxM3LJISsM1n2cs/9SjD6rLqI5IBomuHDeAOYaACRYUEef4Fk6OaCPTUJTx65S5"
+    },
+    {
+      "plain": "alice",
+      "v2": "ENC2:DJYoBWfgTsYHUF5OreZ3xIfucylBf1I3+s/moSoq/xYkn992arouImlya1FTbLKJfw==",
+      "legacy": "g4B4T/2iPN2kFFMtF67nUw=="
+    },
+    {
+      "plain": "p@ssw0rd - 한글 - ",
+      "v2": "ENC2:DJYoBWfgTsYHUF5OreZ3xIfmSHMCbvpZ8aCb7EGkEyujhizCXb4cQlGbWTQKfr8l4cg014u5v+E4TbQ9MiVydQ==",
+      "legacy": "vM6m1qM1eFkkSNrzhN+E54oivyRf/DWqkZzPmlDJkmQ="
+    },
+    {
+      "plain": "",
+      "v2": "",
+      "legacy": ""
+    },
+    {
+      "plain": "a",
+      "v2": "ENC2:DJYoBWfgTsYHUF5OreZ3xPtd90Z0TzlN/y1Q2CWCz9eEdGJSPT469YyZn4rw",
+      "legacy": "yVRYnGEBsR8wxa8gdPu2jg=="
+    },
+    {
+      "plain": "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef",
+      "v2": "ENC2:DJYoBWfgTsYHUF5OreZ3xI7SNKs25xeCPd5zs6TWMQ/WBEgiMa5MHJaFiVntkUBkyGvsGih5HmZPSwczu/E0XrSoYvOIZpmfWLpqHSl6NxQDkN7KUn8XPgEaJIHl9U6BjkA5xMQGzwqopREL",
+      "legacy": "jIPd81sX+sbrAxTlV7hK6fPnbHg725L68cMYBIbB+UJS1GA+0G6JjiVU3WbNvJfRS57Fd3nSwqN5JDl3FT5fstejr2eCtuovrVi8C+ZMySk="
+    },
+    {
+      "plain": "line one\nline two\ttabbed",
+      "v2": "ENC2:DJYoBWfgTsYHUF5OreZ3xLety6U40XaQNbPy0coia0v0WMgwB5LUbrpVsoqs57EqUmXAQRYnc97hvSvHaMOZ2zGxl/0=",
+      "legacy": "L6788au5qyK7DyuFgDmlMNkcjGTnZsRWFHEXbUOdAM0="
+    },
+    {
+      "plain": "🔑 emoji key",
+      "v2": "ENC2:DJYoBWfgTsYHUF5OreZ3xMauRGj+3FmzGxRvsrAD1brGXs8dmnFLB5LWbQb3M7kotiCUV3LhEr97vg==",
+      "legacy": "ek2yctsieLaRqQvsb6qwYw=="
+    }
+  ]
+}

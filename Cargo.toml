@@ -149,6 +149,38 @@ ureq = { version = "3", default-features = false, features = [
 # is the one the lockfile already pins for them. ---
 ring = "0.17"
 
+# --- jdbgen's two encryption schemes, read once by `rudbgen-import` (D5) ---
+# rudbgen has no master password and encrypts nothing; these are here to *read*
+# a `config.json` written by jdbgen, whose `connectionUrl`, `userName` and
+# `userPassword` are the only encrypted values in the file. The scheme is
+# jdbgen's `StrUtils`, reproduced exactly:
+#
+#   * current form — `"ENC2:" + Base64(salt(16) || iv(12) || AES-256-GCM)`, the
+#     key stretched with PBKDF2-HMAC-SHA256 over 210,000 iterations: `aes-gcm`
+#     for the cipher, `pbkdf2` + `sha2` for the derivation,
+#   * superseded form — unprefixed Base64 of AES-128/CBC/PKCS#5 whose key and IV
+#     are the two halves of SHA-256(master): `cbc` over `aes`, `sha2` again,
+#   * `base64` decodes both envelopes.
+#
+# Every version below is one the lockfile already carried for `russh` and
+# `ureq`'s `rustls`, and they are all of one RustCrypto generation (`cipher`
+# 0.5, `digest` 0.11), so the set adds dependency *edges* and not crates.
+# `aes-gcm` drops its default `getrandom`: nothing here ever encrypts, so the
+# crate must not pull a random source in to seed nonces it will not draw.
+# `zeroize` is what lets the import promise that the master password is gone
+# once the wizard closes — it is wiped when the decryptor is dropped rather
+# than left in a `String` for the allocator to hand out again.
+aes-gcm = { version = "0.11", default-features = false, features = [
+    "aes",
+    "alloc",
+] }
+aes = "0.9"
+cbc = { version = "0.2", features = ["alloc", "block-padding"] }
+pbkdf2 = { version = "0.13", default-features = false, features = ["hmac"] }
+sha2 = "0.11"
+base64 = "0.23"
+zeroize = "1"
+
 # --- platform window chrome, and one platform registry ---
 # All four are used by `rudbgen-app` alone, and every one of them only under a
 # `[target.'cfg(...)']` section, so a build for another platform never sees
@@ -239,6 +271,7 @@ rudbgen-ssh = { path = "crates/rudbgen-ssh" }
 rudbgen-jdbc = { path = "crates/rudbgen-jdbc" }
 rudbgen-meta = { path = "crates/rudbgen-meta" }
 rudbgen-gen = { path = "crates/rudbgen-gen" }
+rudbgen-import = { path = "crates/rudbgen-import" }
 rudbgen-grid = { path = "crates/rudbgen-grid" }
 rudbgen-editor = { path = "crates/rudbgen-editor" }
 rudbgen-app = { path = "crates/rudbgen-app" }

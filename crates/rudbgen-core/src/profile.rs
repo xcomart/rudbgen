@@ -813,12 +813,16 @@ impl CustomQuery {
 ///   `IS_KEY`.
 /// * [`table_comments`](CustomQueries::table_comments) — read
 ///   **positionally**: the table name, then the comment.
-/// * [`column_comments`](CustomQueries::column_comments) — read positionally:
-///   the table name, the column name, then the comment.
+/// * [`column_comments`](CustomQueries::column_comments) — run once per
+///   table (`${table}` is set), read positionally: the column name, then the
+///   comment.
 ///
-/// A statement may name `${catalog}`, `${schema}` and `${table}`; what is
-/// substituted, and which of the four the bridge can run today, is the
-/// bridge's business — this type stores them and nothing more.
+/// The schema-level statements may name `${catalog}` and `${schema}`; the two
+/// per-table ones (`columns`, `column_comments`) may also name `${table}`. The
+/// app runs them through `EXECUTE` and reads the result by this contract
+/// (architecture document, §6); the bridge never sees them. [`CustomQueryKind`]
+/// is the contract in code, for the reader and for the driver editor's
+/// **Test** button alike.
 #[derive(Debug, Default, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(default)]
 pub struct CustomQueries {
@@ -830,6 +834,107 @@ pub struct CustomQueries {
     pub table_comments: CustomQuery,
     /// Query answering column comments the driver leaves blank.
     pub column_comments: CustomQuery,
+}
+
+impl CustomQueries {
+    /// The query of one kind.
+    pub fn get(&self, kind: CustomQueryKind) -> &CustomQuery {
+        match kind {
+            CustomQueryKind::Tables => &self.tables,
+            CustomQueryKind::Columns => &self.columns,
+            CustomQueryKind::TableComments => &self.table_comments,
+            CustomQueryKind::ColumnComments => &self.column_comments,
+        }
+    }
+
+    /// The query of one kind, for editing.
+    pub fn get_mut(&mut self, kind: CustomQueryKind) -> &mut CustomQuery {
+        match kind {
+            CustomQueryKind::Tables => &mut self.tables,
+            CustomQueryKind::Columns => &mut self.columns,
+            CustomQueryKind::TableComments => &mut self.table_comments,
+            CustomQueryKind::ColumnComments => &mut self.column_comments,
+        }
+    }
+}
+
+/// Which of the four custom queries, and what each one's result must look
+/// like — jdbgen's contract, kept verbatim so a statement pasted out of a
+/// jdbgen configuration works unedited.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub enum CustomQueryKind {
+    /// The table list of a schema.
+    Tables,
+    /// The column list of a table.
+    Columns,
+    /// Table comments of a schema.
+    TableComments,
+    /// Column comments of a table.
+    ColumnComments,
+}
+
+impl CustomQueryKind {
+    /// All four, in the order the driver editor shows them.
+    pub const ALL: [CustomQueryKind; 4] = [
+        CustomQueryKind::Tables,
+        CustomQueryKind::Columns,
+        CustomQueryKind::TableComments,
+        CustomQueryKind::ColumnComments,
+    ];
+
+    /// The labels the result set must carry, for the two kinds read by
+    /// label; empty for the two read positionally.
+    pub fn required_labels(self) -> &'static [&'static str] {
+        match self {
+            CustomQueryKind::Tables => &[
+                "TABLE_CAT",
+                "TABLE_SCHEM",
+                "TABLE_NAME",
+                "TABLE_TYPE",
+                "REMARKS",
+            ],
+            CustomQueryKind::Columns => &[
+                "TABLE_CAT",
+                "TABLE_SCHEM",
+                "TABLE_NAME",
+                "COLUMN_NAME",
+                "DATA_TYPE",
+                "TYPE_NAME",
+                "COLUMN_SIZE",
+                "NULLABLE",
+                "REMARKS",
+                "COLUMN_DEF",
+                "IS_KEY",
+            ],
+            CustomQueryKind::TableComments | CustomQueryKind::ColumnComments => &[],
+        }
+    }
+
+    /// How many columns a positionally read result must have (name, then
+    /// comment); `None` for the kinds read by label.
+    pub fn positional_columns(self) -> Option<usize> {
+        match self {
+            CustomQueryKind::TableComments | CustomQueryKind::ColumnComments => Some(2),
+            _ => None,
+        }
+    }
+
+    /// Whether `${table}` is meaningful: the statement runs once per table.
+    pub fn per_table(self) -> bool {
+        matches!(
+            self,
+            CustomQueryKind::Columns | CustomQueryKind::ColumnComments
+        )
+    }
+
+    /// The placeholders a statement of this kind may use.
+    pub fn placeholders(self) -> &'static [&'static str] {
+        if self.per_table() {
+            &["${catalog}", "${schema}", "${table}"]
+        } else {
+            &["${catalog}", "${schema}"]
+        }
+    }
 }
 
 /// A JDBC driver rudbgen can load: its class, its JARs, and its URL shape.

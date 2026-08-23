@@ -56,8 +56,8 @@ pub use paths::{
     known_hosts_file, settings_file, template_sets_file, templates_dir, ui_themes_dir,
 };
 pub use profile::{
-    ConnectionProfile, ConnectionStore, CustomQueries, CustomQuery, DriverDef, DriverStore,
-    GenerationProfile, KeepAlive, TemplateRef, TunnelAuth, TunnelConfig,
+    ConnectionProfile, ConnectionStore, CustomQueries, CustomQuery, CustomQueryKind, DriverDef,
+    DriverStore, GenerationProfile, KeepAlive, TemplateRef, TunnelAuth, TunnelConfig,
 };
 pub use secrets::{SecretSlot, SecretStore, init as init_secrets};
 pub use settings::{AppSettings, OverwritePolicy, TitlebarStyle, WindowState};

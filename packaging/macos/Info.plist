@@ -1,0 +1,35 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<!-- Template for the release workflow; __VERSION__ is replaced by the tag. -->
+<plist version="1.0">
+<dict>
+    <key>CFBundleName</key>
+    <string>rudbgen</string>
+    <key>CFBundleDisplayName</key>
+    <string>rudbgen</string>
+    <key>CFBundleIdentifier</key>
+    <string>com.aihouse.rudbgen</string>
+    <key>CFBundleExecutable</key>
+    <string>rudbgen</string>
+    <key>CFBundleIconFile</key>
+    <string>rudbgen</string>
+    <key>CFBundlePackageType</key>
+    <string>APPL</string>
+    <key>CFBundleShortVersionString</key>
+    <string>__VERSION__</string>
+    <key>CFBundleVersion</key>
+    <string>__VERSION__</string>
+    <key>LSMinimumSystemVersion</key>
+    <string>11.0</string>
+    <key>NSHighResolutionCapable</key>
+    <true/>
+    <!-- macOS 15+ gates connections to private-range addresses behind a
+         per-app "Local Network" permission; this string is what its prompt
+         shows. Without the key an ad-hoc-signed app is often denied silently,
+         never appearing in the settings list at all. -->
+    <key>NSLocalNetworkUsageDescription</key>
+    <string>rudbgen connects to database servers and SSH hosts on your local network to read their metadata.</string>
+    <key>NSSupportsAutomaticGraphicsSwitching</key>
+    <true/>
+</dict>
+</plist>

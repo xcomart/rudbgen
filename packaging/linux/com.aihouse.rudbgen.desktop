@@ -1,0 +1,9 @@
+[Desktop Entry]
+Type=Application
+Name=rudbgen
+Comment=Source code generator from JDBC database metadata
+Exec=rudbgen
+Icon=rudbgen
+Terminal=false
+Categories=Development;Database;
+StartupWMClass=com.aihouse.rudbgen

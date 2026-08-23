@@ -21,6 +21,9 @@
 *.pdb binary
 *.so binary
 *.dylib binary
+*.jar binary
+# The bundled H2 sample database (assets/sample/) is an H2 store file.
+*.mv.db binary
 
 # The template engine's golden files carry CRLF on purpose: the line-end
 # detection they test is the first newline of the template. Never normalise.

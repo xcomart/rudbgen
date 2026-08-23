@@ -55,6 +55,7 @@
 //! one read rather than at the end of the transfer.
 
 use std::path::PathBuf;
+use std::sync::Arc;
 
 use futures::StreamExt;
 use futures::channel::mpsc;
@@ -64,6 +65,7 @@ use gpui::{
     div, prelude::*, px,
 };
 use rudbgen_core::{ConnectionProfile, CustomQueryKind, DriverDef, DriverStore, drivers_dir};
+use rudbgen_editor::{EditorView, SqlHighlighter};
 use rudbgen_jdbc::{BridgeErrorKind, DriverProbe, Error as JdbcError, StatementSpec};
 use rudbgen_ui::{
     Button, ButtonVariant, Checkbox, DraggedThumb, Scrollbar, ScrollbarAxis, ScrollbarState,
@@ -86,6 +88,12 @@ const LIST_WIDTH: f32 = 200.;
 
 /// Height at which the two columns start scrolling.
 const BODY_MAX_HEIGHT: f32 = 460.;
+
+/// Height of each custom-query SQL editor: about six lines, enough to read a
+/// `select` with its `where` line without the field becoming the dialog.
+/// Anything longer scrolls inside it, the way the editor already does
+/// everywhere else it is hosted.
+const QUERY_EDITOR_HEIGHT: f32 = 132.;
 
 /// Tab order of the manager's controls.
 mod tab {
@@ -453,7 +461,13 @@ pub struct DriverManager {
     /// Maven coordinate, `group:artifact:version`.
     maven_input: Entity<TextInput>,
     /// The four custom-query statements, in [`CustomQueryKind::ALL`] order.
-    query_inputs: [Entity<TextInput>; 4],
+    ///
+    /// SQL-highlighted rather than a plain field, since a driver's table list
+    /// or comment query is exactly the kind of `select` a colour hint on
+    /// `${schema}` and its keywords is worth having. Read-only whenever the
+    /// row's tick is off: a statement that would not run is not a statement
+    /// to be typing over by mistake.
+    query_editors: [Entity<EditorView>; 4],
     /// Catalogue the test substitutes for `${catalog}`; blank leaves the hole.
     test_catalog_input: Entity<TextInput>,
     /// Schema the test substitutes for `${schema}`.
@@ -516,18 +530,11 @@ impl DriverManager {
             port_input: field(cx, "5432".into(), tab::PORT),
             dialect_input: field(cx, "postgres".into(), tab::DIALECT),
             maven_input: field(cx, "org.postgresql:postgresql:42.7.4".into(), tab::MAVEN),
-            // Four rows tall: enough to read a `select` with its `where` line
-            // without the field becoming the dialog. Anything longer scrolls
-            // inside it.
-            query_inputs: std::array::from_fn(|index| {
-                let placeholder = query_placeholder(CustomQueryKind::ALL[index]);
-                let tab_index = tab::QUERY + index as isize * tab::QUERY_STRIDE + 1;
-                cx.new(move |cx| {
-                    TextInput::new(cx)
-                        .multiline(4)
-                        .placeholder(placeholder)
-                        .tab_index(tab_index)
-                })
+            // `fill_form`, called below, seeds the text and the read-only
+            // state from the selected driver; nothing here depends on which
+            // one that is.
+            query_editors: std::array::from_fn(|_| {
+                cx.new(|cx| EditorView::new(cx).highlighter(Arc::new(SqlHighlighter)))
             }),
             test_catalog_input: field(cx, "".into(), tab::TEST_CATALOG),
             test_schema_input: field(cx, "PUBLIC".into(), tab::TEST_SCHEMA),
@@ -562,8 +569,11 @@ impl DriverManager {
         set_text(&self.dialect_input, driver.dialect, cx);
         set_text(&self.maven_input, driver.maven.unwrap_or_default(), cx);
         for (index, kind) in CustomQueryKind::ALL.into_iter().enumerate() {
-            let sql = driver.custom_queries.get(kind).sql.clone();
-            set_text(&self.query_inputs[index], sql, cx);
+            let query = driver.custom_queries.get(kind);
+            set_editor_text(&self.query_editors[index], &query.sql, cx);
+            self.query_editors[index].update(cx, |editor, cx| {
+                editor.set_read_only(!query.enabled, cx);
+            });
         }
         // A result belongs to the statement it was produced from, and the
         // statement has just been replaced.
@@ -605,7 +615,7 @@ impl DriverManager {
                 // turns a query off is switching it off, not throwing it away.
                 let mut queries = existing.custom_queries.clone();
                 for (index, kind) in CustomQueryKind::ALL.into_iter().enumerate() {
-                    queries.get_mut(kind).sql = text(&self.query_inputs[index], cx);
+                    queries.get_mut(kind).sql = editor_text(&self.query_editors[index], cx);
                 }
                 queries
             },
@@ -628,6 +638,8 @@ impl DriverManager {
         };
         driver.custom_queries.get_mut(kind).enabled = enabled;
         self.store.upsert(driver);
+        let index = kind_index(kind);
+        self.query_editors[index].update(cx, |editor, cx| editor.set_read_only(!enabled, cx));
         cx.notify();
     }
 
@@ -1717,6 +1729,30 @@ impl DriverManager {
                 .child(message)
         });
 
+        // The example is what the field used to show as placeholder text; an
+        // editor has no such thing, so an empty statement shows it as a hint
+        // underneath instead. It disappears the moment there is real SQL to
+        // read, exactly as a placeholder would have.
+        let example = editor_text(&self.query_editors[index], cx)
+            .is_empty()
+            .then(|| hint(query_placeholder(kind), cx));
+
+        let mono = app_settings::monospace_family(cx);
+        let font_size = app_settings::effective(cx).editor_font_size;
+        let editor = div()
+            .flex()
+            .flex_col()
+            .h(px(QUERY_EDITOR_HEIGHT))
+            .min_h_0()
+            .rounded_md()
+            .overflow_hidden()
+            .border_1()
+            .border_color(chrome.border)
+            .font_family(mono)
+            .text_size(px(font_size))
+            .when(!enabled, |el| el.opacity(0.6))
+            .child(self.query_editors[index].clone());
+
         div()
             .flex()
             .flex_col()
@@ -1757,7 +1793,8 @@ impl DriverManager {
                         })
                     }),
             )
-            .child(self.query_inputs[index].clone())
+            .child(editor)
+            .children(example)
             .child(hint(contract, cx))
             .child(hint(placeholders, cx))
             .children(result)
@@ -2087,6 +2124,16 @@ fn set_text(input: &Entity<TextInput>, value: impl Into<SharedString>, cx: &mut 
     input.update(cx, |input, cx| input.set_content(value, cx));
 }
 
+/// Trimmed content of a custom-query editor.
+fn editor_text(editor: &Entity<EditorView>, cx: &App) -> String {
+    editor.read(cx).text().trim().to_owned()
+}
+
+/// Replaces the contents of a custom-query editor.
+fn set_editor_text(editor: &Entity<EditorView>, value: &str, cx: &mut App) {
+    editor.update(cx, |editor, cx| editor.set_text(value, cx));
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -2115,7 +2162,7 @@ mod tests {
 
         cx.update(|cx| {
             manager.update(cx, |manager, cx| {
-                set_text(&manager.query_inputs[index], query, cx);
+                set_editor_text(&manager.query_editors[index], query, cx);
                 manager.toggle_query(CustomQueryKind::TableComments, true, cx);
             });
         });
@@ -2149,10 +2196,7 @@ mod tests {
             });
         });
         cx.update(|cx| {
-            assert_eq!(
-                manager.read(cx).query_inputs[index].read(cx).content(),
-                query
-            );
+            assert_eq!(manager.read(cx).query_editors[index].read(cx).text(), query);
         });
     }
 
@@ -2166,10 +2210,7 @@ mod tests {
         let manager = manager_over(Vec::new(), cx);
         let index = kind_index(CustomQueryKind::Tables);
         cx.update(|cx| {
-            let sql = manager.read(cx).query_inputs[index]
-                .read(cx)
-                .content()
-                .to_string();
+            let sql = manager.read(cx).query_editors[index].read(cx).text();
             assert!(sql.contains("information_schema.tables"), "{sql}");
             assert!(
                 manager
@@ -2180,6 +2221,32 @@ mod tests {
                     .tables
                     .enabled
             );
+        });
+    }
+
+    /// Pressing **Test** reads whatever is in the editor at that moment, not
+    /// whatever `drivers.json` last held.
+    ///
+    /// `test_query` calls `collect` before it looks at the statement, the same
+    /// way `save` does; this is the guard that the wiring from editor to
+    /// draft actually runs on that path too, and not only on save.
+    #[gpui::test]
+    fn the_test_button_reads_the_editors_current_text(cx: &mut gpui::TestAppContext) {
+        let manager = manager_over(Vec::new(), cx);
+        let index = kind_index(CustomQueryKind::Tables);
+        let sql = "select 1 as TABLE_NAME from dual";
+
+        cx.update(|cx| {
+            manager.update(cx, |manager, cx| {
+                set_editor_text(&manager.query_editors[index], sql, cx);
+                // No session is wired up in this test; the button still has
+                // to read the field before it can say so.
+                manager.test_query(CustomQueryKind::Tables, cx);
+            });
+        });
+        cx.update(|cx| {
+            let driver = manager.read(cx).current().expect("H2 is selected");
+            assert_eq!(driver.custom_queries.tables.sql, sql);
         });
     }
 

@@ -291,3 +291,7 @@ Two things a first tag will want that no milestone owns:
   strip of whatever was behind the window composites into the edge. `welcome.png`
   was re-taken with M5: the *Import from jdbgen…* button it used to show greyed
   is live now, and it appears only when there is a configuration to import from.
+  `driver-custom-queries.png` was re-taken and cropped the same way once the
+  custom-query fields became `rudbgen-editor` `EditorView`s with SQL
+  highlighting instead of plain `TextInput` fields; `connection-dialog.png` is
+  still the old uncropped capture and is owed the same pass.

@@ -12,7 +12,46 @@ common:
 # セッションが開いているときのウィンドウ本体。エクスプローラー、インスペクター、
 # その間の作業領域は次に来る。
 workarea:
-  next: エクスプローラー、インスペクター、生成タブは次のマイルストーンで加わります。
+  next: 生成タブは次のマイルストーンで加わります。エクスプローラーとインスペクターはすでにここにあります。
+
+explorer:
+  title: エクスプローラー
+  filter_placeholder: テーブルを絞り込む
+  show_views: ビューを表示
+  loading: 読み込み中…
+  load_failed_unknown: 読み込めませんでした。
+  menu_select_shown: 表示中をすべて選択
+  menu_clear: 選択を解除
+  menu_invert: 選択を反転
+  menu_inspect: インスペクターで開く
+  menu_refresh: 再読み込み
+
+inspector:
+  title: インスペクター
+  tab_columns: 列
+  tab_keys: キー
+  tab_foreign_keys: 外部キー
+  tab_indexes: インデックス
+  empty: テーブルを選ぶと構成を表示します。
+  loading: 読み込み中…
+  refresh: 再読み込み
+  nothing_here: ありません
+  column: 列
+  columns: 列一覧
+  type: 型
+  nullable: NULL 可
+  default: 既定値
+  key: キー
+  comment: コメント
+  name: 名前
+  seq: 位置
+  unique: 一意
+  target: 参照先
+  source: 参照元
+  on_update: 更新時
+  on_delete: 削除時
+  references_out: このテーブルの外部キー
+  references_in: このテーブルを参照する外部キー
 
 connect:
   title: 接続
@@ -175,6 +214,7 @@ menu:
   new_connection: 新規接続…
   settings: 設定…
   toggle_explorer: エクスプローラー
+  toggle_inspector: インスペクター
   about: rudbgen について
   check_updates: 更新を確認
   quit: 終了
@@ -207,6 +247,7 @@ welcome:
 statusbar:
   no_connection: 接続なし
   no_selection: 生成するものがありません
+  tables_selected: "%{count} 件のテーブルを選択"
   # 接続を求めたあとの左セルの 3 つの状態。`%{product}` は語ではなく値。
   connecting: "%{name} に接続中…"
   connected: "%{name} · %{product}"

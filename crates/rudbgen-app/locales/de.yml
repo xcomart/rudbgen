@@ -12,7 +12,46 @@ common:
 # Der Fensterkörper, sobald eine Sitzung offen ist. Explorer, Inspektor und
 # der Arbeitsbereich dazwischen kommen als Nächstes.
 workarea:
-  next: Der Explorer, der Inspektor und der Generieren-Tab kommen im nächsten Meilenstein.
+  next: Der Generieren-Tab kommt im nächsten Meilenstein; der Explorer und der Inspektor sind schon da.
+
+explorer:
+  title: Explorer
+  filter_placeholder: Tabellen filtern
+  show_views: Sichten anzeigen
+  loading: wird geladen …
+  load_failed_unknown: Das konnte nicht geladen werden.
+  menu_select_shown: Alle angezeigten auswählen
+  menu_clear: Auswahl aufheben
+  menu_invert: Auswahl umkehren
+  menu_inspect: Im Inspektor öffnen
+  menu_refresh: Neu laden
+
+inspector:
+  title: Inspektor
+  tab_columns: Spalten
+  tab_keys: Schlüssel
+  tab_foreign_keys: Fremdschlüssel
+  tab_indexes: Indizes
+  empty: Wählen Sie eine Tabelle, um ihren Aufbau zu sehen.
+  loading: wird geladen …
+  refresh: Neu laden
+  nothing_here: nichts vorhanden
+  column: Spalte
+  columns: Spalten
+  type: Typ
+  nullable: "Null"
+  default: Vorgabe
+  key: Schlüssel
+  comment: Kommentar
+  name: Name
+  seq: Position
+  unique: Eindeutig
+  target: Verweist auf
+  source: Verwiesen von
+  on_update: Bei Änderung
+  on_delete: Bei Löschung
+  references_out: Fremdschlüssel dieser Tabelle
+  references_in: Fremdschlüssel auf diese Tabelle
 
 connect:
   title: Verbindungen
@@ -176,6 +215,7 @@ menu:
   new_connection: Neue Verbindung…
   settings: Einstellungen…
   toggle_explorer: Explorer
+  toggle_inspector: Inspektor
   about: Über rudbgen
   check_updates: Nach Updates suchen
   quit: Beenden
@@ -208,6 +248,7 @@ welcome:
 statusbar:
   no_connection: keine Verbindung
   no_selection: nichts zu erzeugen
+  tables_selected: "%{count} Tabellen ausgewählt"
   # Die drei Zustände der linken Zelle, sobald eine Verbindung angefordert
   # wurde. `%{product}` ist ein Wert, kein Wort.
   connecting: "verbinde mit %{name}…"

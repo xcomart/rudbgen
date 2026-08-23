@@ -12,7 +12,46 @@ common:
 # Тело окна, когда сеанс открыт. Обозреватель, инспектор и рабочая область
 # между ними появятся следующими.
 workarea:
-  next: Обозреватель, инспектор и вкладка «Генерация» появятся на следующем этапе.
+  next: Вкладка «Генерация» появится на следующем этапе; обозреватель и инспектор уже здесь.
+
+explorer:
+  title: Обозреватель
+  filter_placeholder: Фильтр таблиц
+  show_views: Показывать представления
+  loading: загрузка…
+  load_failed_unknown: Не удалось загрузить.
+  menu_select_shown: Выбрать все показанные
+  menu_clear: Снять выделение
+  menu_invert: Обратить выделение
+  menu_inspect: Открыть в инспекторе
+  menu_refresh: Обновить
+
+inspector:
+  title: Инспектор
+  tab_columns: Столбцы
+  tab_keys: Ключи
+  tab_foreign_keys: Внешние ключи
+  tab_indexes: Индексы
+  empty: Выберите таблицу, чтобы увидеть её состав.
+  loading: загрузка…
+  refresh: Обновить
+  nothing_here: ничего нет
+  column: Столбец
+  columns: Столбцы
+  type: Тип
+  nullable: "Null"
+  default: По умолчанию
+  key: Ключ
+  comment: Комментарий
+  name: Имя
+  seq: Позиция
+  unique: Уникальный
+  target: Ссылается на
+  source: Ссылаются из
+  on_update: При изменении
+  on_delete: При удалении
+  references_out: Внешние ключи этой таблицы
+  references_in: Внешние ключи на эту таблицу
 
 connect:
   title: Подключения
@@ -176,6 +215,7 @@ menu:
   new_connection: Новое подключение…
   settings: Настройки…
   toggle_explorer: Обозреватель
+  toggle_inspector: Инспектор
   about: О программе rudbgen
   check_updates: Проверить обновления
   quit: Выход
@@ -208,6 +248,7 @@ welcome:
 statusbar:
   no_connection: нет подключения
   no_selection: нечего генерировать
+  tables_selected: "Выбрано таблиц: %{count}"
   # Три состояния левой ячейки после запроса подключения. `%{product}` —
   # это значение, а не слово.
   connecting: "подключение к %{name}…"

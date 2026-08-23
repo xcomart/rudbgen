@@ -30,7 +30,71 @@ common:
 # connected window says which database it is holding and what is still to
 # come, rather than showing an empty three-column frame.
 workarea:
-  next: The explorer, the inspector and the Generate tab arrive in the next milestone.
+  next: The Generate tab arrives in the next milestone; the explorer and the inspector are already here.
+
+# The explorer: the tree of tables down the left, and the ticks that say which
+# of them the generator will be run over.
+explorer:
+  title: Explorer
+  # The filter box over the tree; jdbgen's rule, which is contains, ignoring case.
+  filter_placeholder: Filter tables
+  show_views: Show views
+  # The placeholder row under a schema whose tables are still on their way.
+  loading: loading…
+  # An error row whose message went missing. Only reachable through a bug, but a
+  # blank row would be worse than a word.
+  load_failed_unknown: This could not be loaded.
+
+  # The right-click menu. "Shown" rather than "all": the three commands act on
+  # the rows on screen, which is what the filter and the views toggle left.
+  menu_select_shown: Select all shown
+  menu_clear: Clear selection
+  menu_invert: Invert selection
+  menu_inspect: Open in inspector
+  menu_refresh: Refresh
+
+# The inspector: what one table is made of.
+#
+# Never translated: SQL keywords — NULL, NOT NULL, PK, UNIQUE, CASCADE, SET NULL
+# — nor type names, which are the driver's own words and what the DDL says.
+inspector:
+  title: Inspector
+  tab_columns: Columns
+  tab_keys: Keys
+  tab_foreign_keys: Foreign keys
+  tab_indexes: Indexes
+  # Nothing has been picked yet. The panel is on screen and empty rather than
+  # absent, because it is where the answer will appear.
+  empty: Pick a table to see what it is made of.
+  # While the fetch for the table on screen is out.
+  loading: loading…
+  refresh: Refresh
+  # A table that has none of whatever the tab lists — no indexes, no foreign keys
+  # — as against one that could not be read.
+  nothing_here: nothing here
+
+  # Column headings.
+  column: Column
+  columns: Columns
+  type: Type
+  # Quoted: bare `Null` is YAML's null literal and would load as an empty
+  # heading. The word is the SQL keyword and is not translated.
+  nullable: "Null"
+  default: Default
+  key: Key
+  comment: Comment
+  name: Name
+  seq: Position
+  unique: Unique
+  target: References
+  source: Referenced by
+  on_update: On update
+  on_delete: On delete
+
+  # Section headings, named by what they mean rather than by JDBC's "imported"
+  # and "exported", which do not say which way the key points.
+  references_out: Foreign keys of this table
+  references_in: Foreign keys pointing at this table
 
 connect:
   title: Connections
@@ -235,6 +299,8 @@ menu:
   # Shows and hides the explorer sidebar, which only a connection puts on
   # screen; greyed until then.
   toggle_explorer: Explorer
+  # Shows and hides the inspector panel, the explorer's opposite number.
+  toggle_inspector: Inspector
   about: About rudbgen
   # Both the in-app row and the macOS menu-bar item, and also the title of the
   # dialog it opens — so no trailing ellipsis, which would read oddly as a
@@ -291,6 +357,10 @@ welcome:
 statusbar:
   no_connection: no connection
   no_selection: nothing to generate
+  # The first half of §4.2's arithmetic; the templates and the file count join
+  # it with the Generate tab. Quoted, so the leading interpolation cannot be
+  # read as YAML's own syntax.
+  tables_selected: "%{count} tables selected"
   # The three states of the left cell once a connection has been asked for.
   # `%{product}` is what SESSION_INFO named, which is a value and not a word.
   connecting: "connecting to %{name}…"

@@ -12,7 +12,46 @@ common:
 # Le corps de la fenêtre une fois qu'une session est ouverte. L'explorateur,
 # l'inspecteur et la zone de travail entre les deux arrivent ensuite.
 workarea:
-  next: L'explorateur, l'inspecteur et l'onglet Générer arrivent au prochain jalon.
+  next: L'onglet Générer arrive au prochain jalon ; l'explorateur et l'inspecteur sont déjà là.
+
+explorer:
+  title: Explorateur
+  filter_placeholder: Filtrer les tables
+  show_views: Afficher les vues
+  loading: chargement…
+  load_failed_unknown: Impossible de charger ceci.
+  menu_select_shown: Tout sélectionner parmi l'affiché
+  menu_clear: Effacer la sélection
+  menu_invert: Inverser la sélection
+  menu_inspect: Ouvrir dans l'inspecteur
+  menu_refresh: Recharger
+
+inspector:
+  title: Inspecteur
+  tab_columns: Colonnes
+  tab_keys: Clés
+  tab_foreign_keys: Clés étrangères
+  tab_indexes: Index
+  empty: Choisissez une table pour voir ce qui la compose.
+  loading: chargement…
+  refresh: Recharger
+  nothing_here: rien ici
+  column: Colonne
+  columns: Colonnes
+  type: Type
+  nullable: Nul
+  default: Défaut
+  key: Clé
+  comment: Commentaire
+  name: Nom
+  seq: Position
+  unique: Unique
+  target: Référence vers
+  source: Référencé par
+  on_update: À la mise à jour
+  on_delete: À la suppression
+  references_out: Clés étrangères de cette table
+  references_in: Clés étrangères pointant vers cette table
 
 connect:
   title: Connexions
@@ -176,6 +215,7 @@ menu:
   new_connection: Nouvelle connexion…
   settings: Préférences…
   toggle_explorer: Explorateur
+  toggle_inspector: Inspecteur
   about: À propos de rudbgen
   check_updates: Rechercher les mises à jour
   quit: Quitter
@@ -208,6 +248,7 @@ welcome:
 statusbar:
   no_connection: aucune connexion
   no_selection: rien à générer
+  tables_selected: "%{count} tables sélectionnées"
   # Les trois états de la cellule de gauche une fois une connexion demandée.
   # `%{product}` est une valeur, pas un mot.
   connecting: "connexion à %{name}…"

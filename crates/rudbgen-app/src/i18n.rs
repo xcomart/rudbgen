@@ -162,7 +162,7 @@ mod tests {
 
     /// One key per top-level namespace of `en.yml`, chosen so that no
     /// translation of it legitimately coincides with the English wording.
-    const PROBES: [&str; 13] = [
+    const PROBES: [&str; 15] = [
         "language.name",
         "common.close",
         "menu.new_connection",
@@ -170,6 +170,11 @@ mod tests {
         "welcome.saved",
         "statusbar.no_connection",
         "workarea.next",
+        // Not `explorer.title` or `inspector.title`: several languages keep
+        // both words as they stand, so a leak there would look like a
+        // translation. These two are translated everywhere rudbgen ships.
+        "explorer.show_views",
+        "inspector.tab_columns",
         "about.title",
         "settings.title",
         "connect.title",

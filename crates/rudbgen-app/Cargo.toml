@@ -36,6 +36,15 @@ rudbgen-core.workspace = true
 # that opens one, and `src/driver_manager.rs` reaches the same JVM for
 # `probe_drivers`.
 rudbgen-jdbc.workspace = true
+# The table model behind the explorer tree and the inspector: `MetaReader`
+# turns `DESCRIBE` and the four custom queries into schemas, table lists and
+# whole tables. Every call it offers blocks, so every call site is on a
+# background task holding a `SessionHandle`.
+rudbgen-meta.workspace = true
+# The inspector's Columns tab. The grid is the one widget in the tree that
+# already lays a header, resizable columns and a virtualised body out, and a
+# column list is exactly what it draws.
+rudbgen-grid.workspace = true
 # Local port forwarding through a bastion, for the connection dialog's tunnel
 # block. Set up before the session opens and taken down after it closes; see
 # `src/connection.rs`.

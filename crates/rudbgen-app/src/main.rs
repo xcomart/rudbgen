@@ -45,15 +45,16 @@ mod app_settings;
 mod caption;
 mod connection;
 mod connection_dialog;
-// The menu rows are written as plain data with test helpers rather than for the
-// call sites the shell currently has: the explorer's rows and the work area's
-// tabs are what they are written for, and neither is on screen yet. Inside a
-// binary crate that reads as dead code.
+// The explorer's rows press this; the work area's tabs and the template list
+// (M3) are the call sites still to come, so a builder or two — a shortcut hint,
+// a tick — has no caller yet and reads as dead code inside a binary crate.
 #[allow(dead_code)]
 mod context_menu;
 mod driver_manager;
+mod explorer;
 mod i18n;
 mod icons;
+mod inspector;
 mod maven;
 // The pane tree is written as a self-contained data structure with its own
 // tests rather than for the call sites the shell currently has, so it offers
@@ -80,8 +81,10 @@ use gpui::{
     WindowBounds, WindowControlArea, WindowOptions, actions, div, img, prelude::*, px, size,
 };
 use rudbgen_core::{
-    AppSettings, ConnectionProfile, ConnectionStore, DriverStore, TitlebarStyle, WindowState,
+    AppSettings, ConnectionProfile, ConnectionStore, DriverDef, DriverStore, TitlebarStyle,
+    WindowState,
 };
+use rudbgen_meta::MetaReader;
 use rudbgen_ui::{
     Button, ButtonVariant, DraggedThumb, EditorThemeEntry, EditorThemeRegistry, MenuButton,
     MenuEntry, Scrollbar, ScrollbarAxis, ScrollbarState, Select, Theme, ThemeRegistry,
@@ -95,8 +98,10 @@ use app_settings::WindowGeometry;
 use caption::apply_caption_theme;
 use connection::{ConnectError, Connected, Credentials, SessionHandle};
 use connection_dialog::{ConnectionDialog, ConnectionDialogEvent};
+use explorer::{Explorer, ExplorerEvent, SchemaKey, TableKey};
 use i18n::ts;
 use icons::Icons;
+use inspector::{Inspector, InspectorEvent};
 use settings_dialog::{SettingsDialog, SettingsDialogEvent};
 use update_dialog::{UpdateDialog, UpdateDialogEvent};
 
@@ -115,9 +120,10 @@ actions!(
         CheckUpdates,
         /// Closes whatever overlay is on top, innermost first.
         DismissDialog,
-        /// Shows and hides the explorer sidebar (the tree arrives with the
-        /// metadata reader).
+        /// Shows and hides the explorer sidebar.
         ToggleExplorer,
+        /// Shows and hides the inspector panel.
+        ToggleInspector,
     ]
 );
 
@@ -170,6 +176,36 @@ const SHORTCUT_MODIFIER: &str = if cfg!(target_os = "macos") {
 } else {
     "Ctrl"
 };
+
+/// Width of the grab area between two panels of the body, in logical pixels.
+///
+/// Pulled back over the panel's own border so the band straddles the seam
+/// rather than pushing the work area across; see [`Workspace::render_work_area`].
+const SPLIT_HANDLE: f32 = 6.;
+
+/// Narrowest the explorer may be dragged. Mirrors `rudbgen-core`'s clamp, which
+/// is what the stored width is loaded through.
+const MIN_EXPLORER_WIDTH: f32 = 140.;
+
+/// Widest the explorer may be dragged.
+const MAX_EXPLORER_WIDTH: f32 = 720.;
+
+/// Narrowest the inspector may be dragged.
+const MIN_INSPECTOR_WIDTH: f32 = 200.;
+
+/// Widest the inspector may be dragged.
+const MAX_INSPECTOR_WIDTH: f32 = 720.;
+
+/// The payload of a drag of the explorer's edge.
+///
+/// A marker type and not a value: the width is read from where the pointer is
+/// against the row's own box on every move, so there is nothing to carry.
+#[derive(Clone, Debug, PartialEq, Eq)]
+struct DraggedExplorer;
+
+/// The payload of a drag of the inspector's edge.
+#[derive(Clone, Debug, PartialEq, Eq)]
+struct DraggedInspector;
 
 /// Width of the title bar's connection selector, in logical pixels.
 const CONNECTION_SELECT_WIDTH: f32 = 200.;
@@ -241,6 +277,13 @@ enum ConnectionState {
     Connecting {
         /// What is being opened, for the label and the retry.
         profile: Box<ConnectionProfile>,
+        /// The driver definition it is being opened through.
+        ///
+        /// Carried from here rather than looked up again when the handshake
+        /// lands: `drivers.json` may have been rewritten in between, and a
+        /// metadata read has to use the four custom queries (D9) the session
+        /// was actually opened with.
+        driver: Box<DriverDef>,
         /// Dropped — and so abandoned — when the state is replaced.
         _task: Task<()>,
     },
@@ -248,6 +291,8 @@ enum ConnectionState {
     Open {
         /// The profile it was opened from.
         profile: Box<ConnectionProfile>,
+        /// The driver definition behind it, which every metadata read needs.
+        driver: Box<DriverDef>,
         /// The session and the tunnel under it.
         ///
         /// Boxed for the reason the profile is: `Connected` carries the
@@ -348,8 +393,32 @@ struct Workspace {
     connection_dialog: Entity<ConnectionDialog>,
     /// Whether a session is open, opening, or has just failed.
     connection: ConnectionState,
+    /// Which connection the answers coming back off background tasks belong to.
+    ///
+    /// Bumped by every connect and every disconnect. A metadata read that was
+    /// in flight when the session went away comes back carrying the number it
+    /// left with, and is dropped rather than written into the tree of whatever
+    /// is open now — which would otherwise be one database's schemas under
+    /// another's name.
+    connection_epoch: u64,
     /// Whether the title bar's connection list is showing.
     connection_list_open: bool,
+    /// The left-hand panel: the tree, the filter and the ticks.
+    explorer: Entity<Explorer>,
+    /// The right-hand panel: what one table is made of.
+    inspector: Entity<Inspector>,
+    /// Whether the explorer is on screen, when a connection is open.
+    explorer_visible: bool,
+    /// Whether the inspector is on screen, when a connection is open.
+    inspector_visible: bool,
+    /// Width of the explorer, in logical pixels.
+    ///
+    /// Held here and written back to the settings when a drag ends: a drag is
+    /// hundreds of events, and `settings.json` is written once, when the window
+    /// closes.
+    explorer_width: f32,
+    /// Width of the inspector, in logical pixels.
+    inspector_width: f32,
     /// The update dialog, rendered only while it reports itself open.
     ///
     /// Two things open it: the start-up check in [`update`], at most once per
@@ -376,6 +445,10 @@ struct Workspace {
     _update_events: Subscription,
     /// Keeps the connection dialog subscription alive.
     _connection_events: Subscription,
+    /// Keeps the explorer's subscription alive.
+    _explorer_events: Subscription,
+    /// Keeps the inspector's subscription alive.
+    _inspector_events: Subscription,
     /// Closes the session before the process winds down.
     _quit: Subscription,
     /// Records the window's placement as it is moved and resized.
@@ -520,6 +593,39 @@ impl Workspace {
         })
         .detach();
 
+        // The two panels of the body. Both are built empty and stay out of the
+        // frame until a session opens; see [`Workspace::render_body`].
+        let explorer = cx.new(Explorer::new);
+        let explorer_events = cx.subscribe(&explorer, |workspace, _explorer, event, cx| {
+            match event {
+                // Both of these need the session, which is the workspace's.
+                ExplorerEvent::LoadSchemas => workspace.load_schemas(cx),
+                ExplorerEvent::LoadTables(schema) => workspace.load_tables(schema.clone(), cx),
+                // The status bar counts the ticks, and nothing else changed.
+                ExplorerEvent::SelectionChanged => cx.notify(),
+                ExplorerEvent::Inspect { table, reveal } => {
+                    // Only the menu row asks for the panel to be shown. Moving
+                    // the tree's cursor must not: an arrow key that reopened a
+                    // panel the user had put away would be the shell arguing.
+                    if *reveal {
+                        workspace.inspector_visible = true;
+                        workspace.remember_layout(cx);
+                    }
+                    let table = table.clone();
+                    workspace
+                        .inspector
+                        .update(cx, |panel, cx| panel.show(table, cx));
+                    cx.notify();
+                }
+            }
+        });
+
+        let inspector = cx.new(Inspector::new);
+        let inspector_events =
+            cx.subscribe(&inspector, |workspace, _panel, event, cx| match event {
+                InspectorEvent::Load(table) => workspace.load_table(table.clone(), cx),
+            });
+
         // In memory only; the file is written once, when the window closes. See
         // [`app_settings::record_window_geometry`].
         let bounds = cx.observe_window_bounds(window, |_this, window, cx| {
@@ -537,6 +643,11 @@ impl Workspace {
             this.update(cx, |_, cx| cx.notify()).ok();
         });
 
+        // The layout the last session left behind. Read here rather than in
+        // `render`, so a drag can move the live value without the stored one
+        // pulling it back on the next frame.
+        let layout = app_settings::current(cx);
+
         Self {
             focus_handle: cx.focus_handle(),
             profiles: load_profiles(),
@@ -546,7 +657,14 @@ impl Workspace {
             settings,
             connection_dialog,
             connection: ConnectionState::Idle,
+            connection_epoch: 0,
             connection_list_open: false,
+            explorer,
+            inspector,
+            explorer_visible: layout.explorer_visible,
+            inspector_visible: layout.inspector_visible,
+            explorer_width: layout.explorer_width,
+            inspector_width: layout.inspector_width,
             update,
             menu_open: false,
             titlebar,
@@ -554,6 +672,8 @@ impl Workspace {
             _settings_events: settings_events,
             _update_events: update_events,
             _connection_events: connection_events,
+            _explorer_events: explorer_events,
+            _inspector_events: inspector_events,
             _quit: quit,
             _bounds: bounds,
             _button_layout: button_layout,
@@ -699,6 +819,7 @@ impl Workspace {
 
         let settings = app_settings::current(cx);
         let opening = profile.clone();
+        let definition = driver.clone();
         let run = cx.background_spawn(async move {
             // Read here rather than on the UI thread: a keychain that is locked
             // puts a system prompt up, and waiting for that on the UI thread
@@ -714,9 +835,131 @@ impl Workspace {
 
         self.connection = ConnectionState::Connecting {
             profile: Box::new(profile),
+            driver: Box::new(definition),
             _task: task,
         };
         cx.notify();
+    }
+
+    /// Empties both panels and retires whatever fetch was in flight.
+    ///
+    /// Called by every connect and every disconnect. The ticks go with the
+    /// rest: a tick names a table of *that* database, and carrying one across
+    /// to another server would be a set of names that happen to match.
+    fn reset_panels(&mut self, cx: &mut Context<Self>) {
+        self.connection_epoch = self.connection_epoch.wrapping_add(1);
+        self.explorer.update(cx, |explorer, cx| explorer.reset(cx));
+        self.inspector.update(cx, |panel, cx| panel.reset(cx));
+    }
+
+    /// The session, the driver definition and the epoch a metadata read needs.
+    ///
+    /// `None` while nothing is open, which is what makes every call site below
+    /// a no-op rather than a panic when the session went away between the click
+    /// and the frame.
+    fn meta_context(&self) -> Option<(SessionHandle, DriverDef, u64)> {
+        let ConnectionState::Open {
+            driver, session, ..
+        } = &self.connection
+        else {
+            return None;
+        };
+        Some((session.handle(), (**driver).clone(), self.connection_epoch))
+    }
+
+    /// Reads the catalogs and schemas of the open session.
+    ///
+    /// On a background task, like every other call into `rudbgen-meta`: the
+    /// reader blocks on a round trip through the bridge, and the UI thread
+    /// never waits (architecture document, §6).
+    fn load_schemas(&mut self, cx: &mut Context<Self>) {
+        let Some((handle, driver, epoch)) = self.meta_context() else {
+            return;
+        };
+        cx.spawn(async move |this, cx| {
+            let outcome = cx
+                .background_executor()
+                .spawn(async move {
+                    MetaReader::new(handle.session(), &driver)
+                        .schemas()
+                        .map_err(|error| SharedString::from(error.to_string()))
+                })
+                .await;
+            this.update(cx, |workspace, cx| {
+                if workspace.connection_epoch != epoch {
+                    return;
+                }
+                workspace
+                    .explorer
+                    .update(cx, |explorer, cx| explorer.deliver_schemas(outcome, cx));
+            })
+            .ok();
+        })
+        .detach();
+    }
+
+    /// Reads the table list of one schema.
+    ///
+    /// Views included whatever the panel's toggle says: the explorer caches the
+    /// wider answer and filters it, so flipping the toggle costs no round trip.
+    fn load_tables(&mut self, key: SchemaKey, cx: &mut Context<Self>) {
+        let Some((handle, driver, epoch)) = self.meta_context() else {
+            return;
+        };
+        let schema = key.schema();
+        cx.spawn(async move |this, cx| {
+            let outcome = cx
+                .background_executor()
+                .spawn(async move {
+                    MetaReader::new(handle.session(), &driver)
+                        .tables(&schema, true)
+                        .map_err(|error| SharedString::from(error.to_string()))
+                })
+                .await;
+            this.update(cx, |workspace, cx| {
+                if workspace.connection_epoch != epoch {
+                    return;
+                }
+                workspace
+                    .explorer
+                    .update(cx, |explorer, cx| explorer.deliver_tables(key, outcome, cx));
+            })
+            .ok();
+        })
+        .detach();
+    }
+
+    /// Reads one whole table for the inspector.
+    fn load_table(&mut self, key: TableKey, cx: &mut Context<Self>) {
+        let Some((handle, driver, epoch)) = self.meta_context() else {
+            return;
+        };
+        let reference = rudbgen_meta::TableRef {
+            catalog: key.catalog.clone(),
+            schema: key.schema.clone(),
+            name: key.name.clone(),
+            ..rudbgen_meta::TableRef::default()
+        };
+        cx.spawn(async move |this, cx| {
+            let outcome = cx
+                .background_executor()
+                .spawn(async move {
+                    MetaReader::new(handle.session(), &driver)
+                        .table(&reference)
+                        .map_err(|error| SharedString::from(error.to_string()))
+                })
+                .await;
+            this.update(cx, |workspace, cx| {
+                if workspace.connection_epoch != epoch {
+                    return;
+                }
+                workspace
+                    .inspector
+                    .update(cx, |panel, cx| panel.deliver(key, outcome, cx));
+            })
+            .ok();
+        })
+        .detach();
     }
 
     /// Records what the connection attempt came back with.
@@ -729,8 +972,9 @@ impl Workspace {
         // Anything but `Connecting` means the attempt was abandoned — the user
         // asked for another connection, or disconnected — and its answer is no
         // longer about the state the window is in.
-        let ConnectionState::Connecting { profile, .. } =
-            std::mem::replace(&mut self.connection, ConnectionState::Idle)
+        let ConnectionState::Connecting {
+            profile, driver, ..
+        } = std::mem::replace(&mut self.connection, ConnectionState::Idle)
         else {
             if let Ok(session) = outcome
                 && let Err(error) = session.close()
@@ -768,6 +1012,7 @@ impl Workspace {
                 }
                 ConnectionState::Open {
                     profile,
+                    driver,
                     session: Box::new(session),
                 }
             }
@@ -779,6 +1024,10 @@ impl Workspace {
                 }
             }
         };
+        // After the state is in place, not before: the tree asks for its root
+        // on the first frame it is drawn in, and the request runs through
+        // [`Workspace::meta_context`], which reads that state.
+        self.reset_panels(cx);
         cx.notify();
     }
 
@@ -795,8 +1044,9 @@ impl Workspace {
             return;
         }
         log::warn!("the tunnel under {} ended: {reason}", profile.name);
-        let ConnectionState::Open { profile, session } =
-            std::mem::replace(&mut self.connection, ConnectionState::Idle)
+        let ConnectionState::Open {
+            profile, session, ..
+        } = std::mem::replace(&mut self.connection, ConnectionState::Idle)
         else {
             return;
         };
@@ -807,6 +1057,7 @@ impl Workspace {
             profile,
             message: ts!("connect.tunnel_ended", reason = reason),
         };
+        self.reset_panels(cx);
         cx.notify();
     }
 
@@ -814,6 +1065,7 @@ impl Workspace {
     fn disconnect(&mut self, cx: &mut Context<Self>) {
         self.close_session();
         self.connection_list_open = false;
+        self.reset_panels(cx);
         cx.notify();
     }
 
@@ -823,8 +1075,9 @@ impl Workspace {
     /// quit observer, which is why it takes no context: at quit there is no
     /// frame left to ask for.
     fn close_session(&mut self) {
-        if let ConnectionState::Open { profile, session } =
-            std::mem::replace(&mut self.connection, ConnectionState::Idle)
+        if let ConnectionState::Open {
+            profile, session, ..
+        } = std::mem::replace(&mut self.connection, ConnectionState::Idle)
         {
             log::info!("closing the session on {}", profile.name);
             if let Err(error) = session.close() {
@@ -877,6 +1130,10 @@ impl Workspace {
         // unlike the in-app menu it does not follow a repaint; it has to be
         // handed over again.
         cx.set_menus(app_menus());
+        // The grid borrows its column names from the source it was given, so a
+        // language change has to be written into it; everything else on the two
+        // panels is built afresh every frame.
+        self.inspector.update(cx, |panel, cx| panel.relabel(cx));
         apply_themes(&settings, cx);
         // Ahead of the repaint, so the title bar's next frame already knows
         // whether it has to stand in for a caption; and ahead of the two calls
@@ -967,18 +1224,100 @@ impl Workspace {
     }
 
     /// Shows and hides the explorer sidebar.
-    ///
-    /// Nothing to show yet, and deliberately nothing written either: the
-    /// sidebar's visibility is a setting, and flipping a setting whose effect
-    /// is off screen would leave the user's next session opening in a state
-    /// they never chose. The command comes to life with the tree in M2.
     fn toggle_explorer_action(
         &mut self,
         _: &ToggleExplorer,
-        _window: &mut Window,
-        _cx: &mut Context<Self>,
+        window: &mut Window,
+        cx: &mut Context<Self>,
     ) {
-        log::debug!("the explorer arrives in M2");
+        self.explorer_visible = !self.explorer_visible;
+        self.hid_a_panel(window, cx);
+    }
+
+    /// Shows and hides the inspector panel.
+    fn toggle_inspector_action(
+        &mut self,
+        _: &ToggleInspector,
+        window: &mut Window,
+        cx: &mut Context<Self>,
+    ) {
+        self.inspector_visible = !self.inspector_visible;
+        self.hid_a_panel(window, cx);
+    }
+
+    /// Takes the keyboard back and records what the layout now is.
+    ///
+    /// The focus half is not optional: the panel that has just gone may have
+    /// been holding the keyboard — the filter box, the tree — and a focus
+    /// handle left dangling on an unrendered element takes every shortcut in
+    /// the window with it (architecture document, Appendix A). It has to happen
+    /// in the same update that hides the subtree, which is this one.
+    fn hid_a_panel(&mut self, window: &mut Window, cx: &mut Context<Self>) {
+        self.focus_shell(window, cx);
+        self.remember_layout(cx);
+        cx.notify();
+    }
+
+    /// Writes the panel widths and visibilities into the settings global.
+    ///
+    /// [`app_settings::save`] takes them to disk with everything else when the
+    /// last window closes, so this costs a struct copy and no file write.
+    fn remember_layout(&mut self, cx: &mut Context<Self>) {
+        let mut settings = app_settings::current(cx);
+        let same = settings.explorer_visible == self.explorer_visible
+            && settings.inspector_visible == self.inspector_visible
+            && (settings.explorer_width - self.explorer_width).abs() <= f32::EPSILON
+            && (settings.inspector_width - self.inspector_width).abs() <= f32::EPSILON;
+        if same {
+            return;
+        }
+        settings.explorer_visible = self.explorer_visible;
+        settings.inspector_visible = self.inspector_visible;
+        settings.explorer_width = self.explorer_width;
+        settings.inspector_width = self.inspector_width;
+        app_settings::replace(settings, cx);
+    }
+
+    /// Whether the explorer is on screen, which needs a session as well as the
+    /// switch.
+    fn explorer_showing(&self) -> bool {
+        self.explorer_visible && matches!(self.connection, ConnectionState::Open { .. })
+    }
+
+    /// Whether the inspector is on screen.
+    fn inspector_showing(&self) -> bool {
+        self.inspector_visible && matches!(self.connection, ConnectionState::Open { .. })
+    }
+
+    /// Moves the explorer's edge to wherever the pointer has dragged it.
+    ///
+    /// Measured against the row's own box rather than tracked as a delta, so
+    /// the edge sits under the pointer however far the gesture wandered —
+    /// including outside the window, which a delta would have to keep
+    /// integrating.
+    fn drag_explorer(&mut self, event: &DragMoveEvent<DraggedExplorer>, cx: &mut Context<Self>) {
+        let width = f32::from(event.event.position.x - event.bounds.left());
+        if !width.is_finite() {
+            return;
+        }
+        let width = width.clamp(MIN_EXPLORER_WIDTH, MAX_EXPLORER_WIDTH);
+        if (self.explorer_width - width).abs() > f32::EPSILON {
+            self.explorer_width = width;
+            cx.notify();
+        }
+    }
+
+    /// The same, from the other edge of the row.
+    fn drag_inspector(&mut self, event: &DragMoveEvent<DraggedInspector>, cx: &mut Context<Self>) {
+        let width = f32::from(event.bounds.right() - event.event.position.x);
+        if !width.is_finite() {
+            return;
+        }
+        let width = width.clamp(MIN_INSPECTOR_WIDTH, MAX_INSPECTOR_WIDTH);
+        if (self.inspector_width - width).abs() > f32::EPSILON {
+            self.inspector_width = width;
+            cx.notify();
+        }
     }
 
     /// Closes whatever overlay is on top, in the order they are stacked.
@@ -1068,6 +1407,12 @@ impl Workspace {
 
     /// Scrolls the welcome screen when its thumb is dragged.
     fn drag_scrollbar(&mut self, event: &DragMoveEvent<DraggedThumb>, cx: &mut Context<Self>) {
+        // Every bar in the window answers a drag of this type and all but one
+        // of them finds it is about somebody else's thumb; the inspector's is
+        // asked here because the panel has no always-mounted element of its own
+        // to listen from.
+        self.inspector
+            .update(cx, |panel, cx| panel.drag_scrollbar(event, cx));
         let Some(progress) = self.scrollbar().dragged(event, cx) else {
             return;
         };
@@ -1084,6 +1429,8 @@ impl Workspace {
     /// Every mouse release in the window arrives here; all but the one ending a
     /// drag of the bar find nothing to let go of.
     fn release_scrollbars(&mut self, cx: &mut Context<Self>) {
+        self.inspector
+            .update(cx, |panel, cx| panel.release_scrollbar(cx));
         if let Some(epoch) = self.welcome_scrollbar.release() {
             hide_later(epoch, cx, move |workspace| {
                 Some(&mut workspace.welcome_scrollbar)
@@ -1356,12 +1703,19 @@ impl Workspace {
             MenuEntry::new(ts!("menu.settings"))
                 .shortcut(format!("{SHORTCUT_MODIFIER}+,"))
                 .on_activate(|window, cx| window.dispatch_action(Box::new(OpenSettings), cx)),
+            // Greyed while nothing is connected, which is when the two panels
+            // are out of the frame altogether and the command would flip a
+            // switch with nothing behind it.
             MenuEntry::new(ts!("menu.toggle_explorer"))
                 .shortcut(format!("{SHORTCUT_MODIFIER}+B"))
-                // The tree the command shows and hides arrives with the
-                // metadata reader; until then there is nothing behind it.
-                .disabled(true)
+                .checked(self.explorer_visible)
+                .disabled(!matches!(self.connection, ConnectionState::Open { .. }))
                 .on_activate(|window, cx| window.dispatch_action(Box::new(ToggleExplorer), cx)),
+            MenuEntry::new(ts!("menu.toggle_inspector"))
+                .shortcut(format!("{SHORTCUT_MODIFIER}+I"))
+                .checked(self.inspector_visible)
+                .disabled(!matches!(self.connection, ConnectionState::Open { .. }))
+                .on_activate(|window, cx| window.dispatch_action(Box::new(ToggleInspector), cx)),
             MenuEntry::separator(),
             // Next to About, where a Help menu would put it and where users of
             // every other desktop application look for it.
@@ -1395,9 +1749,9 @@ impl Workspace {
     fn render_body(&self, cx: &mut Context<Self>) -> AnyElement {
         let theme = theme(cx);
         let body = match &self.connection {
-            ConnectionState::Open { profile, session } => {
-                self.render_work_area(profile, session, &theme, cx)
-            }
+            ConnectionState::Open {
+                profile, session, ..
+            } => self.render_work_area(profile, session, &theme, cx),
             _ => self.render_welcome(&theme, cx),
         };
         div()
@@ -1410,12 +1764,104 @@ impl Workspace {
             .into_any_element()
     }
 
-    /// What stands where the explorer, the tabs and the inspector will be.
+    /// §4.2's frame: the explorer, the work area, the inspector.
     ///
-    /// Deliberately not an empty three-column frame: a sidebar with nothing in
-    /// it is a promise the window cannot keep, so what a connected window shows
-    /// is the connection it has and a line saying what comes next.
+    /// Both panels are left out of the tree entirely when they are hidden
+    /// rather than given zero width — a zero-width flex child would still take
+    /// its divider's hit area with it — and so is the divider beside each.
+    ///
+    /// The row paints no fill of its own. Its children tile it and each tints
+    /// its own share: the panels' surface at the two edges, the background
+    /// between them. Side by side rather than stacked is what
+    /// [`app_settings::window_tint`] requires, and it is what lets the blur
+    /// behind the window carry on under the panels too.
     fn render_work_area(
+        &self,
+        profile: &ConnectionProfile,
+        session: &Connected,
+        theme: &Theme,
+        cx: &mut Context<Self>,
+    ) -> AnyElement {
+        let sidebar = self.explorer_showing().then(|| {
+            div()
+                .flex()
+                .flex_none()
+                .w(px(self.explorer_width))
+                .min_h_0()
+                .child(self.explorer.clone())
+        });
+        let left_handle = self.explorer_showing().then(|| {
+            div()
+                .id("explorer-divider")
+                .occlude()
+                .flex_none()
+                .w(px(SPLIT_HANDLE))
+                // Pulled back over the sidebar's own border so the grab area
+                // straddles the seam rather than pushing the work area across.
+                .ml(px(-SPLIT_HANDLE))
+                .cursor_ew_resize()
+                .on_drag(DraggedExplorer, |_, _, _, cx| cx.new(|_| gpui::Empty))
+        });
+        let right_handle = self.inspector_showing().then(|| {
+            div()
+                .id("inspector-divider")
+                .occlude()
+                .flex_none()
+                .w(px(SPLIT_HANDLE))
+                .mr(px(-SPLIT_HANDLE))
+                .cursor_ew_resize()
+                .on_drag(DraggedInspector, |_, _, _, cx| cx.new(|_| gpui::Empty))
+        });
+        let panel = self.inspector_showing().then(|| {
+            div()
+                .flex()
+                .flex_none()
+                .w(px(self.inspector_width))
+                .min_h_0()
+                .child(self.inspector.clone())
+        });
+
+        div()
+            .flex()
+            .flex_row()
+            .flex_grow_1()
+            .min_w_0()
+            .min_h_0()
+            .on_drag_move::<DraggedExplorer>(cx.listener(
+                |workspace, event: &DragMoveEvent<DraggedExplorer>, _window, cx| {
+                    workspace.drag_explorer(event, cx);
+                },
+            ))
+            .on_drag_move::<DraggedInspector>(cx.listener(
+                |workspace, event: &DragMoveEvent<DraggedInspector>, _window, cx| {
+                    workspace.drag_inspector(event, cx);
+                },
+            ))
+            .children(sidebar)
+            .children(left_handle)
+            .child(
+                div()
+                    .flex()
+                    .flex_1()
+                    .min_w_0()
+                    .min_h_0()
+                    // Everything the row is not already covering with a panel's
+                    // own fill, and so the one fill over these pixels; see
+                    // [`app_settings::window_tint`].
+                    .bg(app_settings::window_tint(theme.background, cx))
+                    .child(self.render_generate_placeholder(profile, session, theme, cx)),
+            )
+            .children(right_handle)
+            .children(panel)
+            .into_any_element()
+    }
+
+    /// What stands where the tab strip and the Generate tab will be.
+    ///
+    /// The one part of §4.2 M2 does not fill: the explorer and the inspector
+    /// are around it, so the centre says what it is waiting for rather than
+    /// being blank.
+    fn render_generate_placeholder(
         &self,
         profile: &ConnectionProfile,
         session: &Connected,
@@ -1646,7 +2092,9 @@ impl Workspace {
                         ConnectionState::Connecting { profile, .. } => {
                             ts!("statusbar.connecting", name = label_of(profile))
                         }
-                        ConnectionState::Open { profile, session } => ts!(
+                        ConnectionState::Open {
+                            profile, session, ..
+                        } => ts!(
                             "statusbar.connected",
                             name = label_of(profile),
                             product = session
@@ -1669,7 +2117,15 @@ impl Workspace {
                         // does: a message the user can still read while they
                         // open the dialog to fix what it names.
                         ConnectionState::Failed { message, .. } => message.clone(),
-                        _ => ts!("statusbar.no_selection"),
+                        // The first half of §4.2's arithmetic. The templates
+                        // and the file count join it with the Generate tab; the
+                        // tables are what there is to count today, and counting
+                        // them is what makes a tick visible from the other side
+                        // of the window.
+                        _ => match self.explorer.read(cx).selected_count(cx) {
+                            0 => ts!("statusbar.no_selection"),
+                            count => ts!("statusbar.tables_selected", count = count),
+                        },
                     }),
             )
             .into_any_element()
@@ -1856,6 +2312,21 @@ impl Render for Workspace {
                     workspace.drag_scrollbar(event, cx);
                 },
             ))
+            // The panel edges are dragged from here for the same reason: gpui
+            // hands a drag move to every listener of the type wherever it sits,
+            // and a release outside the handle still has to end the gesture.
+            .on_mouse_up(
+                MouseButton::Left,
+                cx.listener(|workspace, _: &MouseUpEvent, _window, cx| {
+                    workspace.remember_layout(cx);
+                }),
+            )
+            .on_mouse_up_out(
+                MouseButton::Left,
+                cx.listener(|workspace, _: &MouseUpEvent, _window, cx| {
+                    workspace.remember_layout(cx);
+                }),
+            )
             .on_mouse_up(
                 MouseButton::Left,
                 cx.listener(|workspace, _: &MouseUpEvent, _window, cx| {
@@ -1873,6 +2344,7 @@ impl Render for Workspace {
             .on_action(cx.listener(Self::show_about_action))
             .on_action(cx.listener(Self::check_updates_action))
             .on_action(cx.listener(Self::toggle_explorer_action))
+            .on_action(cx.listener(Self::toggle_inspector_action))
             .on_action(cx.listener(Self::dismiss_dialog_action))
             .child(toolbar)
             .child(body)
@@ -2343,10 +2815,10 @@ fn app_menus() -> Vec<Menu> {
         },
         Menu {
             name: ts!("menu.view"),
-            items: vec![MenuItem::action(
-                ts!("menu.toggle_explorer"),
-                ToggleExplorer,
-            )],
+            items: vec![
+                MenuItem::action(ts!("menu.toggle_explorer"), ToggleExplorer),
+                MenuItem::action(ts!("menu.toggle_inspector"), ToggleInspector),
+            ],
             disabled: false,
         },
     ]
@@ -2373,6 +2845,9 @@ fn bind_shortcuts(cx: &mut App) {
         // `Ctrl+B` is what every editor with a sidebar binds it to, and unlike
         // an editing chord it has no contender inside a template editor.
         KeyBinding::new(&format!("{modifier}-b"), ToggleExplorer, Some(KEY_CONTEXT)),
+        // The panel on the other edge, on the letter it starts with. Nothing
+        // else in the shell claims it, and no editor does either.
+        KeyBinding::new(&format!("{modifier}-i"), ToggleInspector, Some(KEY_CONTEXT)),
         KeyBinding::new("escape", DismissDialog, Some(KEY_CONTEXT)),
     ]);
 }
@@ -2426,7 +2901,10 @@ fn main() {
         i18n::apply(settings.language.as_deref());
 
         rudbgen_ui::init(cx);
-        // After the widget layer, because it scopes its bindings to key
+        // The inspector's Columns tab is a grid, and the grid binds its own
+        // keys; without this the panel draws and cannot be walked.
+        rudbgen_grid::init(cx);
+        // After the widget layers, because they scope their bindings to key
         // contexts the shell's own bindings have to be able to outrank.
         bind_shortcuts(cx);
         cx.set_menus(app_menus());
@@ -2650,9 +3128,11 @@ mod tests {
             ts!("titlebar.tip_help"),
             ts!("statusbar.no_connection"),
             ts!("statusbar.no_selection"),
+            ts!("statusbar.tables_selected", count = 2),
             ts!("menu.new_connection"),
             ts!("menu.settings"),
             ts!("menu.toggle_explorer"),
+            ts!("menu.toggle_inspector"),
             ts!("menu.check_updates"),
             ts!("menu.about"),
             ts!("menu.quit"),
@@ -2753,6 +3233,279 @@ mod tests {
             cx.debug_bounds(WELCOME_NEW_SELECTOR).is_some(),
             "the welcome screen drew no way in"
         );
+    }
+
+    /// M2's whole promise, against a real database: connect, tick, read.
+    ///
+    /// A real JVM, a real driver and a real H2 — the same route
+    /// [`connection::tests`] takes — because everything below this line has
+    /// already been tested against fixtures, and what is left to find out is
+    /// whether the three fetches the shell makes ask `rudbgen-meta` for the
+    /// right things and put the answers where the panels look for them.
+    ///
+    /// No window is on screen in a test, but the panels are laid out: the row
+    /// list the tree reports is rebuilt on a draw, so asserting on it is
+    /// asserting about what a user would see.
+    #[gpui::test]
+    fn a_real_database_fills_the_tree_and_the_inspector(cx: &mut gpui::TestAppContext) {
+        use rudbgen_jdbc::StatementSpec;
+
+        let profile = connection::h2::profile("explorer");
+        let driver = connection::h2::driver();
+        let session = connection::connect(
+            &profile,
+            &driver,
+            &Credentials::typed(Some(String::new()), None),
+            &AppSettings::default(),
+        )
+        .expect("H2 opens an in-memory database without a server");
+
+        for sql in [
+            "create table T_SAMPLE_ARTIST (               ARTIST_ID integer not null,               NAME varchar(80) not null,               constraint PK_ARTIST primary key (ARTIST_ID))",
+            "create table T_SAMPLE_ALBUM (               ALBUM_ID integer not null,               ARTIST_ID integer not null,               TITLE varchar(120),               constraint PK_ALBUM primary key (ALBUM_ID),               constraint FK_ALBUM_ARTIST foreign key (ARTIST_ID)                 references T_SAMPLE_ARTIST (ARTIST_ID))",
+            "comment on table T_SAMPLE_ALBUM is 'an album'",
+        ] {
+            session
+                .session()
+                .execute(&StatementSpec::new(sql))
+                .unwrap_or_else(|error| panic!("{sql}: {error}"));
+        }
+
+        cx.update(|cx| {
+            app_settings::init(cx);
+            rudbgen_ui::init(cx);
+            rudbgen_grid::init(cx);
+        });
+        let window = cx.add_window(|window, cx| Workspace::new(TitlebarStyle::Custom, window, cx));
+        window
+            .update(cx, |workspace, _window, cx| {
+                workspace.connection = ConnectionState::Open {
+                    profile: Box::new(profile.clone()),
+                    driver: Box::new(driver.clone()),
+                    session: Box::new(session),
+                };
+                // What `connected` does once the state is in place: the panels
+                // are emptied, and the tree asks for its root on the next draw.
+                workspace.reset_panels(cx);
+                assert!(workspace.explorer_showing());
+                assert!(workspace.inspector_showing());
+            })
+            .expect("the window is open");
+        cx.run_until_parked();
+
+        // The schemas arrived and PUBLIC is among them.
+        let public = window
+            .update(cx, |workspace, _window, cx| {
+                let rows = workspace.explorer.read(cx).row_ids(cx);
+                rows.into_iter()
+                    .flatten()
+                    .find_map(|id| match id {
+                        explorer::NodeId::Schema(key) if key.name == "PUBLIC" => Some(key),
+                        _ => None,
+                    })
+                    .expect("H2 answers with a PUBLIC schema")
+            })
+            .expect("the window is open");
+
+        window
+            .update(cx, |workspace, _window, cx| {
+                workspace.explorer.update(cx, |explorer, cx| {
+                    explorer.expand(&explorer::NodeId::Schema(public.clone()), cx);
+                });
+            })
+            .expect("the window is open");
+        cx.run_until_parked();
+
+        // Both tables, and only the tables. The keys come off the panel rather
+        // than being spelled out here: H2 names the catalog after the URL, and
+        // what a key *is* is the driver's answer and not this test's guess.
+        let keys = window
+            .update(cx, |workspace, _window, cx| {
+                workspace.explorer.read(cx).visible_tables(cx)
+            })
+            .expect("the window is open");
+        assert_eq!(
+            keys.iter().map(|key| key.name.clone()).collect::<Vec<_>>(),
+            vec![
+                "T_SAMPLE_ALBUM".to_string(),
+                "T_SAMPLE_ARTIST".to_string()
+            ]
+        );
+        let album = keys
+            .into_iter()
+            .find(|key| key.name == "T_SAMPLE_ALBUM")
+            .expect("the album is a row");
+
+        // Ticking the schema ticks both, which is what the status bar counts.
+        window
+            .update(cx, |workspace, _window, cx| {
+                workspace.explorer.update(cx, |explorer, cx| {
+                    explorer.toggle_tick(&explorer::NodeId::Schema(public.clone()), cx);
+                });
+                assert_eq!(workspace.explorer.read(cx).selected_count(cx), 2);
+            })
+            .expect("the window is open");
+        cx.run_until_parked();
+
+        // Moving the cursor onto a row points the inspector at it, and the
+        // fetch behind that is the shell's.
+        window
+            .update(cx, |workspace, _window, cx| {
+                workspace.explorer.update(cx, |explorer, cx| {
+                    explorer.select(explorer::NodeId::Table(album.clone()), cx);
+                });
+            })
+            .expect("the window is open");
+        cx.run_until_parked();
+
+        window
+            .update(cx, |workspace, _window, cx| {
+                let panel = workspace.inspector.read(cx);
+                let table = panel.table().expect("the inspector read the table");
+                assert_eq!(table.name, "T_SAMPLE_ALBUM");
+                assert_eq!(table.remarks, "an album");
+                assert_eq!(
+                    table
+                        .columns
+                        .iter()
+                        .map(|column| column.name.clone())
+                        .collect::<Vec<_>>(),
+                    vec!["ALBUM_ID", "ARTIST_ID", "TITLE"]
+                );
+                // The primary key, and the foreign key out of it.
+                assert_eq!(
+                    table
+                        .keys()
+                        .iter()
+                        .map(|column| column.name.clone())
+                        .collect::<Vec<_>>(),
+                    vec!["ALBUM_ID"]
+                );
+                assert_eq!(table.imports.len(), 1, "the foreign key is missing");
+                assert_eq!(table.imports[0].ref_table, "T_SAMPLE_ARTIST");
+            })
+            .expect("the window is open");
+
+        // Disconnecting takes the session, the tree and the ticks with it.
+        window
+            .update(cx, |workspace, _window, cx| {
+                workspace.disconnect(cx);
+                assert_eq!(workspace.explorer.read(cx).selected_count(cx), 0);
+                assert!(!workspace.explorer_showing());
+            })
+            .expect("the window is open");
+        cx.run_until_parked();
+    }
+
+    /// The two panels of §4.2 are switches, and the switches are remembered.
+    ///
+    /// Both of them are also out of the frame while nothing is connected, which
+    /// is the state every test here runs in: the assertion is about the switch
+    /// and the setting behind it, not about pixels.
+    #[gpui::test]
+    fn the_panels_toggle_and_the_layout_is_remembered(cx: &mut gpui::TestAppContext) {
+        cx.update(|cx| {
+            app_settings::init(cx);
+            rudbgen_ui::init(cx);
+        });
+        let window = cx.add_window(|window, cx| Workspace::new(TitlebarStyle::Custom, window, cx));
+
+        window
+            .update(cx, |workspace, window, cx| {
+                // Both start where the settings left them, which on a first run
+                // is on: a workbench whose tree is hidden until it is found in a
+                // menu is a workbench that looks like it has none.
+                assert!(workspace.explorer_visible);
+                assert!(workspace.inspector_visible);
+                // ...and out of the frame regardless, with nothing connected.
+                assert!(!workspace.explorer_showing());
+                assert!(!workspace.inspector_showing());
+
+                workspace.toggle_explorer_action(&ToggleExplorer, window, cx);
+                assert!(!workspace.explorer_visible);
+                assert!(
+                    !app_settings::current(cx).explorer_visible,
+                    "the switch was flipped and not written down"
+                );
+                // The keyboard comes back in the same update the subtree went
+                // in; see [`Workspace::hid_a_panel`].
+                assert!(workspace.focus_handle.is_focused(window));
+
+                workspace.toggle_inspector_action(&ToggleInspector, window, cx);
+                assert!(!workspace.inspector_visible);
+                assert!(!app_settings::current(cx).inspector_visible);
+
+                workspace.toggle_explorer_action(&ToggleExplorer, window, cx);
+                assert!(workspace.explorer_visible);
+                assert!(app_settings::current(cx).explorer_visible);
+            })
+            .expect("the window is open");
+    }
+
+    /// The status bar counts the ticks, wherever they were made.
+    #[gpui::test]
+    fn the_status_bar_counts_the_ticked_tables(cx: &mut gpui::TestAppContext) {
+        cx.update(|cx| {
+            app_settings::init(cx);
+            rudbgen_ui::init(cx);
+        });
+        let window = cx.add_window(|window, cx| Workspace::new(TitlebarStyle::Custom, window, cx));
+
+        window
+            .update(cx, |workspace, _window, cx| {
+                assert_eq!(workspace.explorer.read(cx).selected_count(cx), 0);
+                workspace.explorer.update(cx, |explorer, cx| {
+                    explorer.deliver_schemas(
+                        Ok(vec![rudbgen_meta::Schema {
+                            catalog: String::new(),
+                            schema: "PUBLIC".to_string(),
+                            name: "PUBLIC".to_string(),
+                        }]),
+                        cx,
+                    );
+                });
+            })
+            .expect("the window is open");
+        cx.run_until_parked();
+
+        window
+            .update(cx, |workspace, _window, cx| {
+                let key = SchemaKey {
+                    catalog: String::new(),
+                    schema: "PUBLIC".to_string(),
+                    name: "PUBLIC".to_string(),
+                };
+                workspace.explorer.update(cx, |explorer, cx| {
+                    explorer.deliver_tables(
+                        key,
+                        Ok(vec![rudbgen_meta::TableRef {
+                            catalog: String::new(),
+                            schema: "PUBLIC".to_string(),
+                            name: "T_SAMPLE_ALBUM".to_string(),
+                            kind: rudbgen_meta::KIND_TABLE.to_string(),
+                            ..rudbgen_meta::TableRef::default()
+                        }]),
+                        cx,
+                    );
+                });
+                workspace.explorer.update(cx, |explorer, cx| {
+                    explorer.toggle_tick(
+                        &explorer::NodeId::Table(TableKey {
+                            catalog: String::new(),
+                            schema: "PUBLIC".to_string(),
+                            name: "T_SAMPLE_ALBUM".to_string(),
+                        }),
+                        cx,
+                    );
+                });
+                assert_eq!(workspace.explorer.read(cx).selected_count(cx), 1);
+                assert_ne!(
+                    ts!("statusbar.tables_selected", count = 1),
+                    ts!("statusbar.no_selection"),
+                    "the bar would say the same thing either way"
+                );
+            })
+            .expect("the window is open");
     }
 
     /// Every command the shell offers reaches the workspace, and `Escape`

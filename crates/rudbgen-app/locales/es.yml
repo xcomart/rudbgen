@@ -12,7 +12,46 @@ common:
 # El cuerpo de la ventana una vez que hay una sesión abierta. El explorador,
 # el inspector y el área de trabajo entre ellos llegan después.
 workarea:
-  next: El explorador, el inspector y la pestaña Generar llegan en el próximo hito.
+  next: La pestaña Generar llega en el próximo hito; el explorador y el inspector ya están aquí.
+
+explorer:
+  title: Explorador
+  filter_placeholder: Filtrar tablas
+  show_views: Mostrar vistas
+  loading: cargando…
+  load_failed_unknown: No se pudo cargar.
+  menu_select_shown: Seleccionar todo lo mostrado
+  menu_clear: Quitar la selección
+  menu_invert: Invertir la selección
+  menu_inspect: Abrir en el inspector
+  menu_refresh: Recargar
+
+inspector:
+  title: Inspector
+  tab_columns: Columnas
+  tab_keys: Claves
+  tab_foreign_keys: Claves ajenas
+  tab_indexes: Índices
+  empty: Elige una tabla para ver de qué se compone.
+  loading: cargando…
+  refresh: Recargar
+  nothing_here: no hay nada
+  column: Columna
+  columns: Columnas
+  type: Tipo
+  nullable: Nulo
+  default: Predeterminado
+  key: Clave
+  comment: Comentario
+  name: Nombre
+  seq: Posición
+  unique: Única
+  target: Referencia a
+  source: Referenciado por
+  on_update: Al actualizar
+  on_delete: Al eliminar
+  references_out: Claves ajenas de esta tabla
+  references_in: Claves ajenas que apuntan a esta tabla
 
 connect:
   title: Conexiones
@@ -176,6 +215,7 @@ menu:
   new_connection: Nueva conexión…
   settings: Ajustes…
   toggle_explorer: Explorador
+  toggle_inspector: Inspector
   about: Acerca de rudbgen
   check_updates: Buscar actualizaciones
   quit: Salir
@@ -208,6 +248,7 @@ welcome:
 statusbar:
   no_connection: sin conexión
   no_selection: nada que generar
+  tables_selected: "%{count} tablas seleccionadas"
   # Los tres estados de la celda izquierda una vez pedida una conexión.
   # `%{product}` es un valor, no una palabra.
   connecting: "conectando con %{name}…"

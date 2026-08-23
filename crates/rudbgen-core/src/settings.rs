@@ -54,6 +54,23 @@ const MIN_EXPLORER_WIDTH: f32 = 140.0;
 /// Not a taste judgement — a sidebar wider than this on a small display leaves
 /// no work area at all, and the drag has no other floor to stop at.
 const MAX_EXPLORER_WIDTH: f32 = 720.0;
+
+/// Width of the inspector panel on a first run, in logical pixels.
+///
+/// Wider than the explorer's default: the explorer holds one name per row and
+/// the inspector holds a column's name, type, nullability, default and
+/// comment side by side.
+const DEFAULT_INSPECTOR_WIDTH: f32 = 320.0;
+
+/// Narrowest the inspector may be dragged.
+///
+/// A column name and its type have to fit beside each other; below this the
+/// tabs are a list of ellipses, which says less than the panel being closed.
+const MIN_INSPECTOR_WIDTH: f32 = 200.0;
+
+/// Widest the inspector may be dragged. [`MAX_EXPLORER_WIDTH`]'s reason,
+/// applied from the other edge.
+const MAX_INSPECTOR_WIDTH: f32 = 720.0;
 /// Window width used on a first run.
 const DEFAULT_WINDOW_WIDTH: u32 = 1440;
 /// Window height used on a first run.
@@ -291,6 +308,16 @@ pub struct AppSettings {
     /// On by default: a workbench whose object tree is hidden until it is found
     /// in a menu is a workbench that looks like it has none.
     pub explorer_visible: bool,
+    /// Width of the inspector panel in logical pixels; clamped to
+    /// 200.0 ..= 720.0 on load. Top level for [`AppSettings::explorer_width`]'s
+    /// reason.
+    pub inspector_width: f32,
+    /// Whether the inspector panel is showing.
+    ///
+    /// On by default, as the explorer is: the two are the halves of §4.2's
+    /// frame, and a window that opened with only one of them would look like a
+    /// window missing a panel rather than one with a panel put away.
+    pub inspector_visible: bool,
     /// Window geometry and background treatment.
     pub window: WindowState,
     /// Release tag the user asked never to be told about again, e.g. `"v0.2.0"`.
@@ -331,6 +358,8 @@ impl Default for AppSettings {
             overwrite_policy: OverwritePolicy::default(),
             explorer_width: DEFAULT_EXPLORER_WIDTH,
             explorer_visible: true,
+            inspector_width: DEFAULT_INSPECTOR_WIDTH,
+            inspector_visible: true,
             window: WindowState::default(),
             ignored_update: None,
             extra: BTreeMap::new(),
@@ -411,7 +440,8 @@ impl AppSettings {
     /// Called on every load so a hand-edited `settings.json` cannot break the
     /// app: font sizes are clamped to 6.0 ..= 32.0 (NaN becomes the default),
     /// opacity to 0.5 ..= 1.0, the heap to at least 128 MB, the explorer width
-    /// to 140.0 ..= 720.0, and blank strings fall back to their defaults. The
+    /// to 140.0 ..= 720.0, the inspector width to 200.0 ..= 720.0, and blank
+    /// strings fall back to their defaults. The
     /// UI should call it again after editing values.
     pub fn sanitize(&mut self) {
         self.theme = non_blank(&self.theme, DEFAULT_THEME);
@@ -426,6 +456,12 @@ impl AppSettings {
             MIN_EXPLORER_WIDTH,
             MAX_EXPLORER_WIDTH,
             DEFAULT_EXPLORER_WIDTH,
+        );
+        self.inspector_width = clamp_f32(
+            self.inspector_width,
+            MIN_INSPECTOR_WIDTH,
+            MAX_INSPECTOR_WIDTH,
+            DEFAULT_INSPECTOR_WIDTH,
         );
         // An empty or whitespace-only argument would reach the JVM as an empty
         // string, which it rejects with a message about the wrong argument.
@@ -669,6 +705,18 @@ mod tests {
         settings.explorer_width = f32::NAN;
         settings.sanitize();
         assert_eq!(settings.explorer_width, 260.0);
+
+        settings.inspector_width = 0.0;
+        settings.sanitize();
+        assert_eq!(settings.inspector_width, 200.0);
+
+        settings.inspector_width = 5_000.0;
+        settings.sanitize();
+        assert_eq!(settings.inspector_width, 720.0);
+
+        settings.inspector_width = f32::NAN;
+        settings.sanitize();
+        assert_eq!(settings.inspector_width, 320.0);
     }
 
     #[test]

@@ -21,7 +21,7 @@ this document.
 | D1 | **Copy** rudbman's crates into this repository (not a path or git dependency) and let them evolve on their own | The same rule rudbman applied to logman. A path dependency ties two release cycles together and a git dependency cannot carry the `vendor/` gpui patches. Copies diverge where rudbgen needs them to (driver editor, explorer) and stay `diff`-able where they do not |
 | D2 | **Vendor rudbman's patched gpui** byte-identical, `RULOGMAN PATCH` markers and all | Same patches, same reasons: live title-bar switch, X11 re-entrancy panic, X11 CSD transparency, KWin blur. Kept identical so a fix moves between the three projects as a plain diff |
 | D3 | The **JDBC bridge is inherited as a copy** (`bridge/`, package `comart.rudbgen.bridge`) and **trimmed**: `job/` (Backup, Transfer, Extract) and the LOB path go; `meta/`, `codec/`, `Session`, `Loaders`, `DriverProbe` stay | rudbgen never ferries row data. What it needs — open a session, `DESCRIBE` everything, run a handful of metadata SQL — is the bridge's M1/M2 surface. Trimming removes ~40% of the Java and every job-frame op |
-| D4 | The **template engine is ported to Rust** as the pure crate `rudbgen-template`, byte-compatible with jdbgen's assets | rudbman kept it in Java because rows flow through the JVM there. Here nothing flows: the model is metadata already in Rust, and a Rust engine is what live preview, syntax highlighting and unknown-field diagnostics in the editor need without a JNI round trip per keystroke. jdbgen's three engine test classes (~1,350 lines) are ported first and are the compatibility canary. Padding width keeps jdbgen's EUC-KR byte count via `encoding_rs` |
+| D4 | The **template engine is ported to Rust** as the pure crate `rudbgen-template`, byte-compatible with jdbgen's assets | rudbman kept it in Java because rows flow through the JVM there. Here nothing flows: the model is metadata already in Rust, and a Rust engine is what live preview, syntax highlighting and unknown-field diagnostics in the editor need without a JNI round trip per keystroke. jdbgen's three engine test classes (~1,350 lines) are ported first and are the compatibility canary. Padding counts **display columns** (`unicode-width`, the wcwidth table rulogman's terminal uses) rather than jdbgen's EUC-KR byte count — identical for Hangul, Hanja and ASCII, which is what the shipped assets contain, and right for everything else |
 | D5 | **No master password.** Secrets go to the OS keychain through `rudbgen-core::secrets`; everything else is plain JSON | The master password gates the whole app to protect three fields. jdbgen's own docs list it as the first thing users trip over. A one-time **import from jdbgen** asks for the master password once, decrypts with jdbgen's exact scheme (AES-256-GCM/PBKDF2 v2 and the legacy CBC form), and moves the secrets into the keychain |
 | D6 | **One window, no startup modal.** With no connection open, a welcome screen lists the saved connections; the update check runs in the background and surfaces as a banner | jdbgen blocks three times before the first click (update check up to 60 s, password, mandatory Connection Manager whose Cancel quits). Every one of those becomes a non-blocking state of the main window |
 | D7 | **Edits are transactional.** Every dialog edits a draft; `Save` commits it to the store and disk in one step, `Cancel` discards it. The store is never touched during editing | jdbgen's `+`/clone/import leak into the saved configuration when the dialog is cancelled — a documented known issue. A draft model makes the bug impossible rather than fixed |
@@ -238,7 +238,15 @@ The app implements it for `Table`, `Column`, `ForeignKey`, `Index` and for the c
 
 ### 7.4 Width
 
-Padding and `indent` count **EUC-KR bytes** of the decorated value, as jdbgen does, via `encoding_rs::EUC_KR` (unencodable characters count 1, the Java fallback's behaviour).
+Padding and `indent` count **display columns** of the decorated value —
+`unicode_width::UnicodeWidthStr::width`, the same wcwidth-compatible table
+rulogman's terminal lays cells out by — not jdbgen's EUC-KR byte count. The
+two agree on every character the shipped templates and the golden fixtures
+contain (ASCII, Hangul, Hanja: one column per byte pair), so the byte-identity
+canary holds; they part on what EUC-KR encodes as two bytes but terminals draw
+in one column (Cyrillic, Greek, box drawing) and on what EUC-KR cannot encode
+at all (emoji, most of CJK Ext-B), where the column count is the one the
+generated file is actually viewed in. Zero-width characters count zero.
 
 ---
 

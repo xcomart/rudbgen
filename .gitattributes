@@ -21,3 +21,7 @@
 *.pdb binary
 *.so binary
 *.dylib binary
+
+# The template engine's golden files carry CRLF on purpose: the line-end
+# detection they test is the first newline of the template. Never normalise.
+crates/rudbgen-template/tests/golden/** -text

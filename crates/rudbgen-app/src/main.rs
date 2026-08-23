@@ -45,6 +45,7 @@
 //! application will do, and a button that looks live and does nothing is worse
 //! than either.
 
+mod abbreviation_dialog;
 mod about_dialog;
 mod app_settings;
 mod builtin_templates;
@@ -62,6 +63,7 @@ mod generate_job;
 mod generate_pane;
 mod i18n;
 mod icons;
+mod import_dialog;
 mod inspector;
 mod maven;
 mod palette;
@@ -107,6 +109,7 @@ use rudbgen_ui::{
     window_controls,
 };
 
+use abbreviation_dialog::{AbbreviationDialog, AbbreviationDialogEvent};
 use about_dialog::{AboutDialog, AboutDialogEvent};
 use app_settings::WindowGeometry;
 use caption::apply_caption_theme;
@@ -117,6 +120,7 @@ use generate_job::{GenerationJob, JobEvent};
 use generate_pane::{Blocker, GeneratePane, GeneratePaneEvent};
 use i18n::ts;
 use icons::Icons;
+use import_dialog::{ImportDialog, ImportDialogEvent};
 use inspector::{Inspector, InspectorEvent};
 use pane_tree::{Pane, PaneItem};
 use preview_pane::{PreviewEvent, PreviewFile, PreviewPane};
@@ -158,6 +162,10 @@ actions!(
         ToggleLivePreview,
         /// Offers what may be written where the caret is.
         TriggerCompletion,
+        /// Opens the abbreviation rules editor.
+        EditAbbreviations,
+        /// Opens the jdbgen import wizard.
+        ImportJdbgen,
     ]
 );
 
@@ -208,6 +216,15 @@ const TRAFFIC_LIGHT_GAP: f32 = 78.;
 ///
 /// A wordmark, so it is never translated.
 const APP_NAME: &str = "rudbgen";
+
+/// Theme the import wizard picks when jdbgen was last shown dark.
+///
+/// jdbgen has two appearances and rudbgen has six, so the hint can only pick a
+/// side; these two are the pair the settings dialog itself defaults to.
+const DARK_THEME: &str = "one-dark";
+
+/// Theme the import wizard picks when jdbgen was last shown light.
+const LIGHT_THEME: &str = "one-light";
 
 /// Application id published to the desktop.
 ///
@@ -295,6 +312,9 @@ const WELCOME_FIRST_TAB: isize = 1;
 /// Compiled away outside a test build; it saves a test working the button's
 /// position out from the centred column's layout.
 const WELCOME_NEW_SELECTOR: &str = "welcome-new";
+
+/// Debug selector of the welcome screen's "import from jdbgen" button.
+const WELCOME_IMPORT_SELECTOR: &str = "welcome-import";
 
 /// Debug selector of the welcome screen's "open a template" button.
 const WELCOME_TEMPLATE_SELECTOR: &str = "welcome-template";
@@ -443,6 +463,26 @@ struct Workspace {
     /// alone (architecture document, D7), so the copy in [`Workspace::profiles`]
     /// is re-read whenever it closes.
     connection_dialog: Entity<ConnectionDialog>,
+    /// The abbreviation rules editor, rendered only while it reports itself
+    /// open (§4.6, D7).
+    ///
+    /// Opened from the Generate tab's *Rules…* and from the menu, filled from
+    /// the Generate tab's copy of the store and handing it back on `Save`, so
+    /// that the one `apply_to_names` switch has two controls and no second
+    /// value.
+    abbreviations: Entity<AbbreviationDialog>,
+    /// The jdbgen import wizard, rendered only while it reports itself open.
+    import: Entity<ImportDialog>,
+    /// The jdbgen configuration the welcome screen offers to import, if there
+    /// is one.
+    ///
+    /// Read once, at start-up: §4.3 puts *Import from jdbgen…* on the welcome
+    /// screen only when the file is actually there, and a `stat` on every frame
+    /// to answer a question whose answer cannot change while the window is open
+    /// would be a strange way to pay for it. The **menu** row is live either
+    /// way — a configuration copied from another machine is chosen from inside
+    /// the wizard, and that door must not depend on this answer.
+    jdbgen_config: Option<PathBuf>,
     /// Whether a session is open, opening, or has just failed.
     connection: ConnectionState,
     /// Which connection the answers coming back off background tasks belong to.
@@ -533,6 +573,10 @@ struct Workspace {
     _update_events: Subscription,
     /// Keeps the connection dialog subscription alive.
     _connection_events: Subscription,
+    /// Keeps the rules editor's subscription alive.
+    _abbreviation_events: Subscription,
+    /// Keeps the import wizard's subscription alive.
+    _import_events: Subscription,
     /// Keeps the explorer's subscription alive.
     _explorer_events: Subscription,
     /// Keeps the inspector's subscription alive.
@@ -626,6 +670,67 @@ impl Workspace {
                 }
             },
         );
+
+        let abbreviations = cx.new(AbbreviationDialog::new);
+        let abbreviation_events = cx.subscribe_in(
+            &abbreviations,
+            window,
+            |this, dialog, event, window, cx| match event {
+                // The dialog has already written `abbreviations.json`. What is
+                // left is the copy the Generate tab holds — the panel is what a
+                // run reads the rules from, and re-reading the file here would
+                // be a second answer to a question already answered.
+                AbbreviationDialogEvent::Saved(store) => {
+                    let store = (**store).clone();
+                    this.generate.update(cx, |pane, cx| {
+                        pane.adopt_abbreviations(store, cx);
+                    });
+                    dialog.update(cx, |dialog, cx| dialog.close(cx));
+                    this.focus_shell(window, cx);
+                }
+                AbbreviationDialogEvent::Dismissed => {
+                    dialog.update(cx, |dialog, cx| dialog.close(cx));
+                    this.focus_shell(window, cx);
+                }
+            },
+        );
+
+        let import = cx.new(ImportDialog::new);
+        let import_events =
+            cx.subscribe_in(
+                &import,
+                window,
+                |this, dialog, event, window, cx| match event {
+                    // The wizard has already written the four stores and the
+                    // keychain; the shell re-reads the connection list the welcome
+                    // screen draws, and applies jdbgen's language and theme when
+                    // the user ticked that box — settings are the shell's, never a
+                    // dialog's.
+                    ImportDialogEvent::Imported(hint) => {
+                        this.profiles = load_profiles();
+                        // The wizard wrote `abbreviations.json`; the Generate
+                        // tab holds the copy a run reads the rules from, and it
+                        // only re-reads the file when a connection opens.
+                        match rudbgen_core::AbbreviationStore::load() {
+                            Ok(store) => this.generate.update(cx, |pane, cx| {
+                                pane.adopt_abbreviations(store, cx);
+                            }),
+                            Err(error) => {
+                                log::error!("could not re-read abbreviations.json: {error:#}");
+                            }
+                        }
+                        if let Some(hint) = hint {
+                            this.adopt_jdbgen_settings(hint, window, cx);
+                        }
+                        cx.notify();
+                    }
+                    ImportDialogEvent::Dismissed => {
+                        dialog.update(cx, |dialog, cx| dialog.close(cx));
+                        this.profiles = load_profiles();
+                        this.focus_shell(window, cx);
+                    }
+                },
+            );
 
         // The one thing that must happen before the process winds down: the
         // session is closed, and the tunnel under it after that. A session left
@@ -731,18 +836,28 @@ impl Workspace {
         // strip is, and a strip that appears only once something is connected
         // would move the whole body down the first time it did.
         let generate = cx.new(GeneratePane::new);
-        let generate_events = cx.subscribe(&generate, |workspace, _pane, event, cx| match event {
-            GeneratePaneEvent::Changed => {
-                // The palette lists the custom variables, so a variable typed
-                // into the Generate tab has to reach it.
-                workspace.refresh_palette(cx);
-                cx.notify();
-            }
-            GeneratePaneEvent::EditTemplate(file) => {
-                let file = generate_pane::resolve_template(file);
-                workspace.open_template(file, cx);
-            }
-        });
+        // `subscribe_in` rather than `subscribe`: *Rules…* opens a modal, and
+        // opening one closes whatever else is on screen and moves the keyboard,
+        // both of which need the window.
+        let generate_events = cx.subscribe_in(
+            &generate,
+            window,
+            |workspace, _pane, event, window, cx| match event {
+                GeneratePaneEvent::Changed => {
+                    // The palette lists the custom variables, so a variable
+                    // typed into the Generate tab has to reach it.
+                    workspace.refresh_palette(cx);
+                    cx.notify();
+                }
+                GeneratePaneEvent::EditTemplate(file) => {
+                    let file = generate_pane::resolve_template(file);
+                    workspace.open_template(file, cx);
+                }
+                GeneratePaneEvent::EditAbbreviations => {
+                    workspace.open_abbreviations(window, cx);
+                }
+            },
+        );
 
         let preview = cx.new(PreviewPane::new);
         let preview_events = cx.subscribe(&preview, |workspace, _pane, event, cx| match event {
@@ -799,6 +914,9 @@ impl Workspace {
             about,
             settings,
             connection_dialog,
+            abbreviations,
+            import,
+            jdbgen_config: rudbgen_import::locate(),
             connection: ConnectionState::Idle,
             connection_epoch: 0,
             connection_list_open: false,
@@ -825,6 +943,8 @@ impl Workspace {
             _settings_events: settings_events,
             _update_events: update_events,
             _connection_events: connection_events,
+            _abbreviation_events: abbreviation_events,
+            _import_events: import_events,
             _explorer_events: explorer_events,
             _inspector_events: inspector_events,
             _generate_events: generate_events,
@@ -862,6 +982,8 @@ impl Workspace {
             || self.settings.read(cx).is_open()
             || self.update.read(cx).is_open()
             || self.connection_dialog.read(cx).is_open()
+            || self.abbreviations.read(cx).is_open()
+            || self.import.read(cx).is_open()
             || self.job.read(cx).is_open()
     }
 
@@ -899,6 +1021,12 @@ impl Workspace {
             self.connection_dialog
                 .update(cx, |dialog, cx| dialog.close(cx));
         }
+        if self.abbreviations.read(cx).is_open() {
+            self.abbreviations.update(cx, |dialog, cx| dialog.close(cx));
+        }
+        if self.import.read(cx).is_open() {
+            self.import.update(cx, |dialog, cx| dialog.close(cx));
+        }
         // A run in flight is the one overlay a command may not take the screen
         // from: its own `close` refuses while it is busy, exactly as the
         // update dialog's does mid-install.
@@ -930,6 +1058,68 @@ impl Workspace {
         self.close_overlays(window, cx);
         self.update.update(cx, |dialog, cx| dialog.start_check(cx));
         cx.notify();
+    }
+
+    /// Opens the abbreviation rules editor over the rules the panel holds.
+    ///
+    /// The rules and the switch come from the Generate tab rather than from
+    /// disk: the panel read the file when the connection opened and owns the
+    /// only copy a run will use, so anything else would put two answers on
+    /// screen. The table names come from the explorer, which is what makes the
+    /// whole-name picker worth having; with nothing connected the list is empty
+    /// and the picker is simply not drawn.
+    fn open_abbreviations(&mut self, window: &mut Window, cx: &mut Context<Self>) {
+        self.close_overlays(window, cx);
+        let store = self.generate.read(cx).abbreviations().clone();
+        let tables = self.explorer.read(cx).loaded_table_names(cx);
+        self.abbreviations
+            .update(cx, |dialog, cx| dialog.open(&store, tables, cx));
+        cx.notify();
+    }
+
+    /// Opens the jdbgen import wizard over the configuration it can find.
+    ///
+    /// [`Workspace::jdbgen_config`] answers only when the file is actually
+    /// there (§4.3); when it is not — which is how the menu row is reached, the
+    /// welcome screen leaving its button out — the wizard still opens, on the
+    /// data directory's path, which its first step reports as unreadable and
+    /// offers to replace with a file the user chooses. That is the door for a
+    /// configuration copied from another machine, and the reason the command is
+    /// never greyed out.
+    fn open_import(&mut self, window: &mut Window, cx: &mut Context<Self>) {
+        self.close_overlays(window, cx);
+        let path = self.jdbgen_config.clone().unwrap_or_else(|| {
+            rudbgen_import::data_dir()
+                .unwrap_or_default()
+                .join("config.json")
+        });
+        self.import.update(cx, |dialog, cx| dialog.open(path, cx));
+        cx.notify();
+    }
+
+    /// Takes on the language and theme jdbgen was last run in.
+    ///
+    /// The wizard asked; this applies. Settings are the shell's — it is what
+    /// owns `settings.json`, the live locale and the palettes — so a dialog
+    /// never writes them.
+    fn adopt_jdbgen_settings(
+        &mut self,
+        hint: &rudbgen_import::SettingsHint,
+        window: &mut Window,
+        cx: &mut Context<Self>,
+    ) {
+        let mut settings = app_settings::current(cx);
+        if let Some(language) = &hint.language {
+            settings.language = Some(language.clone());
+        }
+        settings.theme = if hint.dark_ui {
+            DARK_THEME.to_string()
+        } else {
+            LIGHT_THEME.to_string()
+        };
+        app_settings::replace(settings, cx);
+        app_settings::save(cx);
+        self.apply_settings(window, cx);
     }
 
     /// Opens the connection dialog over the profile that is open, if one is.
@@ -2290,6 +2480,26 @@ impl Workspace {
         self.open_settings(window, cx);
     }
 
+    /// Opens the abbreviation rules editor.
+    fn edit_abbreviations_action(
+        &mut self,
+        _: &EditAbbreviations,
+        window: &mut Window,
+        cx: &mut Context<Self>,
+    ) {
+        self.open_abbreviations(window, cx);
+    }
+
+    /// Opens the jdbgen import wizard.
+    fn import_jdbgen_action(
+        &mut self,
+        _: &ImportJdbgen,
+        window: &mut Window,
+        cx: &mut Context<Self>,
+    ) {
+        self.open_import(window, cx);
+    }
+
     /// Opens the about box.
     fn show_about_action(&mut self, _: &ShowAbout, window: &mut Window, cx: &mut Context<Self>) {
         self.open_about(window, cx);
@@ -2462,6 +2672,21 @@ impl Workspace {
         if self.about.read(cx).is_open() {
             self.about.update(cx, |dialog, cx| dialog.close(cx));
             self.focus_shell(window, cx);
+            return;
+        }
+        if self.abbreviations.read(cx).is_open() {
+            // Routed through the dialog: it stacks a table-name dropdown of its
+            // own, and that has to be able to take `Escape` for itself before
+            // the whole draft is thrown away.
+            self.abbreviations
+                .update(cx, |dialog, cx| dialog.escape(cx));
+            return;
+        }
+        if self.import.read(cx).is_open() {
+            // Routed through the wizard, which refuses the key while it is
+            // decrypting or writing: half an import is not a state it can be
+            // left in.
+            self.import.update(cx, |dialog, cx| dialog.escape(cx));
             return;
         }
         if self.connection_dialog.read(cx).is_open() {
@@ -2871,6 +3096,14 @@ impl Workspace {
                 .shortcut(format!("{SHORTCUT_MODIFIER}+G"))
                 .disabled(!self.can_generate(cx))
                 .on_activate(|window, cx| window.dispatch_action(Box::new(Generate), cx)),
+            MenuEntry::new(ts!("menu.abbreviations"))
+                .on_activate(|window, cx| window.dispatch_action(Box::new(EditAbbreviations), cx)),
+            MenuEntry::separator(),
+            // The one-time import (D5). Never greyed: a configuration copied
+            // from another machine is chosen from inside the wizard, so the
+            // command has something to do even when `locate` finds nothing.
+            MenuEntry::new(ts!("menu.import_jdbgen"))
+                .on_activate(|window, cx| window.dispatch_action(Box::new(ImportJdbgen), cx)),
             MenuEntry::separator(),
             // Next to About, where a Help menu would put it and where users of
             // every other desktop application look for it.
@@ -3347,16 +3580,25 @@ impl Workspace {
                             )
                             .into_any_element(),
                     )
-                    .child(
-                        soon(
-                            "welcome-import",
-                            Button::new("welcome-import", ts!("welcome.import_jdbgen"))
-                                .full_width(true)
-                                .disabled(true)
-                                .tab_index(WELCOME_FIRST_TAB + 1),
-                        )
-                        .into_any_element(),
-                    )
+                    // Offered only when there is something to import from
+                    // (§4.3): a button that opens a dialog saying "no jdbgen
+                    // configuration found" would be worse than no button. The
+                    // menu row is there either way, for a file copied from
+                    // another machine.
+                    .children(self.jdbgen_config.is_some().then(|| {
+                        div()
+                            .id(WELCOME_IMPORT_SELECTOR)
+                            .debug_selector(|| WELCOME_IMPORT_SELECTOR.to_string())
+                            .child(
+                                Button::new("welcome-import", ts!("welcome.import_jdbgen"))
+                                    .full_width(true)
+                                    .tab_index(WELCOME_FIRST_TAB + 1)
+                                    .on_click(|_, window, cx| {
+                                        window.dispatch_action(Box::new(ImportJdbgen), cx);
+                                    }),
+                            )
+                            .into_any_element()
+                    }))
                     .child(
                         div()
                             .id(WELCOME_TEMPLATE_SELECTOR)
@@ -3598,19 +3840,6 @@ fn profile_row(
         .into_any_element()
 }
 
-/// Wraps a control whose milestone has not arrived in the tooltip that says so.
-///
-/// The tooltip has to go on a box around the button rather than on the button:
-/// a disabled control takes no pointer events of its own, so the only element
-/// that can answer a hover is one outside it.
-fn soon(id: &'static str, control: impl IntoElement) -> Stateful<Div> {
-    div()
-        .id(id)
-        .debug_selector(move || id.to_string())
-        .tooltip(tooltip_label(ts!("welcome.tip_soon")))
-        .child(control)
-}
-
 /// A box that centres its content while it fits and scrolls it when it does not.
 ///
 /// The two halves of that are what the shape is for: `my_auto` on a `flex_none`
@@ -3691,6 +3920,16 @@ impl Render for Workspace {
                 .inset_0()
                 .child(self.connection_dialog.clone())
         });
+        let abbreviations = self
+            .abbreviations
+            .read(cx)
+            .is_open()
+            .then(|| div().absolute().inset_0().child(self.abbreviations.clone()));
+        let import = self
+            .import
+            .read(cx)
+            .is_open()
+            .then(|| div().absolute().inset_0().child(self.import.clone()));
         let job = self
             .job
             .read(cx)
@@ -3783,6 +4022,8 @@ impl Render for Workspace {
             .on_action(cx.listener(Self::save_template_action))
             .on_action(cx.listener(Self::toggle_live_preview_action))
             .on_action(cx.listener(Self::trigger_completion_action))
+            .on_action(cx.listener(Self::edit_abbreviations_action))
+            .on_action(cx.listener(Self::import_jdbgen_action))
             .on_action(cx.listener(Self::dismiss_dialog_action))
             .child(toolbar)
             .child(body)
@@ -3790,6 +4031,8 @@ impl Render for Workspace {
             .children(about)
             .children(settings)
             .children(connection)
+            .children(abbreviations)
+            .children(import)
             .children(update)
             // Last, so a run that is asking about a file is answered before
             // anything else on screen.
@@ -4249,10 +4492,11 @@ fn app_menus() -> Vec<Menu> {
         },
         Menu {
             name: ts!("menu.connection"),
-            items: vec![MenuItem::action(
-                ts!("menu.mac.new_connection"),
-                NewConnection,
-            )],
+            items: vec![
+                MenuItem::action(ts!("menu.mac.new_connection"), NewConnection),
+                MenuItem::separator(),
+                MenuItem::action(ts!("menu.import_jdbgen"), ImportJdbgen),
+            ],
             disabled: false,
         },
         Menu {
@@ -4281,6 +4525,8 @@ fn app_menus() -> Vec<Menu> {
                 MenuItem::action(ts!("menu.dry_run"), DryRun),
                 MenuItem::separator(),
                 MenuItem::action(ts!("menu.generate"), Generate),
+                MenuItem::separator(),
+                MenuItem::action(ts!("menu.abbreviations"), EditAbbreviations),
             ],
             disabled: false,
         },
@@ -4645,7 +4891,6 @@ mod tests {
             ts!("welcome.open_template"),
             ts!("welcome.saved"),
             ts!("welcome.empty"),
-            ts!("welcome.tip_soon"),
             ts!("titlebar.no_connection"),
             ts!("titlebar.tip_settings"),
             ts!("titlebar.tip_help"),
@@ -4734,6 +4979,8 @@ mod tests {
             ts!("menu.view"),
             ts!("menu.mac.new_connection"),
             ts!("menu.mac.quit"),
+            ts!("menu.abbreviations"),
+            ts!("menu.import_jdbgen"),
         ] {
             assert!(!label.is_empty(), "empty label");
             for namespace in [
@@ -5370,6 +5617,179 @@ mod tests {
                     std::fs::read_to_string(&file).expect("the file is still there"),
                     "class ${name} {}\n",
                     "the buffer was written to disk without a save"
+                );
+            })
+            .expect("the window is open");
+
+        window
+            .update(cx, |workspace, _window, _cx| workspace.close_session())
+            .expect("the window is open");
+    }
+
+    /// M5's promise, against a real database: a rule typed into the editor is
+    /// the rule the preview then applies.
+    ///
+    /// The whole route the user takes — *Rules…* on the Generate tab opens the
+    /// dialog over the panel's own store, the trailing empty row takes the
+    /// rule, `Save` hands the store back, and `${name.abbr}` in a template tab
+    /// renders through it. The one step left out is the write to
+    /// `abbreviations.json`: the configuration directory is the user's own on
+    /// every platform, and a test that wrote into it would be editing the
+    /// machine it runs on. `AbbreviationStore::save_to` is proved in
+    /// `rudbgen-core` against a temporary directory instead.
+    #[gpui::test]
+    fn a_rule_typed_into_the_editor_is_the_rule_the_preview_applies(cx: &mut gpui::TestAppContext) {
+        use rudbgen_core::AbbreviationRule;
+        use rudbgen_jdbc::StatementSpec;
+
+        let dir = tempfile::tempdir().expect("tempdir");
+        let file = dir.path().join("model.java");
+        std::fs::write(&file, "class ${name.abbr} {}\n").expect("the template is written");
+
+        let profile = connection::h2::profile("abbr");
+        let driver = connection::h2::driver();
+        let session = connection::connect(
+            &profile,
+            &driver,
+            &Credentials::typed(Some(String::new()), None),
+            &AppSettings::default(),
+        )
+        .expect("H2 opens an in-memory database without a server");
+        session
+            .session()
+            .execute(&StatementSpec::new(
+                "create table T_SAMPLE_ALBUM (ALBUM_ID integer not null, TITLE varchar(120), constraint PK_ABBR primary key (ALBUM_ID))",
+            ))
+            .expect("the table is created");
+
+        cx.update(|cx| {
+            app_settings::init(cx);
+            rudbgen_ui::init(cx);
+            rudbgen_grid::init(cx);
+            rudbgen_editor::init(cx);
+        });
+        cx.executor().allow_parking();
+        let window = cx.add_window(|window, cx| Workspace::new(TitlebarStyle::Custom, window, cx));
+        window
+            .update(cx, |workspace, _window, cx| {
+                workspace.connection = ConnectionState::Open {
+                    profile: Box::new(profile.clone()),
+                    driver: Box::new(driver.clone()),
+                    session: Box::new(session),
+                };
+                workspace.reset_panels(cx);
+            })
+            .expect("the window is open");
+        cx.run_until_parked();
+
+        let public = window
+            .update(cx, |workspace, _window, cx| {
+                workspace
+                    .explorer
+                    .read(cx)
+                    .row_ids(cx)
+                    .into_iter()
+                    .flatten()
+                    .find_map(|id| match id {
+                        explorer::NodeId::Schema(key) if key.name == "PUBLIC" => Some(key),
+                        _ => None,
+                    })
+                    .expect("H2 answers with a PUBLIC schema")
+            })
+            .expect("the window is open");
+        window
+            .update(cx, |workspace, _window, cx| {
+                workspace.explorer.update(cx, |explorer, cx| {
+                    explorer.expand(&explorer::NodeId::Schema(public.clone()), cx);
+                });
+            })
+            .expect("the window is open");
+        cx.run_until_parked();
+        window
+            .update(cx, |workspace, _window, cx| {
+                workspace.explorer.update(cx, |explorer, cx| {
+                    explorer.toggle_tick(&explorer::NodeId::Schema(public.clone()), cx);
+                });
+            })
+            .expect("the window is open");
+        cx.run_until_parked();
+
+        // The template tab first, so that what the rule changes is visible as a
+        // change: with no rule, `${name.abbr}` is the name itself.
+        window
+            .update(cx, |workspace, _window, cx| {
+                workspace.open_template(file.clone(), cx);
+            })
+            .expect("the window is open");
+        cx.run_until_parked();
+        window
+            .update(cx, |workspace, _window, cx| {
+                assert!(
+                    workspace.templates[0]
+                        .read(cx)
+                        .preview_text(cx)
+                        .contains("T_SAMPLE_ALBUM"),
+                    "an empty dictionary changed the name"
+                );
+            })
+            .expect("the window is open");
+
+        // *Rules…*, which is what the Generate tab's button dispatches.
+        let store = window
+            .update(cx, |workspace, window, cx| {
+                workspace.open_abbreviations(window, cx);
+                workspace.abbreviations.update(cx, |dialog, cx| {
+                    assert!(dialog.is_open());
+                    // The picker offers what the explorer has loaded, which is
+                    // the whole point of it being there.
+                    assert!(
+                        dialog.tables().iter().any(|name| name == "T_SAMPLE_ALBUM"),
+                        "the picker was not given the loaded tables: {:?}",
+                        dialog.tables()
+                    );
+                    // One blank row to type into, and nothing else.
+                    assert_eq!(dialog.draft(cx).len(), 1);
+
+                    dialog.write_row(
+                        0,
+                        &AbbreviationRule {
+                            enabled: true,
+                            whole_name: false,
+                            abbreviation: "album".to_string(),
+                            replacement: "Disc".to_string(),
+                        },
+                        cx,
+                    );
+                    // The row was filled in, so a new blank one appeared under
+                    // it — and the blank one is not saved.
+                    assert_eq!(dialog.draft(cx).len(), 2);
+                    assert!(abbreviation_dialog::duplicates(&dialog.draft(cx)).is_empty());
+                    let store = dialog.drafted_store(cx);
+                    assert_eq!(store.rules.len(), 1);
+                    store
+                })
+            })
+            .expect("the window is open");
+
+        // What `AbbreviationDialogEvent::Saved` does with it.
+        window
+            .update(cx, |workspace, _window, cx| {
+                workspace.generate.update(cx, |pane, cx| {
+                    pane.adopt_abbreviations(store, cx);
+                });
+                workspace.templates[0].update(cx, |pane, cx| pane.refresh(cx));
+            })
+            .expect("the window is open");
+        cx.run_until_parked();
+
+        window
+            .update(cx, |workspace, _window, cx| {
+                let text = workspace.templates[0].read(cx).preview_text(cx);
+                // D10: the rule is spelled `album` and the segment is `ALBUM`.
+                // jdbgen would have matched neither.
+                assert!(
+                    text.contains("T_SAMPLE_Disc"),
+                    "the rule did not reach the preview: {text:?}"
                 );
             })
             .expect("the window is open");

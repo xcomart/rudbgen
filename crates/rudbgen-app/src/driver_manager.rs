@@ -288,9 +288,17 @@ impl Shape {
     /// queries, which is exactly how the metadata reader will read them —
     /// jdbgen's contract, checked here rather than discovered in the middle of
     /// a generation run.
+    ///
+    /// A positional query is complained about only when it comes back *narrow*.
+    /// The reader — `rudbgen_meta`'s `Rows::require_width` — takes the first
+    /// `n` columns and ignores whatever follows, so a
+    /// `select name, comment, owner from …` — the shape a user gets by adding a
+    /// column to a working statement — runs perfectly well and must not be
+    /// reported here as broken. The test and the reader now answer the same
+    /// question: are the columns the reader indexes there at all?
     fn complaint(&self, kind: CustomQueryKind) -> Option<SharedString> {
         if let Some(wanted) = kind.positional_columns()
-            && self.labels.len() != wanted
+            && self.labels.len() < wanted
         {
             return Some(ts!(
                 "custom_query.wrong_columns",
@@ -2214,14 +2222,26 @@ mod tests {
             rows: 12,
         };
         assert_eq!(pair.complaint(CustomQueryKind::TableComments), None);
+
+        // Wider than the contract is not an error: the reader takes the first
+        // two columns and ignores the rest, so the test has to as well or it
+        // would fail a statement that generates perfectly good comments.
         let three = Shape {
             labels: vec!["A".into(), "B".into(), "C".into()],
             rows: 1,
         };
-        let complaint = three
+        assert_eq!(three.complaint(CustomQueryKind::ColumnComments), None);
+
+        // Narrower is: the second column the reader indexes is not there.
+        let one = Shape {
+            labels: vec!["A".into()],
+            rows: 1,
+        };
+        let complaint = one
             .complaint(CustomQueryKind::ColumnComments)
-            .expect("three columns where two are read");
-        assert!(complaint.contains('3'), "{complaint}");
+            .expect("one column where two are read");
+        assert!(complaint.contains('1'), "{complaint}");
+        assert!(complaint.contains('2'), "{complaint}");
     }
 
     /// A hole with nothing to fill it stays in the statement.

@@ -399,6 +399,11 @@ impl ExplorerSource {
         self.index.get(id)
     }
 
+    /// The name of every table fetched so far, in no particular order.
+    fn table_names(&self) -> Vec<String> {
+        self.index.keys().map(|key| key.name.clone()).collect()
+    }
+
     /// What the label of a row says.
     fn label_of(&self, id: &NodeId) -> SharedString {
         match id {
@@ -861,6 +866,32 @@ impl Explorer {
                 _ => None,
             })
             .collect()
+    }
+
+    /// Every table name the tree has fetched, sorted and without repeats.
+    ///
+    /// The whole-name picker of the abbreviation rules editor (§4.6): a rule
+    /// that replaces a whole identifier is written against a table that exists,
+    /// and typing the name back by hand is where the typo comes from. Names
+    /// rather than keys, because that is what the engine matches — a rule knows
+    /// nothing of catalogs and schemas — which is also why two schemas holding
+    /// an `ORDERS` each offer one entry and not two.
+    ///
+    /// The whole index, not the visible rows: the filter box and the *views*
+    /// toggle are about what the run is over, and neither has anything to say
+    /// about which names a rule may mention.
+    pub fn loaded_table_names(&self, cx: &App) -> Vec<SharedString> {
+        let mut names: Vec<SharedString> = self
+            .tree
+            .read(cx)
+            .source()
+            .table_names()
+            .into_iter()
+            .map(SharedString::from)
+            .collect();
+        names.sort();
+        names.dedup();
+        names
     }
 
     /// Ticks or unticks what a row's box stands for.

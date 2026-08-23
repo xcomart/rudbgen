@@ -108,8 +108,7 @@ after the table list has been loaded.
 
 The result set is read **positionally**: column 1 is the table name, column 2 is
 its comment. Labels are irrelevant, so name them anything. The statement must
-return at least two columns; extra ones are ignored (the **Test** button is
-stricter — see [Testing a query](#testing-a-query)).
+return at least two columns; extra ones are ignored.
 
 Table names are matched against the table list loaded just before, and a comment
 is applied **only when the name matches a known table**. Tables missing from the
@@ -361,17 +360,16 @@ The answer is one line under the row:
 |:---|:---|
 | `OK — 42 rows, and every column the reader needs is there.` | The shape is right. A row count of 0 with an OK shape means the statement is correct and this schema has nothing to say |
 | `Missing columns: IS_KEY` | A label-read query is short of a label — the whole list of what is missing, not just the first |
-| `2 columns are read; 3 came back.` | A positional query returned the wrong number of columns |
+| `The first 2 columns are read; only 1 came back.` | A positional query came back too narrow to read. Extra columns past the ones that are read are fine and are not reported |
 | `The statement failed: …` | The database rejected it. An unsubstituted `${schema}` shows up here, as a syntax error naming the placeholder |
 | `Connect to a database that uses this driver first…` | There is no session to run it on. A statement run against another product would fail for reasons that say nothing about the statement |
 
 Only the shape is reported; the rows themselves are not shown.
 
-> **Note**
-> The test is stricter than the reader on one point: it wants a positional
-> query to return **exactly** two columns, where the metadata reader accepts two
-> or more and ignores the rest. A three-column comment query works but does not
-> pass the test.
+The test asks exactly what the reader asks, no more: a label-read query must
+carry every required label, and a positional one must be at least as wide as the
+positions that are read. A comment query with a third column of its own passes,
+because the reader takes the first two and ignores the rest.
 
 ## Writing queries for a new database
 

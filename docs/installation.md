@@ -230,6 +230,11 @@ encrypted with a key of its own, because nothing rudbgen writes is a secret; the
 URL and the user name are stored in the clear, and credentials embedded in a URL
 are masked out of logs and error messages.
 
+Coming from jdbgen, the one place its master password is still needed is the
+import wizard, which asks for it once and then moves the passwords it opened
+into the keychain — see [Importing from
+jdbgen](ui-guide.md#importing-from-jdbgen).
+
 ## Updating
 
 rudbgen checks for a new release once per launch, in the background, and says

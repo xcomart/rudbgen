@@ -336,9 +336,10 @@ An unknown *field* therefore never stops generation; an unknown *processor*
 does. See [Error handling](#error-handling).
 
 Every warning of step 3 carries the line it came from, and the result summary of
-a run counts them per table × template — which is the fastest way to find a
-misspelled field. In the next release the template editor marks them in the
-gutter as you type.
+a run counts them per table × template. The template tab marks them in the gutter
+as you type, against the table the live preview is rendering — which is the
+fastest way to find a misspelled field. See the [user interface
+guide](ui-guide.md#the-template-tab).
 
 ## The model
 
@@ -928,8 +929,12 @@ whose first key is `name` — you do not have to write `.abbr` at all, and
 `${name.lower}` silently becomes `${name.abbr.lower}`. Aliases are not covered:
 `${table}` and `${column}` are never abbreviated.
 
-**Next release**: an editor for the rules, reached from the **Rules…** button
-beside the switch. Until then `abbreviations.json` is edited by hand:
+The **Rules…** button beside the switch opens the [rules
+editor](ui-guide.md#abbreviation-rules), which is where the list is normally
+kept: four columns, a trailing empty row, a table-name picker for the whole-name
+rows, and a refusal to save two enabled rules of one kind that look for the same
+thing. The file behind it is `abbreviations.json`, and it can equally be edited
+by hand:
 
 ```json
 {
@@ -944,8 +949,8 @@ beside the switch. Until then `abbreviations.json` is edited by hand:
 
 `apply_to_names` is the switch itself. A word rule matches a **whole** segment
 between `_` or `-` separators, never a prefix of one, so there is nothing for two
-overlapping rules to fight over; where two rules do name the same abbreviation,
-the later one wins.
+overlapping rules to fight over; where two rules do name the same abbreviation —
+which the editor refuses to save — the later one wins.
 
 ## Error handling
 

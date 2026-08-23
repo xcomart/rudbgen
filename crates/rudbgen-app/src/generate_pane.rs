@@ -72,6 +72,12 @@ pub enum GeneratePaneEvent {
     Changed,
     /// The pencil beside a template row was pressed; the shell opens the tab.
     EditTemplate(PathBuf),
+    /// *Rules…* was pressed; the shell opens the abbreviation rules editor.
+    ///
+    /// The panel does not open it itself for the reason no panel opens a
+    /// dialog here: the modals are the shell's, one at a time, and a panel that
+    /// held one could not be closed with the tab it lives in.
+    EditAbbreviations,
 }
 
 /// Why the run cannot be started.
@@ -384,6 +390,18 @@ impl GeneratePane {
     /// The abbreviation rules, which a run needs and only this panel has read.
     pub fn abbreviations(&self) -> &AbbreviationStore {
         &self.abbr
+    }
+
+    /// Takes on the rules the editor has just written.
+    ///
+    /// The dialog saved the file; this replaces the panel's copy with the same
+    /// value, so the switch on screen and the rules a run applies come from one
+    /// place. Deliberately does **not** save: writing the file twice would be
+    /// the second answer to a question already answered.
+    pub fn adopt_abbreviations(&mut self, store: AbbreviationStore, cx: &mut Context<Self>) {
+        self.abbr = store;
+        cx.emit(GeneratePaneEvent::Changed);
+        cx.notify();
     }
 
     /// How many templates are ticked.
@@ -1060,17 +1078,16 @@ impl GeneratePane {
                     }),
             )
             .child(
-                // The rules editor is M5; the button is drawn rather than left
-                // out, because a way in that is missing tells the reader
-                // nothing about what the application will do.
-                div()
-                    .id("generate-abbr-rules")
-                    .tooltip(tooltip_label(ts!("generate.tip_rules_soon")))
-                    .child(
-                        Button::new("generate-rules", ts!("generate.rules"))
-                            .variant(ButtonVariant::Secondary)
-                            .disabled(true),
-                    ),
+                Button::new("generate-rules", ts!("generate.rules"))
+                    .variant(ButtonVariant::Secondary)
+                    .on_click({
+                        let open = cx.entity();
+                        move |_, _window, cx| {
+                            open.update(cx, |_, cx| {
+                                cx.emit(GeneratePaneEvent::EditAbbreviations);
+                            });
+                        }
+                    }),
             )
     }
 

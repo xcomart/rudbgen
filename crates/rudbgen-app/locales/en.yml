@@ -270,12 +270,12 @@ custom_query:
   testing: Running…
   ok: "OK — %{rows} rows, and every column the reader needs is there."
   missing: "Missing columns: %{labels}"
-  wrong_columns: "%{expected} columns are read; %{actual} came back."
+  wrong_columns: "The first %{expected} columns are read; only %{actual} came back."
   failed: "The statement failed: %{error}"
   empty: There is no statement to test.
   no_session: Connect to a database that uses this driver first — the test runs the statement on that session.
   contract_labels: "Must return these columns, by name: %{labels}"
-  contract_positional: "Must return %{columns} columns, in this order: %{names}"
+  contract_positional: "The first %{columns} columns are read, in this order: %{names}"
   pair_table: table name, comment
   pair_column: column name, comment
   placeholders: "Filled in before the statement runs: %{names}"
@@ -317,6 +317,12 @@ menu:
   dry_run: Dry run
   generate: Generate
   generate_menu: Generate
+  # Opens the abbreviation rules editor, the Generate tab's "Rules…" by another
+  # door.
+  abbreviations: Abbreviation rules…
+  # The one-time import (D5). Never greyed: a configuration copied from another
+  # machine is chosen from inside the wizard.
+  import_jdbgen: Import from jdbgen…
   # Hover label of the button that opens the in-app menu.
   tip_menu: Menu
   mac:
@@ -353,9 +359,6 @@ welcome:
   # Heading of the saved list, and what stands in its place on a first run.
   saved: Saved connections
   empty: No connections saved yet.
-  # Hover label of a button whose milestone has not arrived. Said plainly:
-  # a button that looks live and does nothing is worse than one that says so.
-  tip_soon: Not built yet.
 
 # The bar along the bottom. It reports the connection and the arithmetic of
 # the run — tables × templates → files — and in M0 there is neither.
@@ -412,7 +415,6 @@ generate:
   var_value: value
   apply_abbreviations: Apply abbreviation rules
   rules: Rules…
-  tip_rules_soon: The rules editor is not built yet.
   preview: Preview
   dry_run: Dry run
   run: Generate
@@ -811,3 +813,80 @@ palette:
     key: The field this statement writes, decorators and all
     item: Another name for key
     format: How the date is written, in Java's pattern letters such as yyyy-MM-dd
+
+# The abbreviation rules editor (§4.6). One table over the one global
+# `abbreviations.json`, opened from the Generate tab's "Rules…" and from the
+# menu. The `apply` checkbox above it is the Generate tab's own switch, so its
+# label lives under `generate.apply_abbreviations` and not here.
+abbr:
+  title: Abbreviation rules
+  # The one line that says what a rule does, D10's change included. It is the
+  # difference between a table people can fill in and a table people guess at.
+  how_it_works: A whole-name rule replaces the entire identifier; otherwise the name is split at _ and -, and each word is looked up on its own. Both match whatever the case, which jdbgen did not do.
+  column_apply: Apply
+  column_whole: Whole name
+  column_abbreviation: Abbreviation
+  column_replacement: Replacement
+  abbreviation_placeholder: what to look for
+  replacement_placeholder: what to put in its place
+  # The dropdown beside a whole-name row, offering the tables the explorer has
+  # loaded. Only drawn while something is connected.
+  pick_table: Table…
+  tip_remove: Remove this rule
+  # Why Save is greyed. `%{abbreviation}` is the user's own text.
+  duplicate: "%{abbreviation}: two rules that are on look for this, and only one of them could ever fire."
+
+# The one-time import of a jdbgen configuration (D5), in three steps: the file
+# and the master password, the checklist, the result.
+import:
+  title: Import from jdbgen
+  password_hint: jdbgen encrypts the connection URL, the user name and the password behind one master password. rudbgen asks for it once, here, and then puts the passwords in the keychain your operating system already guards.
+  master_password: Master password
+  password_placeholder: the password jdbgen asks for at start-up
+  other_file: Other file…
+  choose_file: Choose a jdbgen config.json
+  opening: Opening the configuration…
+  next: Next
+  import: Import
+  importing: Writing…
+  section_connections: Connections
+  section_drivers: Drivers
+  section_sets: Template sets
+  section_rules: Abbreviation rules
+  section_settings: Settings
+  section_conflicts: Names that are already taken
+  section_notes: Worth knowing
+  nothing_here: None in this file.
+  rules_count: "Import %{count} rules"
+  apply_abbr: Apply the rules to generated names
+  set_templates: "%{count} templates"
+  matches_builtin: "uses rudbgen's built-in %{builtin}"
+  # The settings row. `%{language}` is a language tag such as ko, `%{theme}`
+  # one of the two words below.
+  adopt_settings: "Use jdbgen's language (%{language}) and its %{theme} theme"
+  system_language: the system language
+  theme_dark: dark
+  theme_light: light
+  conflict_rename: Keep both when a name is already taken
+  conflict_rename_hint: What comes from jdbgen is added with "(imported)" after its name.
+  conflict_skip_hint: What is already here is kept, and the jdbgen entry is left behind.
+  written: "Imported %{connections} connections, %{drivers} drivers, %{sets} template sets and %{rules} abbreviation rules."
+  nothing_written: Nothing was imported.
+  skipped: "Left behind, because the name was taken: %{names}"
+  no_keychain: "These connections were saved without their password, because it could not be put in the keychain: %{names}. Open one and it will ask."
+  wrong_password: That is not the master password of this configuration.
+  malformed: "This configuration is damaged: one of the encrypted values is not a value at all."
+  unreadable: That file could not be read.
+  not_jdbgen: That file is not a jdbgen configuration.
+  # The notes the mapping produced, one line each.
+  note_case_rule: Word abbreviation rules now match whatever the case. jdbgen only ever matched lower-case segments, so a rule that did nothing there may start firing here.
+  note_legacy: Some values were written in jdbgen's older encryption format. They were read all the same, and your jdbgen configuration is left exactly as it was.
+  note_stock_matched: "%{driver}: rudbgen's own %{builtin} definition is used, with your JAR, SQL overrides and properties."
+  note_stock_unknown: "%{driver} (%{class}) matches none of rudbgen's definitions and is imported as a driver of its own."
+  note_unknown_driver: "%{connection} names the driver %{driver}, which this configuration does not define. Pick one before connecting."
+  note_keep_alive: "%{connection} has a keep-alive interval of %{value}, which is not a number of seconds. The probe is imported switched off."
+  note_unresolved_path: "The %{kind} %{path} of %{owner} was in neither of jdbgen's directories. It is imported as it stands."
+  note_icon: "The icon %{icon} of %{owner} has no equivalent here and is dropped."
+  path_jar: driver JAR
+  path_template: template file
+  path_output: output directory

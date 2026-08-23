@@ -4,10 +4,8 @@ rudbgen is **one window**. There is no modal gate to get through before you can
 see anything, no separate generator dialog and no master password: the window
 opens on a welcome screen, and everything else happens inside the same frame.
 
-This guide describes the interface as it is in the current release. A few
-surfaces the [architecture document](architecture.md) §4 describes are not built
-yet; each of those is marked **Next release** where it belongs, so the shape of
-what is coming is visible from here.
+This guide describes the interface as it is in the current release, which is
+every surface the [architecture document](architecture.md) §4 describes.
 
 [← Documentation index](README.md)
 
@@ -18,8 +16,11 @@ what is coming is visible from here.
 - [The explorer](#the-explorer)
 - [The inspector](#the-inspector)
 - [The Generate tab](#the-generate-tab)
+- [Abbreviation rules](#abbreviation-rules)
+- [The template tab](#the-template-tab)
 - [Preview and dry run](#preview-and-dry-run)
 - [Running the generation](#running-the-generation)
+- [Importing from jdbgen](#importing-from-jdbgen)
 - [Settings](#settings)
 - [Keyboard shortcuts](#keyboard-shortcuts)
 
@@ -33,12 +34,12 @@ connection** button. Clicking a row connects. The explorer and the inspector
 stay out of the frame until a connection opens, so there is nothing on screen
 that has nothing to say.
 
-**Next release.** *Import from jdbgen…* appears here when a jdbgen
-`config.json` is found in its own configuration directory; it asks for the
-master password once, shows what it found — connections, drivers, template sets,
-abbreviation rules — with a checkbox each, and then writes the stores and the
-keychain. *Open a template* will also live here, for editing a template with no
-database at all.
+**Open a template…** under it opens a template file in a tab of its own, with no
+database in the picture at all: editing a template needs no connection, and only
+the live preview does. **Import from jdbgen…** appears beside it when a jdbgen
+`config.json` is where jdbgen keeps it — see [Importing from
+jdbgen](#importing-from-jdbgen); the same command is in the menu whether or not
+it is, so a configuration copied from another machine still has a door.
 
 ## Connecting
 
@@ -166,9 +167,12 @@ This is the same model the templates see, so it doubles as a way to check what a
 template will get. Foreign keys and indexes are new in rudbgen; jdbgen showed
 neither.
 
-**Next release.** With a template tab active, the inspector becomes the
-**variable palette** instead: every field the current model offers, clickable to
-insert `${…}` at the caret.
+With a template tab active the inspector becomes the **variable palette**
+instead: every field the current model offers — table fields, column fields,
+foreign keys, indexes, the statements, the decorators, the conditions and your
+own custom variables — each with a one-line description, filterable, and
+clickable to insert `${…}` at the caret. See [The template
+tab](#the-template-tab).
 
 ## The Generate tab
 
@@ -196,16 +200,79 @@ written.
 - **Custom variables** — a key/value table with a trailing empty row that
   becomes a real row as soon as you type in it.
 - **Apply abbreviations** — the switch that inserts `.abbr` into every `${name}`
-  reference automatically. The **Rules…** button beside it is disabled until the
-  next release; the rules themselves are already read from
-  `abbreviations.json` and applied.
+  reference automatically. **Rules…** beside it opens the [rules
+  editor](#abbreviation-rules); the switch there and the switch here are the
+  same value.
 
-**Next release.** The **Edit** glyph on a template row will open the template in
-a tab of its own: the editor with template highlighting, a live preview beside
-it, gutter marks for parse errors and unknown fields, and
-<kbd>Ctrl</kbd>+<kbd>S</kbd> to write. Today the templates are text files you can
-edit in any editor — see [Template reference](template-reference.md) — and
-rudbgen re-reads them on every run.
+The **Edit** glyph on a template row — or a double click on its file — opens
+that template in [a tab of its own](#the-template-tab).
+
+## Abbreviation rules
+
+![The abbreviation rules editor](screenshots/abbreviations.png)
+
+An abbreviation rule rewrites a piece of an identifier on its way into a
+generated name: `EMP` → `Employee`, `NO` → `Number`. The list is **global**, not
+per connection — a shop's vocabulary is a fact about the shop — and lives in
+`abbreviations.json`. Open the editor with **Rules…** on the Generate tab, or
+from the menu.
+
+Each row is a rule:
+
+| Column | What it means |
+|:---|:---|
+| **Apply** | Whether the rule takes part in a run. A tick, not a deletion: switching a rule off for one project does not cost you the rule |
+| **Whole name** | Whether it replaces the entire identifier rather than one word inside it |
+| **Abbreviation** | What to look for |
+| **Replacement** | What to put in its place. May be empty, which is how a `TB_` prefix is stripped |
+
+**How a name is rewritten.** A whole-name rule replaces the entire identifier
+and ends there. Otherwise the name is split at `_` and `-`, and each word is
+looked up on its own, separators kept where they were. Both kinds match
+**whatever the case** — this is the one deliberate behavioural difference from
+jdbgen, whose word rules only ever matched lower-case segments and therefore
+never fired on `TB_USR`. So `album` → `Disc` turns `T_SAMPLE_ALBUM` into
+`T_SAMPLE_Disc`.
+
+The last row is always empty and becomes a real one the moment you type in it;
+an emptied row is dropped when you save. Beside the **Abbreviation** field of a
+whole-name row is a picker offering the tables the explorer has loaded, so a
+rule about a table is written against a name that exists rather than one typed
+from memory. It appears only while something is connected.
+
+Two rules that are on, are of the same kind, and look for the same thing (case
+ignored) would end as one entry in the dictionary, and which of the two survived
+would be invisible. **Save** is disabled while that stands, and the offending
+rows are outlined. **Cancel** throws the whole draft away — nothing is written
+until **Save**.
+
+## The template tab
+
+![The template editor](screenshots/template-editor.png)
+
+A template opens in a tab of its own from the **Edit** glyph on the Generate
+tab, from *Open a template…* on the welcome screen, or from the menu. It is the
+editor with template-language highlighting on the left, a **live preview** on
+the right, and the [variable palette](#the-inspector) in place of the inspector.
+
+- **The preview follows the buffer, not the file.** It renders the text as it
+  now stands against the table named in its header — pick another from the
+  dropdown — so a change shows before it is saved.
+- **Diagnostics** are gutter marks with a message: a parse error stops the
+  render and names the line; an **unknown field** — `${nmae}` — is a warning,
+  because the engine renders it to nothing and jdbgen's way of finding it was to
+  read the generated file. Clicking a diagnostic jumps the caret to it.
+- <kbd>Ctrl</kbd>+<kbd>S</kbd> writes the file; the tab carries a dirty marker
+  until it does, and closing a dirty tab asks first.
+- <kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>P</kbd> shows and hides the preview
+  half.
+
+![Completion inside a statement](screenshots/completion.png)
+
+<kbd>Ctrl</kbd>+<kbd>Space</kbd> — and typing `${` — offers what may be written
+where the caret is: the statement names at the start of one, the option names
+inside it, and the fields of the current model. Each entry carries the same
+one-line description the palette shows.
 
 ## Preview and dry run
 
@@ -249,6 +316,43 @@ warnings, and **Open output directory**.
 Files are written atomically, so a crash cannot leave a truncated source file in
 your tree.
 
+## Importing from jdbgen
+
+![The import wizard](screenshots/import.png)
+
+**Import from jdbgen…** on the welcome screen — also in the menu — moves a
+[jdbgen](https://github.com/xcomart/jdbgen) configuration across in one pass. It
+is offered whenever rudbgen can find `config.json` in jdbgen's own configuration
+directory, and **Other file…** points it at a copy from another machine.
+
+jdbgen keeps the connection URL, the user name and the password encrypted behind
+a master password. rudbgen has none: it asks for jdbgen's **once**, here
+(<kbd>Enter</kbd> is *Next*), reads both of jdbgen's encryption formats, and then
+puts the passwords where they belong — the OS keychain. The password is not kept
+a moment longer than the step it is typed in, and **your jdbgen configuration is
+never touched**: the file is opened read-only, so changing your mind leaves you
+with a working jdbgen.
+
+The second step is a checklist. Connections, drivers, template sets and
+abbreviation rules each have a tick, and under them:
+
+- **Settings** — jdbgen's language and its light/dark choice, off by default.
+- **Names that are already taken** — keep both, and what comes from jdbgen is
+  added with `(imported)` after its name; or leave the jdbgen entry behind. A
+  driver rudbgen already ships a definition for is the common case, and *keep
+  both* repoints the imported connections at the imported definition so nothing
+  ends up naming a driver that is not there.
+- **Worth knowing** — everything the mapping decided that you would otherwise
+  have to discover: a stock driver matched onto a built-in, a connection naming
+  a driver the file does not define, a keep-alive interval that is not a number,
+  a template file found in neither of jdbgen's directories. The note about
+  abbreviation rules matching whatever the case is always among them, because it
+  is the one behaviour that changes underneath you.
+
+The last step reports what was written. A machine with no usable keychain is not
+a failed import: those connections are saved without their password and named
+here, and rudbgen asks for the password when you open one.
+
 ## Settings
 
 <kbd>Ctrl</kbd>+<kbd>,</kbd> opens Settings: the UI theme and the editor theme
@@ -271,6 +375,9 @@ On macOS, read <kbd>Cmd</kbd> for <kbd>Ctrl</kbd>.
 | <kbd>Ctrl</kbd>+<kbd>B</kbd> | Show/hide the explorer |
 | <kbd>Ctrl</kbd>+<kbd>I</kbd> | Show/hide the inspector |
 | <kbd>Ctrl</kbd>+<kbd>,</kbd> | Settings |
+| <kbd>Ctrl</kbd>+<kbd>S</kbd> | Save the template tab on top |
+| <kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>P</kbd> | Show/hide the live preview |
+| <kbd>Ctrl</kbd>+<kbd>Space</kbd> | Suggest what may be written here |
 | <kbd>Esc</kbd> | Dismiss the dialog on top |
 | <kbd>Ctrl</kbd>+<kbd>Q</kbd> | Quit |
 

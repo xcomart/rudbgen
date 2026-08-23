@@ -195,12 +195,12 @@ custom_query:
   testing: 실행 중…
   ok: "성공 — %{rows}행, 필요한 컬럼이 모두 있습니다."
   missing: "빠진 컬럼: %{labels}"
-  wrong_columns: "%{expected}개 컬럼을 읽는데 %{actual}개가 왔습니다."
+  wrong_columns: "앞의 %{expected}개 컬럼을 읽는데 %{actual}개만 왔습니다."
   failed: "문 실행에 실패했습니다: %{error}"
   empty: 테스트할 문이 없습니다.
   no_session: 이 드라이버를 쓰는 데이터베이스에 먼저 연결하세요. 테스트는 그 세션에서 문을 실행합니다.
   contract_labels: "다음 컬럼을 이름으로 반환해야 합니다: %{labels}"
-  contract_positional: "다음 순서로 %{columns}개 컬럼을 반환해야 합니다: %{names}"
+  contract_positional: "앞의 %{columns}개 컬럼을 다음 순서로 읽습니다: %{names}"
   pair_table: 테이블 이름, 주석
   pair_column: 컬럼 이름, 주석
   placeholders: "실행 전에 채워집니다: %{names}"
@@ -224,6 +224,8 @@ menu:
   dry_run: 시험 실행
   generate: 생성
   generate_menu: 생성
+  abbreviations: 약어 규칙…
+  import_jdbgen: jdbgen에서 가져오기…
   tip_menu: 메뉴
   mac:
     new_connection: 새 연결…
@@ -245,7 +247,6 @@ welcome:
   open_template: 템플릿 열기…
   saved: 저장된 연결
   empty: 저장된 연결이 없습니다.
-  tip_soon: 아직 만들어지지 않았습니다.
 
 statusbar:
   no_connection: 연결 없음
@@ -287,7 +288,6 @@ generate:
   var_value: 값
   apply_abbreviations: 약어 규칙 적용
   rules: 규칙…
-  tip_rules_soon: 규칙 편집기는 아직 만들지 않았습니다.
   preview: 미리보기
   dry_run: 시험 실행
   run: 생성
@@ -606,3 +606,66 @@ palette:
     key: 이 문장이 쓸 필드. 데코레이터까지
     item: key의 다른 이름
     format: 날짜를 쓰는 형식. yyyy-MM-dd 같은 자바 패턴 문자
+
+abbr:
+  title: 약어 규칙
+  how_it_works: 전체 이름 규칙은 식별자 전체를 바꿉니다. 그렇지 않으면 이름을 _ 와 - 로 나눠 단어마다 찾습니다. 둘 다 대소문자를 가리지 않습니다. jdbgen은 그러지 않았습니다.
+  column_apply: 적용
+  column_whole: 전체 이름
+  column_abbreviation: 약어
+  column_replacement: 바꿀 말
+  abbreviation_placeholder: 찾을 문자열
+  replacement_placeholder: 대신 넣을 문자열
+  pick_table: 테이블…
+  tip_remove: 이 규칙 삭제
+  duplicate: "%{abbreviation}: 켜져 있는 규칙 둘이 같은 것을 찾습니다. 실제로 걸리는 것은 하나뿐입니다."
+
+import:
+  title: jdbgen에서 가져오기
+  password_hint: jdbgen은 접속 URL, 사용자 이름, 비밀번호를 마스터 패스워드 뒤에 암호화해 둡니다. rudbgen은 여기서 한 번만 묻고, 그 뒤로 비밀번호는 운영체제가 이미 지키고 있는 키체인에 맡깁니다.
+  master_password: 마스터 패스워드
+  password_placeholder: jdbgen이 시작할 때 묻는 그 비밀번호
+  other_file: 다른 파일…
+  choose_file: jdbgen의 config.json 고르기
+  opening: 설정을 여는 중…
+  next: 다음
+  import: 가져오기
+  importing: 쓰는 중…
+  section_connections: 연결
+  section_drivers: 드라이버
+  section_sets: 템플릿 세트
+  section_rules: 약어 규칙
+  section_settings: 설정
+  section_conflicts: 이미 쓰이는 이름
+  section_notes: 알아둘 것
+  nothing_here: 이 파일에는 없습니다.
+  rules_count: "규칙 %{count}개 가져오기"
+  apply_abbr: 만들어지는 이름에 규칙 적용
+  set_templates: "템플릿 %{count}개"
+  matches_builtin: "rudbgen에 내장된 %{builtin}을 씁니다"
+  adopt_settings: "jdbgen의 언어(%{language})와 %{theme} 테마 쓰기"
+  system_language: 시스템 언어
+  theme_dark: 어두운
+  theme_light: 밝은
+  conflict_rename: 이름이 겹치면 둘 다 두기
+  conflict_rename_hint: jdbgen에서 온 쪽은 이름 뒤에 "(imported)"를 붙여 넣습니다.
+  conflict_skip_hint: 여기 있던 것을 두고, jdbgen 쪽 항목은 가져오지 않습니다.
+  written: "연결 %{connections}개, 드라이버 %{drivers}개, 템플릿 세트 %{sets}개, 약어 규칙 %{rules}개를 가져왔습니다."
+  nothing_written: 가져온 것이 없습니다.
+  skipped: "이름이 겹쳐 건너뛰었습니다: %{names}"
+  no_keychain: "키체인에 넣지 못해 다음 연결은 비밀번호 없이 저장했습니다: %{names}. 열 때 다시 묻습니다."
+  wrong_password: 이 설정의 마스터 패스워드가 아닙니다.
+  malformed: 이 설정은 손상되었습니다. 암호화된 값 하나가 값의 꼴이 아닙니다.
+  unreadable: 그 파일을 읽지 못했습니다.
+  not_jdbgen: 그 파일은 jdbgen 설정이 아닙니다.
+  note_case_rule: 단어 규칙이 이제 대소문자를 가리지 않고 걸립니다. jdbgen은 소문자 조각만 봤기 때문에, 거기서 아무 일도 하지 않던 규칙이 여기서는 걸리기 시작할 수 있습니다.
+  note_legacy: 일부 값이 jdbgen의 옛 암호화 형식이었습니다. 그래도 읽었고, 쓰시던 jdbgen 설정은 그대로 둡니다.
+  note_stock_matched: "%{driver}: rudbgen의 %{builtin} 정의를 쓰고, JAR와 SQL 재정의, 속성은 그대로 가져옵니다."
+  note_stock_unknown: "%{driver}(%{class})는 rudbgen의 어느 정의에도 맞지 않아 별도 드라이버로 가져옵니다."
+  note_unknown_driver: "%{connection}이 가리키는 드라이버 %{driver}가 이 설정에 없습니다. 접속하기 전에 하나 고르세요."
+  note_keep_alive: "%{connection}의 연결 유지 간격 %{value}는 초 단위 숫자가 아닙니다. 이 확인은 꺼진 채로 가져옵니다."
+  note_unresolved_path: "%{owner}의 %{kind} %{path}가 jdbgen의 두 디렉터리 어디에도 없었습니다. 적힌 그대로 가져옵니다."
+  note_icon: "%{owner}의 아이콘 %{icon}은 여기에 대응하는 것이 없어 뺍니다."
+  path_jar: 드라이버 JAR
+  path_template: 템플릿 파일
+  path_output: 출력 디렉터리

@@ -74,13 +74,28 @@ Written against jdbgen, because that is what most of this is for:
   ![The driver editor's custom queries](docs/screenshots/driver-custom-queries.png)
 - **SSH tunnels** with password or private-key auth, loopback binds only, and no
   PTY on the bastion — `nologin` jump hosts work.
+- **Templates are documents, not file paths.** A template opens in a tab of its
+  own: the editor with template-language highlighting layered over the output
+  file's own language, a live preview that follows the *buffer* against a table
+  you pick, gutter marks for parse errors and for **unknown fields** — jdbgen's
+  way of finding a typo like `${nmae}` was to read the generated file — a
+  clickable variable palette of every field the model offers, and completion on
+  <kbd>Ctrl</kbd>+<kbd>Space</kbd>.
+  ![The template editor with its live preview](docs/screenshots/template-editor.png)
+- **An abbreviation rules editor.** The four-column table jdbgen kept in its
+  configuration window, with a trailing empty row, a table-name picker for
+  whole-name rules, and a refusal to save two rules that would silently become
+  one. Word rules now match **whatever the case**, which is the one deliberate
+  behavioural break from jdbgen — where they only ever matched lower-case
+  segments and so never fired on `TB_USR`.
+- **A one-time import from jdbgen.** Point it at a `config.json`, type the
+  master password once, and it reads both of jdbgen's encryption formats, shows
+  what it found with a checkbox each, and writes your connections, drivers,
+  template sets and abbreviation rules — passwords into the OS keychain. Your
+  jdbgen configuration is opened read-only and left exactly as it was.
 - **Themes and languages**: UI and editor theme registries with live preview,
   import/export and a user theme directory; eight interface languages (en, ko,
   ja, zh-CN, de, es, fr, ru), switched live.
-
-Coming in the next release: the in-app template editor with a live preview and
-diagnostics, the abbreviation rules editor, and the one-time import of a jdbgen
-`config.json`.
 
 ## Installing
 

@@ -195,12 +195,12 @@ custom_query:
   testing: 执行中…
   ok: "成功 — %{rows} 行，需要的列都在。"
   missing: "缺少的列：%{labels}"
-  wrong_columns: "读取 %{expected} 列，实际返回 %{actual} 列。"
+  wrong_columns: "读取前 %{expected} 列，但只返回了 %{actual} 列。"
   failed: "语句执行失败：%{error}"
   empty: 没有可测试的语句。
   no_session: 请先连接使用此驱动的数据库，测试会在该会话上执行语句。
   contract_labels: "必须按名称返回这些列：%{labels}"
-  contract_positional: "必须按此顺序返回 %{columns} 列：%{names}"
+  contract_positional: "读取前 %{columns} 列，顺序如下：%{names}"
   pair_table: 表名、注释
   pair_column: 列名、注释
   placeholders: "执行前会填入：%{names}"
@@ -224,6 +224,8 @@ menu:
   dry_run: 试运行
   generate: 生成
   generate_menu: 生成
+  abbreviations: 缩写规则…
+  import_jdbgen: 从 jdbgen 导入…
   tip_menu: 菜单
   mac:
     new_connection: 新建连接…
@@ -245,7 +247,6 @@ welcome:
   open_template: 打开模板…
   saved: 已保存的连接
   empty: 尚未保存任何连接。
-  tip_soon: 尚未实现。
 
 statusbar:
   no_connection: 无连接
@@ -286,7 +287,6 @@ generate:
   var_value: 值
   apply_abbreviations: 应用缩写规则
   rules: 规则…
-  tip_rules_soon: 规则编辑器尚未构建。
   preview: 预览
   dry_run: 试运行
   run: 生成
@@ -605,3 +605,66 @@ palette:
     key: 这条语句要写的字段，连修饰符一起
     item: key 的别名
     format: 日期怎么写，用 Java 的模式字母，如 yyyy-MM-dd
+
+abbr:
+  title: 缩写规则
+  how_it_works: 整名规则替换整个标识符；否则名称按 _ 和 - 拆开，每个词各自查找。两者都不区分大小写，jdbgen 并非如此。
+  column_apply: 启用
+  column_whole: 整名
+  column_abbreviation: 缩写
+  column_replacement: 替换为
+  abbreviation_placeholder: 要查找的内容
+  replacement_placeholder: 要替换成的内容
+  pick_table: 表…
+  tip_remove: 删除此规则
+  duplicate: "%{abbreviation}：有两条已启用的规则查找它，最终只有一条能生效。"
+
+import:
+  title: 从 jdbgen 导入
+  password_hint: jdbgen 用一个主密码加密连接 URL、用户名和密码。rudbgen 只在这里问一次，之后把密码交给操作系统本来就在看守的钥匙串。
+  master_password: 主密码
+  password_placeholder: jdbgen 启动时索取的那个密码
+  other_file: 其他文件…
+  choose_file: 选择 jdbgen 的 config.json
+  opening: 正在打开配置…
+  next: 下一步
+  import: 导入
+  importing: 正在写入…
+  section_connections: 连接
+  section_drivers: 驱动
+  section_sets: 模板集
+  section_rules: 缩写规则
+  section_settings: 设置
+  section_conflicts: 已被占用的名称
+  section_notes: 值得一提
+  nothing_here: 此文件中没有。
+  rules_count: "导入 %{count} 条规则"
+  apply_abbr: 把规则用在生成的名称上
+  set_templates: "%{count} 个模板"
+  matches_builtin: "使用 rudbgen 内置的 %{builtin}"
+  adopt_settings: "采用 jdbgen 的语言（%{language}）和它的%{theme}主题"
+  system_language: 系统语言
+  theme_dark: 深色
+  theme_light: 浅色
+  conflict_rename: 名称被占用时两者都留
+  conflict_rename_hint: 来自 jdbgen 的一份会在名称后加上 "(imported)"。
+  conflict_skip_hint: 保留这里已有的，jdbgen 中的条目不导入。
+  written: "已导入 %{connections} 个连接、%{drivers} 个驱动、%{sets} 个模板集和 %{rules} 条缩写规则。"
+  nothing_written: 没有导入任何内容。
+  skipped: "名称被占用，已跳过：%{names}"
+  no_keychain: "以下连接因无法写入钥匙串而未保存密码：%{names}。打开时会再询问。"
+  wrong_password: 这不是该配置的主密码。
+  malformed: 该配置已损坏：其中一个加密值根本不是一个值。
+  unreadable: 无法读取该文件。
+  not_jdbgen: 该文件不是 jdbgen 的配置。
+  note_case_rule: 词级规则现在不区分大小写。jdbgen 只匹配小写片段，因此在那里从不生效的规则，在这里可能开始生效。
+  note_legacy: 有些值使用的是 jdbgen 较旧的加密格式。它们照样被读出，您的 jdbgen 配置保持原样。
+  note_stock_matched: "%{driver}：使用 rudbgen 自带的 %{builtin} 定义，并沿用您的 JAR、SQL 覆盖和属性。"
+  note_stock_unknown: "%{driver}（%{class}）与 rudbgen 的任何定义都不匹配，作为独立驱动导入。"
+  note_unknown_driver: "%{connection} 指向驱动 %{driver}，而此配置并未定义它。连接前请先选一个。"
+  note_keep_alive: "%{connection} 的保活间隔为 %{value}，不是秒数。该探测以关闭状态导入。"
+  note_unresolved_path: "%{owner} 的%{kind} %{path} 在 jdbgen 的两个目录中都找不到，按原样导入。"
+  note_icon: "%{owner} 的图标 %{icon} 在这里没有对应项，已舍弃。"
+  path_jar: 驱动 JAR
+  path_template: 模板文件
+  path_output: 输出目录

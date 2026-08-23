@@ -162,7 +162,7 @@ mod tests {
 
     /// One key per top-level namespace of `en.yml`, chosen so that no
     /// translation of it legitimately coincides with the English wording.
-    const PROBES: [&str; 20] = [
+    const PROBES: [&str; 22] = [
         "language.name",
         "common.close",
         "menu.new_connection",
@@ -192,6 +192,12 @@ mod tests {
         "connect.title",
         "driver.title",
         "custom_query.section",
+        // The rules editor and the import wizard. Not `abbr.title` or
+        // `import.title`: several languages keep "jdbgen" as it stands and the
+        // rules editor's own title is close to the English in more than one.
+        // These two are translated everywhere rudbgen ships.
+        "abbr.column_replacement",
+        "import.master_password",
         "update.ignore",
     ];
 

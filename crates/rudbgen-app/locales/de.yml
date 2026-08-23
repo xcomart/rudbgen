@@ -196,12 +196,12 @@ custom_query:
   testing: Läuft…
   ok: "OK — %{rows} Zeilen, und jede benötigte Spalte ist da."
   missing: "Fehlende Spalten: %{labels}"
-  wrong_columns: "%{expected} Spalten werden gelesen; %{actual} kamen zurück."
+  wrong_columns: "Die ersten %{expected} Spalten werden gelesen; nur %{actual} kamen zurück."
   failed: "Die Anweisung ist fehlgeschlagen: %{error}"
   empty: Es gibt keine Anweisung zum Testen.
   no_session: Verbinden Sie sich zuerst mit einer Datenbank, die diesen Treiber benutzt — der Test führt die Anweisung in dieser Sitzung aus.
   contract_labels: "Muss diese Spalten liefern, nach Namen: %{labels}"
-  contract_positional: "Muss %{columns} Spalten liefern, in dieser Reihenfolge: %{names}"
+  contract_positional: "Die ersten %{columns} Spalten werden gelesen, in dieser Reihenfolge: %{names}"
   pair_table: Tabellenname, Kommentar
   pair_column: Spaltenname, Kommentar
   placeholders: "Wird vor dem Ausführen eingesetzt: %{names}"
@@ -225,6 +225,8 @@ menu:
   dry_run: Probelauf
   generate: Erzeugen
   generate_menu: Erzeugen
+  abbreviations: Abkürzungsregeln…
+  import_jdbgen: Aus jdbgen importieren…
   tip_menu: Menü
   mac:
     new_connection: Neue Verbindung…
@@ -247,7 +249,6 @@ welcome:
   open_template: Vorlage öffnen…
   saved: Gespeicherte Verbindungen
   empty: Noch keine Verbindungen gespeichert.
-  tip_soon: Noch nicht gebaut.
 
 statusbar:
   no_connection: keine Verbindung
@@ -289,7 +290,6 @@ generate:
   var_value: Wert
   apply_abbreviations: Abkürzungsregeln anwenden
   rules: Regeln…
-  tip_rules_soon: Der Regeleditor ist noch nicht gebaut.
   preview: Vorschau
   dry_run: Probelauf
   run: Erzeugen
@@ -608,3 +608,66 @@ palette:
     key: Das Feld, das diese Anweisung schreibt, mitsamt Dekoratoren
     item: Ein anderer Name für key
     format: Wie das Datum geschrieben wird, in Javas Musterbuchstaben wie yyyy-MM-dd
+
+abbr:
+  title: Abkürzungsregeln
+  how_it_works: Eine Ganznamen-Regel ersetzt den ganzen Bezeichner; sonst wird der Name an _ und - zerlegt und jedes Wort für sich nachgeschlagen. Beides ohne Rücksicht auf Groß- und Kleinschreibung, was jdbgen nicht tat.
+  column_apply: Aktiv
+  column_whole: Ganzer Name
+  column_abbreviation: Abkürzung
+  column_replacement: Ersetzung
+  abbreviation_placeholder: wonach gesucht wird
+  replacement_placeholder: was an seine Stelle tritt
+  pick_table: Tabelle…
+  tip_remove: Diese Regel entfernen
+  duplicate: "%{abbreviation}: Zwei aktive Regeln suchen danach, und nur eine davon könnte je greifen."
+
+import:
+  title: Aus jdbgen importieren
+  password_hint: jdbgen verschlüsselt die Verbindungs-URL, den Benutzernamen und das Passwort hinter einem Hauptpasswort. rudbgen fragt einmal danach, hier, und legt die Passwörter danach in den Schlüsselbund, den das Betriebssystem ohnehin bewacht.
+  master_password: Hauptpasswort
+  password_placeholder: das Passwort, nach dem jdbgen beim Start fragt
+  other_file: Andere Datei…
+  choose_file: Eine jdbgen-config.json wählen
+  opening: Konfiguration wird geöffnet…
+  next: Weiter
+  import: Importieren
+  importing: Wird geschrieben…
+  section_connections: Verbindungen
+  section_drivers: Treiber
+  section_sets: Vorlagensätze
+  section_rules: Abkürzungsregeln
+  section_settings: Einstellungen
+  section_conflicts: Bereits vergebene Namen
+  section_notes: Gut zu wissen
+  nothing_here: In dieser Datei keine.
+  rules_count: "%{count} Regeln importieren"
+  apply_abbr: Regeln auf erzeugte Namen anwenden
+  set_templates: "%{count} Vorlagen"
+  matches_builtin: "nutzt rudbgens eingebautes %{builtin}"
+  adopt_settings: "jdbgens Sprache (%{language}) und sein %{theme} Thema übernehmen"
+  system_language: die Systemsprache
+  theme_dark: dunkles
+  theme_light: helles
+  conflict_rename: Bei vergebenem Namen beides behalten
+  conflict_rename_hint: Was aus jdbgen kommt, wird mit "(imported)" hinter dem Namen angelegt.
+  conflict_skip_hint: Was schon da ist, bleibt; der jdbgen-Eintrag wird zurückgelassen.
+  written: "%{connections} Verbindungen, %{drivers} Treiber, %{sets} Vorlagensätze und %{rules} Abkürzungsregeln importiert."
+  nothing_written: Es wurde nichts importiert.
+  skipped: "Zurückgelassen, weil der Name vergeben war: %{names}"
+  no_keychain: "Diese Verbindungen wurden ohne ihr Passwort gespeichert, weil es nicht in den Schlüsselbund gelegt werden konnte: %{names}. Beim Öffnen wird danach gefragt."
+  wrong_password: Das ist nicht das Hauptpasswort dieser Konfiguration.
+  malformed: "Diese Konfiguration ist beschädigt: einer der verschlüsselten Werte ist gar kein Wert."
+  unreadable: Diese Datei konnte nicht gelesen werden.
+  not_jdbgen: Diese Datei ist keine jdbgen-Konfiguration.
+  note_case_rule: Wortregeln greifen jetzt ohne Rücksicht auf Groß- und Kleinschreibung. jdbgen traf nur kleingeschriebene Segmente, also kann eine Regel, die dort nichts tat, hier plötzlich greifen.
+  note_legacy: Einige Werte lagen in jdbgens älterem Verschlüsselungsformat vor. Sie wurden trotzdem gelesen, und Ihre jdbgen-Konfiguration bleibt unverändert.
+  note_stock_matched: "%{driver}: Es wird rudbgens eigene Definition %{builtin} benutzt, mit Ihrer JAR-Datei, Ihren SQL-Überschreibungen und Eigenschaften."
+  note_stock_unknown: "%{driver} (%{class}) passt zu keiner Definition von rudbgen und wird als eigener Treiber importiert."
+  note_unknown_driver: "%{connection} nennt den Treiber %{driver}, den diese Konfiguration nicht definiert. Wählen Sie vor dem Verbinden einen aus."
+  note_keep_alive: "%{connection} hat ein Keep-Alive-Intervall von %{value}, was keine Sekundenzahl ist. Die Prüfung wird ausgeschaltet importiert."
+  note_unresolved_path: "%{kind} %{path} von %{owner} lag in keinem der beiden jdbgen-Verzeichnisse und wird unverändert importiert."
+  note_icon: "Das Symbol %{icon} von %{owner} hat hier keine Entsprechung und entfällt."
+  path_jar: Die Treiber-JAR
+  path_template: Die Vorlagendatei
+  path_output: Das Ausgabeverzeichnis

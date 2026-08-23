@@ -5,6 +5,7 @@ edition.workspace = true
 license.workspace = true
 authors.workspace = true
 repository.workspace = true
+description = "SSH local port forwarding: the tunnel a connection opens before it dials the database"
 
 [dependencies]
 # The only rudbgen crate this one knows. In particular it does *not* know

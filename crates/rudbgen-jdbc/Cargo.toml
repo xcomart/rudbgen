@@ -5,6 +5,7 @@ edition.workspace = true
 license.workspace = true
 authors.workspace = true
 repository.workspace = true
+description = "The JDBC bridge from the Rust side: JVM bootstrap, the session worker, DESCRIBE and EXECUTE"
 
 [dependencies]
 # The only rudbgen crate this one knows, and it is read-only: the JVM heap and

@@ -196,12 +196,12 @@ custom_query:
   testing: Выполняется…
   ok: "Готово — строк: %{rows}; все нужные столбцы на месте."
   missing: "Не хватает столбцов: %{labels}"
-  wrong_columns: "Читается столбцов: %{expected}; вернулось: %{actual}."
+  wrong_columns: "Читаются первые %{expected} столбцов; вернулось лишь %{actual}."
   failed: "Запрос не выполнен: %{error}"
   empty: Проверять нечего — запрос пуст.
   no_session: "Сначала подключитесь к базе, которая использует этот драйвер: проверка выполнит запрос в этом сеансе."
   contract_labels: "Должен вернуть эти столбцы по имени: %{labels}"
-  contract_positional: "Должен вернуть столбцов — %{columns}, в таком порядке: %{names}"
+  contract_positional: "Читаются первые %{columns} столбцов, в таком порядке: %{names}"
   pair_table: имя таблицы, комментарий
   pair_column: имя столбца, комментарий
   placeholders: "Подставляется перед выполнением: %{names}"
@@ -225,6 +225,8 @@ menu:
   dry_run: Пробный запуск
   generate: Сгенерировать
   generate_menu: Генерация
+  abbreviations: Правила сокращений…
+  import_jdbgen: Импорт из jdbgen…
   tip_menu: Меню
   mac:
     new_connection: Новое подключение…
@@ -247,7 +249,6 @@ welcome:
   open_template: Открыть шаблон…
   saved: Сохранённые подключения
   empty: Сохранённых подключений пока нет.
-  tip_soon: Ещё не реализовано.
 
 statusbar:
   no_connection: нет подключения
@@ -289,7 +290,6 @@ generate:
   var_value: значение
   apply_abbreviations: Применять правила сокращений
   rules: Правила…
-  tip_rules_soon: Редактор правил ещё не сделан.
   preview: Предпросмотр
   dry_run: Пробный запуск
   run: Сгенерировать
@@ -608,3 +608,66 @@ palette:
     key: Поле, которое пишет этот оператор, вместе с декораторами
     item: Другое имя для key
     format: Как записывается дата, буквами шаблона Java, например yyyy-MM-dd
+
+abbr:
+  title: Правила сокращений
+  how_it_works: Правило целого имени заменяет весь идентификатор; иначе имя делится по _ и -, и каждое слово ищется отдельно. И то и другое — без учёта регистра, чего jdbgen не делал.
+  column_apply: Применять
+  column_whole: Целое имя
+  column_abbreviation: Сокращение
+  column_replacement: Замена
+  abbreviation_placeholder: что искать
+  replacement_placeholder: что поставить вместо
+  pick_table: Таблица…
+  tip_remove: Удалить это правило
+  duplicate: "%{abbreviation}: это ищут два включённых правила, а сработать может лишь одно."
+
+import:
+  title: Импорт из jdbgen
+  password_hint: jdbgen шифрует URL подключения, имя пользователя и пароль за одним главным паролем. rudbgen спрашивает его один раз, здесь, а дальше кладёт пароли в связку ключей, которую операционная система и так охраняет.
+  master_password: Главный пароль
+  password_placeholder: пароль, который jdbgen спрашивает при запуске
+  other_file: Другой файл…
+  choose_file: Выберите config.json от jdbgen
+  opening: Открываем конфигурацию…
+  next: Далее
+  import: Импортировать
+  importing: Записываем…
+  section_connections: Подключения
+  section_drivers: Драйверы
+  section_sets: Наборы шаблонов
+  section_rules: Правила сокращений
+  section_settings: Настройки
+  section_conflicts: Занятые имена
+  section_notes: Стоит знать
+  nothing_here: В этом файле их нет.
+  rules_count: "Импортировать правил: %{count}"
+  apply_abbr: Применять правила к создаваемым именам
+  set_templates: "Шаблонов: %{count}"
+  matches_builtin: "использует встроенное определение %{builtin}"
+  adopt_settings: "Взять язык jdbgen (%{language}) и его %{theme} тему"
+  system_language: язык системы
+  theme_dark: тёмную
+  theme_light: светлую
+  conflict_rename: Если имя занято — оставить оба
+  conflict_rename_hint: То, что пришло из jdbgen, добавляется с "(imported)" после имени.
+  conflict_skip_hint: Остаётся то, что уже здесь; запись из jdbgen не переносится.
+  written: "Импортировано подключений: %{connections}, драйверов: %{drivers}, наборов шаблонов: %{sets}, правил сокращений: %{rules}."
+  nothing_written: Ничего не импортировано.
+  skipped: "Не перенесено, имя занято: %{names}"
+  no_keychain: "Эти подключения сохранены без пароля, потому что его не удалось положить в связку ключей: %{names}. При открытии он будет запрошен."
+  wrong_password: Это не главный пароль этой конфигурации.
+  malformed: "Эта конфигурация повреждена: одно из зашифрованных значений вовсе не значение."
+  unreadable: Этот файл не удалось прочитать.
+  not_jdbgen: Этот файл — не конфигурация jdbgen.
+  note_case_rule: Пословные правила теперь срабатывают без учёта регистра. jdbgen смотрел только на сегменты в нижнем регистре, так что правило, которое там ничего не делало, здесь может начать срабатывать.
+  note_legacy: Часть значений записана в старом формате шифрования jdbgen. Их всё равно прочитали, а ваша конфигурация jdbgen осталась ровно такой, какой была.
+  note_stock_matched: "%{driver}: используется собственное определение %{builtin} от rudbgen, с вашим JAR, вашими SQL-переопределениями и свойствами."
+  note_stock_unknown: "%{driver} (%{class}) не совпадает ни с одним определением rudbgen и импортируется как отдельный драйвер."
+  note_unknown_driver: "%{connection} называет драйвер %{driver}, которого в этой конфигурации нет. Выберите драйвер перед подключением."
+  note_keep_alive: "У %{connection} интервал keep-alive равен %{value} — это не число секунд. Проверка импортируется выключенной."
+  note_unresolved_path: "%{kind} %{path} записи %{owner} нет ни в одном из двух каталогов jdbgen — импортируется как есть."
+  note_icon: "Значок %{icon} записи %{owner} здесь не имеет соответствия и отброшен."
+  path_jar: JAR драйвера
+  path_template: Файл шаблона
+  path_output: Каталог вывода

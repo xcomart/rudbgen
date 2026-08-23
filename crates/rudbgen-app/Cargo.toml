@@ -58,6 +58,12 @@ rudbgen-editor.workspace = true
 # generation job does not: parsing the buffer for the diagnostics list, and
 # rendering the output-name template for the live preview's header.
 rudbgen-template.workspace = true
+# The one-time import of a jdbgen `config.json` (D5), behind the welcome
+# screen's *Import from jdbgen…*: it locates the file, reads it, decrypts the
+# three encrypted fields with jdbgen's own two schemes and maps the result onto
+# rudbgen's stores. It writes nothing — `src/import_dialog.rs` is what folds
+# what it produced into the four JSON files and the keychain.
+rudbgen-import.workspace = true
 # Local port forwarding through a bastion, for the connection dialog's tunnel
 # block. Set up before the session opens and taken down after it closes; see
 # `src/connection.rs`.
@@ -109,6 +115,10 @@ ureq.workspace = true
 # and `ureq`'s `rustls`, so this is an edge in the graph rather than a crate in
 # the build.
 ring.workspace = true
+# One use, in `src/import_dialog.rs`: the buffer the jdbgen master password is
+# moved into for the one call that needs it, so that it is wiped rather than
+# left in a freed allocation once the configuration is open.
+zeroize.workspace = true
 
 [dev-dependencies]
 # gpui's headless test platform, for the behaviour that only exists once an

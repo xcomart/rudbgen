@@ -5787,6 +5787,7 @@ dependencies = [
  "rudbgen-editor",
  "rudbgen-gen",
  "rudbgen-grid",
+ "rudbgen-import",
  "rudbgen-jdbc",
  "rudbgen-meta",
  "rudbgen-ssh",
@@ -5801,6 +5802,7 @@ dependencies = [
  "windows 0.61.3",
  "windows-registry",
  "winresource",
+ "zeroize",
 ]
 
 [[package]]

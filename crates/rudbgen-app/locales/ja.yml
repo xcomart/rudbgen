@@ -195,12 +195,12 @@ custom_query:
   testing: 実行中…
   ok: "OK — %{rows} 行。必要な列はすべてそろっています。"
   missing: "足りない列: %{labels}"
-  wrong_columns: "読み取るのは %{expected} 列ですが、%{actual} 列返りました。"
+  wrong_columns: "先頭 %{expected} 列を読み取りますが、%{actual} 列しか返りませんでした。"
   failed: "文の実行に失敗しました: %{error}"
   empty: テストする文がありません。
   no_session: まずこのドライバーを使うデータベースに接続してください。テストはその接続で文を実行します。
   contract_labels: "次の列を名前で返す必要があります: %{labels}"
-  contract_positional: "次の順で %{columns} 列を返す必要があります: %{names}"
+  contract_positional: "先頭 %{columns} 列を次の順で読み取ります: %{names}"
   pair_table: テーブル名、コメント
   pair_column: 列名、コメント
   placeholders: "実行前に埋められます: %{names}"
@@ -224,6 +224,8 @@ menu:
   dry_run: ドライラン
   generate: 生成
   generate_menu: 生成
+  abbreviations: 略語規則…
+  import_jdbgen: jdbgen から取り込む…
   tip_menu: メニュー
   mac:
     new_connection: 新規接続…
@@ -246,7 +248,6 @@ welcome:
   open_template: テンプレートを開く…
   saved: 保存した接続
   empty: 保存された接続はありません。
-  tip_soon: まだ実装されていません。
 
 statusbar:
   no_connection: 接続なし
@@ -287,7 +288,6 @@ generate:
   var_value: 値
   apply_abbreviations: 略語規則を適用
   rules: 規則…
-  tip_rules_soon: 規則エディターはまだ作られていません。
   preview: プレビュー
   dry_run: ドライラン
   run: 生成
@@ -606,3 +606,66 @@ palette:
     key: この文が書く項目。デコレーターまで含みます
     item: key の別名
     format: 日付の書き方。yyyy-MM-dd のような Java のパターン文字
+
+abbr:
+  title: 略語規則
+  how_it_works: 全体名の規則は識別子をまるごと置き換えます。そうでなければ名前を _ と - で分け、単語ごとに引きます。どちらも大文字小文字を問いません。jdbgen はそうしませんでした。
+  column_apply: 適用
+  column_whole: 全体名
+  column_abbreviation: 略語
+  column_replacement: 置換後
+  abbreviation_placeholder: 探す文字列
+  replacement_placeholder: 置き換える文字列
+  pick_table: テーブル…
+  tip_remove: この規則を削除
+  duplicate: "%{abbreviation}: 有効な規則が二つ同じものを探しています。実際に効くのは片方だけです。"
+
+import:
+  title: jdbgen から取り込む
+  password_hint: jdbgen は接続 URL、ユーザー名、パスワードをマスターパスワードで暗号化します。rudbgen はここで一度だけそれを尋ね、以後パスワードは OS がもともと守っているキーチェーンに預けます。
+  master_password: マスターパスワード
+  password_placeholder: jdbgen が起動時に尋ねるパスワード
+  other_file: 別のファイル…
+  choose_file: jdbgen の config.json を選ぶ
+  opening: 設定を開いています…
+  next: 次へ
+  import: 取り込む
+  importing: 書き込み中…
+  section_connections: 接続
+  section_drivers: ドライバー
+  section_sets: テンプレートセット
+  section_rules: 略語規則
+  section_settings: 設定
+  section_conflicts: すでに使われている名前
+  section_notes: 知っておくこと
+  nothing_here: このファイルにはありません。
+  rules_count: "規則 %{count} 件を取り込む"
+  apply_abbr: 生成する名前に規則を適用する
+  set_templates: "テンプレート %{count} 件"
+  matches_builtin: "rudbgen 内蔵の %{builtin} を使います"
+  adopt_settings: "jdbgen の言語 (%{language}) と %{theme}テーマを使う"
+  system_language: システムの言語
+  theme_dark: ダーク
+  theme_light: ライト
+  conflict_rename: 名前が使われていたら両方残す
+  conflict_rename_hint: jdbgen から来たものは名前のうしろに "(imported)" を付けて追加します。
+  conflict_skip_hint: すでにあるものを残し、jdbgen 側の項目は取り込みません。
+  written: "接続 %{connections} 件、ドライバー %{drivers} 件、テンプレートセット %{sets} 件、略語規則 %{rules} 件を取り込みました。"
+  nothing_written: 何も取り込みませんでした。
+  skipped: "名前が使われていたため見送りました: %{names}"
+  no_keychain: "キーチェーンに入れられなかったため、次の接続はパスワードなしで保存しました: %{names}。開くときに尋ねます。"
+  wrong_password: この設定のマスターパスワードではありません。
+  malformed: この設定は壊れています。暗号化された値の一つが値の体をなしていません。
+  unreadable: そのファイルは読めませんでした。
+  not_jdbgen: そのファイルは jdbgen の設定ではありません。
+  note_case_rule: 単語規則は大文字小文字を問わず当たるようになりました。jdbgen は小文字の区切りしか見なかったので、そこでは効かなかった規則がここでは効き始めることがあります。
+  note_legacy: 一部の値は jdbgen の古い暗号化形式でした。そのまま読めましたし、お使いの jdbgen の設定はそのまま残ります。
+  note_stock_matched: "%{driver}: rudbgen 自身の %{builtin} 定義を使い、JAR と SQL の上書き、プロパティは引き継ぎます。"
+  note_stock_unknown: "%{driver} (%{class}) は rudbgen のどの定義にも当たらないため、独自のドライバーとして取り込みます。"
+  note_unknown_driver: "%{connection} は %{driver} というドライバーを指していますが、この設定には定義がありません。接続前に選んでください。"
+  note_keep_alive: "%{connection} の keep-alive 間隔 %{value} は秒数ではありません。この確認は無効のまま取り込みます。"
+  note_unresolved_path: "%{owner} の%{kind} %{path} は jdbgen のどちらのディレクトリにもありませんでした。そのまま取り込みます。"
+  note_icon: "%{owner} のアイコン %{icon} はここでは対応するものがなく、外します。"
+  path_jar: ドライバー JAR
+  path_template: テンプレートファイル
+  path_output: 出力ディレクトリ

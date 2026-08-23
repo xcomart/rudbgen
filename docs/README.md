@@ -7,7 +7,7 @@ the language the templates are written in.
 | Page | What it covers |
 |:---|:---|
 | [Installation](installation.md) | Downloads for the three platforms, where your data is kept, the keychain, updating and uninstalling |
-| [User interface guide](ui-guide.md) | The window, the explorer, the inspector, the Generate tab, preview and dry run, the shortcuts |
+| [User interface guide](ui-guide.md) | The window, the explorer, the inspector, the Generate tab, the template tab, the abbreviation rules, importing from jdbgen, the shortcuts |
 | [Template reference](template-reference.md) | The template language: statements, processors, the model's fields, error handling, recipes |
 | [Custom queries](custom-queries.md) | Your own metadata SQL, for a driver whose `DatabaseMetaData` is wrong or missing |
 

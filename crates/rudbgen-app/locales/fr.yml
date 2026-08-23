@@ -196,12 +196,12 @@ custom_query:
   testing: En cours…
   ok: "OK — %{rows} lignes, et toutes les colonnes nécessaires sont là."
   missing: "Colonnes manquantes : %{labels}"
-  wrong_columns: "%{expected} colonnes sont lues ; %{actual} sont revenues."
+  wrong_columns: "Les %{expected} premières colonnes sont lues ; seules %{actual} sont revenues."
   failed: "L'instruction a échoué : %{error}"
   empty: Il n'y a aucune instruction à tester.
   no_session: Connectez-vous d'abord à une base qui utilise ce pilote — le test exécute l'instruction sur cette session.
   contract_labels: "Doit renvoyer ces colonnes, par nom : %{labels}"
-  contract_positional: "Doit renvoyer %{columns} colonnes, dans cet ordre : %{names}"
+  contract_positional: "Les %{columns} premières colonnes sont lues, dans cet ordre : %{names}"
   pair_table: nom de la table, commentaire
   pair_column: nom de la colonne, commentaire
   placeholders: "Remplacés avant l'exécution : %{names}"
@@ -225,6 +225,8 @@ menu:
   dry_run: Simulation
   generate: Générer
   generate_menu: Génération
+  abbreviations: Règles d’abréviation…
+  import_jdbgen: Importer depuis jdbgen…
   tip_menu: Menu
   mac:
     new_connection: Nouvelle connexion…
@@ -247,7 +249,6 @@ welcome:
   open_template: Ouvrir un modèle…
   saved: Connexions enregistrées
   empty: Aucune connexion enregistrée pour l'instant.
-  tip_soon: Pas encore implémenté.
 
 statusbar:
   no_connection: aucune connexion
@@ -289,7 +290,6 @@ generate:
   var_value: valeur
   apply_abbreviations: Appliquer les règles d'abréviation
   rules: Règles…
-  tip_rules_soon: L'éditeur de règles n'est pas encore construit.
   preview: Aperçu
   dry_run: Simulation
   run: Générer
@@ -608,3 +608,66 @@ palette:
     key: Le champ qu'écrit cette instruction, décorateurs compris
     item: Un autre nom pour key
     format: Comment la date est écrite, en lettres de motif Java comme yyyy-MM-dd
+
+abbr:
+  title: Règles d’abréviation
+  how_it_works: Une règle de nom entier remplace tout l’identifiant ; sinon le nom est découpé sur _ et -, et chaque mot est cherché séparément. Les deux ignorent la casse, ce que jdbgen ne faisait pas.
+  column_apply: Appliquer
+  column_whole: Nom entier
+  column_abbreviation: Abréviation
+  column_replacement: Remplacement
+  abbreviation_placeholder: ce qui est cherché
+  replacement_placeholder: ce qui prend sa place
+  pick_table: Table…
+  tip_remove: Supprimer cette règle
+  duplicate: "%{abbreviation} : deux règles actives cherchent la même chose, et une seule pourrait s’appliquer."
+
+import:
+  title: Importer depuis jdbgen
+  password_hint: jdbgen chiffre l’URL de connexion, le nom d’utilisateur et le mot de passe derrière un mot de passe maître. rudbgen le demande une seule fois, ici, puis place les mots de passe dans le trousseau que le système d’exploitation garde déjà.
+  master_password: Mot de passe maître
+  password_placeholder: le mot de passe que jdbgen demande au démarrage
+  other_file: Autre fichier…
+  choose_file: Choisir un config.json de jdbgen
+  opening: Ouverture de la configuration…
+  next: Suivant
+  import: Importer
+  importing: Écriture…
+  section_connections: Connexions
+  section_drivers: Pilotes
+  section_sets: Jeux de modèles
+  section_rules: Règles d’abréviation
+  section_settings: Réglages
+  section_conflicts: Noms déjà pris
+  section_notes: Bon à savoir
+  nothing_here: Aucun dans ce fichier.
+  rules_count: "Importer %{count} règles"
+  apply_abbr: Appliquer les règles aux noms générés
+  set_templates: "%{count} modèles"
+  matches_builtin: "utilise le %{builtin} intégré de rudbgen"
+  adopt_settings: "Utiliser la langue de jdbgen (%{language}) et son thème %{theme}"
+  system_language: la langue du système
+  theme_dark: sombre
+  theme_light: clair
+  conflict_rename: Garder les deux quand le nom est pris
+  conflict_rename_hint: Ce qui vient de jdbgen est ajouté avec "(imported)" après son nom.
+  conflict_skip_hint: Ce qui est déjà là est conservé, et l’entrée jdbgen est laissée de côté.
+  written: "%{connections} connexions, %{drivers} pilotes, %{sets} jeux de modèles et %{rules} règles d’abréviation importés."
+  nothing_written: Rien n’a été importé.
+  skipped: "Laissé de côté, le nom étant pris : %{names}"
+  no_keychain: "Ces connexions ont été enregistrées sans leur mot de passe, faute de pouvoir le mettre dans le trousseau : %{names}. À l’ouverture, il sera demandé."
+  wrong_password: Ce n’est pas le mot de passe maître de cette configuration.
+  malformed: "Cette configuration est endommagée : l’une des valeurs chiffrées n’en est pas une."
+  unreadable: Ce fichier n’a pas pu être lu.
+  not_jdbgen: Ce fichier n’est pas une configuration jdbgen.
+  note_case_rule: "Les règles de mot ignorent désormais la casse. jdbgen ne touchait que les segments en minuscules : une règle qui n’y faisait rien peut se mettre à agir ici."
+  note_legacy: Certaines valeurs étaient dans l’ancien format de chiffrement de jdbgen. Elles ont été lues quand même, et votre configuration jdbgen reste exactement telle quelle.
+  note_stock_matched: "%{driver} : la définition %{builtin} de rudbgen est utilisée, avec votre JAR, vos SQL personnalisés et vos propriétés."
+  note_stock_unknown: "%{driver} (%{class}) ne correspond à aucune définition de rudbgen et est importé comme pilote à part entière."
+  note_unknown_driver: "%{connection} nomme le pilote %{driver}, que cette configuration ne définit pas. Choisissez-en un avant de vous connecter."
+  note_keep_alive: "%{connection} a un intervalle de keep-alive de %{value}, qui n’est pas un nombre de secondes. La sonde est importée désactivée."
+  note_unresolved_path: "%{kind} %{path} de %{owner} ne se trouvait dans aucun des deux répertoires de jdbgen. Il est importé tel quel."
+  note_icon: "L’icône %{icon} de %{owner} n’a pas d’équivalent ici et est abandonnée."
+  path_jar: Le JAR du pilote
+  path_template: Le fichier de modèle
+  path_output: Le répertoire de sortie

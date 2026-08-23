@@ -9,6 +9,169 @@ common:
   save: Speichern
   close: Schließen
 
+# Der Fensterkörper, sobald eine Sitzung offen ist. Explorer, Inspektor und
+# der Arbeitsbereich dazwischen kommen als Nächstes.
+workarea:
+  next: Der Explorer, der Inspektor und der Generieren-Tab kommen im nächsten Meilenstein.
+
+connect:
+  title: Verbindungen
+  new: Neu
+  new_name: Neue Verbindung
+  duplicate: Duplizieren
+  delete: Löschen
+  delete_confirm: "Die Verbindung „%{name}“ und ihr gespeichertes Passwort löschen?"
+  unnamed: "(ohne Namen)"
+  copy_name: "%{name} (Kopie)"
+
+  name: Name
+  folder: Ordner
+  color: Markierung
+  driver: Treiber
+  pick_driver: Treiber wählen
+  manage_drivers: Treiber…
+  driver_has_no_jar: Dieser Treiber hat noch kein JAR. Unter „Treiber“ eines hinzufügen oder herunterladen.
+
+  host: Host
+  port: Port
+  database: Datenbank
+  url: URL
+  url_hint: Wird aus den Feldern darüber zusammengesetzt. Wer sie direkt bearbeitet, behält das Getippte.
+  url_overridden: Von Hand eingetragen; die Felder darüber ändern sie nicht mehr.
+  url_reset: Neu aufbauen
+
+  username: Benutzer
+  password: Passwort
+  props: Treibereigenschaften
+  prop_key: Eigenschaft
+  prop_value: Wert
+  add_prop: Eigenschaft hinzufügen
+
+  section:
+    behaviour: Verhalten
+    tunnel: SSH-Tunnel
+
+  read_only: Verbindung schreibgeschützt öffnen
+  auto_commit: Jede Anweisung sofort bestätigen
+  confirm_writes: Vor schreibenden Anweisungen nachfragen
+  keep_alive: Verbindung mit einer regelmäßigen Abfrage offen halten
+
+  tunnel_enabled: Über einen SSH-Bastion-Host verbinden
+  tunnel_host: Bastion
+  tunnel_user: Bastion-Benutzer
+  tunnel_auth: Authentifizierung
+  tunnel_auth_agent: SSH-Agent
+  tunnel_auth_key: Privater Schlüssel
+  tunnel_auth_password: Passwort
+  tunnel_key: Schlüsseldatei
+  tunnel_password: Bastion-Passwort
+  tunnel_passphrase: Passphrase des Schlüssels
+  tunnel_remote: Datenbank
+  tunnel_hint: Die Datenbank wird so benannt, wie der Bastion-Host sie sieht. rudbgen bindet einen freien lokalen Port und verbindet den Treiber damit.
+
+  test: Testen
+  testing: Verbinde …
+  test_ok: "Mit %{product} verbunden."
+  test_ok_unnamed: Die Verbindung funktioniert.
+  test_failed: "Verbindung nicht möglich: %{error}"
+  test_failed_hint: "Verbindung nicht möglich: %{error} — %{hint}"
+  connect: Verbinden
+  saved: Gespeichert.
+
+  name_required: Der Verbindung einen Namen geben.
+  url_required: Die Verbindung hat keine URL.
+  no_driver: "Keine Treiberdefinition namens „%{driver}“."
+  load_failed: "Die gespeicherten Verbindungen konnten nicht gelesen werden: %{error}"
+  save_failed: "Die Verbindungen konnten nicht gespeichert werden: %{error}"
+  keychain_failed: "Das Passwort konnte nicht im Schlüsselbund gespeichert werden: %{error}"
+
+  hint_auth: Benutzername und Passwort prüfen
+  hint_driver: Treiber-JAR und Treiberklasse prüfen
+  hint_jvm: rudbgen braucht eine Java-Laufzeitumgebung; RUDBGEN_JAVA_HOME oder JAVA_HOME setzen
+  hint_network: Host, Port und Erreichbarkeit der Datenbank prüfen
+  hint_host_key: Dem Hostschlüssel des Bastion-Hosts wird noch nicht vertraut
+
+  host_key_question: "%{host} hat einen unbekannten %{algorithm}-Schlüssel vorgelegt: %{fingerprint}"
+  trust_host_key: Diesem Schlüssel vertrauen
+  host_key_trusted: Der Hostschlüssel wurde als vertrauenswürdig eingetragen. Bitte erneut verbinden.
+
+  # Was der Willkommensbildschirm und die Statusleiste sagen, wenn ein
+  # Versuch nicht durchkam. Der Grund darunter stammt vom Treiber, vom Bastion
+  # oder von der JVM und wird nicht übersetzt.
+  could_not_open: "%{name} konnte nicht geöffnet werden."
+  tunnel_ended: "Der SSH-Tunnel wurde beendet: %{reason}"
+
+driver:
+  title: Treiber
+  name: Name
+  class: Treiberklasse
+  class_hint: Der voll qualifizierte Klassenname, wie ihn die Dokumentation des Treibers angibt — zum Beispiel org.postgresql.Driver.
+  detect: Ermitteln
+  detecting: Die JAR-Dateien werden durchgesehen …
+  probe_found: "%{class} gefunden."
+  probe_choose: Dieser Treiber bringt mehrere Klassen mit. Wählen Sie die aus, mit der verbunden werden soll.
+  probe_recommended: empfohlen
+  probe_none: In diesen Dateien steckt kein JDBC-Treiber. So sieht ein Quelltext- oder Javadoc-JAR aus; prüfen Sie, ob die richtige Datei gewählt wurde.
+  probe_damaged: "Die Datei ist beschädigt und ließ sich nicht bis zum Ende lesen; laden Sie sie erneut herunter. (%{error})"
+  probe_missing: "Die JAR-Datei wurde nicht gefunden: %{error}"
+  probe_jvm_failed: "Die Java-Laufzeitumgebung konnte nicht gestartet werden: %{error}"
+  probe_failed: "Die JAR-Dateien konnten nicht untersucht werden: %{error}"
+  url_template: URL-Vorlage
+  default_port: Standardport
+  dialect: Dialekt
+  maven: Maven-Koordinate
+  jars: JAR-Dateien
+  add_jar: JAR hinzufügen…
+  add_jar_select: Hinzufügen
+  remove_jar: Entfernen
+  jar_missing: fehlt
+  no_jar: kein JAR
+  no_jar_hint: Ein Treiber braucht mindestens ein JAR, bevor eine Verbindung ihn nutzen kann.
+  jar_count: "%{count} JAR(s)"
+  download: Herunterladen
+  downloading: "%{file} wird geladen …"
+  downloading_percent: "%{file} wird geladen — %{percent} %"
+  downloaded: "%{file} wurde geladen und hinzugefügt."
+  download_cancelled: Der Download wurde abgebrochen.
+  bad_coordinate: "„%{coordinate}“ ist keine Koordinate der Form group:artifact:version."
+  not_found: "Maven Central hat nichts unter %{url}."
+  network_failed: "Der Download ist fehlgeschlagen: %{error}"
+  checksum_failed: "Der Download ist beschädigt: erwartet wurde SHA-1 %{expected}, angekommen ist %{actual}."
+  load_failed: "Die Treiberdefinitionen konnten nicht gelesen werden: %{error}"
+  save_failed: "Die Treiberdefinitionen konnten nicht gespeichert werden: %{error}"
+  new: Neu
+  new_name: Neuer Treiber
+  delete: Löschen
+  delete_confirm: "Die Treiberdefinition „%{name}“ löschen?"
+  none_selected: Einen Treiber auswählen oder einen neuen anlegen.
+
+  # jdbgen nennt es noAuth. Das Verbindungsformular lässt die beiden Anmeldezeilen dann ganz weg, statt sie auszugrauen — es gibt nichts zu beantworten.
+  no_auth: Dieses Produkt hat weder Benutzer noch Passwort
+
+# Die vier SQL-Überschreibungen je Treiber im Treibereditor (D9) und die
+# Schaltfläche „Testen“, die eine davon ausführt und das Ergebnis prüft.
+custom_query:
+  section: Eigene Abfragen
+  section_hint: SQL für das, was dieser Treiber schlecht oder gar nicht meldet. Von jdbgen übernommen; eine Anweisung wird nur gesendet, solange ihr Kästchen angehakt ist.
+  test_values: "Testen mit"
+  tables: Tabellenliste
+  columns: Spaltenliste
+  table_comments: Tabellenkommentare
+  column_comments: Spaltenkommentare
+  test: Testen
+  testing: Läuft…
+  ok: "OK — %{rows} Zeilen, und jede benötigte Spalte ist da."
+  missing: "Fehlende Spalten: %{labels}"
+  wrong_columns: "%{expected} Spalten werden gelesen; %{actual} kamen zurück."
+  failed: "Die Anweisung ist fehlgeschlagen: %{error}"
+  empty: Es gibt keine Anweisung zum Testen.
+  no_session: Verbinden Sie sich zuerst mit einer Datenbank, die diesen Treiber benutzt — der Test führt die Anweisung in dieser Sitzung aus.
+  contract_labels: "Muss diese Spalten liefern, nach Namen: %{labels}"
+  contract_positional: "Muss %{columns} Spalten liefern, in dieser Reihenfolge: %{names}"
+  pair_table: Tabellenname, Kommentar
+  pair_column: Spaltenname, Kommentar
+  placeholders: "Wird vor dem Ausführen eingesetzt: %{names}"
+
 menu:
   new_connection: Neue Verbindung…
   settings: Einstellungen…
@@ -26,6 +189,10 @@ menu:
 titlebar:
   no_connection: Keine Verbindung
   tip_settings: Einstellungen
+  # Die Zeile, die die Sitzung schließt statt eine zu öffnen, und was der
+  # Auslöser anzeigt, während eine Sitzung noch geöffnet wird.
+  disconnect: Trennen
+  connecting: "%{name} — verbinden…"
   tip_help: Hilfe
 
 welcome:
@@ -41,6 +208,12 @@ welcome:
 statusbar:
   no_connection: keine Verbindung
   no_selection: nichts zu erzeugen
+  # Die drei Zustände der linken Zelle, sobald eine Verbindung angefordert
+  # wurde. `%{product}` ist ein Wert, kein Wort.
+  connecting: "verbinde mit %{name}…"
+  connected: "%{name} · %{product}"
+  failed: "%{name} — nicht verbunden"
+  unknown_product: unbekanntes Produkt
 
 about:
   title: Über rudbgen

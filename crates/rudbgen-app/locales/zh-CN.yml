@@ -9,6 +9,167 @@ common:
   save: 保存
   close: 关闭
 
+# 会话打开后的窗口主体。浏览器、检查器和它们之间的工作区将在下一步加入。
+workarea:
+  next: 浏览器、检查器和「生成」标签页将在下一个里程碑加入。
+
+connect:
+  title: 连接
+  new: 新建
+  new_name: 新建连接
+  duplicate: 复制
+  delete: 删除
+  delete_confirm: "删除连接“%{name}”及其保存的密码？"
+  unnamed: "(未命名)"
+  copy_name: "%{name}（副本）"
+
+  name: 名称
+  folder: 文件夹
+  color: 标记
+  driver: 驱动
+  pick_driver: 选择驱动
+  manage_drivers: 驱动…
+  driver_has_no_jar: 该驱动还没有 JAR。请在驱动界面添加或下载一个。
+
+  host: 主机
+  port: 端口
+  database: 数据库
+  url: URL
+  url_hint: 由上面的字段拼装而成。直接编辑将保留你输入的内容。
+  url_overridden: 手动输入的 URL；上面的字段不再改动它。
+  url_reset: 重新拼装
+
+  username: 用户
+  password: 密码
+  props: 驱动属性
+  prop_key: 属性
+  prop_value: 值
+  add_prop: 添加属性
+
+  section:
+    behaviour: 行为
+    tunnel: SSH 隧道
+
+  read_only: 以只读方式打开连接
+  auto_commit: 每条语句执行后立即提交
+  confirm_writes: 执行写入语句前先确认
+  keep_alive: 用定期查询保持连接
+
+  tunnel_enabled: 通过 SSH 堡垒机连接
+  tunnel_host: 堡垒机
+  tunnel_user: 堡垒机用户
+  tunnel_auth: 认证
+  tunnel_auth_agent: SSH 代理
+  tunnel_auth_key: 私钥
+  tunnel_auth_password: 密码
+  tunnel_key: 密钥文件
+  tunnel_password: 堡垒机密码
+  tunnel_passphrase: 密钥口令
+  tunnel_remote: 数据库
+  tunnel_hint: 数据库地址填堡垒机所看到的名字。rudbgen 会绑定一个空闲的本地端口，并把驱动接到该端口。
+
+  test: 测试
+  testing: 正在连接…
+  test_ok: "已连接到 %{product}。"
+  test_ok_unnamed: 连接可用。
+  test_failed: "无法连接：%{error}"
+  test_failed_hint: "无法连接：%{error} — %{hint}"
+  connect: 连接
+  saved: 已保存。
+
+  name_required: 请为该连接取个名字。
+  url_required: 该连接没有 URL。
+  no_driver: "没有名为“%{driver}”的驱动定义。"
+  load_failed: "无法读取已保存的连接：%{error}"
+  save_failed: "无法保存连接：%{error}"
+  keychain_failed: "无法把密码保存到密钥链：%{error}"
+
+  hint_auth: 请检查用户名和密码
+  hint_driver: 请检查驱动 JAR 和驱动类
+  hint_jvm: rudbgen 需要一个 Java 运行时；请设置 RUDBGEN_JAVA_HOME 或 JAVA_HOME
+  hint_network: 请检查主机、端口以及数据库是否可达
+  hint_host_key: 堡垒机的主机密钥尚未受信任
+
+  host_key_question: "%{host} 出示了未知的 %{algorithm} 密钥：%{fingerprint}"
+  trust_host_key: 信任该密钥
+  host_key_trusted: 主机密钥已加入信任列表。请再试一次。
+
+  # 连接没能建立时，欢迎界面和状态栏所说的话。下面那行原因来自驱动、跳板机
+  # 或 JVM，不做翻译。
+  could_not_open: "无法打开 %{name}。"
+  tunnel_ended: "SSH 隧道已结束：%{reason}"
+
+driver:
+  title: 驱动
+  name: 名称
+  class: 驱动类
+  class_hint: 驱动文档中给出的完全限定类名，例如 org.postgresql.Driver。
+  detect: 自动检测
+  detecting: 正在查看 JAR 文件…
+  probe_found: "找到了 %{class}。"
+  probe_choose: 该驱动包含多个类。请选择用于连接的那一个。
+  probe_recommended: 推荐
+  probe_none: 这些文件里没有 JDBC 驱动。源码包或 javadoc 包就是这样；请确认选对了文件。
+  probe_damaged: "文件已损坏，无法读完；请重新下载。（%{error}）"
+  probe_missing: "找不到 JAR 文件：%{error}"
+  probe_jvm_failed: "无法启动 Java 运行时：%{error}"
+  probe_failed: "无法检查 JAR 文件：%{error}"
+  url_template: URL 模板
+  default_port: 默认端口
+  dialect: 方言
+  maven: Maven 坐标
+  jars: JAR 文件
+  add_jar: 添加 JAR…
+  add_jar_select: 添加
+  remove_jar: 移除
+  jar_missing: 缺失
+  no_jar: 无 JAR
+  no_jar_hint: 驱动至少要有一个 JAR，连接才能使用它。
+  jar_count: "%{count} 个 JAR"
+  download: 下载
+  downloading: "正在下载 %{file}…"
+  downloading_percent: "正在下载 %{file} — %{percent}%"
+  downloaded: "已下载并添加 %{file}。"
+  download_cancelled: 下载已取消。
+  bad_coordinate: "“%{coordinate}”不是 group:artifact:version 形式的坐标。"
+  not_found: "Maven Central 的 %{url} 上没有这个文件。"
+  network_failed: "下载失败：%{error}"
+  checksum_failed: "下载的文件已损坏：SHA-1 应为 %{expected}，实际为 %{actual}。"
+  load_failed: "无法读取驱动定义：%{error}"
+  save_failed: "无法保存驱动定义：%{error}"
+  new: 新建
+  new_name: 新建驱动
+  delete: 删除
+  delete_confirm: "删除驱动定义“%{name}”？"
+  none_selected: 请选择一个驱动，或新建一个。
+
+  # 即 jdbgen 的 noAuth。连接表单会直接不显示这两行凭据，而不是把它们变灰：这里没有需要回答的问题。
+  no_auth: 此产品没有用户名和密码
+
+# 驱动编辑器中每个驱动的四条 SQL 覆盖（D9），以及执行其中一条并核对返回
+# 结果形状的「测试」按钮。
+custom_query:
+  section: 自定义查询
+  section_hint: 用来补上此驱动答得不好、甚至根本不答的内容的 SQL。沿用自 jdbgen；只有勾选时才会发送。
+  test_values: "测试用值"
+  tables: 表清单
+  columns: 列清单
+  table_comments: 表注释
+  column_comments: 列注释
+  test: 测试
+  testing: 执行中…
+  ok: "成功 — %{rows} 行，需要的列都在。"
+  missing: "缺少的列：%{labels}"
+  wrong_columns: "读取 %{expected} 列，实际返回 %{actual} 列。"
+  failed: "语句执行失败：%{error}"
+  empty: 没有可测试的语句。
+  no_session: 请先连接使用此驱动的数据库，测试会在该会话上执行语句。
+  contract_labels: "必须按名称返回这些列：%{labels}"
+  contract_positional: "必须按此顺序返回 %{columns} 列：%{names}"
+  pair_table: 表名、注释
+  pair_column: 列名、注释
+  placeholders: "执行前会填入：%{names}"
+
 menu:
   new_connection: 新建连接…
   settings: 设置…
@@ -26,6 +187,9 @@ menu:
 titlebar:
   no_connection: 无连接
   tip_settings: 设置
+  # 用于断开而非打开会话的那一行，以及会话正在打开时触发按钮上的文字。
+  disconnect: 断开连接
+  connecting: "%{name} — 连接中…"
   tip_help: 帮助
 
 welcome:
@@ -41,6 +205,11 @@ welcome:
 statusbar:
   no_connection: 无连接
   no_selection: 没有可生成的内容
+  # 请求连接之后左侧单元格的三种状态。`%{product}` 是值，不是词。
+  connecting: "正在连接 %{name}…"
+  connected: "%{name} · %{product}"
+  failed: "%{name} — 未连接"
+  unknown_product: 未知产品
 
 about:
   title: 关于 rudbgen

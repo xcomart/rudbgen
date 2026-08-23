@@ -15,34 +15,45 @@
 //! altogether, because a sidebar with nothing in it is a promise the window
 //! cannot keep.
 //!
-//! # What M0 is, and is not
+//! # The session
 //!
-//! This is the shell and nothing behind it. The window opens, the settings
-//! dialog edits every setting there is and previews the two palettes live, the
-//! about box and the update check work end to end, and the welcome screen lists
-//! whatever `connections.json` holds. Nothing on that screen opens a database:
-//! the connection dialog and the explorer arrive in M2, the Generate tab and
-//! the work area in M3, the template editor in M4, and the jdbgen import in M5.
-//! The three buttons the welcome screen offers are drawn disabled with a
-//! tooltip that says so, rather than left out — a way in that is missing tells
-//! the reader nothing about what the application will do, and a button that
-//! looks live and does nothing is worse than either.
+//! The window owns exactly one, as [`ConnectionState`]: idle, opening, open, or
+//! failed with the reason still on the status bar. Everything that blocks —
+//! the keychain, the tunnel, `JNI_CreateJavaVM` on the first connection of the
+//! run, `OPEN_SESSION` — happens on a background task, and the JVM is started
+//! by the first connection rather than at start-up, so a user who never opens
+//! one never pays for a Java runtime (architecture document, §4.1). A failure
+//! is reported on the status bar and on the welcome screen rather than in a box
+//! to dismiss: the user asked for a database, and the message has to stay
+//! readable while they open the dialog to fix what it names.
+//!
+//! # What is here, and what is not
+//!
+//! The shell, the dialogs and the connection behind them. The welcome screen's
+//! saved rows open a session, `Ctrl+N` opens the connection dialog, and the
+//! driver editor inside it edits the four custom queries and tests them (D9).
+//! What a connected window then shows is a placeholder: the explorer and the
+//! inspector arrive with the metadata reader, the Generate tab and the work
+//! area with the generation job, the template editor after that, and the jdbgen
+//! import last. The two welcome buttons those milestones belong to are drawn
+//! disabled with a tooltip that says so, rather than left out — a way in that
+//! is missing tells the reader nothing about what the application will do, and
+//! a button that looks live and does nothing is worse than either.
 
 mod about_dialog;
 mod app_settings;
 mod caption;
+mod connection;
+mod connection_dialog;
 // The menu rows are written as plain data with test helpers rather than for the
-// call sites the shell currently has, because no surface of the M0 window draws
-// a context menu — the explorer's rows (M2) and the work area's tabs (M3) are
-// what they are written for. Inside a binary crate that reads as dead code.
+// call sites the shell currently has: the explorer's rows and the work area's
+// tabs are what they are written for, and neither is on screen yet. Inside a
+// binary crate that reads as dead code.
 #[allow(dead_code)]
 mod context_menu;
+mod driver_manager;
 mod i18n;
 mod icons;
-// The Maven downloader is complete and tested, but the surface that presses
-// its button — the driver editor of M2's connection dialog — is not written
-// yet, so inside a binary crate it reads as dead code.
-#[allow(dead_code)]
 mod maven;
 // The pane tree is written as a self-contained data structure with its own
 // tests rather than for the call sites the shell currently has, so it offers
@@ -63,12 +74,14 @@ mod update_dialog;
 rust_i18n::i18n!("locales", fallback = "en");
 
 use gpui::{
-    AnyElement, App, Bounds, Context, Div, DragMoveEvent, Entity, FocusHandle, KeyBinding, Menu,
-    MenuItem, MouseButton, MouseUpEvent, Pixels, Point, QuitMode, ScrollHandle, SharedString,
-    Stateful, Subscription, TitlebarOptions, Window, WindowBackgroundAppearance, WindowBounds,
-    WindowControlArea, WindowOptions, actions, div, img, prelude::*, px, size,
+    AnyElement, App, Bounds, Context, Div, DragMoveEvent, Entity, FocusHandle, Hsla, KeyBinding,
+    Menu, MenuItem, MouseButton, MouseUpEvent, Pixels, Point, QuitMode, ScrollHandle, SharedString,
+    Stateful, Subscription, Task, TitlebarOptions, Window, WindowBackgroundAppearance,
+    WindowBounds, WindowControlArea, WindowOptions, actions, div, img, prelude::*, px, size,
 };
-use rudbgen_core::{AppSettings, ConnectionStore, TitlebarStyle, WindowState};
+use rudbgen_core::{
+    AppSettings, ConnectionProfile, ConnectionStore, DriverStore, TitlebarStyle, WindowState,
+};
 use rudbgen_ui::{
     Button, ButtonVariant, DraggedThumb, EditorThemeEntry, EditorThemeRegistry, MenuButton,
     MenuEntry, Scrollbar, ScrollbarAxis, ScrollbarState, Select, Theme, ThemeRegistry,
@@ -80,6 +93,8 @@ use rudbgen_ui::{
 use about_dialog::{AboutDialog, AboutDialogEvent};
 use app_settings::WindowGeometry;
 use caption::apply_caption_theme;
+use connection::{ConnectError, Connected, Credentials, SessionHandle};
+use connection_dialog::{ConnectionDialog, ConnectionDialogEvent};
 use i18n::ts;
 use icons::Icons;
 use settings_dialog::{SettingsDialog, SettingsDialogEvent};
@@ -90,7 +105,7 @@ actions!(
     [
         /// Leaves the application.
         Quit,
-        /// Opens the connection dialog (M2).
+        /// Opens the connection dialog.
         NewConnection,
         /// Opens the settings dialog.
         OpenSettings,
@@ -100,7 +115,8 @@ actions!(
         CheckUpdates,
         /// Closes whatever overlay is on top, innermost first.
         DismissDialog,
-        /// Shows and hides the explorer sidebar (M2).
+        /// Shows and hides the explorer sidebar (the tree arrives with the
+        /// metadata reader).
         ToggleExplorer,
     ]
 );
@@ -211,6 +227,93 @@ fn load_profiles() -> ConnectionStore {
     }
 }
 
+/// Whether a database session is open, opening, or has just failed to open.
+///
+/// One connection at a time, deliberately: everything the window shows — the
+/// explorer, the Generate tab's options, the status bar's arithmetic — belongs
+/// to one database, and a second session would need a second window's worth of
+/// state to say anything about. Switching connections replaces this whole
+/// value, which is what closes the session that was open.
+enum ConnectionState {
+    /// No session, and none being opened.
+    Idle,
+    /// A session is opening on a background task.
+    Connecting {
+        /// What is being opened, for the label and the retry.
+        profile: Box<ConnectionProfile>,
+        /// Dropped — and so abandoned — when the state is replaced.
+        _task: Task<()>,
+    },
+    /// A session is open.
+    Open {
+        /// The profile it was opened from.
+        profile: Box<ConnectionProfile>,
+        /// The session and the tunnel under it.
+        ///
+        /// Boxed for the reason the profile is: `Connected` carries the
+        /// bridge's whole `SESSION_INFO` answer, and an unboxed variant would
+        /// make the idle state as large as the connected one.
+        session: Box<Connected>,
+    },
+    /// The last attempt failed, and the reason is still on the status bar.
+    Failed {
+        /// What was being opened.
+        profile: Box<ConnectionProfile>,
+        /// [`ConnectError::message`], already rendered.
+        message: SharedString,
+    },
+}
+
+impl ConnectionState {
+    /// The profile this state is about, if any.
+    fn profile(&self) -> Option<&ConnectionProfile> {
+        match self {
+            ConnectionState::Idle => None,
+            ConnectionState::Connecting { profile, .. }
+            | ConnectionState::Open { profile, .. }
+            | ConnectionState::Failed { profile, .. } => Some(profile),
+        }
+    }
+
+    /// The open session, for whoever needs to run a statement on it.
+    fn session(&self) -> Option<&Connected> {
+        match self {
+            ConnectionState::Open { session, .. } => Some(session),
+            _ => None,
+        }
+    }
+
+    /// The colour of the dot in front of the connection selector.
+    ///
+    /// The three states are three colours because they are three different
+    /// situations: a session that is still opening and one that died are told
+    /// apart without opening anything (architecture document, §4.2).
+    fn dot(&self, theme: &Theme) -> Hsla {
+        match self {
+            ConnectionState::Idle => theme.text_muted,
+            ConnectionState::Connecting { .. } => theme.accent,
+            ConnectionState::Open { .. } => theme.success,
+            ConnectionState::Failed { .. } => theme.danger,
+        }
+    }
+}
+
+/// What a profile is called on screen.
+///
+/// The name the user gave it, and the URL when they have not given one yet: a
+/// row reading "(unnamed)" in a list of three is not something to pick
+/// between, where the URL at least says which database it is.
+/// [`ConnectionProfile::label`] is the *session*'s name — `user@url` — which
+/// is a different question and belongs in a tab, not in the picker.
+fn label_of(profile: &ConnectionProfile) -> SharedString {
+    let name = profile.name.trim();
+    if name.is_empty() {
+        SharedString::from(profile.label())
+    } else {
+        SharedString::from(name.to_owned())
+    }
+}
+
 /// The whole of the window.
 struct Workspace {
     /// Focus target for the window, so the shortcuts stay live.
@@ -237,6 +340,16 @@ struct Workspace {
     about: Entity<AboutDialog>,
     /// The settings dialog, rendered only while it reports itself open.
     settings: Entity<SettingsDialog>,
+    /// The connection dialog, rendered only while it reports itself open.
+    ///
+    /// It edits a draft of the store and writes `connections.json` on `Save`
+    /// alone (architecture document, D7), so the copy in [`Workspace::profiles`]
+    /// is re-read whenever it closes.
+    connection_dialog: Entity<ConnectionDialog>,
+    /// Whether a session is open, opening, or has just failed.
+    connection: ConnectionState,
+    /// Whether the title bar's connection list is showing.
+    connection_list_open: bool,
     /// The update dialog, rendered only while it reports itself open.
     ///
     /// Two things open it: the start-up check in [`update`], at most once per
@@ -261,6 +374,10 @@ struct Workspace {
     _settings_events: Subscription,
     /// Keeps the update dialog subscription alive.
     _update_events: Subscription,
+    /// Keeps the connection dialog subscription alive.
+    _connection_events: Subscription,
+    /// Closes the session before the process winds down.
+    _quit: Subscription,
     /// Records the window's placement as it is moved and resized.
     _bounds: Subscription,
     /// Redraws the title bar when the desktop moves its caption buttons.
@@ -315,6 +432,40 @@ impl Workspace {
                 }
             },
         );
+
+        let connection_dialog = cx.new(ConnectionDialog::new);
+        let connection_events = cx.subscribe_in(
+            &connection_dialog,
+            window,
+            |this, dialog, event, window, cx| match event {
+                // The dialog has already written `connections.json`; the shell
+                // re-reads it and opens the session, because the session is the
+                // shell's to own — a dialog that held one could not be closed
+                // without closing the database with it.
+                ConnectionDialogEvent::Connect(profile) => {
+                    this.profiles = load_profiles();
+                    let profile = (**profile).clone();
+                    this.focus_shell(window, cx);
+                    this.connect_to(profile, cx);
+                }
+                ConnectionDialogEvent::Dismissed => {
+                    dialog.update(cx, |dialog, cx| dialog.close(cx));
+                    // Saved, renamed or deleted while it was up, so the welcome
+                    // list and the selector both have to be re-read.
+                    this.profiles = load_profiles();
+                    this.focus_shell(window, cx);
+                }
+            },
+        );
+
+        // The one thing that must happen before the process winds down: the
+        // session is closed, and the tunnel under it after that. A session left
+        // open holds an embedded database's lock file, which the next run then
+        // cannot get past.
+        let quit = cx.on_app_quit(|workspace: &mut Workspace, _cx| {
+            workspace.close_session();
+            async {}
+        });
 
         let update = cx.new(UpdateDialog::new);
         let update_events = cx.subscribe_in(&update, window, |this, dialog, event, window, cx| {
@@ -393,12 +544,17 @@ impl Workspace {
             welcome_scrollbar: ScrollbarState::new(),
             about,
             settings,
+            connection_dialog,
+            connection: ConnectionState::Idle,
+            connection_list_open: false,
             update,
             menu_open: false,
             titlebar,
             _about_events: about_events,
             _settings_events: settings_events,
             _update_events: update_events,
+            _connection_events: connection_events,
+            _quit: quit,
             _bounds: bounds,
             _button_layout: button_layout,
         }
@@ -427,6 +583,7 @@ impl Workspace {
         self.about.read(cx).is_open()
             || self.settings.read(cx).is_open()
             || self.update.read(cx).is_open()
+            || self.connection_dialog.read(cx).is_open()
     }
 
     /// Closes every dialog and the dropdown menu.
@@ -456,6 +613,10 @@ impl Workspace {
         if self.update.read(cx).is_open() {
             self.update.update(cx, |dialog, cx| dialog.close(cx));
         }
+        if self.connection_dialog.read(cx).is_open() {
+            self.connection_dialog
+                .update(cx, |dialog, cx| dialog.close(cx));
+        }
     }
 
     /// Opens the about dialog, closing whatever else was showing.
@@ -481,6 +642,205 @@ impl Workspace {
         self.close_overlays(window, cx);
         self.update.update(cx, |dialog, cx| dialog.start_check(cx));
         cx.notify();
+    }
+
+    /// Opens the connection dialog over the profile that is open, if one is.
+    fn open_connection_dialog(&mut self, window: &mut Window, cx: &mut Context<Self>) {
+        self.close_overlays(window, cx);
+        // What the driver editor's custom-query **Test** runs against when the
+        // driver being edited is the one this session was opened through.
+        let session = self.connection.session().map(|connected| {
+            (
+                self.connection
+                    .profile()
+                    .map(|profile| profile.driver_id.clone())
+                    .unwrap_or_default(),
+                connected.handle(),
+            )
+        });
+        let at = self.connection.profile().map(|profile| profile.id);
+        self.connection_dialog.update(cx, |dialog, cx| {
+            dialog.set_open_session(session);
+            match at {
+                Some(id) => dialog.open_at(id, cx),
+                None => dialog.open(cx),
+            }
+        });
+        cx.notify();
+    }
+
+    // --- the session ------------------------------------------------------
+
+    /// Opens a session for `profile`, replacing whatever was open.
+    ///
+    /// Everything that blocks — the keychain read, the tunnel, `JNI_CreateJavaVM`
+    /// on the first connection of the run, `OPEN_SESSION` — happens on a
+    /// background task, so the window stays live while a database that is not
+    /// answering takes its time about saying so.
+    fn connect_to(&mut self, profile: ConnectionProfile, cx: &mut Context<Self>) {
+        self.close_session();
+
+        let drivers = match DriverStore::load() {
+            Ok(drivers) => drivers,
+            Err(error) => {
+                log::error!("could not read drivers.json: {error:#}");
+                DriverStore::default()
+            }
+        };
+        let Some(driver) = drivers.get(&profile.driver_id).cloned() else {
+            let message = ts!("connect.no_driver", driver = profile.driver_id.clone());
+            self.connection = ConnectionState::Failed {
+                profile: Box::new(profile),
+                message,
+            };
+            cx.notify();
+            return;
+        };
+
+        let settings = app_settings::current(cx);
+        let opening = profile.clone();
+        let run = cx.background_spawn(async move {
+            // Read here rather than on the UI thread: a keychain that is locked
+            // puts a system prompt up, and waiting for that on the UI thread
+            // would freeze the window behind it.
+            let credentials = Credentials::read(&opening);
+            connection::connect(&opening, &driver, &credentials, &settings)
+        });
+        let task = cx.spawn(async move |this, cx| {
+            let outcome = run.await;
+            this.update(cx, |workspace, cx| workspace.connected(outcome, cx))
+                .ok();
+        });
+
+        self.connection = ConnectionState::Connecting {
+            profile: Box::new(profile),
+            _task: task,
+        };
+        cx.notify();
+    }
+
+    /// Records what the connection attempt came back with.
+    ///
+    /// A failure is reported on the status bar rather than in a dialog: the
+    /// user asked for a database, not for a box to dismiss, and the message
+    /// has to stay readable while they open the connection dialog to fix
+    /// whatever it names.
+    fn connected(&mut self, outcome: Result<Connected, ConnectError>, cx: &mut Context<Self>) {
+        // Anything but `Connecting` means the attempt was abandoned — the user
+        // asked for another connection, or disconnected — and its answer is no
+        // longer about the state the window is in.
+        let ConnectionState::Connecting { profile, .. } =
+            std::mem::replace(&mut self.connection, ConnectionState::Idle)
+        else {
+            if let Ok(session) = outcome
+                && let Err(error) = session.close()
+            {
+                log::warn!("an abandoned session did not close: {error:#}");
+            }
+            return;
+        };
+
+        self.connection = match outcome {
+            Ok(session) => {
+                log::info!(
+                    "connected to {} ({})",
+                    profile.name,
+                    session.product().unwrap_or_else(|| "unknown".into())
+                );
+                // A tunnel that breaks takes the session above it with it, and
+                // is never repaired silently: a reconnection would hide what
+                // was in flight when the socket went away. The watch fires once,
+                // with the reason, and the window goes to the failed state
+                // wearing it.
+                if let Some(lease) = session.lease() {
+                    let watch = lease.watch();
+                    let id = profile.id;
+                    cx.spawn(async move |this, cx| {
+                        let Ok(reason) = watch.await else {
+                            return;
+                        };
+                        this.update(cx, |workspace, cx| {
+                            workspace.tunnel_died(id, reason, cx);
+                        })
+                        .ok();
+                    })
+                    .detach();
+                }
+                ConnectionState::Open {
+                    profile,
+                    session: Box::new(session),
+                }
+            }
+            Err(error) => {
+                log::warn!("could not connect to {}: {error}", profile.name);
+                ConnectionState::Failed {
+                    profile,
+                    message: error.message().into(),
+                }
+            }
+        };
+        cx.notify();
+    }
+
+    /// The tunnel under the open session ended; the session goes with it.
+    ///
+    /// Keyed on the profile's id rather than on its name: by the time this
+    /// arrives the user may have connected to something else, and only the
+    /// session that was running over *this* tunnel is the one to take down.
+    fn tunnel_died(&mut self, id: uuid::Uuid, reason: String, cx: &mut Context<Self>) {
+        let ConnectionState::Open { profile, .. } = &self.connection else {
+            return;
+        };
+        if profile.id != id {
+            return;
+        }
+        log::warn!("the tunnel under {} ended: {reason}", profile.name);
+        let ConnectionState::Open { profile, session } =
+            std::mem::replace(&mut self.connection, ConnectionState::Idle)
+        else {
+            return;
+        };
+        // The session is gone whatever the close says; the tunnel it ran over
+        // is already down.
+        drop(session);
+        self.connection = ConnectionState::Failed {
+            profile,
+            message: ts!("connect.tunnel_ended", reason = reason),
+        };
+        cx.notify();
+    }
+
+    /// Closes the session and goes back to the welcome screen.
+    fn disconnect(&mut self, cx: &mut Context<Self>) {
+        self.close_session();
+        self.connection_list_open = false;
+        cx.notify();
+    }
+
+    /// Closes whatever session is open, without touching anything on screen.
+    ///
+    /// Shared by [`Workspace::disconnect`], by every reconnection, and by the
+    /// quit observer, which is why it takes no context: at quit there is no
+    /// frame left to ask for.
+    fn close_session(&mut self) {
+        if let ConnectionState::Open { profile, session } =
+            std::mem::replace(&mut self.connection, ConnectionState::Idle)
+        {
+            log::info!("closing the session on {}", profile.name);
+            if let Err(error) = session.close() {
+                log::warn!("the session did not close cleanly: {error:#}");
+            }
+        }
+    }
+
+    /// A handle a background task can carry, while a session is open.
+    ///
+    /// Nothing calls it yet — the explorer and the metadata reader are what it
+    /// is for — and it is the one thing every one of those call sites needs, so
+    /// it arrives with the session rather than after it.
+    #[allow(dead_code)]
+    fn session_handle(&self) -> Option<SessionHandle> {
+        self.connection.session().map(Connected::handle)
     }
 
     /// Opens the settings dialog, closing whatever else was showing.
@@ -572,17 +932,13 @@ impl Workspace {
     // --- actions ----------------------------------------------------------
 
     /// Opens the connection dialog.
-    ///
-    /// M2: the dialog, the driver store and the session behind it are what that
-    /// milestone is. Bound and dispatched from now so that the route exists and
-    /// the menu row is not a lie about where the command will live.
     fn new_connection_action(
         &mut self,
         _: &NewConnection,
-        _window: &mut Window,
-        _cx: &mut Context<Self>,
+        window: &mut Window,
+        cx: &mut Context<Self>,
     ) {
-        log::debug!("the connection dialog arrives in M2");
+        self.open_connection_dialog(window, cx);
     }
 
     /// Opens the settings dialog.
@@ -651,6 +1007,15 @@ impl Workspace {
         if self.about.read(cx).is_open() {
             self.about.update(cx, |dialog, cx| dialog.close(cx));
             self.focus_shell(window, cx);
+            return;
+        }
+        if self.connection_dialog.read(cx).is_open() {
+            // Routed through the dialog for the reason the settings dialog is:
+            // it stacks the driver editor and a delete confirmation of its own,
+            // and each has to be able to take `Escape` for itself before the
+            // whole form is thrown away.
+            self.connection_dialog
+                .update(cx, |dialog, cx| dialog.escape(cx));
             return;
         }
         if self.settings.read(cx).is_open() {
@@ -870,11 +1235,33 @@ impl Workspace {
     ///
     /// A [`Select`] with a status dot in front of it: connecting, connected or
     /// failed, so a session that is still opening and one that died are told
-    /// apart without opening anything. In M0 it has no options and no handler —
-    /// there is no session to pick — so it stands as the placeholder the
-    /// architecture document's sketch shows, greyed and inert. M2 fills it.
+    /// apart without opening anything. The list is the saved profiles, with
+    /// **Disconnect** on the end while a session is open — the one row that is
+    /// not a connection, which is why the handler branches on the index rather
+    /// than on the text.
     fn render_connection_select(&self, cx: &mut Context<Self>) -> impl IntoElement + use<> {
         let theme = theme(cx);
+        let names: Vec<SharedString> = self.profiles.connections().iter().map(label_of).collect();
+        let count = names.len();
+        let connected = matches!(self.connection, ConnectionState::Open { .. });
+        let mut options = names;
+        if connected {
+            options.push(ts!("titlebar.disconnect"));
+        }
+
+        // The label follows the state rather than the store: a profile that is
+        // opening says so, and one that failed keeps its name on the trigger so
+        // that the message on the status bar has something to belong to.
+        let selected = self.connection.profile().map(|profile| {
+            let label = label_of(profile);
+            match self.connection {
+                ConnectionState::Connecting { .. } => ts!("titlebar.connecting", name = label),
+                _ => label,
+            }
+        });
+
+        let this = cx.entity();
+        let toggle = cx.entity();
         div()
             // Occluded because it sits inside the window's drag area: without
             // it a press on the control would move the window instead.
@@ -890,15 +1277,40 @@ impl Workspace {
                     .flex_none()
                     .size(px(STATUS_DOT))
                     .rounded_full()
-                    // Muted rather than `danger`: nothing has failed, there is
-                    // simply nothing there.
-                    .bg(theme.text_muted),
+                    .bg(self.connection.dot(&theme)),
             )
             .child(
                 div().flex_1().min_w_0().child(
                     Select::new("connection-select")
                         .placeholder(ts!("titlebar.no_connection"))
-                        .width(px(CONNECTION_SELECT_WIDTH)),
+                        .options(options)
+                        .selected(selected)
+                        .open(self.connection_list_open)
+                        .width(px(CONNECTION_SELECT_WIDTH))
+                        .on_select(move |index, _text, _window, cx| {
+                            this.update(cx, |workspace, cx| {
+                                workspace.connection_list_open = false;
+                                match workspace.profiles.connections().get(index).cloned() {
+                                    Some(profile) => workspace.connect_to(profile, cx),
+                                    // Past the end of the list is the
+                                    // "Disconnect" row.
+                                    None if index == count => workspace.disconnect(cx),
+                                    None => {}
+                                }
+                            });
+                        })
+                        .on_open_change(move |open, _window, cx| {
+                            toggle.update(cx, |workspace, cx| {
+                                // Re-read on the way open: the dialog may have
+                                // added or renamed a profile since the last
+                                // frame that drew this list.
+                                if open {
+                                    workspace.profiles = load_profiles();
+                                }
+                                workspace.connection_list_open = open;
+                                cx.notify();
+                            });
+                        }),
                 ),
             )
     }
@@ -940,16 +1352,14 @@ impl Workspace {
         let entries = vec![
             MenuEntry::new(ts!("menu.new_connection"))
                 .shortcut(format!("{SHORTCUT_MODIFIER}+N"))
-                // M2.
-                .disabled(true)
                 .on_activate(|window, cx| window.dispatch_action(Box::new(NewConnection), cx)),
             MenuEntry::new(ts!("menu.settings"))
                 .shortcut(format!("{SHORTCUT_MODIFIER}+,"))
                 .on_activate(|window, cx| window.dispatch_action(Box::new(OpenSettings), cx)),
             MenuEntry::new(ts!("menu.toggle_explorer"))
                 .shortcut(format!("{SHORTCUT_MODIFIER}+B"))
-                // Nothing to show while no connection is open, which in M0 is
-                // always.
+                // The tree the command shows and hides arrives with the
+                // metadata reader; until then there is nothing behind it.
                 .disabled(true)
                 .on_activate(|window, cx| window.dispatch_action(Box::new(ToggleExplorer), cx)),
             MenuEntry::separator(),
@@ -977,31 +1387,112 @@ impl Workspace {
 
     /// Renders the body of the window.
     ///
-    /// The welcome screen and nothing else, because there is no connection to
-    /// draw a work area for. The explorer and the inspector are out of the
-    /// frame rather than empty (architecture document, §4.3), and the tabbed
-    /// work area they flank arrives with them in M2/M3.
+    /// The welcome screen while no session is open, and the work area once one
+    /// is. The explorer and the inspector are out of the frame rather than
+    /// empty until then (architecture document, §4.3); the tree that fills the
+    /// first of them arrives with the metadata reader, and the tab strip
+    /// between them with the Generate tab.
     fn render_body(&self, cx: &mut Context<Self>) -> AnyElement {
         let theme = theme(cx);
+        let body = match &self.connection {
+            ConnectionState::Open { profile, session } => {
+                self.render_work_area(profile, session, &theme, cx)
+            }
+            _ => self.render_welcome(&theme, cx),
+        };
         div()
             .flex()
             .flex_col()
             .flex_grow_1()
             .min_h_0()
             .bg(app_settings::window_tint(theme.background, cx))
-            .child(self.render_welcome(&theme, cx))
+            .child(body)
             .into_any_element()
+    }
+
+    /// What stands where the explorer, the tabs and the inspector will be.
+    ///
+    /// Deliberately not an empty three-column frame: a sidebar with nothing in
+    /// it is a promise the window cannot keep, so what a connected window shows
+    /// is the connection it has and a line saying what comes next.
+    fn render_work_area(
+        &self,
+        profile: &ConnectionProfile,
+        session: &Connected,
+        theme: &Theme,
+        cx: &mut Context<Self>,
+    ) -> AnyElement {
+        let product = session
+            .product()
+            .map(SharedString::from)
+            .unwrap_or_else(|| ts!("statusbar.unknown_product"));
+        let content = div()
+            .flex()
+            .flex_col()
+            .items_center()
+            .gap(px(10.))
+            .child(
+                div()
+                    .text_size(px(20.))
+                    .text_color(theme.text)
+                    .child(label_of(profile)),
+            )
+            .child(
+                div()
+                    .text_size(px(12.))
+                    .text_color(theme.text_muted)
+                    .child(product),
+            )
+            .child(
+                div()
+                    .w(px(WELCOME_WIDTH))
+                    .text_size(px(12.))
+                    .text_color(theme.text_muted)
+                    .child(ts!("workarea.next")),
+            );
+
+        let bar = self.hovering_scrollbar(cx);
+        centered_scroll(WELCOME_STATE, &self.welcome_scroll, bar, theme, content).into_any_element()
     }
 
     /// The welcome screen: the name, what the application is for, the three
     /// ways in, and the connections already saved.
     ///
-    /// None of the three buttons does anything yet, and each says so on hover
-    /// rather than by silence. The saved list is read from `connections.json`
-    /// and shown; a row of it becomes a way in when there is a session behind
-    /// it, in M2.
+    /// A saved row opens the session it names; the two buttons whose milestone
+    /// has not arrived say so on hover rather than by silence.
     fn render_welcome(&self, theme: &Theme, cx: &mut Context<Self>) -> AnyElement {
         let profiles = self.profiles.connections();
+        // A failed attempt is reported here as well as on the status bar: the
+        // welcome screen is what the window goes back to when a connection does
+        // not open, and a bar 400 pixels below the button that was pressed is
+        // not where the answer is looked for.
+        let failure = match &self.connection {
+            ConnectionState::Failed { profile, message } => Some(
+                div()
+                    .flex()
+                    .flex_col()
+                    .gap(px(2.))
+                    .w(px(WELCOME_WIDTH))
+                    .p(px(8.))
+                    .rounded_md()
+                    .bg(theme.surface)
+                    .border_1()
+                    .border_color(theme.danger)
+                    .child(
+                        div()
+                            .text_size(px(12.))
+                            .text_color(theme.danger)
+                            .child(ts!("connect.could_not_open", name = label_of(profile))),
+                    )
+                    .child(
+                        div()
+                            .text_size(px(11.))
+                            .text_color(theme.text_muted)
+                            .child(message.clone()),
+                    ),
+            ),
+            _ => None,
+        };
 
         // A first run has nothing saved and no habit of the chord yet, so the
         // line under the buttons is left out; once something is saved it
@@ -1031,7 +1522,19 @@ impl Workspace {
             .when(!profiles.is_empty(), |list| {
                 list.child(div().flex().flex_col().gap(px(1.)).children(
                     profiles.iter().enumerate().map(|(index, profile)| {
-                        profile_row(index, &profile.name, &profile.driver_id, theme)
+                        let id = profile.id;
+                        profile_row(
+                            index,
+                            &profile.name,
+                            &profile.driver_id,
+                            theme,
+                            cx.listener(move |workspace, _, _window, cx| {
+                                let Some(profile) = workspace.profiles.get(id).cloned() else {
+                                    return;
+                                };
+                                workspace.connect_to(profile, cx);
+                            }),
+                        )
                     }),
                 ))
             });
@@ -1061,15 +1564,19 @@ impl Workspace {
                     .gap(px(6.))
                     .w(px(WELCOME_WIDTH))
                     .child(
-                        soon(
-                            WELCOME_NEW_SELECTOR,
-                            Button::new("welcome-new", ts!("welcome.new_connection"))
-                                .variant(ButtonVariant::Primary)
-                                .full_width(true)
-                                .disabled(true)
-                                .tab_index(WELCOME_FIRST_TAB),
-                        )
-                        .into_any_element(),
+                        div()
+                            .id(WELCOME_NEW_SELECTOR)
+                            .debug_selector(|| WELCOME_NEW_SELECTOR.to_string())
+                            .child(
+                                Button::new("welcome-new", ts!("welcome.new_connection"))
+                                    .variant(ButtonVariant::Primary)
+                                    .full_width(true)
+                                    .tab_index(WELCOME_FIRST_TAB)
+                                    .on_click(|_, window, cx| {
+                                        window.dispatch_action(Box::new(NewConnection), cx);
+                                    }),
+                            )
+                            .into_any_element(),
                     )
                     .child(
                         soon(
@@ -1092,6 +1599,7 @@ impl Workspace {
                         .into_any_element(),
                     ),
             )
+            .children(failure)
             .children(hint)
             .child(saved);
 
@@ -1129,26 +1637,59 @@ impl Workspace {
                 div()
                     .flex_none()
                     .whitespace_nowrap()
-                    .child(ts!("statusbar.no_connection")),
+                    .when(
+                        matches!(self.connection, ConnectionState::Failed { .. }),
+                        |cell| cell.text_color(theme.danger),
+                    )
+                    .child(match &self.connection {
+                        ConnectionState::Idle => ts!("statusbar.no_connection"),
+                        ConnectionState::Connecting { profile, .. } => {
+                            ts!("statusbar.connecting", name = label_of(profile))
+                        }
+                        ConnectionState::Open { profile, session } => ts!(
+                            "statusbar.connected",
+                            name = label_of(profile),
+                            product = session
+                                .product()
+                                .map(SharedString::from)
+                                .unwrap_or_else(|| ts!("statusbar.unknown_product"))
+                        ),
+                        ConnectionState::Failed { profile, .. } => {
+                            ts!("statusbar.failed", name = label_of(profile))
+                        }
+                    }),
             )
             .child(
                 div()
                     .flex_1()
                     .min_w_0()
                     .truncate()
-                    .child(ts!("statusbar.no_selection")),
+                    .child(match &self.connection {
+                        // The reason lives here for as long as the failure
+                        // does: a message the user can still read while they
+                        // open the dialog to fix what it names.
+                        ConnectionState::Failed { message, .. } => message.clone(),
+                        _ => ts!("statusbar.no_selection"),
+                    }),
             )
             .into_any_element()
     }
 }
 
-/// One row of the welcome screen's saved list.
+/// One row of the welcome screen's saved list, which opens the session it
+/// names.
 ///
-/// Display only in M0: no hover, no pointer, no tab stop, because clicking a
-/// row opens a session and there is nothing behind it to open one on. The row
-/// gets its click, its context menu and its tab-ring place in M2, when it can
-/// keep the promise a pointer cursor makes.
-fn profile_row(index: usize, name: &str, driver: &str, theme: &Theme) -> AnyElement {
+/// A press connects rather than opening the editor: the list is the way *in*,
+/// and a saved connection that asks to be confirmed before it opens is a
+/// dialog nobody wanted. Editing one is the connection dialog's job, which the
+/// title bar and `Ctrl+N` both reach.
+fn profile_row(
+    index: usize,
+    name: &str,
+    driver: &str,
+    theme: &Theme,
+    on_click: impl Fn(&gpui::ClickEvent, &mut Window, &mut App) + 'static,
+) -> AnyElement {
     div()
         .id(("profile-row", index))
         .flex()
@@ -1158,6 +1699,9 @@ fn profile_row(index: usize, name: &str, driver: &str, theme: &Theme) -> AnyElem
         .px(px(6.))
         .py(px(5.))
         .rounded_md()
+        .cursor_pointer()
+        .hover(|style| style.bg(theme.surface_hover))
+        .on_click(on_click)
         .child(
             div()
                 .flex_1()
@@ -1265,6 +1809,12 @@ impl Render for Workspace {
             .read(cx)
             .is_open()
             .then(|| div().absolute().inset_0().child(self.update.clone()));
+        let connection = self.connection_dialog.read(cx).is_open().then(|| {
+            div()
+                .absolute()
+                .inset_0()
+                .child(self.connection_dialog.clone())
+        });
 
         // With client-side decorations the compositor stops drawing the drop
         // shadow along with the frame, so the window has to bring its own: the
@@ -1329,6 +1879,7 @@ impl Render for Workspace {
             .child(status_bar)
             .children(about)
             .children(settings)
+            .children(connection)
             .children(update);
 
         let Some(tiling) = tiling else {

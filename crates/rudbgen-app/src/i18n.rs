@@ -162,15 +162,19 @@ mod tests {
 
     /// One key per top-level namespace of `en.yml`, chosen so that no
     /// translation of it legitimately coincides with the English wording.
-    const PROBES: [&str; 9] = [
+    const PROBES: [&str; 13] = [
         "language.name",
         "common.close",
         "menu.new_connection",
         "titlebar.no_connection",
         "welcome.saved",
         "statusbar.no_connection",
+        "workarea.next",
         "about.title",
         "settings.title",
+        "connect.title",
+        "driver.title",
+        "custom_query.section",
         "update.ignore",
     ];
 

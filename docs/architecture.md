@@ -85,6 +85,7 @@ rudbgen/
     ├── rudbgen-template/       the template engine — pure, no gpui, no JNI
     ├── rudbgen-meta/           the table model: DESCRIBE + custom queries → template Model
     ├── rudbgen-gen/            the generation job: plan → render → write (§9), no gpui
+    ├── rudbgen-import/         reads a jdbgen config.json (D5): decryption and store mapping, no gpui
     ├── rudbgen-editor/         code editor widget with pluggable highlighting
     ├── rudbgen-grid/           virtualized grid widget
     └── rudbgen-app/            the binary
@@ -99,6 +100,7 @@ rudbgen-app
  ├─→ rudbgen-template          (pure: encoding_rs, regex, chrono only)
  ├─→ rudbgen-meta ─→ rudbgen-jdbc, rudbgen-template, rudbgen-core
  ├─→ rudbgen-gen ─→ rudbgen-meta, rudbgen-template, rudbgen-core
+ ├─→ rudbgen-import ─→ rudbgen-core
  ├─→ rudbgen-jdbc ─→ rudbgen-core
  ├─→ rudbgen-ssh  ─→ rudbgen-core
  └─→ rudbgen-core

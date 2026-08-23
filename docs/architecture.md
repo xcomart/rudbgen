@@ -84,6 +84,7 @@ rudbgen/
     ├── rudbgen-jdbc/           JNI: JVM bootstrap, session worker, DESCRIBE, EXECUTE
     ├── rudbgen-template/       the template engine — pure, no gpui, no JNI
     ├── rudbgen-meta/           the table model: DESCRIBE + custom queries → template Model
+    ├── rudbgen-gen/            the generation job: plan → render → write (§9), no gpui
     ├── rudbgen-editor/         code editor widget with pluggable highlighting
     ├── rudbgen-grid/           virtualized grid widget
     └── rudbgen-app/            the binary
@@ -97,6 +98,7 @@ rudbgen-app
  ├─→ rudbgen-editor ─┼─→ rudbgen-ui ─→ gpui
  ├─→ rudbgen-template          (pure: encoding_rs, regex, chrono only)
  ├─→ rudbgen-meta ─→ rudbgen-jdbc, rudbgen-template, rudbgen-core
+ ├─→ rudbgen-gen ─→ rudbgen-meta, rudbgen-template, rudbgen-core
  ├─→ rudbgen-jdbc ─→ rudbgen-core
  ├─→ rudbgen-ssh  ─→ rudbgen-core
  └─→ rudbgen-core
@@ -253,7 +255,7 @@ Two implementations: `TemplateHighlighter` (text, `${`…`}` statement, statemen
 
 ## 9. Generation
 
-`generate(plan: Plan, policy: Overwrite, cancel: CancelToken, progress: Sender<Progress>) -> Outcome` on a background thread:
+`rudbgen-gen`'s `generate(plan: Plan, policy: Overwrite, cancel: CancelToken, progress: Sender<Progress>) -> Outcome`, run by the app on a background thread:
 
 1. Load columns (and keys/FKs/indexes) for every ticked table — one `DESCRIBE` each, cached per connection until refresh.
 2. Parse every ticked template and every output-name template once; a parse error aborts **before** any file is written.

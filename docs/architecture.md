@@ -83,6 +83,7 @@ rudbgen/
     ├── rudbgen-ssh/            SSH local port forwarding
     ├── rudbgen-jdbc/           JNI: JVM bootstrap, session worker, DESCRIBE, EXECUTE
     ├── rudbgen-template/       the template engine — pure, no gpui, no JNI
+    ├── rudbgen-meta/           the table model: DESCRIBE + custom queries → template Model
     ├── rudbgen-editor/         code editor widget with pluggable highlighting
     ├── rudbgen-grid/           virtualized grid widget
     └── rudbgen-app/            the binary
@@ -95,6 +96,7 @@ rudbgen-app
  ├─→ rudbgen-grid ───┐
  ├─→ rudbgen-editor ─┼─→ rudbgen-ui ─→ gpui
  ├─→ rudbgen-template          (pure: encoding_rs, regex, chrono only)
+ ├─→ rudbgen-meta ─→ rudbgen-jdbc, rudbgen-template, rudbgen-core
  ├─→ rudbgen-jdbc ─→ rudbgen-core
  ├─→ rudbgen-ssh  ─→ rudbgen-core
  └─→ rudbgen-core
@@ -196,7 +198,7 @@ Secrets: `SecretSlot::Connection(uuid)` for the database password, `SecretSlot::
 
 ## 6. Metadata
 
-All through the bridge's `DESCRIBE` (`catalogs`, `schemas`, `tables`, `columns`, `primary_keys`, `imported_keys`, `exported_keys`, `indexes`). The app's `meta` module builds the template model:
+All through the bridge's `DESCRIBE` (`catalogs`, `schemas`, `tables`, `columns`, `primary_keys`, `imported_keys`, `exported_keys`, `indexes`). The `rudbgen-meta` crate builds the template model (and implements `rudbgen_template::Model` for it), so it is testable against H2 without a window:
 
 - `Table { catalog, schema, name, table, title, type, remarks, columns, keys, not_keys, imports, exports, indexes, no }` — the first nine exactly as jdbgen; `imports`/`exports`/`indexes` new.
 - `Column { … jdbgen's 18 fields …, precision, scale, auto_increment, fk: Option<ForeignKeyRef> }`.

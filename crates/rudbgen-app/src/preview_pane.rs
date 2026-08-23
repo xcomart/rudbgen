@@ -7,18 +7,19 @@
 //! — path, whether something is already there, how big it would be — with the
 //! text of whichever row is selected underneath.
 //!
-//! The text is read-only monospace here. M4 replaces it with an
-//! [`EditorView`](rudbgen_editor) so that a preview scrolls, selects and copies
-//! like the editor beside it; the shape of what this holds — a path, a body and
-//! a list of diagnostics per file — is what that view will be given, so the
-//! swap is a change of one child and not of this panel.
+//! The text is a read-only [`EditorView`], coloured by the *output* file's
+//! language — a rendered Java template is Java, whatever the template it came
+//! from was — so a preview scrolls, selects and copies exactly like the editor
+//! a template tab holds. The panel's own scroll handle rides the dry run's file
+//! list, which is the one thing here that is not the editor.
 
 use std::path::PathBuf;
 
 use gpui::{
-    App, Context, DragMoveEvent, EventEmitter, FocusHandle, Focusable, ScrollHandle, SharedString,
-    Window, div, prelude::*, px,
+    App, Context, DragMoveEvent, Entity, EventEmitter, FocusHandle, Focusable, ScrollHandle,
+    SharedString, Window, div, prelude::*, px,
 };
+use rudbgen_editor::EditorView;
 use rudbgen_ui::{
     DraggedThumb, Scrollbar, ScrollbarAxis, ScrollbarState, Select, hide_later, hide_now,
     scroll_to, scrolled, theme,
@@ -26,6 +27,7 @@ use rudbgen_ui::{
 
 use crate::app_settings;
 use crate::i18n::ts;
+use crate::template_pane::to_lf;
 
 /// Element id of the panel's scrolling box.
 const PANE_SCROLL: &str = "preview-scroll";
@@ -94,6 +96,8 @@ pub struct PreviewPane {
     diagnostics: Vec<SharedString>,
     /// Why nothing could be rendered, when nothing could.
     error: Option<SharedString>,
+    /// The rendered text, read-only.
+    text: Entity<EditorView>,
     /// Vertical scroll of the text.
     scroll: ScrollHandle,
     /// Whether the panel's overlay scroll indicator is on screen.
@@ -116,6 +120,7 @@ impl PreviewPane {
             selected: 0,
             diagnostics: Vec::new(),
             error: None,
+            text: cx.new(|cx| EditorView::new(cx).read_only(true)),
             scroll: ScrollHandle::new(),
             scrollbar: ScrollbarState::new(),
         }
@@ -174,6 +179,7 @@ impl PreviewPane {
         self.selected = 0;
         self.diagnostics = diagnostics;
         self.error = None;
+        self.show_selected(cx);
         cx.notify();
     }
 
@@ -189,6 +195,7 @@ impl PreviewPane {
         self.selected = 0;
         self.diagnostics = diagnostics;
         self.error = None;
+        self.show_selected(cx);
         cx.notify();
     }
 
@@ -197,7 +204,27 @@ impl PreviewPane {
         self.files.clear();
         self.diagnostics.clear();
         self.error = Some(message);
+        self.show_selected(cx);
         cx.notify();
+    }
+
+    /// Puts the selected file's text in the editor, coloured by what it is.
+    ///
+    /// The highlighter comes from the *output* file's extension: what is on
+    /// screen is the Java, XML or PHP a template rendered to, and colouring it
+    /// as a template would paint the one thing it no longer contains.
+    fn show_selected(&mut self, cx: &mut Context<Self>) {
+        let file = self.files.get(self.selected);
+        let highlighter = file.and_then(|file| {
+            file.path
+                .extension()
+                .and_then(|ext| rudbgen_editor::highlighter_for_extension(&ext.to_string_lossy()))
+        });
+        let text = file.map(|file| to_lf(&file.content)).unwrap_or_default();
+        self.text.update(cx, |editor, cx| {
+            editor.set_highlighter(highlighter, cx);
+            editor.set_text(&text, cx);
+        });
     }
 
     /// Empties the panel; the connection it belonged to is gone.
@@ -210,6 +237,7 @@ impl PreviewPane {
         self.table_index = 0;
         self.template_index = 0;
         self.selected = 0;
+        self.show_selected(cx);
         cx.notify();
     }
 
@@ -370,6 +398,7 @@ impl PreviewPane {
                     .on_click(move |_, _window, cx| {
                         this.update(cx, |pane, cx| {
                             pane.selected = index;
+                            pane.show_selected(cx);
                             cx.notify();
                         });
                     })
@@ -409,7 +438,8 @@ impl PreviewPane {
             .collect();
 
         div()
-            .id("preview-files")
+            .id(PANE_SCROLL)
+            .track_scroll(&self.scroll)
             .flex()
             .flex_col()
             .gap(px(1.))
@@ -478,6 +508,8 @@ impl Render for PreviewPane {
             (None, Some(file)) => div()
                 .flex()
                 .flex_col()
+                .flex_grow_1()
+                .min_h_0()
                 .gap(px(6.))
                 .child(
                     div()
@@ -487,30 +519,18 @@ impl Render for PreviewPane {
                         .child(SharedString::from(file.path.display().to_string())),
                 )
                 .child(
-                    // Read-only monospace until M4 puts an `EditorView` here.
-                    // `whitespace_normal` is deliberately not set: a rendered
-                    // template is code, and code is not reflowed.
                     div()
-                        .id(PANE_SCROLL)
-                        .track_scroll(&self.scroll)
                         .flex()
                         .flex_col()
                         .flex_grow_1()
                         .min_h_0()
-                        .p(px(8.))
-                        .overflow_y_scroll()
                         .rounded_md()
-                        .bg(theme.surface)
+                        .overflow_hidden()
                         .border_1()
                         .border_color(theme.border)
                         .font_family(mono)
                         .text_size(px(font_size))
-                        .text_color(theme.text)
-                        .children(
-                            file.content
-                                .lines()
-                                .map(|line| div().child(SharedString::from(line.to_owned()))),
-                        ),
+                        .child(self.text.clone()),
                 )
                 .into_any_element(),
             (None, None) => div()

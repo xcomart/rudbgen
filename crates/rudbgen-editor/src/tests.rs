@@ -13,7 +13,7 @@ use std::ops::Deref;
 use std::rc::Rc;
 use std::sync::Arc;
 
-use crate::editor::{EditorEvent, EditorView};
+use crate::editor::{EditorEvent, EditorView, MarkKind, NavKey};
 use crate::sql_syntax::SqlHighlighter;
 use gpui::{
     Context, Entity, EntityInputHandler, Focusable, IntoElement, Render, TestAppContext,
@@ -1042,5 +1042,102 @@ fn a_right_click_asks_for_a_menu_without_moving_the_caret(cx: &mut TestAppContex
     assert!(
         editor.with_window(&mut cx, |editor, window, _| editor.is_focused(window)),
         "a right click did not take the focus"
+    );
+}
+
+#[gpui::test]
+fn the_gutter_marks_keep_one_verdict_per_line(cx: &mut TestAppContext) {
+    let (editor, mut cx) = open("one\ntwo\nthree\n", cx);
+
+    editor.update(&mut cx, |editor, cx| {
+        editor.set_marks(
+            vec![
+                (2, MarkKind::Warning),
+                (0, MarkKind::Warning),
+                // The same line twice, and the error is the one that has to be
+                // fixed first, so it is the one that survives.
+                (0, MarkKind::Error),
+                // Past the end of the buffer: kept rather than dropped, because
+                // a diagnostic computed on a background task may describe a
+                // buffer that has since been shortened.
+                (9, MarkKind::Error),
+            ],
+            cx,
+        );
+    });
+
+    assert_eq!(
+        editor.read(&mut cx, |editor| editor.marks().to_vec()),
+        vec![
+            (0, MarkKind::Error),
+            (2, MarkKind::Warning),
+            (9, MarkKind::Error)
+        ]
+    );
+    assert_eq!(
+        editor.read(&mut cx, |editor| editor.mark_on(0)),
+        Some(MarkKind::Error)
+    );
+    assert_eq!(editor.read(&mut cx, |editor| editor.mark_on(1)), None);
+
+    // The marks are drawn, which is the half a unit test cannot see; what it
+    // can see is that drawing them does not panic over the line past the end.
+    draw(&mut cx);
+}
+
+#[gpui::test]
+fn an_intercepted_key_is_handed_over_instead_of_acted_on(cx: &mut TestAppContext) {
+    let (editor, mut cx) = open("one\ntwo\n", cx);
+    editor.update(&mut cx, |editor, cx| {
+        editor.move_to(0, cx);
+    });
+    editor.drain_events();
+
+    // Off: the five keys are the editor's own.
+    cx.simulate_keystrokes("down");
+    cx.run_until_parked();
+    assert_eq!(editor.caret(&mut cx), 4, "the caret did not move a line");
+    assert!(
+        !editor
+            .drain_events()
+            .iter()
+            .any(|event| matches!(event, EditorEvent::Intercepted(_))),
+        "a key was handed over with no popup asking for it"
+    );
+
+    // On: the host gets them, and the buffer is left alone.
+    editor.update(&mut cx, |editor, _cx| editor.set_intercept(true));
+    let before = editor.text(&mut cx);
+    cx.simulate_keystrokes("down up enter tab escape");
+    cx.run_until_parked();
+    assert_eq!(
+        editor.drain_events(),
+        vec![
+            EditorEvent::Intercepted(NavKey::Down),
+            EditorEvent::Intercepted(NavKey::Up),
+            EditorEvent::Intercepted(NavKey::Enter),
+            EditorEvent::Intercepted(NavKey::Tab),
+            EditorEvent::Intercepted(NavKey::Escape),
+        ]
+    );
+    assert_eq!(editor.text(&mut cx), before, "an intercepted key edited");
+    assert_eq!(
+        editor.caret(&mut cx),
+        4,
+        "an intercepted key moved the caret"
+    );
+
+    // The find bar still owns Escape while it is open, popup or no popup.
+    cx.simulate_keystrokes("ctrl-f");
+    cx.run_until_parked();
+    editor.drain_events();
+    cx.simulate_keystrokes("escape");
+    cx.run_until_parked();
+    assert!(
+        !editor
+            .drain_events()
+            .iter()
+            .any(|event| matches!(event, EditorEvent::Intercepted(_))),
+        "the find bar's Escape was taken by the popup"
     );
 }

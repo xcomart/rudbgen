@@ -9,11 +9,6 @@ common:
   save: 保存
   close: 閉じる
 
-# セッションが開いているときのウィンドウ本体。エクスプローラー、インスペクター、
-# その間の作業領域は次に来る。
-workarea:
-  next: テンプレートエディターは次のマイルストーンで加わります。隣の生成タブはすでにここにあります。
-
 explorer:
   title: エクスプローラー
   filter_placeholder: テーブルを絞り込む
@@ -220,6 +215,11 @@ menu:
   quit: 終了
   connection: 接続
   view: 表示
+  template: テンプレート
+  open_template: テンプレートを開く…
+  save_template: テンプレートを保存
+  toggle_live_preview: ライブプレビュー
+  trigger_completion: 候補を表示
   preview: プレビュー
   dry_run: ドライラン
   generate: 生成
@@ -273,6 +273,7 @@ generate:
   template_name: 名前
   out_template: 出力名
   tip_edit: テンプレートを編集
+  tip_open: ダブルクリックでテンプレートを開きます
   tip_remove: 一覧から削除
   options: オプション
   output_dir: 出力先
@@ -460,3 +461,148 @@ update:
   installing: インストールしています…
   failed: 更新に失敗しました。
   open_release: リリースページを開く
+
+template:
+  unsaved: 未保存
+  tip_preview: ライブプレビューの表示を切り替えます
+  show_preview: プレビューを表示
+  hide_preview: プレビューを隠す
+  preview_table: テーブル
+  preview_no_connection: 接続を開くと、このテンプレートをテーブルに当てた結果が出ます。
+  preview_no_table: エクスプローラーでテーブルを選ぶと、当てた結果が出ます。
+  preview_parse_error: テンプレートを解析できません。何が悪いかは下に並んでいます。
+  read_failed: "%{file} を開けませんでした: %{reason}"
+  write_failed: "%{file} を書けませんでした: %{reason}"
+  not_utf8: "%{file} は UTF-8 のテキストではないため、ここでは編集できません。"
+  open_select: テンプレートを開く
+  close_title: 保存していない変更
+  close_question: "%{file} にまだ保存していない変更があります。"
+  discard: 保存しない
+
+diagnostics:
+  title: 問題 (%{count})
+  at: "%{line}:%{column}"
+
+completion:
+  hint: ↑↓ 選択 · Enter 挿入 · Esc 閉じる
+  more: ほか %{count} 件
+
+palette:
+  title: 変数
+  search: 変数を絞り込む
+  no_match: 一致するものがありません。
+  custom_var: 生成タブの変数表にある変数です。
+  section_table: テーブルの項目
+  section_column: 列の項目 (for の中)
+  section_fk: 外部キーの項目
+  section_index: インデックスの項目
+  section_statement: 文
+  section_decorator: デコレーター
+  section_condition: 条件
+  section_custom: ユーザー変数
+  table:
+    catalog: このテーブルが属するデータベースカタログ
+    schema: このテーブルが属するデータベーススキーマ
+    name: テーブル名
+    table: name の別名
+    title: name の別名
+    type: TABLE か VIEW
+    remarks: テーブルのコメント
+    columns: データベースが返した順の全列
+    keys: キー順に並んだ主キーの列
+    notKeys: 主キーに入っていない全列
+    imports: このテーブルが宣言している外部キー
+    exports: 他のテーブルがこのテーブルに向けて宣言した外部キー
+    indexes: このテーブルのインデックス
+    icon: テーブル一覧が横に描くアイコン
+    position: 読み込んだ一覧での位置
+  column:
+    catalog: この列が属するデータベースカタログ
+    schema: この列が属するデータベーススキーマ
+    table: この列が属するテーブル
+    name: 列名
+    column: name の別名
+    typeName: ドライバーが返した型名。VARCHAR や INT など
+    typeString: DDL の書き方の型。長さまで付いた VARCHAR(256) など
+    isKey: この列が主キーの一部かどうか
+    isCharType: 型が CHAR、CLOB、TEXT の仲間かどうか
+    length: 列の大きさ。文字型は文字数、数値型は桁数
+    precision: 数値列が持つ全体の桁数
+    scale: そのうち小数点以下の桁数
+    nullable: NOT NULL なら 0、NULL を受けるなら 1
+    remarks: 列のコメント
+    defVal: 既定値
+    dataType: ドライバーが返した java.sql.Types の値
+    jdbcType: その値が表す JDBC 型の名前
+    javaType: その値に対応する Java 型の名前
+    autoIncrement: データベースが自分で値を埋めるかどうか
+    keySeq: 主キーの中での位置。1 から
+    fk: 外部キーがちょうど一つこの列を使うとき、その指す先
+    position: 繰り返しの中での位置。1 から
+  fk:
+    name: 制約の名前
+    columns: このキーを作る、このテーブルの列
+    refCatalog: 相手側テーブルのカタログ
+    refSchema: 相手側テーブルのスキーマ
+    refTable: 相手側のテーブル
+    refColumns: こちらと同じ順に並んだ相手側の列
+    onUpdate: 相手側の行が変わったときの動き
+    onDelete: 相手側の行が消えたときの動き
+    position: キー一覧での位置。1 から
+    catalog: 列の fk の中で — 指す先のテーブルのカタログ
+    schema: 列の fk の中で — 指す先のテーブルのスキーマ
+    table: 列の fk の中で — 指す先のテーブル
+    column: 列の fk の中で — 指す先の列
+  index:
+    name: インデックス名
+    unique: 一意インデックスかどうか
+    columns: インデックス順に並んだ列
+    position: インデックス一覧での位置。1 から
+  stmt:
+    item: モデルの項目を、デコレーターまで付けて書きます
+    super: for の中からテーブルに届きます
+    if: 条件が成り立つとき本文を書きます。endif が要ります
+    elif: 上の if のもう一つの分岐
+    else: どの分岐も成り立たないときに書くもの
+    endif: if を閉じます
+    for: 集まりの要素ごとに本文を一度ずつ書きます
+    endfor: for を閉じます
+    date: format が決めた形で書いた今日の日付
+    user: 生成を走らせているアカウント
+    author: 生成タブの作成者の欄
+    inStr: 繰り返しの間に書く文字。最初の前と最後の後には書きません
+    indent: inStr が書くものの字下げに足す桁。負でも構いません
+    skipList: 飛ばす要素名。カンマで区切り、大文字小文字まで合わせます
+  dec:
+    abbr: 値に略語規則を当てます
+    suffix: 最初の下線までを捨てます。T_SAMPLE_ALBUM は SAMPLE_ALBUM になります
+    prefix: 最後の下線からを捨てます。SAMPLE_ALBUM_T は SAMPLE_ALBUM になります
+    camel: キャメル。SAMPLE_ALBUM は sampleAlbum になります
+    pascal: パスカル。SAMPLE_ALBUM は SampleAlbum になります
+    snake: スネーク。SAMPLE_ALBUM は sample_album になります
+    screaming: 大文字スネーク。sampleAlbum は SAMPLE_ALBUM になります
+    skewer: ケバブ。SAMPLE_ALBUM は sample-album になります
+    kebab: skewer の別名
+    lower: 小文字
+    upper: 大文字
+    replace: replace('from','to') は出てくるたびに置き換えます
+    padSize: この幅になるまで値を空白で埋めます
+    padDir: 空白を付ける側。left か right で、既定は right
+    quote: 値の両端をこの文字で包みます
+    prepend: 値の前にこの文字を書きます
+    postpend: 値の後ろにこの文字を書きます
+  cond:
+    equals: 大文字小文字を問わず値がこれと同じなら真
+    notEquals: 値がこれ以外なら真
+    startsWith: 大文字小文字を問わず値がこれで始まるなら真
+    notStartsWith: 値がこれで始まらないなら真
+    endsWith: 大文字小文字を問わず値がこれで終わるなら真
+    notEndsWith: 値がこれで終わらないなら真
+    contains: 集まりにこの名前の要素があるか、カンマ区切りの一覧にこの値があれば真
+    notContains: どちらでもなければ真
+    matches: 値の全体がこの正規表現に合えば真。ここは大文字小文字を区別します
+    notMatches: 値の全体がこの正規表現に合わなければ真
+  opt:
+    key: この文が書く項目。デコレーターまで含みます
+    item: key の別名
+    format: 日付の書き方。yyyy-MM-dd のような Java のパターン文字

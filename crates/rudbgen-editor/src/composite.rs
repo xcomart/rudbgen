@@ -33,7 +33,7 @@
 //!
 //! # What it does not do yet
 //!
-//! Picking the base from the file's extension is the *app*'s decision (M4) and
+//! Picking the base from the file's extension is the *app*'s decision and
 //! not this crate's: `rudbgen-editor` knows `rudbgen-ui` and no file system.
 //! Only the SQL highlighter ships as a base today, so a `.java` template
 //! composes over nothing until a Java lexer is written; the composition itself

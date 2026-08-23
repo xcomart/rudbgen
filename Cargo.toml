@@ -270,6 +270,7 @@ rudbgen-ui = { path = "crates/rudbgen-ui" }
 rudbgen-ssh = { path = "crates/rudbgen-ssh" }
 rudbgen-jdbc = { path = "crates/rudbgen-jdbc" }
 rudbgen-meta = { path = "crates/rudbgen-meta" }
+rudbgen-template = { path = "crates/rudbgen-template" }
 rudbgen-gen = { path = "crates/rudbgen-gen" }
 rudbgen-import = { path = "crates/rudbgen-import" }
 rudbgen-grid = { path = "crates/rudbgen-grid" }

@@ -97,7 +97,7 @@ pub mod template_syntax;
 
 pub use buffer::Buffer;
 pub use composite::CompositeHighlighter;
-pub use editor::{EditorEvent, EditorView, init};
+pub use editor::{EditorEvent, EditorView, MarkKind, NavKey, init};
 pub use element::EditorElement;
 pub use find::{FindState, find_all};
 pub use highlight::{Highlighter, LineState, Span, SyntaxCache, Token};

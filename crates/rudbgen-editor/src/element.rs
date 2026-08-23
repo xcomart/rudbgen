@@ -61,6 +61,15 @@ const GUTTER_LEAD: f32 = 8.;
 /// Width of the caret.
 const CARET_WIDTH: f32 = 2.;
 
+/// Width of the bar a gutter mark draws at the left edge of the gutter.
+const MARK_WIDTH: f32 = 3.;
+
+/// How much of the line's height that bar takes, centred on the line.
+const MARK_HEIGHT: f32 = 0.7;
+
+/// How strongly a marked line's own row is tinted behind the text.
+const MARK_WASH: f32 = 0.12;
+
 /// How far past the viewport lines are shaped, so that a partially visible row
 /// at either edge is drawn rather than clipped away.
 const OVERSCAN: usize = 1;
@@ -88,6 +97,8 @@ pub struct PrepaintState {
     below: Vec<PaintQuad>,
     /// The caret, when it is visible.
     caret: Option<PaintQuad>,
+    /// The bars of the gutter marks, which are painted outside the text mask.
+    marks: Vec<PaintQuad>,
     /// Width of the gutter.
     gutter: Pixels,
     /// Height of one line.
@@ -190,6 +201,7 @@ impl Element for EditorElement {
         let mut lines = Vec::with_capacity(last_line - first_line + 1);
         let mut numbers = Vec::with_capacity(last_line - first_line + 1);
         let mut below = Vec::new();
+        let mut marks = Vec::new();
         let mut caret = None;
         let mut content_width = px(0.);
 
@@ -279,6 +291,26 @@ impl Element for EditorElement {
                 ));
             }
 
+            // 8a. the diagnostic mark, when the host put one on this line: a
+            // bar at the left edge of the gutter and a wash across the row, so
+            // that a warning is visible both where the line numbers are looked
+            // at and where the text is read.
+            if let Some(kind) = editor.mark_on(line) {
+                let color = match kind {
+                    crate::editor::MarkKind::Error => palette.error,
+                    crate::editor::MarkKind::Warning => palette.warning,
+                };
+                below.push(fill(row, color.opacity(MARK_WASH)));
+                let inset = line_height * ((1. - MARK_HEIGHT) / 2.);
+                marks.push(fill(
+                    Bounds::from_corners(
+                        point(bounds.left(), top + inset),
+                        point(bounds.left() + px(MARK_WIDTH), top + line_height - inset),
+                    ),
+                    color,
+                ));
+            }
+
             // 8. the line number.
             let number = format!("{}", line + 1);
             let color = if line == caret_line {
@@ -300,6 +332,7 @@ impl Element for EditorElement {
             lines,
             numbers,
             below,
+            marks,
             caret,
             gutter,
             line_height,
@@ -375,6 +408,12 @@ impl Element for EditorElement {
                     window.paint_quad(caret);
                 }
             });
+
+            // The diagnostic bars ride the gutter's left edge, outside the
+            // text mask with the numbers.
+            for quad in prepaint.marks.drain(..) {
+                window.paint_quad(quad);
+            }
 
             // The line numbers are the only thing drawn in the gutter, and so the
             // only thing outside the mask above. Nothing here fills the gutter

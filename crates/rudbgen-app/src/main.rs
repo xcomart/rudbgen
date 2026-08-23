@@ -36,11 +36,14 @@
 //! area with the Generate tab in it, and the inspector. The status bar carries
 //! the arithmetic of the run and the three buttons that start one.
 //!
-//! What is still to come is the template editor (M4), which turns the pencil
-//! beside a template row into a tab, and the jdbgen import (M5). Both are drawn
-//! disabled with a tooltip that says so rather than left out — a way in that is
-//! missing tells the reader nothing about what the application will do, and a
-//! button that looks live and does nothing is worse than either.
+//! A template is a document: the pencil beside a template row, a double click
+//! on it, and the welcome screen's *Open a template* all open one in a tab of
+//! its own — the editor, the live preview beside it and the variable palette in
+//! the inspector's column (D12, §4.5). What is still to come is the jdbgen
+//! import (M5), which is drawn disabled with a tooltip that says so rather than
+//! left out: a way in that is missing tells the reader nothing about what the
+//! application will do, and a button that looks live and does nothing is worse
+//! than either.
 
 mod about_dialog;
 mod app_settings;
@@ -61,23 +64,28 @@ mod i18n;
 mod icons;
 mod inspector;
 mod maven;
+mod palette;
 // The work area uses `Pane` — the tab strip's list and its active index — but
-// not yet `PaneTree`, whose splits arrive with the template editor's side-by-side
-// preview in M4. Until then the tree's own operations (splitting, merging a
-// subtree, walking the leaves) read as dead code inside a binary crate.
+// not `PaneTree`: the template tab splits itself down the middle rather than
+// splitting the *pane*, so the tree's own operations (splitting, merging a
+// subtree, walking the leaves) still read as dead code inside a binary crate.
 #[allow(dead_code)]
 mod pane_tree;
 mod preview_pane;
 mod settings_dialog;
+mod template_pane;
 mod theme_editor;
 mod update;
 mod update_dialog;
+mod variable_palette;
 
 // Compiles `locales/*.yml` into the binary and defines the machinery `t!`
 // expands to, which is why it has to sit in the crate root. `fallback = "en"`
 // is per key, not per locale: a string a translator has not got to yet shows
 // in English while the rest of that language stays translated.
 rust_i18n::i18n!("locales", fallback = "en");
+
+use std::path::{Path, PathBuf};
 
 use gpui::{
     AnyElement, App, Bounds, Context, Div, DragMoveEvent, Entity, FocusHandle, Hsla, KeyBinding,
@@ -89,7 +97,7 @@ use rudbgen_core::{
     AppSettings, ConnectionProfile, ConnectionStore, DriverDef, DriverStore, TemplateSetStore,
     TitlebarStyle, WindowState,
 };
-use rudbgen_gen::Plan;
+use rudbgen_gen::{Plan, TemplateSpec};
 use rudbgen_meta::{MetaReader, Table};
 use rudbgen_ui::{
     Button, ButtonVariant, DraggedThumb, EditorThemeEntry, EditorThemeRegistry, MenuButton,
@@ -113,7 +121,9 @@ use inspector::{Inspector, InspectorEvent};
 use pane_tree::{Pane, PaneItem};
 use preview_pane::{PreviewEvent, PreviewFile, PreviewPane};
 use settings_dialog::{SettingsDialog, SettingsDialogEvent};
+use template_pane::{PreviewOutcome, TemplatePane, TemplatePaneEvent};
 use update_dialog::{UpdateDialog, UpdateDialogEvent};
+use variable_palette::{PaletteEvent, VariablePalette};
 
 actions!(
     rudbgen,
@@ -140,6 +150,14 @@ actions!(
         Preview,
         /// Renders every pair into memory, writing nothing.
         DryRun,
+        /// Opens a template file in a tab of its own.
+        OpenTemplate,
+        /// Writes the template tab that is on top back to its file.
+        SaveTemplate,
+        /// Shows and hides the live preview beside the template being edited.
+        ToggleLivePreview,
+        /// Offers what may be written where the caret is.
+        TriggerCompletion,
     ]
 );
 
@@ -277,6 +295,9 @@ const WELCOME_FIRST_TAB: isize = 1;
 /// Compiled away outside a test build; it saves a test working the button's
 /// position out from the centred column's layout.
 const WELCOME_NEW_SELECTOR: &str = "welcome-new";
+
+/// Debug selector of the welcome screen's "open a template" button.
+const WELCOME_TEMPLATE_SELECTOR: &str = "welcome-template";
 
 /// Reads `connections.json` for the welcome screen's list.
 ///
@@ -442,13 +463,27 @@ struct Workspace {
     generate: Entity<GeneratePane>,
     /// The Preview tab's contents, when there is one.
     preview: Entity<PreviewPane>,
+    /// One editor per open template file, in no particular order.
+    ///
+    /// The tab strip holds the paths and this holds the buffers, which is what
+    /// lets a template tab survive a reconnection: the strip is rebuilt when
+    /// the connection changes and these are not (§4.2 — switching the
+    /// connection never closes an open template).
+    templates: Vec<Entity<TemplatePane>>,
+    /// Keeps the template tabs' subscriptions alive, one per entry above.
+    template_events: Vec<Subscription>,
+    /// The variable palette, which replaces the inspector while a template tab
+    /// is on top (§4.5).
+    palette: Entity<VariablePalette>,
+    /// The tab a close is waiting on an answer about, when one is.
+    closing: Option<usize>,
     /// The progress dialog, the overwrite question and the summary (D11).
     job: Entity<GenerationJob>,
     /// The work area's tab strip.
     ///
-    /// A [`Pane`] rather than a [`pane_tree::PaneTree`]: there is one pane
-    /// today, and the splits the tree is for arrive with the template editor's
-    /// side-by-side preview in M4.
+    /// A [`Pane`] rather than a [`pane_tree::PaneTree`]: there is one pane, and
+    /// the template tab's side-by-side preview is a split *inside* the tab
+    /// rather than a second pane beside it.
     pane: Pane,
     /// Whether the tab strip's dropdown is showing.
     pane_menu_open: bool,
@@ -506,6 +541,8 @@ struct Workspace {
     _generate_events: Subscription,
     /// Keeps the Preview tab's subscription alive.
     _preview_events: Subscription,
+    /// Keeps the variable palette's subscription alive.
+    _palette_events: Subscription,
     /// Keeps the generation dialog's subscription alive.
     _job_events: Subscription,
     /// Closes the session before the process winds down.
@@ -660,8 +697,12 @@ impl Workspace {
                 // Both of these need the session, which is the workspace's.
                 ExplorerEvent::LoadSchemas => workspace.load_schemas(cx),
                 ExplorerEvent::LoadTables(schema) => workspace.load_tables(schema.clone(), cx),
-                // The status bar counts the ticks, and nothing else changed.
-                ExplorerEvent::SelectionChanged => cx.notify(),
+                // The status bar counts the ticks, and so does the list of
+                // tables a live preview may be rendered against.
+                ExplorerEvent::SelectionChanged => {
+                    workspace.refresh_templates(cx);
+                    cx.notify();
+                }
                 ExplorerEvent::Inspect { table, reveal } => {
                     // Only the menu row asks for the panel to be shown. Moving
                     // the tree's cursor must not: an arrow key that reopened a
@@ -690,12 +731,16 @@ impl Workspace {
         // strip is, and a strip that appears only once something is connected
         // would move the whole body down the first time it did.
         let generate = cx.new(GeneratePane::new);
-        let generate_events = cx.subscribe(&generate, |_workspace, _pane, event, cx| match event {
-            GeneratePaneEvent::Changed => cx.notify(),
-            // M4 opens the template tab; until then the pencil says so on hover
-            // and the press is logged rather than swallowed silently.
+        let generate_events = cx.subscribe(&generate, |workspace, _pane, event, cx| match event {
+            GeneratePaneEvent::Changed => {
+                // The palette lists the custom variables, so a variable typed
+                // into the Generate tab has to reach it.
+                workspace.refresh_palette(cx);
+                cx.notify();
+            }
             GeneratePaneEvent::EditTemplate(file) => {
-                log::debug!("the template editor arrives in M4: {}", file.display());
+                let file = generate_pane::resolve_template(file);
+                workspace.open_template(file, cx);
             }
         });
 
@@ -705,6 +750,15 @@ impl Workspace {
                 workspace.render_preview(*table, *template, cx);
             }
         });
+
+        let palette = cx.new(VariablePalette::new);
+        let palette_events = cx.subscribe_in(
+            &palette,
+            window,
+            |workspace, _panel, event, window, cx| match event {
+                PaletteEvent::Insert(text) => workspace.insert_into_template(text, window, cx),
+            },
+        );
 
         let job = cx.new(GenerationJob::new);
         let job_events =
@@ -752,6 +806,10 @@ impl Workspace {
             inspector,
             generate,
             preview,
+            templates: Vec::new(),
+            template_events: Vec::new(),
+            palette,
+            closing: None,
             job,
             pane,
             pane_menu_open: false,
@@ -771,6 +829,7 @@ impl Workspace {
             _inspector_events: inspector_events,
             _generate_events: generate_events,
             _preview_events: preview_events,
+            _palette_events: palette_events,
             _job_events: job_events,
             _quit: quit,
             _bounds: bounds,
@@ -798,7 +857,8 @@ impl Workspace {
     /// announces itself only into an empty window. It is the one dialog nobody
     /// asked for, and it must not land on top of something the user opened.
     fn dialog_open(&self, cx: &App) -> bool {
-        self.about.read(cx).is_open()
+        self.closing.is_some()
+            || self.about.read(cx).is_open()
             || self.settings.read(cx).is_open()
             || self.update.read(cx).is_open()
             || self.connection_dialog.read(cx).is_open()
@@ -822,6 +882,9 @@ impl Workspace {
     /// [`UpdateDialog::close`].
     fn close_overlays(&mut self, window: &mut Window, cx: &mut Context<Self>) {
         self.menu_open = false;
+        // A question nobody answered is a question withdrawn: the tab stays
+        // open with its edits, which is the safe half of both answers.
+        self.closing = None;
         if self.about.read(cx).is_open() {
             self.about.update(cx, |dialog, cx| dialog.close(cx));
         }
@@ -957,12 +1020,24 @@ impl Workspace {
         self.inspector.update(cx, |panel, cx| panel.reset(cx));
         self.run_tables.clear();
         self.preview.update(cx, |pane, cx| pane.reset(cx));
-        // The tab strip goes back to the one permanent tab: a preview belongs
-        // to the database it was rendered against, and keeping it open over a
-        // different one would be a file name from a schema that is no longer
-        // there.
+        // The tab strip goes back to the permanent tab and the templates: a
+        // preview belongs to the database it was rendered against, and keeping
+        // it open over a different one would be a file name from a schema that
+        // is no longer there — where a template is a *file*, belongs to no
+        // connection, and is never closed by one changing (§4.2).
+        let templates: Vec<PaneItem> = self
+            .pane
+            .items()
+            .iter()
+            .filter(|item| matches!(item, PaneItem::Template { .. }))
+            .cloned()
+            .collect();
         self.pane = Pane::new();
         self.pane.push(PaneItem::Generate);
+        for template in templates {
+            self.pane.push(template);
+        }
+        self.pane.activate(0);
         // The panel edits whatever connection is now open — and nothing at all
         // while none is, which is what keeps a debounced save from writing into
         // a profile the window has already left.
@@ -974,6 +1049,12 @@ impl Workspace {
                     .update(cx, |pane, cx| pane.load(id, &generation, cx));
             }
             None => self.generate.update(cx, |pane, cx| pane.reset(cx)),
+        }
+        // The tables a live preview may be rendered against are this
+        // connection's, and so is everything the palette shows an example of.
+        self.refresh_templates(cx);
+        for pane in self.templates.clone() {
+            pane.update(cx, |pane, cx| pane.refresh(cx));
         }
     }
 
@@ -1090,6 +1171,9 @@ impl Workspace {
                 workspace
                     .inspector
                     .update(cx, |panel, cx| panel.deliver(key, outcome, cx));
+                // The palette's examples come from whatever table is in hand,
+                // and one has just arrived.
+                workspace.refresh_palette(cx);
             })
             .ok();
         })
@@ -1421,6 +1505,543 @@ impl Workspace {
             self.pane.push(PaneItem::Preview { title });
         }
         cx.notify();
+    }
+
+    // --- the template tabs ------------------------------------------------
+
+    /// Whether any template is open, connection or no connection.
+    ///
+    /// What decides between the welcome screen and the work area when nothing
+    /// is connected: a template can be edited without a database (§4.3), and
+    /// the tab it is in has to be somewhere.
+    fn has_templates(&self) -> bool {
+        !self.templates.is_empty()
+    }
+
+    /// Where the buffer for `file` is, if it is open.
+    fn template_index(&self, file: &Path, cx: &App) -> Option<usize> {
+        self.templates
+            .iter()
+            .position(|pane| pane.read(cx).path() == file)
+    }
+
+    /// The buffer of the tab on top, when the tab on top is a template.
+    fn active_template(&self, cx: &App) -> Option<usize> {
+        match self.pane.active() {
+            Some(PaneItem::Template { file, .. }) => self.template_index(file, cx),
+            _ => None,
+        }
+    }
+
+    /// Opens `file` in a tab, or brings the tab that already has it to the top.
+    ///
+    /// One tab per file, deliberately: two buffers over one path are two
+    /// answers to what is in it, and the second save would silently undo the
+    /// first.
+    fn open_template(&mut self, file: PathBuf, cx: &mut Context<Self>) {
+        if let Some(index) = self.pane.template_of(&file) {
+            self.pane.activate(index);
+            if let Some(at) = self.template_index(&file, cx) {
+                self.templates[at]
+                    .clone()
+                    .update(cx, |pane, cx| pane.request_focus(cx));
+            }
+            self.refresh_templates(cx);
+            cx.notify();
+            return;
+        }
+
+        let opened = cx.new(|cx| TemplatePane::open(file.clone(), cx));
+        let events = cx.subscribe(&opened, |workspace, pane, event, cx| match event {
+            TemplatePaneEvent::DirtyChanged => workspace.retitle_templates(cx),
+            TemplatePaneEvent::Render { source, table } => {
+                let file = pane.read(cx).path().to_path_buf();
+                workspace.render_template_preview(file, source.clone(), *table, cx);
+            }
+        });
+        let title = opened.read(cx).title();
+        self.templates.push(opened);
+        self.template_events.push(events);
+        self.pane.push(PaneItem::Template {
+            file,
+            title,
+            dirty: false,
+        });
+        self.refresh_templates(cx);
+        // Nothing has been typed yet, so there is nothing to wait for: the tab
+        // opens with its diagnostics and its preview already in it.
+        if let Some(index) = self.active_template(cx) {
+            self.templates[index].update(cx, |pane, cx| pane.refresh(cx));
+        }
+        cx.notify();
+    }
+
+    /// Asks the platform for a template file and opens what it hands back.
+    ///
+    /// The one way in that needs no connection (§4.3). Nothing waits on the
+    /// prompt — on X11 that call is what gpui had to be patched around — so the
+    /// click returns and the answer is picked up on a task of its own.
+    fn choose_template(&mut self, cx: &mut Context<Self>) {
+        let paths = cx.prompt_for_paths(gpui::PathPromptOptions {
+            files: true,
+            directories: false,
+            multiple: true,
+            prompt: Some(ts!("template.open_select")),
+        });
+        cx.spawn(async move |this, cx| {
+            let chosen = match paths.await {
+                Ok(Ok(Some(paths))) => paths,
+                Ok(Ok(None)) | Err(_) => return,
+                Ok(Err(error)) => {
+                    log::warn!("the file picker could not be opened: {error:#}");
+                    return;
+                }
+            };
+            this.update(cx, |workspace, cx| {
+                for path in chosen {
+                    workspace.open_template(path, cx);
+                }
+            })
+            .ok();
+        })
+        .detach();
+    }
+
+    /// Copies every buffer's dirty flag onto its tab.
+    fn retitle_templates(&mut self, cx: &mut Context<Self>) {
+        let mut changed = false;
+        for index in 0..self.pane.items().len() {
+            let Some(PaneItem::Template { file, .. }) = self.pane.get(index) else {
+                continue;
+            };
+            let file = file.clone();
+            let Some(at) = self.template_index(&file, cx) else {
+                continue;
+            };
+            let dirty = self.templates[at].read(cx).is_dirty(cx);
+            let title = self.templates[at].read(cx).title();
+            if let Some(PaneItem::Template {
+                dirty: was,
+                title: label,
+                ..
+            }) = self.pane.get_mut(index)
+                && (*was != dirty || *label != title)
+            {
+                *was = dirty;
+                *label = title;
+                changed = true;
+            }
+        }
+        if changed {
+            cx.notify();
+        }
+    }
+
+    /// The tables the live preview may be rendered against, in the order the
+    /// header's dropdown lists them.
+    ///
+    /// The ticked tables, which is what the run itself would use; and when
+    /// nothing is ticked, whatever the inspector last described, so that a
+    /// template opened after a walk through the tree still has something to
+    /// render against.
+    fn preview_tables(&self, cx: &App) -> Vec<(TableKey, SharedString)> {
+        if !matches!(self.connection, ConnectionState::Open { .. }) {
+            return Vec::new();
+        }
+        let mut tables: Vec<(TableKey, SharedString)> = self
+            .explorer
+            .read(cx)
+            .selection(cx)
+            .into_iter()
+            .map(|key| {
+                let label = SharedString::from(key.name.clone());
+                (key, label)
+            })
+            .collect();
+        if tables.is_empty()
+            && let Some(table) = self.inspector.read(cx).table()
+        {
+            tables.push((
+                TableKey {
+                    catalog: table.catalog.clone(),
+                    schema: table.schema.clone(),
+                    name: table.name.clone(),
+                },
+                SharedString::from(table.name.clone()),
+            ));
+        }
+        tables
+    }
+
+    /// Hands every open template the current table list and the current
+    /// palette.
+    fn refresh_templates(&mut self, cx: &mut Context<Self>) {
+        let choices: Vec<SharedString> = self
+            .preview_tables(cx)
+            .into_iter()
+            .map(|(_, label)| label)
+            .collect();
+        for pane in self.templates.clone() {
+            pane.update(cx, |pane, cx| pane.set_choices(choices.clone(), cx));
+        }
+        self.refresh_palette(cx);
+    }
+
+    /// Rebuilds the palette from the model and the profile.
+    fn refresh_palette(&mut self, cx: &mut Context<Self>) {
+        let table = self.palette_table(cx);
+        let vars = self.generate.read(cx).collect(cx).custom_vars;
+        let items = palette::items(table.as_ref(), &vars);
+        self.palette
+            .update(cx, |panel, cx| panel.set_items(items.clone(), cx));
+        for pane in self.templates.clone() {
+            pane.update(cx, |pane, cx| pane.set_items(items.clone(), cx));
+        }
+    }
+
+    /// The table the palette's examples come from.
+    ///
+    /// The one the tab on top is previewing, so that the examples and the
+    /// preview agree; the inspector's otherwise, and nothing at all when
+    /// neither has one.
+    fn palette_table(&self, cx: &App) -> Option<Table> {
+        if let Some(index) = self.active_template(cx) {
+            let choice = self.templates[index].read(cx).choice();
+            if let Some((key, _)) = self.preview_tables(cx).get(choice)
+                && let Some(table) = self.inspector.read(cx).cached(key)
+            {
+                return Some((*table).clone());
+            }
+        }
+        self.inspector.read(cx).table().cloned()
+    }
+
+    /// Renders `source` against the chosen table and hands it to the tab.
+    ///
+    /// The table is read first when nothing has described it yet, exactly as a
+    /// run does — the inspector's cache is what usually makes that free.
+    fn render_template_preview(
+        &mut self,
+        file: PathBuf,
+        source: String,
+        choice: usize,
+        cx: &mut Context<Self>,
+    ) {
+        let Some(index) = self.template_index(&file, cx) else {
+            return;
+        };
+        let tables = self.preview_tables(cx);
+        let Some((key, _)) = tables.get(choice).cloned() else {
+            let note = if matches!(self.connection, ConnectionState::Open { .. }) {
+                ts!("template.preview_no_table")
+            } else {
+                ts!("template.preview_no_connection")
+            };
+            self.refuse_preview(index, note, &source, cx);
+            return;
+        };
+
+        if let Some(table) = self.inspector.read(cx).cached(&key) {
+            self.render_template_with(index, source, (*table).clone(), cx);
+            return;
+        }
+
+        let Some((handle, driver, epoch)) = self.meta_context() else {
+            let note = ts!("template.preview_no_connection");
+            self.refuse_preview(index, note, &source, cx);
+            return;
+        };
+        let reference = self
+            .explorer
+            .read(cx)
+            .table_ref(&key, cx)
+            .unwrap_or_else(|| rudbgen_meta::TableRef {
+                catalog: key.catalog.clone(),
+                schema: key.schema.clone(),
+                name: key.name.clone(),
+                ..rudbgen_meta::TableRef::default()
+            });
+        cx.spawn(async move |this, cx| {
+            let read = cx
+                .background_executor()
+                .spawn(async move {
+                    MetaReader::new(handle.session(), &driver)
+                        .table(&reference)
+                        .map_err(|error| error.to_string())
+                })
+                .await;
+            this.update(cx, |workspace, cx| {
+                if workspace.connection_epoch != epoch {
+                    return;
+                }
+                match read {
+                    Ok(table) => {
+                        workspace
+                            .inspector
+                            .update(cx, |panel, _cx| panel.remember(key, table.clone()));
+                        // The palette's examples come from the same table, and
+                        // this is the read that put one in reach.
+                        workspace.refresh_palette(cx);
+                        workspace.render_template_with(index, source, table, cx);
+                    }
+                    Err(message) => {
+                        let note = ts!(
+                            "generate.read_failed",
+                            table = key.qualified(),
+                            reason = message
+                        );
+                        workspace.refuse_preview(index, note, &source, cx);
+                    }
+                }
+            })
+            .ok();
+        })
+        .detach();
+    }
+
+    /// Tells the tab why there is no preview.
+    fn refuse_preview(
+        &mut self,
+        index: usize,
+        note: SharedString,
+        source: &str,
+        cx: &mut Context<Self>,
+    ) {
+        let Some(pane) = self.templates.get(index).cloned() else {
+            return;
+        };
+        pane.update(cx, |pane, cx| {
+            pane.deliver_preview(PreviewOutcome::Refused(note), source, cx);
+        });
+    }
+
+    /// Renders one pair with a table that is already in hand.
+    ///
+    /// The plan is built here rather than taken from [`Workspace::plan`]: the
+    /// template being edited need not be one of the ticked ones, its body comes
+    /// from the buffer rather than from the file (`TemplateSpec::source`), and
+    /// the output name is deliberately a literal — so that every warning the
+    /// render reports is the *body*'s, and its span therefore an offset into
+    /// the buffer the marks are drawn on. The name the run would really give
+    /// the file is rendered separately, for the header alone.
+    fn render_template_with(
+        &mut self,
+        index: usize,
+        source: String,
+        table: Table,
+        cx: &mut Context<Self>,
+    ) {
+        let Some(pane) = self.templates.get(index).cloned() else {
+            return;
+        };
+        let file = pane.read(cx).path().to_path_buf();
+        let profile = self.generate.read(cx).collect(cx);
+        let stored = generate_pane::store_template_path(&file);
+        let known = profile.templates.iter().find(|template| {
+            generate_pane::resolve_template(&template.file) == file || template.file == stored
+        });
+        let label = file
+            .file_name()
+            .map(|name| name.to_string_lossy().into_owned())
+            .unwrap_or_else(|| "preview".to_owned());
+        let name = known.map_or_else(|| label.clone(), |template| template.name.clone());
+        let out_template = known.map(|template| template.out_template.clone());
+        let output_dir = self
+            .generate
+            .read(cx)
+            .output_dir(cx)
+            .unwrap_or_else(|| std::env::temp_dir().join("rudbgen-preview"));
+
+        let mut plan = Plan::new(
+            vec![table],
+            vec![TemplateSpec::new(&name, &file, &label).with_source(source.clone())],
+            output_dir,
+        );
+        plan.author = profile.author;
+        plan.custom_vars = profile.custom_vars;
+        let plan = plan.with_abbreviations(self.generate.read(cx).abbreviations());
+
+        cx.spawn(async move |this, cx| {
+            let rendered = cx
+                .background_executor()
+                .spawn(async move {
+                    // The real output name, for the header. Its own unknown
+                    // fields are not reported: their spans point into the name
+                    // template, and a mark on line 3 of the body would be a lie.
+                    let named = out_template.and_then(|out| {
+                        let ctx = plan.context();
+                        let table = plan.tables.first()?;
+                        rudbgen_template::Template::parse(&out)
+                            .ok()?
+                            .render(table, &ctx)
+                            .ok()
+                    });
+                    let path = named.map(|name| plan.output_dir.join(name));
+                    (rudbgen_gen::preview(&plan, 0, 0), path)
+                })
+                .await;
+            this.update(cx, |workspace, cx| {
+                let (preview, named) = rendered;
+                let outcome = match preview {
+                    Ok(preview) => PreviewOutcome::Rendered {
+                        path: named.unwrap_or(preview.path),
+                        content: preview.content,
+                        warnings: preview.diagnostics,
+                    },
+                    Err(error) => PreviewOutcome::Refused(SharedString::from(error.to_string())),
+                };
+                let Some(pane) = workspace.templates.get(index).cloned() else {
+                    return;
+                };
+                pane.update(cx, |pane, cx| pane.deliver_preview(outcome, &source, cx));
+            })
+            .ok();
+        })
+        .detach();
+    }
+
+    /// Writes the palette's entry at the caret of the tab on top.
+    fn insert_into_template(
+        &mut self,
+        text: &SharedString,
+        window: &mut Window,
+        cx: &mut Context<Self>,
+    ) {
+        let Some(index) = self.active_template(cx) else {
+            return;
+        };
+        let pane = self.templates[index].clone();
+        pane.update(cx, |pane, cx| pane.insert(text, window, cx));
+    }
+
+    // --- the tab strip ----------------------------------------------------
+
+    /// Closes the tab at `index`, asking first when it holds unsaved edits.
+    fn request_close_tab(&mut self, index: usize, window: &mut Window, cx: &mut Context<Self>) {
+        match self.pane.get(index) {
+            // The Generate tab is what the run is configured in and there is no
+            // second one to fall back on, so it is the one tab a close cannot
+            // take away.
+            Some(PaneItem::Generate) | None => (),
+            Some(PaneItem::Preview { .. }) => self.close_tab(index, window, cx),
+            Some(PaneItem::Template { file, .. }) => {
+                // The buffer is asked, not the flag on the tab: the flag is a
+                // copy that travels on the effect cycle, and a save followed by
+                // a close in the same update would still find it set.
+                let file = file.clone();
+                let dirty = self
+                    .template_index(&file, cx)
+                    .is_some_and(|at| self.templates[at].read(cx).is_dirty(cx));
+                if dirty {
+                    self.closing = Some(index);
+                    cx.notify();
+                } else {
+                    self.close_tab(index, window, cx);
+                }
+            }
+        }
+    }
+
+    /// Closes the tab at `index`, whatever is in it.
+    fn close_tab(&mut self, index: usize, window: &mut Window, cx: &mut Context<Self>) {
+        self.closing = None;
+        let Some(closed) = self.pane.close(index) else {
+            return;
+        };
+        if let PaneItem::Template { file, .. } = closed
+            && let Some(at) = self.template_index(&file, cx)
+        {
+            self.templates.remove(at);
+            drop(self.template_events.remove(at));
+        }
+        // The tab that has gone may have been holding the keyboard, and a
+        // focus handle left on an unrendered element takes every shortcut in
+        // the window with it (Appendix A).
+        self.focus_shell(window, cx);
+        self.refresh_templates(cx);
+        cx.notify();
+    }
+
+    /// Answers the "save before closing?" question.
+    fn answer_close(&mut self, save: bool, window: &mut Window, cx: &mut Context<Self>) {
+        let Some(index) = self.closing else {
+            return;
+        };
+        if save {
+            let Some(PaneItem::Template { file, .. }) = self.pane.get(index) else {
+                self.closing = None;
+                return;
+            };
+            let file = file.clone();
+            let Some(at) = self.template_index(&file, cx) else {
+                self.closing = None;
+                return;
+            };
+            let pane = self.templates[at].clone();
+            if !pane.update(cx, |pane, cx| pane.save(cx)) {
+                // The write failed and the tab is showing why; closing it now
+                // would take the message away with the text it is about.
+                self.closing = None;
+                cx.notify();
+                return;
+            }
+        }
+        self.close_tab(index, window, cx);
+    }
+
+    // --- the template actions ---------------------------------------------
+
+    /// Opens a template file through the platform picker.
+    fn open_template_action(
+        &mut self,
+        _: &OpenTemplate,
+        _window: &mut Window,
+        cx: &mut Context<Self>,
+    ) {
+        self.choose_template(cx);
+    }
+
+    /// Writes the template on top back to its file.
+    fn save_template_action(
+        &mut self,
+        _: &SaveTemplate,
+        _window: &mut Window,
+        cx: &mut Context<Self>,
+    ) {
+        let Some(index) = self.active_template(cx) else {
+            return;
+        };
+        let pane = self.templates[index].clone();
+        pane.update(cx, |pane, cx| pane.save(cx));
+        self.retitle_templates(cx);
+    }
+
+    /// Shows and hides the live preview beside the editor.
+    fn toggle_live_preview_action(
+        &mut self,
+        _: &ToggleLivePreview,
+        _window: &mut Window,
+        cx: &mut Context<Self>,
+    ) {
+        let Some(index) = self.active_template(cx) else {
+            return;
+        };
+        let pane = self.templates[index].clone();
+        pane.update(cx, |pane, cx| pane.toggle_preview(cx));
+    }
+
+    /// Offers what may be written where the caret is.
+    fn trigger_completion_action(
+        &mut self,
+        _: &TriggerCompletion,
+        _window: &mut Window,
+        cx: &mut Context<Self>,
+    ) {
+        let Some(index) = self.active_template(cx) else {
+            return;
+        };
+        let pane = self.templates[index].clone();
+        pane.update(cx, |pane, cx| pane.trigger_completion(cx));
     }
 
     /// Records what the connection attempt came back with.
@@ -1808,6 +2429,14 @@ impl Workspace {
             self.set_menu_open(false, cx);
             return;
         }
+        // Then the "save before closing?" question, which is the innermost
+        // thing on screen whenever it is up: it was opened by a press on a
+        // tab's close button, over whatever else was already there.
+        if self.closing.is_some() {
+            self.closing = None;
+            self.focus_shell(window, cx);
+            return;
+        }
         if self.update.read(cx).is_open() {
             // Swallowed rather than propagated while an install runs: the key
             // must not reach anything else, but nothing may take the screen
@@ -1904,6 +2533,8 @@ impl Workspace {
             .update(cx, |pane, cx| pane.drag_scrollbar(event, cx));
         self.preview
             .update(cx, |pane, cx| pane.drag_scrollbar(event, cx));
+        self.palette
+            .update(cx, |panel, cx| panel.drag_scrollbar(event, cx));
         let Some(progress) = self.scrollbar().dragged(event, cx) else {
             return;
         };
@@ -1926,6 +2557,8 @@ impl Workspace {
             .update(cx, |pane, cx| pane.release_scrollbar(cx));
         self.preview
             .update(cx, |pane, cx| pane.release_scrollbar(cx));
+        self.palette
+            .update(cx, |panel, cx| panel.release_scrollbar(cx));
         if let Some(epoch) = self.welcome_scrollbar.release() {
             hide_later(epoch, cx, move |workspace| {
                 Some(&mut workspace.welcome_scrollbar)
@@ -2212,6 +2845,19 @@ impl Workspace {
                 .disabled(!matches!(self.connection, ConnectionState::Open { .. }))
                 .on_activate(|window, cx| window.dispatch_action(Box::new(ToggleInspector), cx)),
             MenuEntry::separator(),
+            // The one way into a template tab that needs no connection and no
+            // template list (§4.3), beside the save that writes it back.
+            MenuEntry::new(ts!("menu.open_template"))
+                .on_activate(|window, cx| window.dispatch_action(Box::new(OpenTemplate), cx)),
+            MenuEntry::new(ts!("menu.save_template"))
+                .shortcut(format!("{SHORTCUT_MODIFIER}+S"))
+                .disabled(self.active_template(cx).is_none())
+                .on_activate(|window, cx| window.dispatch_action(Box::new(SaveTemplate), cx)),
+            MenuEntry::new(ts!("menu.toggle_live_preview"))
+                .shortcut(format!("{SHORTCUT_MODIFIER}+Shift+P"))
+                .disabled(self.active_template(cx).is_none())
+                .on_activate(|window, cx| window.dispatch_action(Box::new(ToggleLivePreview), cx)),
+            MenuEntry::separator(),
             // The three run commands, in the order the status bar draws them.
             // Each is greyed exactly when the button is, and for the reason the
             // button's tooltip gives.
@@ -2271,12 +2917,15 @@ impl Workspace {
     /// between them with the Generate tab.
     fn render_body(&self, cx: &mut Context<Self>) -> AnyElement {
         let theme = theme(cx);
-        let body = match &self.connection {
-            ConnectionState::Open {
-                profile, session, ..
-            } => self.render_work_area(profile, session, &theme, cx),
-            _ => self.render_welcome(&theme, cx),
-        };
+        // The work area needs a connection *or* an open template: a template
+        // can be edited without a database (§4.3), and the tab it is in has to
+        // be somewhere. With neither, the welcome screen is the whole body.
+        let body =
+            if matches!(self.connection, ConnectionState::Open { .. }) || self.has_templates() {
+                self.render_work_area(&theme, cx)
+            } else {
+                self.render_welcome(&theme, cx)
+            };
         div()
             .flex()
             .flex_col()
@@ -2298,13 +2947,7 @@ impl Workspace {
     /// between them. Side by side rather than stacked is what
     /// [`app_settings::window_tint`] requires, and it is what lets the blur
     /// behind the window carry on under the panels too.
-    fn render_work_area(
-        &self,
-        profile: &ConnectionProfile,
-        session: &Connected,
-        theme: &Theme,
-        cx: &mut Context<Self>,
-    ) -> AnyElement {
+    fn render_work_area(&self, theme: &Theme, cx: &mut Context<Self>) -> AnyElement {
         let sidebar = self.explorer_showing().then(|| {
             div()
                 .flex()
@@ -2325,23 +2968,34 @@ impl Workspace {
                 .cursor_ew_resize()
                 .on_drag(DraggedExplorer, |_, _, _, cx| cx.new(|_| gpui::Empty))
         });
-        let right_handle = self.inspector_showing().then(|| {
-            div()
-                .id("inspector-divider")
-                .occlude()
-                .flex_none()
-                .w(px(SPLIT_HANDLE))
-                .mr(px(-SPLIT_HANDLE))
-                .cursor_ew_resize()
-                .on_drag(DraggedInspector, |_, _, _, cx| cx.new(|_| gpui::Empty))
-        });
-        let panel = self.inspector_showing().then(|| {
+        let right_handle =
+            (self.active_template(cx).is_some() || self.inspector_showing()).then(|| {
+                div()
+                    .id("inspector-divider")
+                    .occlude()
+                    .flex_none()
+                    .w(px(SPLIT_HANDLE))
+                    .mr(px(-SPLIT_HANDLE))
+                    .cursor_ew_resize()
+                    .on_drag(DraggedInspector, |_, _, _, cx| cx.new(|_| gpui::Empty))
+            });
+        // The same column, and one of two things in it: the variable palette
+        // while a template is being edited, the table inspector otherwise
+        // (§4.5). The palette needs no connection — a template opened from the
+        // welcome screen still gets its statements and its decorators, and only
+        // the example values are missing.
+        let palette = self.active_template(cx).is_some();
+        let panel = (palette || self.inspector_showing()).then(|| {
             div()
                 .flex()
                 .flex_none()
                 .w(px(self.inspector_width))
                 .min_h_0()
-                .child(self.inspector.clone())
+                .child(if palette {
+                    self.palette.clone().into_any_element()
+                } else {
+                    self.inspector.clone().into_any_element()
+                })
         });
 
         div()
@@ -2377,7 +3031,7 @@ impl Workspace {
                     // [`app_settings::window_tint`].
                     .bg(app_settings::window_tint(theme.background, cx))
                     .child(self.render_tabs(theme, cx))
-                    .child(self.render_active_tab(profile, session, theme, cx)),
+                    .child(self.render_active_tab(theme, cx)),
             )
             .children(right_handle)
             .children(panel)
@@ -2386,9 +3040,9 @@ impl Workspace {
 
     /// The work area's tab strip.
     ///
-    /// The Generate tab is permanent and carries no close button (§4.2); the
-    /// Preview tab does, because it is a view that was asked for and can be put
-    /// away. Template tabs join it in M4.
+    /// The Generate tab is permanent and carries no close button (§4.2); a
+    /// Preview and a template tab both do, because each was asked for and can
+    /// be put away — a template with unsaved edits asks first.
     fn render_tabs(&self, theme: &Theme, cx: &mut Context<Self>) -> AnyElement {
         let tabs: Vec<TabItem> = self
             .pane
@@ -2401,7 +3055,14 @@ impl Workspace {
                     PaneItem::Template { title, .. } => title.clone(),
                     PaneItem::Preview { title } => title.clone(),
                 };
-                TabItem::new(("work-tab", index), title)
+                let tab = TabItem::new(("work-tab", index), title);
+                // The dirty marker is the strip's own dot rather than a
+                // character glued to the title: a title that changes width
+                // when a key is pressed makes the whole strip twitch.
+                match item {
+                    PaneItem::Template { dirty: true, .. } => tab.dot(theme.accent),
+                    _ => tab,
+                }
             })
             .collect();
         let select = cx.entity();
@@ -2422,22 +3083,29 @@ impl Workspace {
                     .scroll_handle(self.pane.scroll_handle())
                     .menu_open(self.pane_menu_open)
                     .menu_icon(icons::TAB_LIST)
-                    .on_select(move |index, _window, cx| {
+                    .on_select(move |index, window, cx| {
                         select.update(cx, |workspace, cx| {
-                            workspace.pane.activate(index);
+                            if !workspace.pane.activate(index) {
+                                return;
+                            }
+                            // The tab that was on top is about to stop being
+                            // rendered, so whatever inside it held the keyboard
+                            // has to give it up in the same update (Appendix A)
+                            // — and a template that has just come to the front
+                            // asks for it back on the frame that draws it.
+                            workspace.focus_shell(window, cx);
+                            if let Some(at) = workspace.active_template(cx) {
+                                workspace.templates[at]
+                                    .clone()
+                                    .update(cx, |pane, cx| pane.request_focus(cx));
+                            }
+                            workspace.refresh_templates(cx);
                             cx.notify();
                         });
                     })
-                    .on_close(move |index, _window, cx| {
+                    .on_close(move |index, window, cx| {
                         close.update(cx, |workspace, cx| {
-                            // The Generate tab is what the run is configured in
-                            // and there is no second one to fall back on, so it
-                            // is the one tab a close cannot take away.
-                            if matches!(workspace.pane.get(index), Some(PaneItem::Generate)) {
-                                return;
-                            }
-                            workspace.pane.close(index);
-                            cx.notify();
+                            workspace.request_close_tab(index, window, cx);
                         });
                     })
                     .on_menu_open_change(move |open, _window, cx| {
@@ -2451,71 +3119,109 @@ impl Workspace {
     }
 
     /// Whatever tab is on top.
-    fn render_active_tab(
-        &self,
-        profile: &ConnectionProfile,
-        session: &Connected,
-        theme: &Theme,
-        cx: &mut Context<Self>,
-    ) -> AnyElement {
-        match self.pane.active() {
-            Some(PaneItem::Generate) | None => div()
-                .flex()
-                .flex_col()
-                .flex_grow_1()
-                .min_h_0()
-                .child(self.generate.clone())
-                .into_any_element(),
-            Some(PaneItem::Preview { .. }) => div()
-                .flex()
-                .flex_col()
-                .flex_grow_1()
-                .min_h_0()
-                .child(self.preview.clone())
-                .into_any_element(),
-            // The editor arrives in M4; until then a template tab cannot be
-            // opened at all, and this is the branch that says so if one ever is.
-            Some(PaneItem::Template { title, .. }) => {
-                self.render_tab_placeholder(profile, session, title.clone(), theme, cx)
+    fn render_active_tab(&self, theme: &Theme, cx: &mut Context<Self>) -> AnyElement {
+        let body = match self.pane.active() {
+            // With no connection the Generate tab has no profile to edit, so it
+            // shows the way to one: the welcome screen, inside the strip, which
+            // is what a window holding nothing but a template tab looks like.
+            Some(PaneItem::Generate) | None => {
+                if matches!(self.connection, ConnectionState::Open { .. }) {
+                    self.generate.clone().into_any_element()
+                } else {
+                    return self.render_welcome(theme, cx);
+                }
             }
-        }
-    }
-
-    /// What stands where a tab this milestone does not draw would be.
-    fn render_tab_placeholder(
-        &self,
-        profile: &ConnectionProfile,
-        session: &Connected,
-        title: SharedString,
-        theme: &Theme,
-        cx: &mut Context<Self>,
-    ) -> AnyElement {
-        let product = session
-            .product()
-            .map(SharedString::from)
-            .unwrap_or_else(|| ts!("statusbar.unknown_product"));
-        let content = div()
+            Some(PaneItem::Preview { .. }) => self.preview.clone().into_any_element(),
+            Some(PaneItem::Template { file, .. }) => match self.template_index(file, cx) {
+                Some(index) => self.templates[index].clone().into_any_element(),
+                // A tab with no buffer behind it cannot happen — the two are
+                // pushed together — but drawing nothing is better than a panic
+                // if it ever did.
+                None => div().into_any_element(),
+            },
+        };
+        div()
             .flex()
             .flex_col()
-            .items_center()
-            .gap(px(10.))
-            .child(div().text_size(px(20.)).text_color(theme.text).child(title))
-            .child(
-                div()
-                    .text_size(px(12.))
-                    .text_color(theme.text_muted)
-                    .child(format!("{} · {}", label_of(profile), product)),
-            )
-            .child(
-                div()
-                    .w(px(WELCOME_WIDTH))
-                    .text_size(px(12.))
-                    .text_color(theme.text_muted)
-                    .child(ts!("workarea.next")),
-            );
+            .flex_grow_1()
+            .min_h_0()
+            .child(body)
+            .into_any_element()
+    }
 
-        let bar = self.hovering_scrollbar(cx);
-        centered_scroll(WELCOME_STATE, &self.welcome_scroll, bar, theme, content).into_any_element()
+    /// The "save before closing?" question.
+    ///
+    /// Three answers rather than two: a close that only offered *save* or
+    /// *don't* would be a close nobody could take back, and the tab was
+    /// closed by a press on a button four pixels from the one that selects it.
+    fn render_close_prompt(&self, index: usize, cx: &mut Context<Self>) -> AnyElement {
+        let title = match self.pane.get(index) {
+            Some(PaneItem::Template { title, .. }) => title.clone(),
+            _ => SharedString::default(),
+        };
+        let theme = theme(cx);
+        let save = cx.entity();
+        let discard = cx.entity();
+        let cancel = cx.entity();
+        let dismissed = cx.entity();
+
+        rudbgen_ui::modal(
+            "template-close",
+            ts!("template.close_title"),
+            px(400.),
+            div()
+                .flex()
+                .flex_col()
+                .gap(px(14.))
+                .child(
+                    div()
+                        .text_size(px(12.))
+                        .text_color(theme.text)
+                        .child(ts!("template.close_question", file = title)),
+                )
+                .child(
+                    div()
+                        .flex()
+                        .flex_row()
+                        .justify_end()
+                        .gap(px(8.))
+                        .child(
+                            Button::new("template-close-cancel", ts!("common.cancel")).on_click(
+                                move |_, window, cx| {
+                                    cancel.update(cx, |workspace, cx| {
+                                        workspace.closing = None;
+                                        workspace.focus_shell(window, cx);
+                                    });
+                                },
+                            ),
+                        )
+                        .child(
+                            Button::new("template-close-discard", ts!("template.discard"))
+                                .variant(ButtonVariant::Danger)
+                                .on_click(move |_, window, cx| {
+                                    discard.update(cx, |workspace, cx| {
+                                        workspace.answer_close(false, window, cx);
+                                    });
+                                }),
+                        )
+                        .child(
+                            Button::new("template-close-save", ts!("common.save"))
+                                .variant(ButtonVariant::Primary)
+                                .on_click(move |_, window, cx| {
+                                    save.update(cx, |workspace, cx| {
+                                        workspace.answer_close(true, window, cx);
+                                    });
+                                }),
+                        ),
+                ),
+            move |window, cx| {
+                dismissed.update(cx, |workspace, cx| {
+                    workspace.closing = None;
+                    workspace.focus_shell(window, cx);
+                });
+            },
+        )
+        .into_any_element()
     }
 
     /// The welcome screen: the name, what the application is for, the three
@@ -2652,14 +3358,18 @@ impl Workspace {
                         .into_any_element(),
                     )
                     .child(
-                        soon(
-                            "welcome-template",
-                            Button::new("welcome-template", ts!("welcome.open_template"))
-                                .full_width(true)
-                                .disabled(true)
-                                .tab_index(WELCOME_FIRST_TAB + 2),
-                        )
-                        .into_any_element(),
+                        div()
+                            .id(WELCOME_TEMPLATE_SELECTOR)
+                            .debug_selector(|| WELCOME_TEMPLATE_SELECTOR.to_string())
+                            .child(
+                                Button::new("welcome-template", ts!("welcome.open_template"))
+                                    .full_width(true)
+                                    .tab_index(WELCOME_FIRST_TAB + 2)
+                                    .on_click(|_, window, cx| {
+                                        window.dispatch_action(Box::new(OpenTemplate), cx);
+                                    }),
+                            )
+                            .into_any_element(),
                     ),
             )
             .children(failure)
@@ -2986,6 +3696,12 @@ impl Render for Workspace {
             .read(cx)
             .is_open()
             .then(|| div().absolute().inset_0().child(self.job.clone()));
+        let closing = self.closing.map(|index| {
+            div()
+                .absolute()
+                .inset_0()
+                .child(self.render_close_prompt(index, cx))
+        });
 
         // With client-side decorations the compositor stops drawing the drop
         // shadow along with the frame, so the window has to bring its own: the
@@ -3063,6 +3779,10 @@ impl Render for Workspace {
             .on_action(cx.listener(Self::generate_action))
             .on_action(cx.listener(Self::preview_action))
             .on_action(cx.listener(Self::dry_run_action))
+            .on_action(cx.listener(Self::open_template_action))
+            .on_action(cx.listener(Self::save_template_action))
+            .on_action(cx.listener(Self::toggle_live_preview_action))
+            .on_action(cx.listener(Self::trigger_completion_action))
             .on_action(cx.listener(Self::dismiss_dialog_action))
             .child(toolbar)
             .child(body)
@@ -3073,7 +3793,8 @@ impl Render for Workspace {
             .children(update)
             // Last, so a run that is asking about a file is answered before
             // anything else on screen.
-            .children(job);
+            .children(job)
+            .children(closing);
 
         let Some(tiling) = tiling else {
             // A server-decorated window: the compositor frames and shadows it,
@@ -3535,6 +4256,17 @@ fn app_menus() -> Vec<Menu> {
             disabled: false,
         },
         Menu {
+            name: ts!("menu.template"),
+            items: vec![
+                MenuItem::action(ts!("menu.open_template"), OpenTemplate),
+                MenuItem::action(ts!("menu.save_template"), SaveTemplate),
+                MenuItem::separator(),
+                MenuItem::action(ts!("menu.toggle_live_preview"), ToggleLivePreview),
+                MenuItem::action(ts!("menu.trigger_completion"), TriggerCompletion),
+            ],
+            disabled: false,
+        },
+        Menu {
             name: ts!("menu.view"),
             items: vec![
                 MenuItem::action(ts!("menu.toggle_explorer"), ToggleExplorer),
@@ -3581,11 +4313,23 @@ fn bind_shortcuts(cx: &mut App) {
         KeyBinding::new(&format!("{modifier}-i"), ToggleInspector, Some(KEY_CONTEXT)),
         // The one chord the run gets. `Ctrl+G` is "go" in every generator that
         // has ever had a shortcut for it, and no editor claims it — where
-        // `Ctrl+R` would be a find-and-replace inside a template tab from M4.
+        // `Ctrl+R` would be a find-and-replace inside a template tab.
         // The other two commands are deliberately unbound: they are one press
         // of a button away, and a chord for each would take three from the
         // editor for a command nobody repeats.
         KeyBinding::new(&format!("{modifier}-g"), Generate, Some(KEY_CONTEXT)),
+        // The template tab's three. `Ctrl+S` is the one chord an editor may
+        // not claim for itself — it means "write this file" everywhere — and
+        // the editor deliberately binds neither it nor `Ctrl+Space`, which is
+        // what asks for a completion in every editor that has one. The preview
+        // toggle takes the letter of the thing it shows.
+        KeyBinding::new(&format!("{modifier}-s"), SaveTemplate, Some(KEY_CONTEXT)),
+        KeyBinding::new(
+            &format!("{modifier}-shift-p"),
+            ToggleLivePreview,
+            Some(KEY_CONTEXT),
+        ),
+        KeyBinding::new("ctrl-space", TriggerCompletion, Some(KEY_CONTEXT)),
         KeyBinding::new("escape", DismissDialog, Some(KEY_CONTEXT)),
     ]);
 }
@@ -3672,6 +4416,9 @@ fn main() {
         // The inspector's Columns tab is a grid, and the grid binds its own
         // keys; without this the panel draws and cannot be walked.
         rudbgen_grid::init(cx);
+        // The template tab's buffer and both read-only previews are
+        // `EditorView`s, which bind their own keys to the `Editor` context.
+        rudbgen_editor::init(cx);
         // After the widget layers, because they scope their bindings to key
         // contexts the shell's own bindings have to be able to outrank.
         bind_shortcuts(cx);
@@ -4478,6 +5225,160 @@ mod tests {
             .expect("the window is open");
     }
 
+    /// M4's other half, against a real database: the live preview renders the
+    /// buffer — not the file — and an unknown field comes back as a warning on
+    /// the line that names it.
+    ///
+    /// The typo is the case D12 exists for: `${nmae}` parses, renders to
+    /// nothing, and in jdbgen is found by reading the generated file.
+    #[gpui::test]
+    fn a_real_database_marks_an_unknown_field_in_the_live_preview(cx: &mut gpui::TestAppContext) {
+        use rudbgen_jdbc::StatementSpec;
+
+        let dir = tempfile::tempdir().expect("tempdir");
+        let file = dir.path().join("model.java");
+        std::fs::write(&file, "class ${name} {}\n").expect("the template is written");
+
+        let profile = connection::h2::profile("preview");
+        let driver = connection::h2::driver();
+        let session = connection::connect(
+            &profile,
+            &driver,
+            &Credentials::typed(Some(String::new()), None),
+            &AppSettings::default(),
+        )
+        .expect("H2 opens an in-memory database without a server");
+        session
+            .session()
+            .execute(&StatementSpec::new(
+                "create table T_SAMPLE_ALBUM (ALBUM_ID integer not null, TITLE varchar(120), constraint PK_PREVIEW primary key (ALBUM_ID))",
+            ))
+            .expect("the table is created");
+
+        cx.update(|cx| {
+            app_settings::init(cx);
+            rudbgen_ui::init(cx);
+            rudbgen_grid::init(cx);
+            rudbgen_editor::init(cx);
+        });
+        cx.executor().allow_parking();
+        let window = cx.add_window(|window, cx| Workspace::new(TitlebarStyle::Custom, window, cx));
+        window
+            .update(cx, |workspace, _window, cx| {
+                workspace.connection = ConnectionState::Open {
+                    profile: Box::new(profile.clone()),
+                    driver: Box::new(driver.clone()),
+                    session: Box::new(session),
+                };
+                workspace.reset_panels(cx);
+            })
+            .expect("the window is open");
+        cx.run_until_parked();
+
+        // Tick the schema, so the preview has a table to render against.
+        let public = window
+            .update(cx, |workspace, _window, cx| {
+                workspace
+                    .explorer
+                    .read(cx)
+                    .row_ids(cx)
+                    .into_iter()
+                    .flatten()
+                    .find_map(|id| match id {
+                        explorer::NodeId::Schema(key) if key.name == "PUBLIC" => Some(key),
+                        _ => None,
+                    })
+                    .expect("H2 answers with a PUBLIC schema")
+            })
+            .expect("the window is open");
+        window
+            .update(cx, |workspace, _window, cx| {
+                workspace.explorer.update(cx, |explorer, cx| {
+                    explorer.expand(&explorer::NodeId::Schema(public.clone()), cx);
+                });
+            })
+            .expect("the window is open");
+        cx.run_until_parked();
+        window
+            .update(cx, |workspace, _window, cx| {
+                workspace.explorer.update(cx, |explorer, cx| {
+                    explorer.toggle_tick(&explorer::NodeId::Schema(public.clone()), cx);
+                });
+            })
+            .expect("the window is open");
+        cx.run_until_parked();
+
+        window
+            .update(cx, |workspace, _window, cx| {
+                workspace.open_template(file.clone(), cx);
+            })
+            .expect("the window is open");
+        cx.run_until_parked();
+
+        // The template as written renders, and the preview is of the table.
+        window
+            .update(cx, |workspace, _window, cx| {
+                let pane = workspace.templates[0].read(cx);
+                assert!(pane.diagnostics().is_empty(), "{:?}", pane.diagnostics());
+                assert!(
+                    pane.preview_text(cx).contains("T_SAMPLE_ALBUM"),
+                    "the preview is {:?}",
+                    pane.preview_text(cx)
+                );
+                // The palette knows what the table is called, which is what
+                // makes an example an example.
+                assert!(
+                    workspace.palette_table(cx).is_some(),
+                    "the palette has no model"
+                );
+            })
+            .expect("the window is open");
+
+        // Now the typo, in the buffer alone: the file on disk still says
+        // `${name}`, and the preview follows the buffer.
+        window
+            .update(cx, |workspace, _window, cx| {
+                let pane = workspace.templates[0].clone();
+                pane.update(cx, |pane, cx| {
+                    pane.set_source("class ${nmae} {}\n", cx);
+                    pane.refresh(cx);
+                });
+            })
+            .expect("the window is open");
+        cx.run_until_parked();
+
+        window
+            .update(cx, |workspace, _window, cx| {
+                let pane = workspace.templates[0].read(cx);
+                let found = pane.diagnostics();
+                assert_eq!(found.len(), 1, "{found:?}");
+                assert!(
+                    !found[0].error,
+                    "an unknown field is a warning, not an error"
+                );
+                assert_eq!(found[0].line, 0);
+                assert!(
+                    found[0].message.contains("nmae"),
+                    "the warning does not name the field: {:?}",
+                    found[0].message
+                );
+                assert!(
+                    !pane.preview_text(cx).contains("T_SAMPLE_ALBUM"),
+                    "the preview did not follow the buffer"
+                );
+                assert_eq!(
+                    std::fs::read_to_string(&file).expect("the file is still there"),
+                    "class ${name} {}\n",
+                    "the buffer was written to disk without a save"
+                );
+            })
+            .expect("the window is open");
+
+        window
+            .update(cx, |workspace, _window, _cx| workspace.close_session())
+            .expect("the window is open");
+    }
+
     /// Waits for the run to reach its summary, and hands back what it said.
     ///
     /// The generation thread is a real thread, so the test alternates between
@@ -4649,6 +5550,184 @@ mod tests {
 
     /// Every command the shell offers reaches the workspace, and `Escape`
     /// closes what the command opened.
+    /// M4's whole promise, without a database: open a template, edit it, see
+    /// what is wrong with it, and write it back.
+    ///
+    /// No connection at all, deliberately — §4.3 says a template may be edited
+    /// without one, and everything here but the live preview works that way.
+    /// The CRLF the shipped templates are written with is what the file is
+    /// made of, so the round trip through the buffer is under test too.
+    #[gpui::test]
+    fn a_template_opens_edits_diagnoses_and_saves(cx: &mut gpui::TestAppContext) {
+        cx.update(|cx| {
+            app_settings::init(cx);
+            rudbgen_ui::init(cx);
+            rudbgen_editor::init(cx);
+        });
+
+        let dir = tempfile::tempdir().expect("a temporary directory");
+        let file = dir.path().join("java_model.java");
+        std::fs::write(&file, "public class ${name.pascal} {\r\n}\r\n").expect("the file");
+
+        let window = cx.add_window(|window, cx| Workspace::new(TitlebarStyle::Custom, window, cx));
+        window
+            .update(cx, |workspace, _window, cx| {
+                workspace.open_template(file.clone(), cx);
+            })
+            .expect("the window is open");
+        cx.run_until_parked();
+
+        // One tab, one buffer, and the buffer is `\n` only whatever the file is.
+        window
+            .update(cx, |workspace, _window, cx| {
+                assert_eq!(workspace.templates.len(), 1);
+                assert!(matches!(
+                    workspace.pane.active(),
+                    Some(PaneItem::Template { .. })
+                ));
+                let pane = workspace.templates[0].read(cx);
+                assert!(!pane.source(cx).is_empty());
+                assert!(pane.source(cx).contains("\r\n"), "the ending was forgotten");
+                assert!(!pane.is_dirty(cx), "a freshly opened file is not dirty");
+                assert!(pane.preview_open(), "the preview half starts open");
+                // The palette took the place of the inspector, and it is full
+                // even with no connection: only the examples need a table.
+                assert!(
+                    workspace.palette.read(cx).len() > 90,
+                    "the palette is empty"
+                );
+                // Opening the same file again is a navigation, not a second
+                // buffer over one path.
+                workspace.open_template(file.clone(), cx);
+                assert_eq!(workspace.templates.len(), 1);
+                // And the preview half puts itself away when asked.
+                let pane = workspace.templates[0].clone();
+                pane.update(cx, |pane, cx| {
+                    pane.toggle_preview(cx);
+                    assert!(!pane.preview_open());
+                    pane.toggle_preview(cx);
+                });
+            })
+            .expect("the window is open");
+
+        // A typo in a field name: the template still parses, so the verdict has
+        // to come from a render — which needs no connection to *fail*, and the
+        // parse below is what the tab computes locally.
+        window
+            .update(cx, |workspace, window, cx| {
+                let pane = workspace.templates[0].clone();
+                pane.update(cx, |pane, cx| {
+                    pane.insert("${for:item=columns}", window, cx);
+                });
+            })
+            .expect("the window is open");
+        cx.executor()
+            .advance_clock(std::time::Duration::from_millis(500));
+        cx.run_until_parked();
+
+        // A `for` with no `endfor` does not parse, and the tab says where.
+        window
+            .update(cx, |workspace, _window, cx| {
+                let pane = workspace.templates[0].read(cx);
+                assert!(pane.is_dirty(cx), "the edit did not mark the tab");
+                let found = pane.diagnostics();
+                assert_eq!(found.len(), 1, "{found:?}");
+                assert!(found[0].error, "{found:?}");
+                // And the tab strip is wearing the marker.
+                assert!(matches!(
+                    workspace.pane.active(),
+                    Some(PaneItem::Template { dirty: true, .. })
+                ));
+            })
+            .expect("the window is open");
+
+        // Closing it now asks rather than throwing the edit away.
+        window
+            .update(cx, |workspace, window, cx| {
+                let index = workspace.pane.active_index();
+                workspace.request_close_tab(index, window, cx);
+                assert_eq!(workspace.closing, Some(index));
+                assert_eq!(workspace.templates.len(), 1, "it closed without asking");
+            })
+            .expect("the window is open");
+
+        // Cancel leaves everything where it was; Save writes and closes.
+        window
+            .update(cx, |workspace, window, cx| {
+                workspace.closing = None;
+                let pane = workspace.templates[0].clone();
+                pane.update(cx, |pane, cx| {
+                    // Undo the unterminated loop, so the file that is written
+                    // is one that parses.
+                    let source = pane.source(cx);
+                    let fixed = source.replace("${for:item=columns}", "");
+                    pane.set_source(&fixed, cx);
+                    assert!(pane.save(cx), "the file did not write");
+                });
+                let index = workspace.pane.active_index();
+                workspace.request_close_tab(index, window, cx);
+                assert_eq!(workspace.closing, None, "a saved tab still asked");
+                assert!(workspace.templates.is_empty(), "the tab stayed open");
+            })
+            .expect("the window is open");
+
+        let written = std::fs::read_to_string(&file).expect("the file is still there");
+        assert!(
+            written.contains("\r\n"),
+            "the line ending was not restored: {written:?}"
+        );
+        assert!(!written.contains("\n\n"), "a bare newline was written");
+    }
+
+    /// The completion popup offers what the caret's context allows, and
+    /// accepting one writes it over what was typed.
+    #[gpui::test]
+    fn the_completion_popup_offers_and_accepts(cx: &mut gpui::TestAppContext) {
+        cx.update(|cx| {
+            app_settings::init(cx);
+            rudbgen_ui::init(cx);
+            rudbgen_editor::init(cx);
+        });
+
+        let dir = tempfile::tempdir().expect("a temporary directory");
+        let file = dir.path().join("model.java");
+        std::fs::write(&file, "class X {\n}\n").expect("the file");
+
+        let window = cx.add_window(|window, cx| Workspace::new(TitlebarStyle::Custom, window, cx));
+        window
+            .update(cx, |workspace, _window, cx| {
+                workspace.open_template(file.clone(), cx);
+            })
+            .expect("the window is open");
+        cx.run_until_parked();
+
+        window
+            .update(cx, |workspace, window, cx| {
+                let pane = workspace.templates[0].clone();
+                pane.update(cx, |pane, cx| pane.insert("${na", window, cx));
+            })
+            .expect("the window is open");
+        // The buffer's `Changed` reaches the tab on the effect cycle, and the
+        // popup follows it.
+        cx.run_until_parked();
+
+        window
+            .update(cx, |workspace, _window, cx| {
+                let pane = workspace.templates[0].clone();
+                pane.update(cx, |pane, cx| {
+                    assert!(pane.completion_open(), "typing a brace offered nothing");
+                    let names = pane.completion_names();
+                    assert_eq!(names.first().map(|name| name.as_ref()), Some("name"));
+                    // Accepting writes the rest of the word over the prefix,
+                    // and takes the popup down.
+                    pane.accept_completion(0, cx);
+                    assert!(!pane.completion_open());
+                    assert!(pane.source(cx).contains("${name"), "{}", pane.source(cx));
+                });
+            })
+            .expect("the window is open");
+    }
+
     #[gpui::test]
     fn the_dialogs_open_from_their_actions_and_close_on_escape(cx: &mut gpui::TestAppContext) {
         cx.update(|cx| {

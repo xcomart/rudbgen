@@ -9,11 +9,6 @@ common:
   save: Speichern
   close: Schließen
 
-# Der Fensterkörper, sobald eine Sitzung offen ist. Explorer, Inspektor und
-# der Arbeitsbereich dazwischen kommen als Nächstes.
-workarea:
-  next: Der Vorlageneditor kommt im nächsten Meilenstein; der Generieren-Tab daneben ist schon da.
-
 explorer:
   title: Explorer
   filter_placeholder: Tabellen filtern
@@ -221,6 +216,11 @@ menu:
   quit: Beenden
   connection: Verbindung
   view: Ansicht
+  template: Vorlage
+  open_template: Vorlage öffnen…
+  save_template: Vorlage speichern
+  toggle_live_preview: Live-Vorschau
+  trigger_completion: Vorschlagen
   preview: Vorschau
   dry_run: Probelauf
   generate: Erzeugen
@@ -275,6 +275,7 @@ generate:
   template_name: Name
   out_template: Ausgabename
   tip_edit: Vorlage bearbeiten
+  tip_open: Doppelklick öffnet die Vorlage
   tip_remove: Aus der Liste entfernen
   options: Optionen
   output_dir: Ausgabe
@@ -462,3 +463,148 @@ update:
   installing: Wird installiert…
   failed: Das Update ist fehlgeschlagen.
   open_release: Release-Seite öffnen
+
+template:
+  unsaved: ungespeichert
+  tip_preview: Live-Vorschau ein- und ausblenden
+  show_preview: Vorschau zeigen
+  hide_preview: Vorschau ausblenden
+  preview_table: Tabelle
+  preview_no_connection: Öffnen Sie eine Verbindung, um diese Vorlage auf eine Tabelle angewandt zu sehen.
+  preview_no_table: Haken Sie im Explorer eine Tabelle an, um diese Vorlage angewandt zu sehen.
+  preview_parse_error: Die Vorlage lässt sich nicht lesen; was daran fehlt, steht unten.
+  read_failed: "%{file} ließ sich nicht öffnen: %{reason}"
+  write_failed: "%{file} ließ sich nicht schreiben: %{reason}"
+  not_utf8: "%{file} ist kein UTF-8-Text und kann hier nicht bearbeitet werden."
+  open_select: Vorlage öffnen
+  close_title: Ungespeicherte Änderungen
+  close_question: "%{file} hat Änderungen, die noch nicht gespeichert sind."
+  discard: Nicht speichern
+
+diagnostics:
+  title: Probleme (%{count})
+  at: "%{line}:%{column}"
+
+completion:
+  hint: ↑↓ wählen · Enter einfügen · Esc schließen
+  more: "%{count} weitere"
+
+palette:
+  title: Variablen
+  search: Variablen filtern
+  no_match: Nichts passt dazu.
+  custom_var: Eine Variable aus der Tabelle des Generieren-Tabs.
+  section_table: Tabellenfelder
+  section_column: Spaltenfelder (innerhalb eines for)
+  section_fk: Fremdschlüsselfelder
+  section_index: Indexfelder
+  section_statement: Anweisungen
+  section_decorator: Dekoratoren
+  section_condition: Bedingungen
+  section_custom: Eigene Variablen
+  table:
+    catalog: Der Datenbankkatalog, in dem die Tabelle liegt
+    schema: Das Datenbankschema, in dem die Tabelle liegt
+    name: Der Tabellenname
+    table: Ein anderer Name für name
+    title: Ein anderer Name für name
+    type: TABLE oder VIEW
+    remarks: Der Kommentar der Tabelle
+    columns: Alle Spalten, in der Reihenfolge der Datenbank
+    keys: Die Spalten des Primärschlüssels, in Schlüsselreihenfolge
+    notKeys: Alle Spalten, die nicht zum Primärschlüssel gehören
+    imports: Die Fremdschlüssel, die diese Tabelle erklärt
+    exports: Die Fremdschlüssel, die andere Tabellen auf diese erklären
+    indexes: Die Indizes dieser Tabelle
+    icon: Das Symbol, das die Tabellenliste daneben zeichnet
+    position: Die Stelle in der gelesenen Liste
+  column:
+    catalog: Der Datenbankkatalog, in dem die Spalte liegt
+    schema: Das Datenbankschema, in dem die Spalte liegt
+    table: Die Tabelle, zu der die Spalte gehört
+    name: Der Spaltenname
+    column: Ein anderer Name für name
+    typeName: Der Typname, den der Treiber meldet, etwa VARCHAR oder INT
+    typeString: Der Typ, wie DDL ihn schreibt, mit Länge, etwa VARCHAR(256)
+    isKey: Ob die Spalte zum Primärschlüssel gehört
+    isCharType: Ob der Typ ein CHAR, CLOB oder TEXT ist
+    length: Die Größe der Spalte, in Zeichen bei Text und in Stellen bei Zahlen
+    precision: Wie viele Stellen eine numerische Spalte insgesamt hat
+    scale: Wie viele davon hinter dem Komma stehen
+    nullable: 0 bei NOT NULL, 1 wenn die Spalte NULL annimmt
+    remarks: Der Kommentar der Spalte
+    defVal: Der Vorgabewert
+    dataType: Der rohe java.sql.Types-Code des Treibers
+    jdbcType: Der JDBC-Typname zu diesem Code
+    javaType: Der Java-Typname zu diesem Code
+    autoIncrement: Ob die Datenbank die Spalte selbst füllt
+    keySeq: Die Stelle der Spalte im Primärschlüssel, ab 1
+    fk: Worauf die Spalte zeigt, wenn genau ein Fremdschlüssel sie verwendet
+    position: Die Stelle der Spalte in der Schleife, ab 1
+  fk:
+    name: Der Name der Bedingung
+    columns: Die Spalten dieser Tabelle, aus denen der Schlüssel besteht
+    refCatalog: Der Katalog der Tabelle am anderen Ende
+    refSchema: Das Schema der Tabelle am anderen Ende
+    refTable: Die Tabelle am anderen Ende
+    refColumns: Deren Spalten, in derselben Reihenfolge wie hier
+    onUpdate: Was eine Änderung der Zeile am anderen Ende auslöst
+    onDelete: Was ein Löschen der Zeile am anderen Ende auslöst
+    position: Die Stelle in der Liste der Schlüssel, ab 1
+    catalog: Im fk einer Spalte — der Katalog der Tabelle, auf die sie zeigt
+    schema: Im fk einer Spalte — das Schema der Tabelle, auf die sie zeigt
+    table: Im fk einer Spalte — die Tabelle, auf die sie zeigt
+    column: Im fk einer Spalte — die Spalte, auf die sie zeigt
+  index:
+    name: Der Name des Index
+    unique: Ob es ein eindeutiger Index ist
+    columns: Seine Spalten, in Indexreihenfolge
+    position: Die Stelle in der Liste der Indizes, ab 1
+  stmt:
+    item: Schreibt ein Feld des Modells, mitsamt seinen Dekoratoren
+    super: Erreicht die Tabelle aus einer for-Schleife heraus
+    if: Schreibt seinen Rumpf, wenn die Bedingungen gelten; braucht ein endif
+    elif: Ein weiterer Zweig des if darüber
+    else: Was geschrieben wird, wenn kein Zweig galt
+    endif: Beendet ein if
+    for: Schreibt seinen Rumpf einmal je Element einer Sammlung
+    endfor: Beendet ein for
+    date: Heute, geschrieben so, wie format es sagt
+    user: Das Konto, unter dem der Generator läuft
+    author: Das Feld Autor im Generieren-Tab
+    inStr: Text zwischen zwei Durchläufen, nie vor dem ersten oder nach dem letzten
+    indent: Leerzeichen, die zur Einrückung von inStr hinzukommen; darf negativ sein
+    skipList: Namen zu überspringender Elemente, durch Kommas getrennt und genau verglichen
+  dec:
+    abbr: Wendet die Abkürzungsregeln auf den Wert an
+    suffix: Wirft alles bis zum ersten Unterstrich weg, aus T_SAMPLE_ALBUM wird SAMPLE_ALBUM
+    prefix: Wirft alles ab dem letzten Unterstrich weg, aus SAMPLE_ALBUM_T wird SAMPLE_ALBUM
+    camel: Camel Case, aus SAMPLE_ALBUM wird sampleAlbum
+    pascal: Pascal Case, aus SAMPLE_ALBUM wird SampleAlbum
+    snake: Snake Case, aus SAMPLE_ALBUM wird sample_album
+    screaming: Großgeschriebenes Snake Case, aus sampleAlbum wird SAMPLE_ALBUM
+    skewer: Kebab Case, aus SAMPLE_ALBUM wird sample-album
+    kebab: Ein anderer Name für skewer
+    lower: Kleinbuchstaben
+    upper: Großbuchstaben
+    replace: replace('von','nach') ersetzt jedes Vorkommen
+    padSize: Füllt den Wert mit Leerzeichen bis auf diese Breite
+    padDir: Auf welcher Seite gefüllt wird, left oder right; rechts als Vorgabe
+    quote: Umschließt den Wert an beiden Enden mit diesem Text
+    prepend: Schreibt diesen Text vor den Wert
+    postpend: Schreibt diesen Text hinter den Wert
+  cond:
+    equals: Gilt, wenn der Wert dies ist, ohne auf Groß und Klein zu achten
+    notEquals: Gilt, wenn der Wert alles andere als dies ist
+    startsWith: Gilt, wenn der Wert damit beginnt, ohne auf Groß und Klein zu achten
+    notStartsWith: Gilt, wenn der Wert nicht damit beginnt
+    endsWith: Gilt, wenn der Wert damit endet, ohne auf Groß und Klein zu achten
+    notEndsWith: Gilt, wenn der Wert nicht damit endet
+    contains: Gilt, wenn eine Sammlung ein Element dieses Namens hat oder eine Liste mit Kommas diesen Wert
+    notContains: Gilt, wenn weder das eine noch das andere zutrifft
+    matches: Gilt, wenn der ganze Wert auf diesen regulären Ausdruck passt; hier zählt Groß und Klein
+    notMatches: Gilt, wenn der ganze Wert nicht darauf passt
+  opt:
+    key: Das Feld, das diese Anweisung schreibt, mitsamt Dekoratoren
+    item: Ein anderer Name für key
+    format: Wie das Datum geschrieben wird, in Javas Musterbuchstaben wie yyyy-MM-dd

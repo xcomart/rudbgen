@@ -9,11 +9,6 @@ common:
   save: 저장
   close: 닫기
 
-# 세션이 열려 있을 때의 창 본문. 탐색기와 인스펙터, 그 사이의 작업 영역은
-# 다음 차례다.
-workarea:
-  next: 템플릿 편집기는 다음 마일스톤에서 추가됩니다. 옆의 생성 탭은 이미 여기에 있습니다.
-
 explorer:
   title: 탐색기
   filter_placeholder: 테이블 이름으로 거르기
@@ -220,6 +215,11 @@ menu:
   quit: 종료
   connection: 연결
   view: 보기
+  template: 템플릿
+  open_template: 템플릿 열기…
+  save_template: 템플릿 저장
+  toggle_live_preview: 실시간 미리보기
+  trigger_completion: 자동 완성
   preview: 미리보기
   dry_run: 시험 실행
   generate: 생성
@@ -273,6 +273,7 @@ generate:
   template_name: 이름
   out_template: 출력 이름
   tip_edit: 템플릿 편집
+  tip_open: 두 번 누르면 템플릿을 엽니다
   tip_remove: 목록에서 제거
   options: 옵션
   output_dir: 출력 위치
@@ -460,3 +461,148 @@ update:
   installing: 설치하는 중…
   failed: 업데이트에 실패했습니다.
   open_release: 릴리스 페이지 열기
+
+template:
+  unsaved: 저장 안 됨
+  tip_preview: 실시간 미리보기를 켜거나 끕니다
+  show_preview: 미리보기 표시
+  hide_preview: 미리보기 숨기기
+  preview_table: 테이블
+  preview_no_connection: 연결을 열면 이 템플릿을 테이블에 적용한 결과를 보여 줍니다.
+  preview_no_table: 탐색기에서 테이블을 고르면 이 템플릿을 적용한 결과를 보여 줍니다.
+  preview_parse_error: 템플릿을 해석할 수 없습니다. 무엇이 잘못됐는지는 아래에 있습니다.
+  read_failed: "%{file}을(를) 열지 못했습니다: %{reason}"
+  write_failed: "%{file}을(를) 쓰지 못했습니다: %{reason}"
+  not_utf8: "%{file}은(는) UTF-8 텍스트가 아니어서 여기서 편집할 수 없습니다."
+  open_select: 템플릿 열기
+  close_title: 저장하지 않은 변경
+  close_question: "%{file}에 아직 저장하지 않은 변경이 있습니다."
+  discard: 저장 안 함
+
+diagnostics:
+  title: 문제 (%{count})
+  at: "%{line}:%{column}"
+
+completion:
+  hint: ↑↓ 선택 · Enter 삽입 · Esc 닫기
+  more: "%{count}개 더"
+
+palette:
+  title: 변수
+  search: 변수 거르기
+  no_match: 일치하는 항목이 없습니다.
+  custom_var: 생성 탭의 변수 표에서 온 변수입니다.
+  section_table: 테이블 필드
+  section_column: 열 필드 (for 안)
+  section_fk: 외래 키 필드
+  section_index: 인덱스 필드
+  section_statement: 문장
+  section_decorator: 데코레이터
+  section_condition: 조건
+  section_custom: 사용자 변수
+  table:
+    catalog: 이 테이블이 속한 데이터베이스 카탈로그
+    schema: 이 테이블이 속한 데이터베이스 스키마
+    name: 테이블 이름
+    table: name의 다른 이름
+    title: name의 다른 이름
+    type: TABLE 또는 VIEW
+    remarks: 테이블 주석
+    columns: 데이터베이스가 알려 준 순서대로의 모든 열
+    keys: 키 순서대로의 기본 키 열
+    notKeys: 기본 키에 속하지 않는 모든 열
+    imports: 이 테이블이 선언한 외래 키
+    exports: 다른 테이블이 이 테이블을 향해 선언한 외래 키
+    indexes: 이 테이블의 인덱스
+    icon: 테이블 목록이 옆에 그리는 아이콘
+    position: 읽어 온 목록에서의 순번
+  column:
+    catalog: 이 열이 속한 데이터베이스 카탈로그
+    schema: 이 열이 속한 데이터베이스 스키마
+    table: 이 열이 속한 테이블
+    name: 열 이름
+    column: name의 다른 이름
+    typeName: 드라이버가 알려 준 타입 이름. VARCHAR, INT 따위
+    typeString: DDL이 쓰는 형태의 타입. 길이까지 붙은 VARCHAR(256) 따위
+    isKey: 이 열이 기본 키의 일부인지
+    isCharType: 타입이 CHAR, CLOB, TEXT 계열인지
+    length: 열 크기. 문자형은 글자 수, 숫자형은 자릿수
+    precision: 숫자 열이 담는 전체 자릿수
+    scale: 그 가운데 소수점 아래 자릿수
+    nullable: NOT NULL이면 0, 널을 받으면 1
+    remarks: 열 주석
+    defVal: 기본값
+    dataType: 드라이버가 알려 준 java.sql.Types 코드
+    jdbcType: 그 코드가 뜻하는 JDBC 타입 이름
+    javaType: 그 코드가 대응하는 자바 타입 이름
+    autoIncrement: 데이터베이스가 값을 스스로 채우는지
+    keySeq: 기본 키 안에서의 자리. 1부터
+    fk: 외래 키 하나만 이 열을 쓸 때, 그 열이 가리키는 곳
+    position: 반복 안에서의 순번. 1부터
+  fk:
+    name: 제약 조건 이름
+    columns: 이 키를 이루는 이 테이블의 열
+    refCatalog: 반대편 테이블의 카탈로그
+    refSchema: 반대편 테이블의 스키마
+    refTable: 반대편 테이블
+    refColumns: 이쪽과 같은 순서로 놓인 반대편 열
+    onUpdate: 반대편 행이 바뀔 때 하는 일
+    onDelete: 반대편 행이 지워질 때 하는 일
+    position: 키 목록에서의 순번. 1부터
+    catalog: 열의 fk 안에서 — 가리키는 테이블의 카탈로그
+    schema: 열의 fk 안에서 — 가리키는 테이블의 스키마
+    table: 열의 fk 안에서 — 가리키는 테이블
+    column: 열의 fk 안에서 — 가리키는 열
+  index:
+    name: 인덱스 이름
+    unique: 유일 인덱스인지
+    columns: 인덱스 순서대로의 열
+    position: 인덱스 목록에서의 순번. 1부터
+  stmt:
+    item: 모델의 필드를 데코레이터까지 붙여 씁니다
+    super: for 반복 안에서 테이블에 닿습니다
+    if: 조건이 맞으면 본문을 씁니다. endif가 있어야 합니다
+    elif: 위 if의 또 다른 분기
+    else: 어느 분기도 맞지 않을 때 쓰는 것
+    endif: if를 닫습니다
+    for: 모음의 원소마다 본문을 한 번씩 씁니다
+    endfor: for를 닫습니다
+    date: format이 정한 형태로 쓴 오늘 날짜
+    user: 생성기를 돌리고 있는 계정
+    author: 생성 탭의 작성자 항목
+    inStr: 반복 사이에 쓰는 글자. 처음 앞과 마지막 뒤에는 쓰지 않습니다
+    indent: inStr이 쓰는 것의 들여쓰기에 더할 칸. 음수도 됩니다
+    skipList: 건너뛸 원소 이름. 쉼표로 나누며 대소문자까지 그대로 맞춥니다
+  dec:
+    abbr: 값에 약어 규칙을 적용합니다
+    suffix: 첫 밑줄까지를 버립니다. T_SAMPLE_ALBUM은 SAMPLE_ALBUM이 됩니다
+    prefix: 마지막 밑줄부터를 버립니다. SAMPLE_ALBUM_T는 SAMPLE_ALBUM이 됩니다
+    camel: 카멜 표기. SAMPLE_ALBUM은 sampleAlbum이 됩니다
+    pascal: 파스칼 표기. SAMPLE_ALBUM은 SampleAlbum이 됩니다
+    snake: 스네이크 표기. SAMPLE_ALBUM은 sample_album이 됩니다
+    screaming: 대문자 스네이크 표기. sampleAlbum은 SAMPLE_ALBUM이 됩니다
+    skewer: 케밥 표기. SAMPLE_ALBUM은 sample-album이 됩니다
+    kebab: skewer의 다른 이름
+    lower: 소문자
+    upper: 대문자
+    replace: replace('from','to')는 나오는 곳마다 바꿉니다
+    padSize: 이 너비가 되도록 값을 공백으로 채웁니다
+    padDir: 공백을 붙일 쪽. left 또는 right이며 기본은 right
+    quote: 값의 양쪽을 이 글자로 감쌉니다
+    prepend: 값 앞에 이 글자를 씁니다
+    postpend: 값 뒤에 이 글자를 씁니다
+  cond:
+    equals: 대소문자를 가리지 않고 값이 이것과 같으면 참
+    notEquals: 값이 이것이 아니면 참
+    startsWith: 대소문자를 가리지 않고 값이 이것으로 시작하면 참
+    notStartsWith: 값이 이것으로 시작하지 않으면 참
+    endsWith: 대소문자를 가리지 않고 값이 이것으로 끝나면 참
+    notEndsWith: 값이 이것으로 끝나지 않으면 참
+    contains: 모음에 이 이름의 원소가 있거나, 쉼표로 나눈 목록에 이 값이 있으면 참
+    notContains: 둘 다 아니면 참
+    matches: 값 전체가 이 정규식과 맞으면 참. 여기서는 대소문자를 가립니다
+    notMatches: 값 전체가 이 정규식과 맞지 않으면 참
+  opt:
+    key: 이 문장이 쓸 필드. 데코레이터까지
+    item: key의 다른 이름
+    format: 날짜를 쓰는 형식. yyyy-MM-dd 같은 자바 패턴 문자

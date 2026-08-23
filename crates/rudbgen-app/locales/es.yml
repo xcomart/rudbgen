@@ -9,11 +9,6 @@ common:
   save: Guardar
   close: Cerrar
 
-# El cuerpo de la ventana una vez que hay una sesión abierta. El explorador,
-# el inspector y el área de trabajo entre ellos llegan después.
-workarea:
-  next: El editor de plantillas llega en el próximo hito; la pestaña Generar de al lado ya está aquí.
-
 explorer:
   title: Explorador
   filter_placeholder: Filtrar tablas
@@ -221,6 +216,11 @@ menu:
   quit: Salir
   connection: Conexión
   view: Ver
+  template: Plantilla
+  open_template: Abrir plantilla…
+  save_template: Guardar plantilla
+  toggle_live_preview: Vista previa en vivo
+  trigger_completion: Sugerir
   preview: Vista previa
   dry_run: Simulación
   generate: Generar
@@ -275,6 +275,7 @@ generate:
   template_name: nombre
   out_template: nombre de salida
   tip_edit: Editar la plantilla
+  tip_open: Haga doble clic para abrir la plantilla
   tip_remove: Quitar de la lista
   options: Opciones
   output_dir: Salida
@@ -462,3 +463,148 @@ update:
   installing: Instalando…
   failed: La actualización ha fallado.
   open_release: Abrir la página de la versión
+
+template:
+  unsaved: sin guardar
+  tip_preview: Mostrar u ocultar la vista previa en vivo
+  show_preview: Mostrar vista previa
+  hide_preview: Ocultar vista previa
+  preview_table: Tabla
+  preview_no_connection: Abra una conexión para ver esta plantilla aplicada a una tabla.
+  preview_no_table: Marque una tabla en el explorador para ver esta plantilla aplicada.
+  preview_parse_error: La plantilla no se puede analizar; lo que falla está listado abajo.
+  read_failed: "No se pudo abrir %{file}: %{reason}"
+  write_failed: "No se pudo escribir %{file}: %{reason}"
+  not_utf8: "%{file} no es texto UTF-8, así que no se puede editar aquí."
+  open_select: Abrir una plantilla
+  close_title: Cambios sin guardar
+  close_question: "%{file} tiene cambios que todavía no se han guardado."
+  discard: No guardar
+
+diagnostics:
+  title: Problemas (%{count})
+  at: "%{line}:%{column}"
+
+completion:
+  hint: ↑↓ elegir · Intro insertar · Esc cerrar
+  more: "%{count} más"
+
+palette:
+  title: Variables
+  search: Filtrar variables
+  no_match: No hay nada que coincida.
+  custom_var: Una variable de la tabla de la pestaña Generar.
+  section_table: Campos de la tabla
+  section_column: Campos de columna (dentro de un for)
+  section_fk: Campos de clave externa
+  section_index: Campos de índice
+  section_statement: Sentencias
+  section_decorator: Decoradores
+  section_condition: Condiciones
+  section_custom: Variables propias
+  table:
+    catalog: El catálogo de base de datos que contiene la tabla
+    schema: El esquema de base de datos que contiene la tabla
+    name: El nombre de la tabla
+    table: Otro nombre para name
+    title: Otro nombre para name
+    type: TABLE o VIEW
+    remarks: El comentario de la tabla
+    columns: Todas las columnas, en el orden que da la base de datos
+    keys: Las columnas de la clave primaria, en orden de clave
+    notKeys: Todas las columnas que no son de la clave primaria
+    imports: Las claves externas que declara esta tabla
+    exports: Las claves externas que otras tablas declaran hacia esta
+    indexes: Los índices de esta tabla
+    icon: El icono que la lista de tablas dibuja al lado
+    position: El puesto en la lista de la que vino
+  column:
+    catalog: El catálogo de base de datos que contiene la columna
+    schema: El esquema de base de datos que contiene la columna
+    table: La tabla a la que pertenece la columna
+    name: El nombre de la columna
+    column: Otro nombre para name
+    typeName: El nombre de tipo que informa el controlador, como VARCHAR o INT
+    typeString: El tipo tal como lo escribe el DDL, con su longitud, como VARCHAR(256)
+    isKey: Si la columna forma parte de la clave primaria
+    isCharType: Si el tipo es un CHAR, un CLOB o un TEXT
+    length: El tamaño de la columna, en caracteres para texto y en dígitos para números
+    precision: Cuántos dígitos tiene en total una columna numérica
+    scale: Cuántos de ellos van tras la coma decimal
+    nullable: 0 cuando la columna es NOT NULL, 1 cuando admite NULL
+    remarks: El comentario de la columna
+    defVal: El valor por omisión
+    dataType: El código java.sql.Types en bruto que informó el controlador
+    jdbcType: El nombre de tipo JDBC de ese código
+    javaType: El nombre de tipo Java al que corresponde ese código
+    autoIncrement: Si la base de datos rellena la columna por sí sola
+    keySeq: El puesto de la columna dentro de la clave primaria, desde 1
+    fk: A qué apunta la columna, cuando la usa exactamente una clave externa
+    position: El puesto de la columna en el bucle, desde 1
+  fk:
+    name: El nombre de la restricción
+    columns: Las columnas de esta tabla de las que se compone la clave
+    refCatalog: El catálogo de la tabla del otro extremo
+    refSchema: El esquema de la tabla del otro extremo
+    refTable: La tabla del otro extremo
+    refColumns: Sus columnas, en el mismo orden que las de aquí
+    onUpdate: Qué ocurre cuando cambia la fila del otro extremo
+    onDelete: Qué ocurre cuando se borra la fila del otro extremo
+    position: El puesto en la lista de claves, desde 1
+    catalog: Dentro del fk de una columna — el catálogo de la tabla a la que apunta
+    schema: Dentro del fk de una columna — el esquema de la tabla a la que apunta
+    table: Dentro del fk de una columna — la tabla a la que apunta
+    column: Dentro del fk de una columna — la columna a la que apunta
+  index:
+    name: El nombre del índice
+    unique: Si es un índice único
+    columns: Sus columnas, en orden de índice
+    position: El puesto en la lista de índices, desde 1
+  stmt:
+    item: Escribe un campo del modelo, decoradores incluidos
+    super: Alcanza la tabla desde dentro de un bucle for
+    if: Escribe su cuerpo cuando se cumplen las condiciones; necesita un endif
+    elif: Otra rama del if de arriba
+    else: Lo que se escribe cuando ninguna rama se cumplió
+    endif: Termina un if
+    for: Escribe su cuerpo una vez por elemento de una colección
+    endfor: Termina un for
+    date: Hoy, escrito como diga format
+    user: La cuenta con la que corre el generador
+    author: El campo Autor de la pestaña Generar
+    inStr: Texto escrito entre dos vueltas, nunca antes de la primera ni tras la última
+    indent: Espacios que se suman a la sangría de lo que escribe inStr; puede ser negativo
+    skipList: Nombres de elementos que saltar, separados por comas y comparados tal cual
+  dec:
+    abbr: Aplica las reglas de abreviatura al valor
+    suffix: "Descarta todo hasta el primer guion bajo: T_SAMPLE_ALBUM queda en SAMPLE_ALBUM"
+    prefix: "Descarta todo desde el último guion bajo: SAMPLE_ALBUM_T queda en SAMPLE_ALBUM"
+    camel: "Estilo camel: SAMPLE_ALBUM queda en sampleAlbum"
+    pascal: "Estilo pascal: SAMPLE_ALBUM queda en SampleAlbum"
+    snake: "Estilo serpiente: SAMPLE_ALBUM queda en sample_album"
+    screaming: "Estilo serpiente en mayúsculas: sampleAlbum queda en SAMPLE_ALBUM"
+    skewer: "Estilo kebab: SAMPLE_ALBUM queda en sample-album"
+    kebab: Otro nombre para skewer
+    lower: Minúsculas
+    upper: Mayúsculas
+    replace: replace('de','a') sustituye cada aparición
+    padSize: Rellena el valor con espacios hasta este ancho
+    padDir: De qué lado van los espacios, left o right; a la derecha por omisión
+    quote: Envuelve el valor en este texto por ambos lados
+    prepend: Escribe este texto delante del valor
+    postpend: Escribe este texto detrás del valor
+  cond:
+    equals: Se cumple cuando el valor es este, sin mirar mayúsculas
+    notEquals: Se cumple cuando el valor es cualquier otro
+    startsWith: Se cumple cuando el valor empieza por esto, sin mirar mayúsculas
+    notStartsWith: Se cumple cuando el valor no empieza por esto
+    endsWith: Se cumple cuando el valor acaba en esto, sin mirar mayúsculas
+    notEndsWith: Se cumple cuando el valor no acaba en esto
+    contains: Se cumple cuando una colección tiene un elemento con este nombre, o una lista con comas tiene este valor
+    notContains: Se cumple cuando no ocurre ninguna de las dos cosas
+    matches: Se cumple cuando el valor entero encaja en esta expresión regular; aquí sí importan las mayúsculas
+    notMatches: Se cumple cuando el valor entero no encaja en ella
+  opt:
+    key: El campo que escribe esta sentencia, decoradores incluidos
+    item: Otro nombre para key
+    format: Cómo se escribe la fecha, en letras de patrón de Java como yyyy-MM-dd

@@ -9,11 +9,6 @@ common:
   save: Enregistrer
   close: Fermer
 
-# Le corps de la fenêtre une fois qu'une session est ouverte. L'explorateur,
-# l'inspecteur et la zone de travail entre les deux arrivent ensuite.
-workarea:
-  next: L'éditeur de modèles arrive au prochain jalon ; l'onglet Générer, à côté, est déjà là.
-
 explorer:
   title: Explorateur
   filter_placeholder: Filtrer les tables
@@ -221,6 +216,11 @@ menu:
   quit: Quitter
   connection: Connexion
   view: Affichage
+  template: Modèle
+  open_template: Ouvrir un modèle…
+  save_template: Enregistrer le modèle
+  toggle_live_preview: Aperçu en direct
+  trigger_completion: Suggérer
   preview: Aperçu
   dry_run: Simulation
   generate: Générer
@@ -275,6 +275,7 @@ generate:
   template_name: nom
   out_template: nom de sortie
   tip_edit: Modifier le modèle
+  tip_open: Double-cliquez pour ouvrir le modèle
   tip_remove: Retirer de la liste
   options: Options
   output_dir: Sortie
@@ -462,3 +463,148 @@ update:
   installing: Installation…
   failed: La mise à jour a échoué.
   open_release: Ouvrir la page de la version
+
+template:
+  unsaved: non enregistré
+  tip_preview: Afficher ou masquer l'aperçu en direct
+  show_preview: Afficher l'aperçu
+  hide_preview: Masquer l'aperçu
+  preview_table: Table
+  preview_no_connection: Ouvrez une connexion pour voir ce modèle appliqué à une table.
+  preview_no_table: Cochez une table dans l'explorateur pour voir ce modèle appliqué.
+  preview_parse_error: Le modèle ne peut pas être analysé ; ce qui cloche est listé ci-dessous.
+  read_failed: "%{file} n'a pas pu être ouvert : %{reason}"
+  write_failed: "%{file} n'a pas pu être écrit : %{reason}"
+  not_utf8: "%{file} n'est pas du texte UTF-8 et ne peut pas être édité ici."
+  open_select: Ouvrir un modèle
+  close_title: Modifications non enregistrées
+  close_question: "%{file} contient des modifications qui n'ont pas encore été enregistrées."
+  discard: Ne pas enregistrer
+
+diagnostics:
+  title: Problèmes (%{count})
+  at: "%{line}:%{column}"
+
+completion:
+  hint: ↑↓ choisir · Entrée insérer · Échap fermer
+  more: "%{count} de plus"
+
+palette:
+  title: Variables
+  search: Filtrer les variables
+  no_match: Rien ne correspond.
+  custom_var: Une variable venue du tableau de l'onglet Générer.
+  section_table: Champs de la table
+  section_column: Champs de colonne (dans un for)
+  section_fk: Champs de clé étrangère
+  section_index: Champs d'index
+  section_statement: Instructions
+  section_decorator: Décorateurs
+  section_condition: Conditions
+  section_custom: Variables personnalisées
+  table:
+    catalog: Le catalogue de base de données qui contient la table
+    schema: Le schéma de base de données qui contient la table
+    name: Le nom de la table
+    table: Un autre nom pour name
+    title: Un autre nom pour name
+    type: TABLE ou VIEW
+    remarks: Le commentaire de la table
+    columns: Toutes les colonnes, dans l'ordre donné par la base
+    keys: Les colonnes de la clé primaire, dans l'ordre de la clé
+    notKeys: Toutes les colonnes hors clé primaire
+    imports: Les clés étrangères déclarées par cette table
+    exports: Les clés étrangères que d'autres tables déclarent vers celle-ci
+    indexes: Les index de cette table
+    icon: L'icône que la liste des tables dessine à côté
+    position: Le rang dans la liste d'où elle vient
+  column:
+    catalog: Le catalogue de base de données qui contient la colonne
+    schema: Le schéma de base de données qui contient la colonne
+    table: La table à laquelle appartient la colonne
+    name: Le nom de la colonne
+    column: Un autre nom pour name
+    typeName: Le nom de type rapporté par le pilote, VARCHAR ou INT par exemple
+    typeString: Le type tel que le DDL l'écrit, longueur comprise, VARCHAR(256) par exemple
+    isKey: Si la colonne fait partie de la clé primaire
+    isCharType: Si le type est un CHAR, un CLOB ou un TEXT
+    length: La taille de la colonne, en caractères pour du texte et en chiffres pour un nombre
+    precision: Combien de chiffres une colonne numérique porte en tout
+    scale: Combien d'entre eux sont après la virgule
+    nullable: 0 quand la colonne est NOT NULL, 1 quand elle accepte NULL
+    remarks: Le commentaire de la colonne
+    defVal: La valeur par défaut
+    dataType: Le code java.sql.Types brut rapporté par le pilote
+    jdbcType: Le nom de type JDBC de ce code
+    javaType: Le nom de type Java auquel ce code correspond
+    autoIncrement: Si la base remplit la colonne elle-même
+    keySeq: Le rang de la colonne dans la clé primaire, à partir de 1
+    fk: Ce que la colonne désigne, quand une seule clé étrangère l'utilise
+    position: Le rang de la colonne dans la boucle, à partir de 1
+  fk:
+    name: Le nom de la contrainte
+    columns: Les colonnes de cette table dont la clé est faite
+    refCatalog: Le catalogue de la table à l'autre bout
+    refSchema: Le schéma de la table à l'autre bout
+    refTable: La table à l'autre bout
+    refColumns: Ses colonnes, dans le même ordre qu'ici
+    onUpdate: Ce qu'entraîne une modification de la ligne à l'autre bout
+    onDelete: Ce qu'entraîne une suppression de la ligne à l'autre bout
+    position: Le rang dans la liste des clés, à partir de 1
+    catalog: Dans le fk d'une colonne — le catalogue de la table visée
+    schema: Dans le fk d'une colonne — le schéma de la table visée
+    table: Dans le fk d'une colonne — la table visée
+    column: Dans le fk d'une colonne — la colonne visée
+  index:
+    name: Le nom de l'index
+    unique: S'il s'agit d'un index unique
+    columns: Ses colonnes, dans l'ordre de l'index
+    position: Le rang dans la liste des index, à partir de 1
+  stmt:
+    item: Écrit un champ du modèle, décorateurs compris
+    super: Atteint la table depuis l'intérieur d'une boucle for
+    if: Écrit son corps quand les conditions tiennent ; demande un endif
+    elif: Une autre branche du if au-dessus
+    else: Ce qui est écrit quand aucune branche n'a tenu
+    endif: Termine un if
+    for: Écrit son corps une fois par élément d'une collection
+    endfor: Termine un for
+    date: Aujourd'hui, écrit comme format le dit
+    user: Le compte sous lequel le générateur tourne
+    author: Le champ Auteur de l'onglet Générer
+    inStr: Texte écrit entre deux tours, jamais avant le premier ni après le dernier
+    indent: Espaces ajoutés à l'indentation de ce qu'écrit inStr ; peut être négatif
+    skipList: Noms d'éléments à sauter, séparés par des virgules et comparés à l'identique
+  dec:
+    abbr: Applique les règles d'abréviation à la valeur
+    suffix: "Jette tout jusqu'au premier tiret bas : T_SAMPLE_ALBUM devient SAMPLE_ALBUM"
+    prefix: "Jette tout à partir du dernier tiret bas : SAMPLE_ALBUM_T devient SAMPLE_ALBUM"
+    camel: "Casse camel : SAMPLE_ALBUM devient sampleAlbum"
+    pascal: "Casse pascal : SAMPLE_ALBUM devient SampleAlbum"
+    snake: "Casse serpent : SAMPLE_ALBUM devient sample_album"
+    screaming: "Casse serpent majuscule : sampleAlbum devient SAMPLE_ALBUM"
+    skewer: "Casse kebab : SAMPLE_ALBUM devient sample-album"
+    kebab: Un autre nom pour skewer
+    lower: Minuscules
+    upper: Majuscules
+    replace: replace('de','vers') remplace chaque occurrence
+    padSize: Complète la valeur par des espaces jusqu'à cette largeur
+    padDir: De quel côté vont les espaces, left ou right ; à droite par défaut
+    quote: Entoure la valeur de ce texte des deux côtés
+    prepend: Écrit ce texte devant la valeur
+    postpend: Écrit ce texte derrière la valeur
+  cond:
+    equals: Vrai quand la valeur est celle-ci, sans regarder la casse
+    notEquals: Vrai quand la valeur est tout sauf celle-ci
+    startsWith: Vrai quand la valeur commence par ceci, sans regarder la casse
+    notStartsWith: Vrai quand la valeur ne commence pas par ceci
+    endsWith: Vrai quand la valeur finit par ceci, sans regarder la casse
+    notEndsWith: Vrai quand la valeur ne finit pas par ceci
+    contains: Vrai quand une collection contient un élément de ce nom, ou qu'une liste à virgules contient cette valeur
+    notContains: Vrai quand ni l'un ni l'autre
+    matches: Vrai quand la valeur entière correspond à cette expression régulière ; ici la casse compte
+    notMatches: Vrai quand la valeur entière n'y correspond pas
+  opt:
+    key: Le champ qu'écrit cette instruction, décorateurs compris
+    item: Un autre nom pour key
+    format: Comment la date est écrite, en lettres de motif Java comme yyyy-MM-dd

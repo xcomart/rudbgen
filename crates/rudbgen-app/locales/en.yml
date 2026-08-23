@@ -25,13 +25,6 @@ common:
   save: Save
   close: Close
 
-# The body of the window once a session is open. The explorer, the inspector
-# and the tabbed work area they flank are what comes next; until they exist, a
-# connected window says which database it is holding and what is still to
-# come, rather than showing an empty three-column frame.
-workarea:
-  next: The template editor arrives in the next milestone; the Generate tab beside this one is already here.
-
 # The explorer: the tree of tables down the left, and the ticks that say which
 # of them the generator will be run over.
 explorer:
@@ -312,6 +305,14 @@ menu:
   connection: Connection
   # Name of its third, holding what changes the layout of the window.
   view: View
+  # Name of the menu holding the template tab's own commands, and the four
+  # rows in it. Every one of them acts on the template that is on top, so all
+  # but the first are greyed while no template tab is.
+  template: Template
+  open_template: Open template…
+  save_template: Save template
+  toggle_live_preview: Live preview
+  trigger_completion: Suggest
   preview: Preview
   dry_run: Dry run
   generate: Generate
@@ -394,6 +395,7 @@ generate:
   template_name: name
   out_template: output name
   tip_edit: Edit the template
+  tip_open: Double click to open the template
   tip_remove: Remove from the list
   options: Options
   output_dir: Output
@@ -642,3 +644,170 @@ update:
   # The way out of the error state, and of a release with no build for this
   # platform: the browser, and the user takes it from there.
   open_release: Open the release page
+
+# The template tab: the editor, the live preview beside it, and the question
+# asked when one is closed with edits in it (§4.5).
+template:
+  # The marker in the tab's header strip while the buffer differs from the file.
+  unsaved: unsaved
+  tip_preview: Show or hide the live preview
+  show_preview: Show preview
+  hide_preview: Hide preview
+  # Placeholder of the dropdown that picks which table the preview is of.
+  preview_table: Table
+  # What stands in the preview's place when it cannot be rendered. The first
+  # two are situations rather than failures, so neither is worded as an error.
+  preview_no_connection: Open a connection to see this template rendered against a table.
+  preview_no_table: Tick a table in the explorer to see this template rendered.
+  preview_parse_error: The template cannot be parsed; what is wrong is listed below.
+  # The file could not be opened or written. `%{file}` is a path and
+  # `%{reason}` the operating system's own words.
+  read_failed: "%{file} could not be opened: %{reason}"
+  write_failed: "%{file} could not be written: %{reason}"
+  not_utf8: "%{file} is not UTF-8 text, so it cannot be edited here."
+  # Title of the platform file picker the welcome screen and the menu open.
+  open_select: Open a template
+  # Closing a tab with unsaved edits. Three answers, because a close that only
+  # offered two would be one nobody could take back.
+  close_title: Unsaved changes
+  close_question: "%{file} has changes that have not been saved yet."
+  discard: Don't save
+
+# The list under the editor: what the parser rejected, and what the render
+# could not answer. Both are places in the file, so both are listed the same
+# way and marked the same way in the gutter.
+diagnostics:
+  title: Problems (%{count})
+  # One row's position: line and column, both counted from one.
+  at: "%{line}:%{column}"
+
+# The popup that offers what may be written where the caret is.
+completion:
+  # The footer under the list. The key names are not translated.
+  hint: ↑↓ to choose · Enter to insert · Esc to dismiss
+  # Shown in the footer when the list is longer than the popup.
+  more: "%{count} more"
+
+# The variable palette, which is what the inspector's column becomes while a
+# template tab is on top. Every entry carries one line about what it does,
+# summarised from jdbgen's template reference; they are documentation, and
+# they are what the completion popup shows beside each suggestion too.
+palette:
+  title: Variables
+  search: Filter variables
+  no_match: Nothing matches.
+  custom_var: A variable from the Generate tab's table.
+  section_table: Table fields
+  section_column: Column fields (inside a for)
+  section_fk: Foreign key fields
+  section_index: Index fields
+  section_statement: Statements
+  section_decorator: Decorators
+  section_condition: Conditions
+  section_custom: Custom variables
+  table:
+    catalog: The database catalog holding the table
+    schema: The database schema holding the table
+    name: The table name
+    table: Another name for name
+    title: Another name for name
+    type: TABLE or VIEW
+    remarks: The table comment
+    columns: Every column, in the order the database reports them
+    keys: The primary key columns, in key order
+    notKeys: Every column that is not part of the primary key
+    imports: The foreign keys this table declares
+    exports: The foreign keys other tables declare on this one
+    indexes: The indexes of this table
+    icon: The icon the table list draws beside the table
+    position: Where the table came in the list it was read from
+  column:
+    catalog: The database catalog holding the column
+    schema: The database schema holding the column
+    table: The table the column belongs to
+    name: The column name
+    column: Another name for name
+    typeName: The type name the driver reports, such as VARCHAR or INT
+    typeString: The type as DDL writes it, length and all, such as VARCHAR(256)
+    isKey: Whether the column is part of the primary key
+    isCharType: Whether the type is a CHAR, CLOB or TEXT
+    length: "The column size: characters for text, digits for numbers"
+    precision: How many digits a numeric column holds altogether
+    scale: How many of those digits are after the decimal point
+    nullable: 0 when the column is NOT NULL, 1 when it accepts one
+    remarks: The column comment
+    defVal: The default value
+    dataType: The raw java.sql.Types code the driver reported
+    jdbcType: The JDBC type name that code stands for
+    javaType: The Java type name that code maps to
+    autoIncrement: Whether the database fills the column in by itself
+    keySeq: Where the column comes in the primary key, from 1
+    fk: What the column points at, when exactly one foreign key uses it
+    position: Where the column comes in the loop, from 1
+  fk:
+    name: The constraint name
+    columns: The columns of this table the key is made of
+    refCatalog: The catalog of the table at the other end
+    refSchema: The schema of the table at the other end
+    refTable: The table at the other end
+    refColumns: Its columns, in the same order as this one's
+    onUpdate: What an update to the row at the other end does
+    onDelete: What a delete of the row at the other end does
+    position: Where the key comes in the list, from 1
+    catalog: Inside a column's fk — the catalog of the table it points at
+    schema: Inside a column's fk — the schema of the table it points at
+    table: Inside a column's fk — the table it points at
+    column: Inside a column's fk — the column it points at
+  index:
+    name: The index name
+    unique: Whether it is a unique index
+    columns: Its columns, in index order
+    position: Where the index comes in the list, from 1
+  stmt:
+    item: Writes a field of the model, with its decorators
+    super: Reaches the table from inside a for loop
+    if: Writes its body when the conditions hold; needs an endif
+    elif: Another branch of the if above it
+    else: What is written when no branch held
+    endif: Ends an if
+    for: Writes its body once per element of a collection
+    endfor: Ends a for
+    date: Today, written the way format says
+    user: The account the generator is running as
+    author: The Author field of the Generate tab
+    inStr: Text written between iterations, never before the first or after the last
+    indent: Spaces added to what inStr writes; may be negative
+    skipList: Element names to skip, separated by commas and matched exactly
+  dec:
+    abbr: Applies the abbreviation rules to the value
+    suffix: Drops everything up to the first underscore, so T_SAMPLE_ALBUM becomes SAMPLE_ALBUM
+    prefix: Drops everything from the last underscore, so SAMPLE_ALBUM_T becomes SAMPLE_ALBUM
+    camel: Camel case, so SAMPLE_ALBUM becomes sampleAlbum
+    pascal: Pascal case, so SAMPLE_ALBUM becomes SampleAlbum
+    snake: Snake case, so SAMPLE_ALBUM becomes sample_album
+    screaming: Screaming snake case, so sampleAlbum becomes SAMPLE_ALBUM
+    skewer: Skewer case, so SAMPLE_ALBUM becomes sample-album
+    kebab: Another name for skewer
+    lower: Lower case
+    upper: Upper case
+    replace: replace('from','to') rewrites every occurrence
+    padSize: Pads the value with spaces up to this width
+    padDir: Which side the padding goes on, left or right; right by default
+    quote: Wraps the value in this text at both ends
+    prepend: Writes this text in front of the value
+    postpend: Writes this text after the value
+  cond:
+    equals: Holds when the value is this, whatever the case
+    notEquals: Holds when the value is anything but this
+    startsWith: Holds when the value starts with this, whatever the case
+    notStartsWith: Holds when the value does not start with this
+    endsWith: Holds when the value ends with this, whatever the case
+    notEndsWith: Holds when the value does not end with this
+    contains: Holds when a collection holds an element of this name, or a comma-separated list holds this value
+    notContains: Holds when neither does
+    matches: Holds when the whole value matches this regular expression; case matters here
+    notMatches: Holds when the whole value does not match it
+  opt:
+    key: The field this statement writes, decorators and all
+    item: Another name for key
+    format: How the date is written, in Java's pattern letters such as yyyy-MM-dd

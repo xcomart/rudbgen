@@ -82,10 +82,10 @@ const MONOSPACE_CANDIDATES: &[&str] = &[];
 /// every frame that draws a line of SQL.
 ///
 /// Nothing calls it yet: the one thing in rudbgen that draws fixed-pitch text
-/// is the template editor, which arrives in M4, and the settings dialog stores
+/// is the template editor, and the settings dialog stores
 /// the family without having to resolve it. Kept — with the two candidate
 /// lists it reads — because the reasoning above is per-platform knowledge that
-/// would have to be rediscovered, and because it is what M4 has to call.
+/// would have to be rediscovered, and because it is what the editor calls.
 #[allow(dead_code)]
 pub fn monospace_family(cx: &App) -> SharedString {
     static RESOLVED: OnceLock<SharedString> = OnceLock::new();

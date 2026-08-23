@@ -9,10 +9,6 @@ common:
   save: 保存
   close: 关闭
 
-# 会话打开后的窗口主体。浏览器、检查器和它们之间的工作区将在下一步加入。
-workarea:
-  next: 模板编辑器将在下一个里程碑加入；旁边的「生成」标签页已经在这里了。
-
 explorer:
   title: 浏览器
   filter_placeholder: 筛选表
@@ -219,6 +215,11 @@ menu:
   quit: 退出
   connection: 连接
   view: 视图
+  template: 模板
+  open_template: 打开模板…
+  save_template: 保存模板
+  toggle_live_preview: 实时预览
+  trigger_completion: 补全建议
   preview: 预览
   dry_run: 试运行
   generate: 生成
@@ -271,6 +272,7 @@ generate:
   template_name: 名称
   out_template: 输出文件名
   tip_edit: 编辑模板
+  tip_open: 双击打开模板
   tip_remove: 从列表中移除
   options: 选项
   output_dir: 输出
@@ -458,3 +460,148 @@ update:
   installing: 正在安装…
   failed: 更新失败。
   open_release: 打开发布页面
+
+template:
+  unsaved: 未保存
+  tip_preview: 显示或隐藏实时预览
+  show_preview: 显示预览
+  hide_preview: 隐藏预览
+  preview_table: 表
+  preview_no_connection: 打开一个连接，就能看到这个模板套在表上的结果。
+  preview_no_table: 在浏览器里勾一张表，就能看到这个模板套上去的结果。
+  preview_parse_error: 模板无法解析，问题都列在下面。
+  read_failed: "打不开 %{file}: %{reason}"
+  write_failed: "写不了 %{file}: %{reason}"
+  not_utf8: "%{file} 不是 UTF-8 文本，无法在这里编辑。"
+  open_select: 打开模板
+  close_title: 尚未保存的改动
+  close_question: "%{file} 里还有没保存的改动。"
+  discard: 不保存
+
+diagnostics:
+  title: 问题 (%{count})
+  at: "%{line}:%{column}"
+
+completion:
+  hint: ↑↓ 选择 · Enter 插入 · Esc 关闭
+  more: 还有 %{count} 条
+
+palette:
+  title: 变量
+  search: 筛选变量
+  no_match: 没有匹配的条目。
+  custom_var: 来自生成标签页变量表的变量。
+  section_table: 表字段
+  section_column: 列字段（在 for 里）
+  section_fk: 外键字段
+  section_index: 索引字段
+  section_statement: 语句
+  section_decorator: 修饰符
+  section_condition: 条件
+  section_custom: 自定义变量
+  table:
+    catalog: 这张表所在的数据库目录
+    schema: 这张表所在的数据库模式
+    name: 表名
+    table: name 的别名
+    title: name 的别名
+    type: TABLE 或 VIEW
+    remarks: 表注释
+    columns: 按数据库给出的顺序排列的全部列
+    keys: 按键序排列的主键列
+    notKeys: 不属于主键的全部列
+    imports: 这张表自己声明的外键
+    exports: 别的表指向这张表的外键
+    indexes: 这张表的索引
+    icon: 表列表在旁边画的图标
+    position: 在读取到的列表里的位次
+  column:
+    catalog: 这一列所在的数据库目录
+    schema: 这一列所在的数据库模式
+    table: 这一列所属的表
+    name: 列名
+    column: name 的别名
+    typeName: 驱动报告的类型名，如 VARCHAR、INT
+    typeString: DDL 写法的类型，带长度，如 VARCHAR(256)
+    isKey: 这一列是否属于主键
+    isCharType: 类型是否属于 CHAR、CLOB、TEXT 一类
+    length: 列的大小：字符型算字符数，数值型算位数
+    precision: 数值列一共有多少位
+    scale: 其中小数点后有多少位
+    nullable: NOT NULL 时为 0，可为空时为 1
+    remarks: 列注释
+    defVal: 默认值
+    dataType: 驱动报告的 java.sql.Types 原始代码
+    jdbcType: 该代码对应的 JDBC 类型名
+    javaType: 该代码映射到的 Java 类型名
+    autoIncrement: 数据库是否自己填这一列
+    keySeq: 在主键里的位次，从 1 起
+    fk: 只有一个外键用到这一列时，它指向的地方
+    position: 在循环里的位次，从 1 起
+  fk:
+    name: 约束名
+    columns: 构成这个键的、本表的列
+    refCatalog: 另一端表的目录
+    refSchema: 另一端表的模式
+    refTable: 另一端的表
+    refColumns: 与本表这边同序排列的另一端的列
+    onUpdate: 另一端的行被改动时的动作
+    onDelete: 另一端的行被删除时的动作
+    position: 在键列表里的位次，从 1 起
+    catalog: 在列的 fk 里 — 它指向的表的目录
+    schema: 在列的 fk 里 — 它指向的表的模式
+    table: 在列的 fk 里 — 它指向的表
+    column: 在列的 fk 里 — 它指向的列
+  index:
+    name: 索引名
+    unique: 是否是唯一索引
+    columns: 按索引顺序排列的列
+    position: 在索引列表里的位次，从 1 起
+  stmt:
+    item: 写出模型的一个字段，连修饰符一起
+    super: 在 for 循环里够到外层的表
+    if: 条件成立时写出主体；要有 endif
+    elif: 上面那个 if 的另一个分支
+    else: 所有分支都不成立时写的东西
+    endif: 结束一个 if
+    for: 集合里每有一个元素就写一遍主体
+    endfor: 结束一个 for
+    date: 按 format 说的样子写出的今天
+    user: 运行生成器的账号
+    author: 生成标签页里的作者一栏
+    inStr: 写在两次循环之间的文字；第一次之前和最后一次之后都不写
+    indent: 给 inStr 写的东西添的缩进空格，可以是负数
+    skipList: 要跳过的元素名，用逗号分开，大小写也要对上
+  dec:
+    abbr: 把缩写规则套到值上
+    suffix: 丢掉第一个下划线之前的部分，T_SAMPLE_ALBUM 变成 SAMPLE_ALBUM
+    prefix: 丢掉最后一个下划线之后的部分，SAMPLE_ALBUM_T 变成 SAMPLE_ALBUM
+    camel: 小驼峰，SAMPLE_ALBUM 变成 sampleAlbum
+    pascal: 大驼峰，SAMPLE_ALBUM 变成 SampleAlbum
+    snake: 蛇形，SAMPLE_ALBUM 变成 sample_album
+    screaming: 大写蛇形，sampleAlbum 变成 SAMPLE_ALBUM
+    skewer: 串形，SAMPLE_ALBUM 变成 sample-album
+    kebab: skewer 的别名
+    lower: 小写
+    upper: 大写
+    replace: replace('from','to') 把出现的地方都换掉
+    padSize: 用空格把值补到这个宽度
+    padDir: 空格补在哪一边，left 或 right，默认 right
+    quote: 用这段文字把值两头包起来
+    prepend: 在值前面写上这段文字
+    postpend: 在值后面写上这段文字
+  cond:
+    equals: 不分大小写，值等于它就成立
+    notEquals: 值不是它就成立
+    startsWith: 不分大小写，值以它开头就成立
+    notStartsWith: 值不以它开头就成立
+    endsWith: 不分大小写，值以它结尾就成立
+    notEndsWith: 值不以它结尾就成立
+    contains: 集合里有叫这个名字的元素，或逗号分隔的列表里有这个值，就成立
+    notContains: 两样都没有就成立
+    matches: 整个值匹配这个正则就成立；这里分大小写
+    notMatches: 整个值匹配不上这个正则就成立
+  opt:
+    key: 这条语句要写的字段，连修饰符一起
+    item: key 的别名
+    format: 日期怎么写，用 Java 的模式字母，如 yyyy-MM-dd

@@ -293,7 +293,10 @@ impl Inspector {
     }
 
     /// The table on screen, once its fetch has come back.
-    #[cfg(test)]
+    ///
+    /// Read by the variable palette as well as by the tests: with nothing
+    /// ticked, the table the cursor last walked onto is the one a live preview
+    /// and the palette's examples are of.
     pub fn table(&self) -> Option<&Table> {
         match &self.load {
             Load::Ready(table) => Some(table),

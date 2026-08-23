@@ -221,6 +221,17 @@ pub enum EditorEvent {
     },
     /// Execute every statement in the buffer.
     RunAll,
+    /// A key the host asked to be given instead of acted on.
+    ///
+    /// Emitted only while [`EditorView::set_intercept`] is on, which is how a
+    /// completion popup drives itself from keys the editor would otherwise
+    /// claim: `Up` and `Down` move the caret, `Enter` breaks the line and
+    /// `Tab` indents, so a popup outside this crate could never see them — a
+    /// key binding is matched on the innermost node of the dispatch path, and
+    /// nothing the host wraps the editor in is inner to the editor's own
+    /// surface. While the flag is on the five keys below are handed over
+    /// untouched; while it is off nothing changes at all.
+    Intercepted(NavKey),
     /// The user right clicked, and wants the editor's menu.
     ///
     /// The editor detects the press, takes the focus and says where it was; the
@@ -237,6 +248,34 @@ pub enum EditorEvent {
         /// menu anchors to.
         position: Point<Pixels>,
     },
+}
+
+/// One of the keys a host may ask for with [`EditorView::set_intercept`].
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum NavKey {
+    /// The up arrow.
+    Up,
+    /// The down arrow.
+    Down,
+    /// Return.
+    Enter,
+    /// Tab.
+    Tab,
+    /// Escape, when the find bar is not the one it belongs to.
+    Escape,
+}
+
+/// What a gutter mark says about the line it sits on.
+///
+/// The verdict comes from outside — this crate has never heard of the template
+/// engine — so the editor only holds the marks and paints them; see
+/// [`EditorView::set_marks`].
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
+pub enum MarkKind {
+    /// Something that parses but looks wrong: an unknown field.
+    Warning,
+    /// Something that does not parse at all.
+    Error,
 }
 
 /// How much a drag selects at a time.
@@ -333,6 +372,10 @@ pub struct EditorView {
     find_replacement: Entity<TextInput>,
     vertical_bar: ScrollbarState,
     horizontal_bar: ScrollbarState,
+    /// Gutter marks, at most one per line, sorted by line.
+    marks: Vec<(usize, MarkKind)>,
+    /// Whether the five keys of [`NavKey`] are handed to the host.
+    intercept: bool,
 }
 
 /// Registers the key bindings every [`EditorView`] relies on.
@@ -448,6 +491,8 @@ impl EditorView {
             find_replacement: cx.new(TextInput::new),
             vertical_bar: ScrollbarState::new(),
             horizontal_bar: ScrollbarState::new(),
+            marks: Vec::new(),
+            intercept: false,
         }
     }
 
@@ -525,6 +570,64 @@ impl EditorView {
     pub fn mark_clean(&mut self, cx: &mut Context<Self>) {
         self.dirty = false;
         cx.notify();
+    }
+
+    // --- gutter marks -------------------------------------------------------
+
+    /// Replaces the gutter marks.
+    ///
+    /// One mark per line at most: a line that is both an error and a warning
+    /// wears the error, because the parse failure is what has to be fixed
+    /// first. Lines past the end of the buffer are kept rather than dropped —
+    /// a diagnostic arrives from a background task, and the buffer it was
+    /// computed against may already have been shortened — and simply never
+    /// drawn.
+    pub fn set_marks(&mut self, marks: Vec<(usize, MarkKind)>, cx: &mut Context<Self>) {
+        let mut marks = marks;
+        marks.sort_by(|left, right| left.0.cmp(&right.0).then(right.1.cmp(&left.1)));
+        marks.dedup_by_key(|(line, _)| *line);
+        self.marks = marks;
+        cx.notify();
+    }
+
+    /// The gutter marks in force, sorted by line.
+    pub fn marks(&self) -> &[(usize, MarkKind)] {
+        &self.marks
+    }
+
+    /// The mark on `line`, if it has one.
+    pub(crate) fn mark_on(&self, line: usize) -> Option<MarkKind> {
+        self.marks
+            .binary_search_by_key(&line, |(at, _)| *at)
+            .ok()
+            .map(|index| self.marks[index].1)
+    }
+
+    // --- key interception ---------------------------------------------------
+
+    /// Hands `Up`, `Down`, `Enter`, `Tab` and `Escape` to the host as
+    /// [`EditorEvent::Intercepted`] instead of acting on them.
+    ///
+    /// For a completion popup, and for nothing else: those five keys are bound
+    /// on the editor's own key context, which is the innermost node of the
+    /// dispatch path while the buffer has the keyboard, so no element the host
+    /// wraps around the editor can take them first.
+    pub fn set_intercept(&mut self, intercept: bool) {
+        self.intercept = intercept;
+    }
+
+    /// Whether the five keys are being handed over.
+    pub const fn intercepts(&self) -> bool {
+        self.intercept
+    }
+
+    /// Emits `key` when the host asked for it, and says so.
+    fn intercepted(&mut self, key: NavKey, cx: &mut Context<Self>) -> bool {
+        if !self.intercept {
+            return false;
+        }
+        cx.emit(EditorEvent::Intercepted(key));
+        true
     }
 
     /// The selected byte range. Empty when there is only a caret.
@@ -854,10 +957,16 @@ impl EditorView {
     }
 
     fn up(&mut self, _: &Up, _: &mut Window, cx: &mut Context<Self>) {
+        if self.intercepted(NavKey::Up, cx) {
+            return;
+        }
         self.move_vertically(-1, false, cx);
     }
 
     fn down(&mut self, _: &Down, _: &mut Window, cx: &mut Context<Self>) {
+        if self.intercepted(NavKey::Down, cx) {
+            return;
+        }
         self.move_vertically(1, false, cx);
     }
 
@@ -1012,6 +1121,9 @@ impl EditorView {
     }
 
     fn newline(&mut self, _: &Newline, _: &mut Window, cx: &mut Context<Self>) {
+        if self.intercepted(NavKey::Enter, cx) {
+            return;
+        }
         // Auto-indent: the new line starts with whatever the current one starts
         // with, so a `select` list stays lined up without anyone pressing
         // space.
@@ -1029,6 +1141,9 @@ impl EditorView {
     }
 
     fn indent(&mut self, _: &Indent, _: &mut Window, cx: &mut Context<Self>) {
+        if self.intercepted(NavKey::Tab, cx) {
+            return;
+        }
         let (first, last) = syntax::line_span(&self.buffer, &self.selected_range);
         if first == last && self.selected_range.is_empty() {
             // A caret on one line: `Tab` is a character, not a command.
@@ -1275,7 +1390,7 @@ impl EditorView {
 
     // --- what a completion popup needs --------------------------------------
     //
-    // The popup itself is the app's (M4, late): it needs the variable palette,
+    // The popup itself is the app's: it needs the variable palette,
     // which needs the model, which this crate has never heard of. What the
     // popup needs *from here* is four questions and two commands, and they are
     // below rather than in the app because every one of them is about byte
@@ -1394,8 +1509,13 @@ impl EditorView {
 
     fn close_find(&mut self, _: &CloseFind, window: &mut Window, cx: &mut Context<Self>) {
         if !self.find.open {
-            // With the find bar already shut there is nothing here for Escape
-            // to do; let it climb to whoever is listening above the editor.
+            // The find bar is what `Escape` belongs to while it is open; with
+            // it shut the key is the host's — a completion popup's first, if it
+            // asked for one, and otherwise whatever is listening above the
+            // editor.
+            if self.intercepted(NavKey::Escape, cx) {
+                return;
+            }
             cx.propagate();
             return;
         }

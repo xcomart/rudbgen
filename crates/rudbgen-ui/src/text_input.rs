@@ -27,7 +27,7 @@
 //!
 //! What it is not: a code editor. There is no undo, no syntax highlighting and
 //! no gutter — the custom-query fields of the driver editor are what the mode
-//! exists for, and `rudbgen-editor` (M4) is what replaces it there once the
+//! exists for, and `rudbgen-editor` is what replaces it there once the
 //! template editor brings a real one.
 
 use std::cell::RefCell;

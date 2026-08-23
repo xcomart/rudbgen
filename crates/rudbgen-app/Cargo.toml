@@ -50,6 +50,14 @@ rudbgen-grid.workspace = true
 # run on a background thread, pumps its `Progress` into the progress dialog and
 # answers its overwrite question from a modal.
 rudbgen-gen.workspace = true
+# The template tab's buffer (M4): `EditorView` with the template highlighter
+# over it, the composite one when the file's extension names a base language,
+# and the same widget read-only for the live preview and the Preview tab.
+rudbgen-editor.workspace = true
+# The engine itself, for the two things the app does with a template that the
+# generation job does not: parsing the buffer for the diagnostics list, and
+# rendering the output-name template for the live preview's header.
+rudbgen-template.workspace = true
 # Local port forwarding through a bastion, for the connection dialog's tunnel
 # block. Set up before the session opens and taken down after it closes; see
 # `src/connection.rs`.

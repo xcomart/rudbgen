@@ -89,14 +89,13 @@ static NEXT_SPLIT_ID: AtomicU64 = AtomicU64::new(1);
 /// that adds a kind of tab adds a variant here and an arm to the renderer, and
 /// touches nothing else.
 ///
-/// Nothing here carries a view yet. rudbman's counterpart holds an
+/// Nothing here carries a view. rudbman's counterpart holds an
 /// [`Entity`](gpui::Entity) per variant, because there every tab was already a
-/// panel; here the three tabs the architecture document names arrive over M3
-/// and M4, and a variant holding a handle to a type that does not exist would
-/// be a placeholder pretending to be a payload. What each variant carries now
-/// is the tab's *identity* — which is what the lookups below match on and what
-/// a reopened tab is recognised by — and the view goes in beside it when it is
-/// written.
+/// panel; here a variant carries the tab's *identity* instead — which is what
+/// the lookups below match on and what a reopened tab is recognised by — and
+/// the shell keeps the views beside the strip. That is what lets a template tab
+/// outlive a reconnection: the strip is rebuilt when the connection changes
+/// and the buffers are not.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum PaneItem {
     /// The Generate tab: template set, template list, options (§4.4).
@@ -188,6 +187,15 @@ impl Pane {
     /// The tab at `index`, if there is one.
     pub fn get(&self, index: usize) -> Option<&PaneItem> {
         self.items.get(index)
+    }
+
+    /// The tab at `index`, to be changed in place.
+    ///
+    /// What the dirty marker travels through: the buffer is the truth and the
+    /// tab is a copy of one flag off it, refreshed whenever the buffer says it
+    /// changed.
+    pub fn get_mut(&mut self, index: usize) -> Option<&mut PaneItem> {
+        self.items.get_mut(index)
     }
 
     /// The scroll handle of this pane's tab strip.

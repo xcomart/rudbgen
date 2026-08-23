@@ -70,7 +70,7 @@ const FIRST_TAB: isize = 100;
 pub enum GeneratePaneEvent {
     /// The profile changed: the status bar has to recount.
     Changed,
-    /// The pencil beside a template row was pressed (M4 opens the tab).
+    /// The pencil beside a template row was pressed; the shell opens the tab.
     EditTemplate(PathBuf),
 }
 
@@ -948,19 +948,40 @@ impl GeneratePane {
             )
             .child(div().w(px(150.)).flex_none().child(row.name.clone()))
             .child(
+                // The file, and the second way into its tab: a double click on
+                // the row opens what the pencil beside it opens. A *single*
+                // click deliberately does nothing — the row is a form, and a
+                // click on a form is how a caret is placed, not how a document
+                // is opened.
                 div()
+                    .id(("generate-file", index))
                     .flex_1()
                     .min_w_0()
                     .truncate()
+                    .cursor_pointer()
                     .text_size(px(11.))
                     .text_color(theme.text_muted)
+                    .tooltip(tooltip_label(ts!("generate.tip_open")))
+                    .on_click({
+                        let open = cx.entity();
+                        let file = row.file.clone();
+                        move |event: &gpui::ClickEvent, _window, cx| {
+                            if event.click_count() < 2 {
+                                return;
+                            }
+                            let file = file.clone();
+                            open.update(cx, |_, cx| {
+                                cx.emit(GeneratePaneEvent::EditTemplate(file));
+                            });
+                        }
+                    })
                     .child(shown.clone()),
             )
             .child(div().w(px(200.)).flex_none().child(row.out.clone()))
             .child(
-                // M4 turns this into the template tab; until then it says so on
-                // hover rather than by silence, the way the welcome screen's two
-                // unfinished buttons do.
+                // The way into the template tab (§4.5). The path the event
+                // carries is the profile's, which the shell resolves against
+                // the configuration directory before opening it.
                 div()
                     .id(("generate-edit", index))
                     .flex()

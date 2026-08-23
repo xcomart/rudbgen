@@ -391,10 +391,11 @@ impl Model for Column {
                 Some(seq) => Value::Int(i64::from(seq)),
                 None => Value::Null,
             },
-            "fk" => match &self.fk {
-                Some(fk) => Value::List(vec![fk as &dyn Model]),
-                None => Value::Null,
-            },
+            // A list of zero or one, never Null: `${for:item=fk}` must be a
+            // loop that runs once or not at all, and a Null is what the loop
+            // renderer refuses ("not a collection"), which would leave a
+            // template no way to guard it.
+            "fk" => Value::List(self.fk.iter().map(|fk| fk as &dyn Model).collect()),
             "no" => Value::Int(self.no as i64),
             // jdbgen's field for the name a template gives the NVL of this
             // column. Never filled in by a metadata reader, in either project.
@@ -697,7 +698,9 @@ mod tests {
         assert_eq!(text("keySeq"), "1");
         assert_eq!(text("no"), "7");
         assert_eq!(text("nvlColName"), "");
-        assert!(column.get("fk").expect("fk").is_null());
+        // No foreign key is an empty list, so `${for:item=fk}` has something
+        // to loop over zero times rather than a Null it cannot loop over.
+        assert!(matches!(column.get("fk"), Some(Value::List(ref list)) if list.is_empty()));
         assert!(column.get("nosuchfield").is_none());
     }
 

@@ -5774,7 +5774,9 @@ dependencies = [
  "raw-window-handle",
  "ring",
  "rudbgen-core",
+ "rudbgen-grid",
  "rudbgen-jdbc",
+ "rudbgen-meta",
  "rudbgen-ssh",
  "rudbgen-ui",
  "rust-i18n",
@@ -5800,6 +5802,18 @@ dependencies = [
  "serde_json",
  "tempfile",
  "uuid",
+]
+
+[[package]]
+name = "rudbgen-gen"
+version = "0.1.0"
+dependencies = [
+ "log",
+ "rudbgen-core",
+ "rudbgen-meta",
+ "rudbgen-template",
+ "tempfile",
+ "thiserror 2.0.20",
 ]
 
 [[package]]

@@ -202,7 +202,7 @@ All through the bridge's `DESCRIBE` (`catalogs`, `schemas`, `tables`, `columns`,
 - `Column { … jdbgen's 18 fields …, precision, scale, auto_increment, fk: Option<ForeignKeyRef> }`.
 - `ForeignKey { name, columns[], ref_table, ref_columns[], on_update, on_delete }`, `Index { name, unique, columns[] }`.
 
-Custom queries (D9) run through `EXECUTE` on the session and are mapped **by label** with the same required-label contract as jdbgen; the table-comment and column-comment queries apply only to names they return (jdbgen's column-comment path overwrote comments it did not return — that is a bug, not a contract, and is not reproduced).
+Custom queries (D9) run through `EXECUTE` on the session, **on the Rust side**, with jdbgen's contract exactly — so a driver definition imported from jdbgen works unedited: the table-list and column-list queries are read **by label** (`TABLE_CAT, TABLE_SCHEM, TABLE_NAME, TABLE_TYPE, REMARKS` / the eleven column labels including `IS_KEY`), the two comment queries are read **positionally** (1 = name, 2 = comment), and the parameters are `${catalog}`, `${schema}` and, for the per-table ones, `${table}`. The comment queries apply only to names they return (jdbgen's column-comment path overwrote comments it did not return — that is a bug, not a contract, and is not reproduced). The bridge's own comment enrichment (`meta/Comments.java`, inherited from rudbman and scoped per schema) is an internal detail of `DESCRIBE` and is not exposed as a user-editable query; a custom comment query, when enabled, replaces its result for the names it returns.
 
 Every catalogue read is one round trip on the session worker; the UI thread never waits.
 

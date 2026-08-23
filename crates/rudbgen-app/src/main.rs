@@ -39,6 +39,11 @@ mod caption;
 mod context_menu;
 mod i18n;
 mod icons;
+// The Maven downloader is complete and tested, but the surface that presses
+// its button — the driver editor of M2's connection dialog — is not written
+// yet, so inside a binary crate it reads as dead code.
+#[allow(dead_code)]
+mod maven;
 // The pane tree is written as a self-contained data structure with its own
 // tests rather than for the call sites the shell currently has, so it offers
 // operations nothing reaches yet — merging a subtree, editing a payload — which

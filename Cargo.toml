@@ -85,6 +85,11 @@ repository = "https://github.com/xcomart/rudbgen"
 [workspace.dependencies]
 # --- shared utilities ---
 anyhow = "1"
+# `anyhow` is for the application's own error paths; `thiserror` is for the
+# library ones that callers match on. `rudbgen-jdbc` needs the second kind: a
+# caller has to be able to tell a SQL error from a driver error from a protocol
+# error without parsing a message.
+thiserror = "2"
 log = "0.4"
 env_logger = "0.11"
 serde = { version = "1", features = ["derive"] }
@@ -93,7 +98,15 @@ uuid = { version = "1", features = ["v4", "serde"] }
 directories = "6"
 keyring = "4"
 unicode-segmentation = "1"
+# Auto-fitting a grid column to its contents needs the *display* width of a
+# string rather than its length in `char`s, so that a column of Korean names
+# is not fitted to half the width it needs.
+unicode-width = "0.2"
 tempfile = "3"
+# Fair, non-poisoning mutexes. `rudbgen-jdbc` keeps a JVM handle and a session
+# registry behind one each, and a panic while a session is being opened must not
+# leave the whole JVM unreachable, which is exactly what `std`'s poisoning does.
+parking_lot = "0.12"
 
 # --- HTTP: the driver downloader and the update check ---
 # Maven Central and the GitHub releases API are the only hosts rudbgen ever
@@ -197,10 +210,16 @@ russh = { version = "0.62", default-features = false, features = [
     "rsa",
 ] }
 
+# --- JNI: the JDBC bridge.  `invocation` is what lets the process create its
+# own JVM rather than be loaded into one. ---
+jni = { version = "0.22", features = ["invocation"] }
+
 # --- internal crates ---
 rudbgen-core = { path = "crates/rudbgen-core" }
 rudbgen-ui = { path = "crates/rudbgen-ui" }
 rudbgen-ssh = { path = "crates/rudbgen-ssh" }
+rudbgen-jdbc = { path = "crates/rudbgen-jdbc" }
+rudbgen-grid = { path = "crates/rudbgen-grid" }
 rudbgen-app = { path = "crates/rudbgen-app" }
 
 [profile.dev]

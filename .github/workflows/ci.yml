@@ -1,25 +1,15 @@
 # Build, lint and test on every platform rudbgen ships on.
 #
-# Inherited from rudbman, whose notes still hold for what is here today — russh
-# is pinned to the `ring` backend so no NASM is needed anywhere, the OS-keychain
-# tests are `#[ignore]`d, and gpui comes from a pinned revision of Zed's
-# monorepo with the four crates patched on top of it under vendor/, so the only
-# network the build needs is crates.io plus that one git fetch.
-#
-# Two things rudbman's workflow has that this one does not have *yet*:
-#
-#   * the JDK/Gradle steps that build `bridge/` and hand the H2 driver to the
-#     JNI tests through an environment variable. `rudbgen-jdbc` and the trimmed
-#     bridge arrive in M2 (architecture document, §10), and until then nothing
-#     in the workspace boots a JVM, so a JDK on the runner would only be a
-#     cache to warm.
-#   * the opt-in `containers` job. It exists there to prove what five real
-#     servers do with the SQL `rudbman-sql` writes; rudbgen writes no SQL to a
-#     server, and the metadata reads it does make arrive with M2. The job comes
-#     back then, against the same `docker/compose.yml` ports.
-#
-# Both are M2 work. Adding them earlier would mean a red matrix on a workspace
-# that has nothing for them to test.
+# Inherited from rudbman, whose notes still hold — russh and ureq are pinned to
+# the `ring` backend so no NASM is needed anywhere, the OS-keychain tests are
+# `#[ignore]`d, and gpui comes from a pinned revision of Zed's monorepo with the
+# four crates patched on top of it under vendor/, so the only network the build
+# needs is crates.io plus that one git fetch — plus a JVM. The bridge JAR is
+# built and tested first, because `rudbgen-jdbc`'s build script refuses to build
+# without the JAR, and its integration tests then boot a real JVM against a real
+# H2. That H2 driver is handed to the tests explicitly through
+# RUDBGEN_TEST_H2_JAR rather than found by globbing the Gradle cache, so the
+# lookup cannot go wrong three different ways on three different runners.
 name: CI
 
 on:
@@ -57,6 +47,41 @@ jobs:
           sudo apt-get install -y --no-install-recommends \
             libxkbcommon-dev libxkbcommon-x11-dev libwayland-dev libfontconfig1-dev
 
+      # 17 is the floor the bridge compiles against (--release 17) and the JVM
+      # the JNI tests boot. Temurin because it exists for all three runners.
+      - name: Install JDK
+        uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: '17'
+          cache: gradle
+          cache-dependency-path: bridge/*.gradle
+
+      # The Java half first: rudbgen-jdbc's build script only checks that the
+      # JAR exists, so it has to exist before anything Rust is compiled, and
+      # running the bridge's own suite here keeps the two halves of the wire
+      # contract tested in the same run that tests the Rust decoder.
+      - name: Build and test the bridge
+        working-directory: bridge
+        # bash on every runner: the Windows one has Git Bash, and this keeps
+        # `./gradlew` meaning the same file on all three.
+        shell: bash
+        run: ./gradlew build --no-daemon
+
+      # Tell the JNI tests where the driver landed instead of letting them
+      # search: Gradle has just downloaded it, and bash (which the Windows
+      # runner also has) can name it in one line.
+      - name: Locate the H2 driver
+        shell: bash
+        run: |
+          jar=$(find ~/.gradle/caches/modules-2/files-2.1/com.h2database -name 'h2-*.jar' | head -1)
+          test -f "$jar"
+          # Git Bash's find answers with a POSIX path (/c/Users/...), which the
+          # native-Windows test binary cannot open; hand it over in the OS's
+          # own spelling.
+          if [ "$RUNNER_OS" = "Windows" ]; then jar=$(cygpath -w "$jar"); fi
+          echo "RUDBGEN_TEST_H2_JAR=$jar" >> "$GITHUB_ENV"
+
       - uses: dtolnay/rust-toolchain@stable
         with:
           components: clippy, rustfmt
@@ -73,3 +98,152 @@ jobs:
 
       - name: test
         run: cargo test --workspace --locked
+
+  # The opt-in container suite, which the matrix above skips: with no
+  # RUDBGEN_TEST_*_URL set, every test in `tests/containers.rs` passes by doing
+  # nothing, so `cargo test --workspace` stays green on a runner with no server.
+  # That is the right default and it also means nobody would ever run them, so
+  # they get a job.
+  #
+  # Linux only, because that is where GitHub's `services:` can run containers at
+  # all — and one runner is enough: what these tests check is what five real
+  # drivers answer to `DESCRIBE`, which is a property of the servers and the
+  # drivers, not of the machine asking. They are also the only tests that can
+  # check it. Every field of the template model — a column's type name and
+  # nullability, a key's order, a foreign key's two ends, an index's uniqueness
+  # (architecture.md §6, D8) — comes out of `DatabaseMetaData`, and H2 has no
+  # opinion about how the other five spell it.
+  #
+  # No apt step: this builds `rudbgen-jdbc` and `rudbgen-core`, neither of which
+  # is gpui, so the native libraries the matrix installs are not needed.
+  # SQLite rides along in the same job without a service of its own: it is a
+  # file rather than a server, so all it needs is a path on the runner, and what
+  # `tests/sqlite.rs` checks — that a product with no comments answers `remarks`
+  # as null rather than failing — is the other end of what the five prove.
+  containers:
+    name: PostgreSQL, MySQL, MariaDB, SQL Server, Oracle and SQLite
+    runs-on: ubuntu-latest
+    # The tests themselves take seconds; the budget is almost all image pull and
+    # first start. The Oracle image is several gigabytes and gvenzl/oracle-free's
+    # own init runs after it, so an hour is what keeps a slow pull from being a
+    # red job.
+    timeout-minutes: 60
+    services:
+      # The ports match docker/compose.yml so one set of URLs works in both
+      # places. On a runner nothing else is listening, but a developer reading
+      # the two files should not have to notice a difference.
+      postgres:
+        image: postgres:17
+        env:
+          POSTGRES_USER: rudbgen
+          POSTGRES_PASSWORD: rudbgen
+          POSTGRES_DB: rudbgen
+        ports: ['55432:5432']
+        options: >-
+          --health-cmd "pg_isready -U rudbgen -d rudbgen"
+          --health-interval 3s --health-timeout 5s --health-retries 20
+      # Every image tag here is pinned, so that a driver habit these tests pin
+      # down is pinned against a known server rather than against whatever
+      # "latest" resolved to on the day.
+      mysql:
+        image: mysql:8.4
+        env:
+          MYSQL_ROOT_PASSWORD: rudbgen
+          MYSQL_DATABASE: rudbgen
+          MYSQL_USER: rudbgen
+          MYSQL_PASSWORD: rudbgen
+        ports: ['33306:3306']
+        options: >-
+          --health-cmd "mysqladmin ping -h 127.0.0.1 -u root -prudbgen --silent"
+          --health-interval 3s --health-timeout 5s --health-retries 30
+      mariadb:
+        image: mariadb:11
+        env:
+          MYSQL_ROOT_PASSWORD: rudbgen
+          MYSQL_DATABASE: rudbgen
+          MYSQL_USER: rudbgen
+          MYSQL_PASSWORD: rudbgen
+        ports: ['53306:3306']
+        options: >-
+          --health-cmd "healthcheck.sh --connect --innodb_initialized"
+          --health-interval 3s --health-timeout 5s --health-retries 30
+      # No `rudbgen` login: the `sa` password complexity rule rules out
+      # `rudbgen`, so this one gets `sa` / `Rudbgen!Passw0rd` instead — see
+      # docker/compose.yml and `credentials()` in containers.rs, which already
+      # default to that pair.
+      mssql:
+        image: mcr.microsoft.com/mssql/server:2022-latest
+        env:
+          ACCEPT_EULA: "Y"
+          MSSQL_SA_PASSWORD: "Rudbgen!Passw0rd"
+        ports: ['51433:1433']
+        options: >-
+          --health-cmd "/opt/mssql-tools18/bin/sqlcmd -C -S localhost -U sa -P \"Rudbgen!Passw0rd\" -Q \"SELECT 1\" -b"
+          --health-interval 3s --health-timeout 10s --health-retries 40
+      # gvenzl/oracle-free is several gigabytes and slow to first-start even
+      # once pulled, so it gets the longest interval and the most retries of
+      # the five.
+      oracle:
+        image: gvenzl/oracle-free:23-slim-faststart
+        env:
+          ORACLE_PASSWORD: rudbgen
+          APP_USER: rudbgen
+          APP_USER_PASSWORD: rudbgen
+        ports: ['51521:1521']
+        options: >-
+          --health-cmd "healthcheck.sh"
+          --health-interval 5s --health-timeout 10s --health-retries 60
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Install JDK
+        uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: '17'
+          cache: gradle
+          cache-dependency-path: bridge/*.gradle
+
+      # `jar`, not `build`: the matrix above already runs the Java suite, and
+      # rudbgen-jdbc's build script only needs the JAR to exist. `drivers` is
+      # the task that pulls all six JDBC drivers into the Gradle cache.
+      - name: Build the bridge JAR and fetch the drivers
+        working-directory: bridge
+        shell: bash
+        run: ./gradlew jar drivers --no-daemon
+
+      # Handed over explicitly rather than searched for, for the reason the H2
+      # lookup above is: Gradle has just downloaded them and one line can name
+      # them, where a glob has more ways to be wrong than to be right.
+      - name: Locate the JDBC drivers
+        shell: bash
+        run: |
+          for spec in "PG:org.postgresql:postgresql" "MYSQL:com.mysql:mysql-connector-j" \
+                      "MARIADB:org.mariadb.jdbc:mariadb-java-client" \
+                      "ORACLE:com.oracle.database.jdbc:ojdbc11" \
+                      "MSSQL:com.microsoft.sqlserver:mssql-jdbc" \
+                      "SQLITE:org.xerial:sqlite-jdbc"; do
+            var=${spec%%:*}; rest=${spec#*:}; group=${rest%%:*}; artifact=${rest#*:}
+            jar=$(find ~/.gradle/caches/modules-2/files-2.1/"$group"/"$artifact" \
+                    -name "$artifact-*.jar" ! -name '*-sources.jar' | head -1)
+            test -f "$jar"
+            echo "RUDBGEN_TEST_${var}_JAR=$jar" >> "$GITHUB_ENV"
+          done
+
+      - uses: dtolnay/rust-toolchain@stable
+
+      - uses: Swatinem/rust-cache@v2
+
+      - name: test
+        env:
+          RUDBGEN_TEST_PG_URL: jdbc:postgresql://127.0.0.1:55432/rudbgen
+          RUDBGEN_TEST_MYSQL_URL: jdbc:mysql://127.0.0.1:33306/rudbgen?allowPublicKeyRetrieval=true&useSSL=false
+          RUDBGEN_TEST_MARIADB_URL: jdbc:mariadb://127.0.0.1:53306/rudbgen
+          RUDBGEN_TEST_MSSQL_URL: jdbc:sqlserver://127.0.0.1:51433;encrypt=false
+          RUDBGEN_TEST_ORACLE_URL: jdbc:oracle:thin:@//127.0.0.1:51521/FREEPDB1
+          # A path rather than a port: the driver makes the file on connect, and
+          # the runner's temp directory goes away with the runner.
+          RUDBGEN_TEST_SQLITE_URL: jdbc:sqlite:${{ runner.temp }}/rudbgen-sqlite-test.db
+        # `--nocapture` so the skip lines are visible: a run where a URL went
+        # missing would otherwise be a green job that tested nothing.
+        run: cargo test -p rudbgen-jdbc --test containers --test sqlite --locked -- --nocapture

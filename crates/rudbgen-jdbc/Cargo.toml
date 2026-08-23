@@ -1,0 +1,28 @@
+[package]
+name = "rudbgen-jdbc"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+authors.workspace = true
+repository.workspace = true
+
+[dependencies]
+# The only rudbgen crate this one knows, and it is read-only: the JVM heap and
+# the extra JVM arguments come from `AppSettings`. In particular this crate does
+# *not* know `gpui` — it exposes a plain synchronous API and leaves the binding
+# to the UI thread to `rudbgen-app` (architecture.md §3).
+rudbgen-core.workspace = true
+
+anyhow.workspace = true
+jni.workspace = true
+log.workspace = true
+parking_lot.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+thiserror.workspace = true
+
+[dev-dependencies]
+# The container tests write nothing and the extraction tests are gone with the
+# job layer, so the only dev dependency left is the one the H2 suite uses to
+# read a raw response envelope that has no typed accessor.
+serde_json.workspace = true

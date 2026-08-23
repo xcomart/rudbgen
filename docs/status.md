@@ -14,7 +14,7 @@ Last updated: 2026-08-23 (M0, the workspace foundation and the app shell).
 |---|---|---|
 | M0 | done | The workspace foundation and the application shell, described below. The window opens on the welcome screen; the settings dialog, the theme editor, the about box and the update check all work end to end |
 | M1 | not started | `rudbgen-template`: the ported jdbgen tests, the engine, diagnostics, byte-identical fixtures |
-| M2 | not started | The trimmed bridge (D3) + `rudbgen-jdbc`, the merged stock driver store, Maven download, the connection dialog with Test, SSH wired up, the explorer tree, the inspector |
+| M2 | in progress | The trimmed bridge (D3) + `rudbgen-jdbc`, the merged stock driver store, Maven download, the connection dialog with Test, SSH wired up, the explorer tree, the inspector. In the tree so far: `DriverDef` carries jdbgen's four custom queries (D9), its driver-wide properties and `noAuth`, and `builtins()` is the merge of rudbman's seven products with jdbgen's ten — H2 split into the embedded and the server form, MongoDB and CUBRID added, every Maven coordinate checked against Central; `rudbgen-grid` copied from rudbman whole; `maven.rs` copied into `rudbgen-app` and declared, waiting for the driver editor to press it; **`bridge/` and `crates/rudbgen-jdbc/` copied and trimmed per D3** — see below |
 | M3 | not started | The Generate tab, template sets, the generation job (cancel, policy, summary), the status bar, preview and dry run |
 | M4 | not started | Template tabs: the editor with its highlighter, the variable palette, live preview, diagnostics |
 | M5 | not started | Custom queries with Test, the abbreviation rules dialog with D10 semantics, the jdbgen import wizard |
@@ -30,8 +30,11 @@ Last updated: 2026-08-23 (M0, the workspace foundation and the app shell).
 | `crates/rudbgen-core` | rudbman's core with the fields rudbgen does not have removed and the ones it needs added — see the next table |
 | `crates/rudbgen-ssh` | rudbman's tunnel crate, whole: russh, a bastion without a PTY, loopback binds, the trusted-host-key check against `known_hosts`. Tunnels are already wired into the connection dialog rudbgen inherits, so removing them would cost more than keeping them (§2.1) |
 | `crates/rudbgen-app` | The binary, `rudbgen`. rudbman's bootstrap sequence, `actions!`, `bind_shortcuts`, menus and window-chrome helpers; its `app_settings`, `caption`, `icons`, `about_dialog`, `theme_editor`, `settings_dialog`, `update` and `update_dialog` with the names, URLs and settings that changed; `i18n.rs` and eight locale files trimmed to rudbgen's keys; a `Workspace` written from scratch around §4.2's sketch. See the third table below for what diverged |
+| `bridge/` | rudbman's JDBC bridge, package `comart.rudbgen.bridge`, artefact `rudbgen-bridge.jar`, **trimmed per D3** — see the table below for what went. 58 JUnit tests against in-memory H2; `cd bridge && ./gradlew build` runs them |
+| `crates/rudbgen-jdbc` | rudbman's JNI crate against that JAR: `jvm`, `session`, `protocol`, `codec`, `error`, `response`, `spec`, minus the data plane (D3). Env names are `RUDBGEN_JAVA_HOME`, `RUDBGEN_BRIDGE_JAR`, `RUDBGEN_TEST_H2_JAR`. 46 unit tests, 22 H2 integration tests that boot a real JVM, and two opt-in suites (five servers, SQLite) |
+| `docker/compose.yml` | The five servers the opt-in `containers` suite runs against, on non-standard ports so a developer's own server is never shadowed. `rudbgen`/`rudbgen` everywhere but SQL Server, whose `sa` complexity rule forces `sa`/`Rudbgen!Passw0rd` |
 | `assets/` | `icon.svg` — the master mark, a sheet of generated source with `</>` on it, rudbman's two colours swapped — with `icon-128.png`, `icon-256.png`, `icon.ico` and `icon.icns` rendered from it by `render.py`. `assets/drivers/` holds jdbgen's eleven driver icons, unused until M2 |
-| `.github/workflows/ci.yml` | rudbman's `check` job — three platforms, `cargo fmt --check` once, `clippy --workspace --all-targets --locked -- -D warnings`, `cargo test --workspace --locked`. The Gradle/JDK steps and the opt-in `containers` job are **deliberately absent until M2**; the file says why |
+| `.github/workflows/ci.yml` | rudbman's `check` job — three platforms, `cargo fmt --check` once, `clippy --workspace --all-targets --locked -- -D warnings`, `cargo test --workspace --locked` — now with the JDK/Gradle steps in front of it (`cd bridge && ./gradlew build`, then the H2 JAR handed to the Rust tests through `RUDBGEN_TEST_H2_JAR`), plus the opt-in `containers` job: five servers from `docker/compose.yml`'s ports, SQLite riding along, all of them reading metadata only |
 
 ### How `rudbgen-core` differs from `rudbman-core`
 
@@ -126,6 +129,41 @@ write-atomic (`paths::write_atomic`).
   tests are unchanged apart from the `PROBES` list, which now names one key per
   surviving namespace.
 
+### What the bridge and `rudbgen-jdbc` dropped (D3)
+
+The two are rudbman's, copied and cut down. rudbgen reads a schema and writes
+files from it; it never ferries row data, so the whole data plane went. What is
+left is byte-for-byte rudbman's apart from the package name, so a fix moves
+between the two as a plain `diff`.
+
+| Gone | Java | Rust |
+|---|---|---|
+| The job layer — extract, backup, transfer | `job/` (7 classes), `meta/Upsert` | `Op::{JobStart, JobPoll, JobCancel}`, `Job`, `Session::start_job`/`start_transfer`/`start_backup`, `ExtractSpec`/`TransferSpec`/`BackupSpec` and their option types, `JobProgress`, `JobState` |
+| The LOB reference path | `codec/LobSink`, `ColumnWriters.LobWriter`, `Cursor.LobRef` | `Op::LobRead`, `ColumnKind::Lob`, `Value::Lob` |
+| The four vendor-catalogue `DESCRIBE` kinds — `ddl`, `procedures`, `functions`, `sequences` | `meta/Ddl`, `meta/Routines`, `meta/Sequences` | `Session::describe_ddl`, `DdlSource`, `DdlResult` |
+| The template engine (it is `rudbgen-template`, D4) | `template/` | — |
+
+Two consequences worth knowing:
+
+- **Retired operation codes are never reused.** `0x25` and `0x40`–`0x42` stay
+  spent on both sides of the boundary, and so does batch kind `6`. Both tables
+  carry a comment saying so, and `protocol.rs`'s own test asserts that no `Op`
+  variant claims one. The point is that rudbman's op table and rudbgen's keep
+  lining up line for line.
+- **LOBs are now materialised** — `BLOB` as `BIN`, `CLOB`/`NCLOB` as `STR` —
+  because there is no `LOB_READ` left to resolve a reference with. That is safe
+  only because the sole statements rudbgen executes are the four custom
+  catalogue queries (D9), whose values are names and comments, and Oracle hands
+  a comment back as a `CLOB`. It is written down in `bridge/README.md`'s *Known
+  gaps*: a custom query pointed at a document table would carry the document
+  across JNI.
+
+`DESCRIBE` keeps `catalogs`, `schemas`, `tables`, `columns`, `primary_keys`,
+`imported_keys`, `exported_keys`, `indexes` and `type_info` — §6's list, which
+is everything the template model is built from — and `meta/Comments` stays,
+because a driver that reports no comment where the server holds one is the
+normal case rather than the exception.
+
 ## How work is done here
 
 - Repository: <https://github.com/xcomart/rudbgen> (MIT, same author as
@@ -154,9 +192,26 @@ links against have to be present — on Debian/Ubuntu that is
 `libxkbcommon-dev libxkbcommon-x11-dev libwayland-dev libfontconfig1-dev`;
 CI installs exactly those.
 
-No JDK is needed yet. It becomes a requirement in M2, when the bridge and
-`rudbgen-jdbc` arrive: `rudbgen-jdbc`'s build script will refuse to compile
-without the bridge JAR, so Gradle runs before cargo from then on.
+A JDK 17 or newer is required from M2 on. `rudbgen-jdbc`'s build script
+refuses to compile without the bridge JAR — it deliberately does **not** invoke
+Gradle itself, because a JVM start-up per Rust edit is not a trade worth
+making — so the Java half is built first:
+
+```sh
+cd bridge && ./gradlew build     # compile + test -> build/libs/rudbgen-bridge.jar
+```
+
+The H2 driver the JNI tests boot against is found in the Gradle cache that
+build fills, or named explicitly with `RUDBGEN_TEST_H2_JAR`. The container and
+SQLite suites are opt-in and pass by doing nothing with their
+`RUDBGEN_TEST_*_URL` unset:
+
+```sh
+docker compose -f docker/compose.yml up -d      # then wait for "healthy"
+cd bridge && ./gradlew drivers                  # the six JDBC drivers
+# then export the URLs listed in docker/compose.yml's header
+cargo test -p rudbgen-jdbc --test containers --test sqlite -- --nocapture
+```
 
 Tests that touch the real OS keychain are `#[ignore]`d, so a headless machine
 runs the suite green. Run them by hand with:

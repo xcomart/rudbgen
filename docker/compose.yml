@@ -1,0 +1,126 @@
+# The five servers the opt-in container tests run against.
+#
+# `crates/rudbgen-jdbc/tests/containers.rs` reads the catalogue of a real
+# PostgreSQL, MySQL, MariaDB, SQL Server and Oracle through the bridge's
+# DESCRIBE, which is the one thing about this layer that H2 cannot answer: a
+# driver's metadata habits are per product. Nothing in the workspace needs these
+# to be up:
+# with the environment variables below unset every one of those tests passes
+# by doing nothing, which is what keeps `cargo test --workspace` green on a
+# machine with no Docker.
+#
+#     docker compose -f docker/compose.yml up -d
+#     docker compose -f docker/compose.yml ps          # wait for "healthy"
+#     docker compose -f docker/compose.yml down
+#
+# Then, from the repository root:
+#
+#     export RUDBGEN_TEST_PG_URL='jdbc:postgresql://127.0.0.1:55432/rudbgen'
+#     export RUDBGEN_TEST_MYSQL_URL='jdbc:mysql://127.0.0.1:33306/rudbgen?allowPublicKeyRetrieval=true&useSSL=false'
+#     export RUDBGEN_TEST_MARIADB_URL='jdbc:mariadb://127.0.0.1:53306/rudbgen'
+#     export RUDBGEN_TEST_MSSQL_URL='jdbc:sqlserver://127.0.0.1:51433;encrypt=false'
+#     export RUDBGEN_TEST_ORACLE_URL='jdbc:oracle:thin:@//127.0.0.1:51521/FREEPDB1'
+#     cargo test -p rudbgen-jdbc --test containers
+#
+# The user and the password default to `rudbgen`/`rudbgen`, matching this
+# file, for every service except SQL Server; RUDBGEN_TEST_PG_USER,
+# RUDBGEN_TEST_PG_PASSWORD, RUDBGEN_TEST_MYSQL_USER,
+# RUDBGEN_TEST_MYSQL_PASSWORD, and their MARIADB/ORACLE counterparts override
+# them. SQL Server has no `rudbgen` login of its own: the `sa` password
+# complexity requirement rules out `rudbgen`, so its account is
+# `sa` / `Rudbgen!Passw0rd`, and its image does not create a `rudbgen`
+# database — a test that needs one creates it, or connects to `master`.
+#
+# The ports are deliberately not the standard ones (5432, 3306, 1433, 1521,
+# ...). A developer with a server of their own running would otherwise find
+# these shadowing it — or, worse, find the tests creating and dropping tables
+# in it.
+#
+# The image tags are pinned, so that a metadata habit these tests pin down is
+# pinned against a known server rather than against whatever "latest" resolved
+# to on the day.
+
+services:
+  postgres:
+    image: postgres:17
+    container_name: rudbgen-test-postgres
+    environment:
+      POSTGRES_USER: rudbgen
+      POSTGRES_PASSWORD: rudbgen
+      POSTGRES_DB: rudbgen
+    ports:
+      - "127.0.0.1:55432:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U rudbgen -d rudbgen"]
+      interval: 3s
+      timeout: 5s
+      retries: 20
+
+  mysql:
+    image: mysql:8.4
+    container_name: rudbgen-test-mysql
+    environment:
+      MYSQL_ROOT_PASSWORD: rudbgen
+      MYSQL_DATABASE: rudbgen
+      MYSQL_USER: rudbgen
+      MYSQL_PASSWORD: rudbgen
+    ports:
+      - "127.0.0.1:33306:3306"
+    healthcheck:
+      test:
+        [
+          "CMD-SHELL",
+          "mysqladmin ping -h 127.0.0.1 -u root -p\"$$MYSQL_ROOT_PASSWORD\" --silent",
+        ]
+      interval: 3s
+      timeout: 5s
+      retries: 30
+
+  mariadb:
+    image: mariadb:11
+    container_name: rudbgen-test-mariadb
+    environment:
+      MYSQL_ROOT_PASSWORD: rudbgen
+      MYSQL_DATABASE: rudbgen
+      MYSQL_USER: rudbgen
+      MYSQL_PASSWORD: rudbgen
+    ports:
+      - "127.0.0.1:53306:3306"
+    healthcheck:
+      test: ["CMD", "healthcheck.sh", "--connect", "--innodb_initialized"]
+      interval: 3s
+      timeout: 5s
+      retries: 30
+
+  mssql:
+    image: mcr.microsoft.com/mssql/server:2022-latest
+    container_name: rudbgen-test-mssql
+    environment:
+      ACCEPT_EULA: "Y"
+      MSSQL_SA_PASSWORD: "Rudbgen!Passw0rd"
+    ports:
+      - "127.0.0.1:51433:1433"
+    healthcheck:
+      test:
+        [
+          "CMD-SHELL",
+          "/opt/mssql-tools18/bin/sqlcmd -C -S localhost -U sa -P \"Rudbgen!Passw0rd\" -Q \"SELECT 1\" -b",
+        ]
+      interval: 3s
+      timeout: 10s
+      retries: 40
+
+  oracle:
+    image: gvenzl/oracle-free:23-slim-faststart
+    container_name: rudbgen-test-oracle
+    environment:
+      ORACLE_PASSWORD: rudbgen
+      APP_USER: rudbgen
+      APP_USER_PASSWORD: rudbgen
+    ports:
+      - "127.0.0.1:51521:1521"
+    healthcheck:
+      test: ["CMD", "healthcheck.sh"]
+      interval: 5s
+      timeout: 10s
+      retries: 60

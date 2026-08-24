@@ -820,6 +820,10 @@ impl Workspace {
                     workspace
                         .inspector
                         .update(cx, |panel, cx| panel.show(table, cx));
+                    // A cache hit draws without asking anybody, so no Load
+                    // event follows to refresh the palette on the way back —
+                    // refresh it here, for the table now in hand.
+                    workspace.refresh_palette(cx);
                     cx.notify();
                 }
             }

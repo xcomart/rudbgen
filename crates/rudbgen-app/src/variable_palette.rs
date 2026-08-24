@@ -259,7 +259,6 @@ impl Render for VariablePalette {
         div()
             .key_context("VariablePalette")
             .track_focus(&self.focus_handle)
-            .relative()
             .flex()
             .flex_col()
             .size_full()
@@ -285,19 +284,32 @@ impl Render for VariablePalette {
                     .child(self.search.clone()),
             )
             .child(
+                // The bar hangs off this wrapper rather than the panel root:
+                // the thumb is measured against the scrolling box, so the box
+                // the strip spans has to be that one — hung off the root it
+                // would ride over the title and the filter above, and stop
+                // short of the bottom by their height.
                 div()
-                    .id(PANEL_SCROLL)
-                    .track_scroll(&self.scroll)
+                    .relative()
                     .flex()
                     .flex_col()
                     .flex_grow_1()
                     .min_h_0()
-                    .pb(px(8.))
-                    .overflow_y_scroll()
-                    .restrict_scroll_to_axis()
-                    .children(groups)
-                    .children(empty),
+                    .child(
+                        div()
+                            .id(PANEL_SCROLL)
+                            .track_scroll(&self.scroll)
+                            .flex()
+                            .flex_col()
+                            .flex_grow_1()
+                            .min_h_0()
+                            .pb(px(8.))
+                            .overflow_y_scroll()
+                            .restrict_scroll_to_axis()
+                            .children(groups)
+                            .children(empty),
+                    )
+                    .children(bar.render(&theme)),
             )
-            .children(bar.render(&theme))
     }
 }

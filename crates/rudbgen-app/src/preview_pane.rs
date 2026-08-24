@@ -471,7 +471,28 @@ impl Render for PreviewPane {
 
         let header = match self.kind {
             PreviewKind::Single => Some(self.render_header(cx).into_any_element()),
-            PreviewKind::DryRun => Some(self.render_file_list(cx).into_any_element()),
+            PreviewKind::DryRun => {
+                let bar = self
+                    .bar()
+                    .on_hover(cx.listener(|pane, hovered: &bool, _window, cx| {
+                        pane.hover_scrollbar(*hovered, cx);
+                    }));
+                Some(
+                    // The bar hangs off this wrapper rather than the pane root:
+                    // the thumb is measured against the scrolling box, which is
+                    // the file list alone — hung off the root it would ride over
+                    // the diagnostics and the text below it and never reach the
+                    // list's own bottom.
+                    div()
+                        .relative()
+                        .flex()
+                        .flex_col()
+                        .flex_none()
+                        .child(self.render_file_list(cx))
+                        .children(bar.render(&theme))
+                        .into_any_element(),
+                )
+            }
         };
 
         let diagnostics = (!self.diagnostics.is_empty()).then(|| {
@@ -541,16 +562,9 @@ impl Render for PreviewPane {
                 .into_any_element(),
         };
 
-        let bar = self
-            .bar()
-            .on_hover(cx.listener(|pane, hovered: &bool, _window, cx| {
-                pane.hover_scrollbar(*hovered, cx);
-            }));
-
         div()
             .key_context("PreviewPane")
             .track_focus(&self.focus_handle)
-            .relative()
             .flex()
             .flex_col()
             .flex_grow_1()
@@ -560,6 +574,5 @@ impl Render for PreviewPane {
             .children(header)
             .children(diagnostics)
             .child(body)
-            .children(bar.render(&theme))
     }
 }

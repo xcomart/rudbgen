@@ -1176,7 +1176,9 @@ fn an_intercepted_key_is_handed_over_instead_of_acted_on(cx: &mut TestAppContext
     );
 
     // The find bar still owns Escape while it is open, popup or no popup.
-    cx.simulate_keystrokes("ctrl-f");
+    // Both chords, as every shortcut in this file sends them: each platform
+    // acts on the one it binds and lets the other fall through.
+    cx.simulate_keystrokes("cmd-f ctrl-f");
     cx.run_until_parked();
     editor.drain_events();
     cx.simulate_keystrokes("escape");

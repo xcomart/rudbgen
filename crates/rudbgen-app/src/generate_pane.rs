@@ -1401,7 +1401,13 @@ mod tests {
 
     #[test]
     fn an_absolute_template_path_is_left_alone() {
-        let absolute = PathBuf::from("/opt/templates/mine.java");
+        // A drive letter on Windows, where `/opt/templates/mine.java` is a
+        // *relative* path and would be resolved against the config directory.
+        let absolute = if cfg!(windows) {
+            PathBuf::from(r"C:\opt\templates\mine.java")
+        } else {
+            PathBuf::from("/opt/templates/mine.java")
+        };
         assert_eq!(resolve_template(&absolute), absolute);
         assert_eq!(store_template_path(&absolute), absolute);
     }

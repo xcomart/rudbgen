@@ -288,10 +288,11 @@ Two things a first tag will want that no milestone owns:
   band for the drop shadow all round. Every one of them is now cropped to the
   window's own frame — the fully opaque part of an RGBA capture, which is
   exactly the window — and a new capture has to be cropped the same way, or a
-  strip of whatever was behind the window composites into the edge. `welcome.png`
-  was re-taken with M5: the *Import from jdbgen…* button it used to show greyed
-  is live now, and it appears only when there is a configuration to import from.
-  `driver-custom-queries.png` was re-taken and cropped the same way once the
-  custom-query fields became `rudbgen-editor` `EditorView`s with SQL
-  highlighting instead of plain `TextInput` fields; `connection-dialog.png` is
-  still the old uncropped capture and is owed the same pass.
+  strip of whatever was behind the window composites into the edge. All twelve
+  were re-taken together after M5 — in the **English** interface, where earlier
+  captures were of the Korean one — and every one now carries that crop,
+  `connection-dialog.png` included, which used to owe it. `import.png` is staged
+  from `crates/rudbgen-import/tests/vectors/config.json` (the synthetic fixture)
+  rather than from a real jdbgen configuration, so its checklist has something
+  worth showing; the master password it unlocks with is the one in
+  `import_dialog.rs`'s tests.

@@ -81,12 +81,10 @@ const MONOSPACE_CANDIDATES: &[&str] = &[];
 /// a trade we make knowingly — the alternative is paying for the enumeration on
 /// every frame that draws a line of SQL.
 ///
-/// Nothing calls it yet: the one thing in rudbgen that draws fixed-pitch text
-/// is the template editor, and the settings dialog stores
-/// the family without having to resolve it. Kept — with the two candidate
-/// lists it reads — because the reasoning above is per-platform knowledge that
-/// would have to be rediscovered, and because it is what the editor calls.
-#[allow(dead_code)]
+/// Called as the fallback of [`editor_font`], for the case a user has not
+/// named a family of their own: everywhere in rudbgen that draws fixed-pitch
+/// text goes through `editor_font`, and this is what it reaches for when
+/// [`AppSettings::editor_font_family`] is `None`.
 pub fn monospace_family(cx: &App) -> SharedString {
     static RESOLVED: OnceLock<SharedString> = OnceLock::new();
     RESOLVED
@@ -95,6 +93,21 @@ pub fn monospace_family(cx: &App) -> SharedString {
                 .map_or_else(|| SharedString::new_static(GENERIC_MONOSPACE), Into::into)
         })
         .clone()
+}
+
+/// The font family every piece of code text in rudbgen should render with.
+///
+/// The user's configured family — [`effective`], not [`current`], so a face
+/// being previewed in the settings dialog shows up before it is saved — or,
+/// absent one, the per-OS monospace default from [`monospace_family`].
+/// Rendering code should call this rather than `monospace_family` directly:
+/// `monospace_family` only ever answers the fallback, never the user's
+/// choice.
+pub fn editor_font(cx: &App) -> SharedString {
+    effective(cx)
+        .editor_font_family
+        .map(SharedString::from)
+        .unwrap_or_else(|| monospace_family(cx))
 }
 
 /// The first of `candidates` that `installed` offers, spelled as `installed`
@@ -525,6 +538,28 @@ mod tests {
     fn the_test_platform_falls_back_to_the_generic_alias(cx: &mut gpui::TestAppContext) {
         cx.update(|cx| {
             assert_eq!(monospace_family(cx), GENERIC_MONOSPACE);
+        });
+    }
+
+    /// `editor_font` is the one rendering code is meant to call: a configured
+    /// family wins, and its absence falls through to the same OS default
+    /// `monospace_family` answers.
+    #[gpui::test]
+    fn editor_font_prefers_the_configured_family_and_falls_back_to_monospace(
+        cx: &mut gpui::TestAppContext,
+    ) {
+        cx.update(|cx| {
+            cx.set_global(CurrentSettings(AppSettings {
+                editor_font_family: Some("Custom Face".to_string()),
+                ..AppSettings::default()
+            }));
+            assert_eq!(editor_font(cx), "Custom Face");
+
+            cx.set_global(CurrentSettings(AppSettings {
+                editor_font_family: None,
+                ..AppSettings::default()
+            }));
+            assert_eq!(editor_font(cx), monospace_family(cx));
         });
     }
 

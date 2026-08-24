@@ -942,6 +942,8 @@ impl TemplatePane {
         let select = cx.entity();
         let toggle = cx.entity();
         let chosen = self.choices.get(self.choice).cloned();
+        let mono = app_settings::editor_font(cx);
+        let font_size = app_settings::effective(cx).editor_font_size;
 
         div()
             .flex()
@@ -1010,6 +1012,12 @@ impl TemplatePane {
                     .flex()
                     .flex_grow_1()
                     .min_h_0()
+                    // The same face and size the editor half draws with: the
+                    // two sit side by side showing source and result, and a
+                    // preview in the interface font would read as chrome
+                    // rather than as the file the run will write.
+                    .font_family(mono)
+                    .text_size(px(font_size))
                     .child(self.preview.clone())
                     .into_any_element(),
             })
@@ -1098,7 +1106,7 @@ impl TemplatePane {
         let open = self.completion.as_ref()?;
         let anchor = open.anchor?;
         let theme = theme(cx);
-        let mono = app_settings::monospace_family(cx);
+        let mono = app_settings::editor_font(cx);
         let selected = open.selected;
         // A window of the list around the highlighted row, so that walking
         // past the bottom of the popup keeps the choice on screen without the
@@ -1214,7 +1222,7 @@ impl Render for TemplatePane {
             self.focus_editor(window, cx);
         }
         let theme = theme(cx);
-        let mono = app_settings::monospace_family(cx);
+        let mono = app_settings::editor_font(cx);
         let font_size = app_settings::effective(cx).editor_font_size;
 
         if let Some(failure) = &self.failure {

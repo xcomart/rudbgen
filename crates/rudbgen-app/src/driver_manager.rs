@@ -1737,7 +1737,7 @@ impl DriverManager {
             .is_empty()
             .then(|| hint(query_placeholder(kind), cx));
 
-        let mono = app_settings::monospace_family(cx);
+        let mono = app_settings::editor_font(cx);
         let font_size = app_settings::effective(cx).editor_font_size;
         let editor = div()
             .flex()

@@ -466,7 +466,7 @@ impl Render for PreviewPane {
     fn render(&mut self, _window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
         let theme = theme(cx);
         self.watch_scroll(cx);
-        let mono = app_settings::monospace_family(cx);
+        let mono = app_settings::editor_font(cx);
         let font_size = app_settings::effective(cx).editor_font_size;
 
         let header = match self.kind {

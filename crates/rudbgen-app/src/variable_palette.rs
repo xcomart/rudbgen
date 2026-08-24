@@ -173,7 +173,7 @@ impl Render for VariablePalette {
     fn render(&mut self, _window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
         let theme = theme(cx);
         self.watch_scroll(cx);
-        let mono = app_settings::monospace_family(cx);
+        let mono = app_settings::editor_font(cx);
         let query = self.query(cx);
 
         let mut groups = Vec::new();

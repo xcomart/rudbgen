@@ -510,6 +510,17 @@ impl TemplatePane {
         self.choice
     }
 
+    /// Picks the table the preview renders against, as the header does.
+    ///
+    /// For the tests: the dropdown in [`TemplatePane::render`] is the only
+    /// other way in, and it is a click on an element.
+    #[cfg(test)]
+    pub fn choose(&mut self, index: usize, cx: &mut Context<Self>) {
+        self.choice = index;
+        self.request_render(cx);
+        cx.notify();
+    }
+
     /// Replaces the entries the completion popup filters.
     pub fn set_items(&mut self, items: Vec<PaletteItem>, cx: &mut Context<Self>) {
         self.items = items;

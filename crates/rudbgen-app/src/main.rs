@@ -1932,6 +1932,10 @@ impl Workspace {
         };
 
         if let Some(table) = self.inspector.read(cx).cached(&key) {
+            // The palette's examples come from the same table, and it is the
+            // table that has changed here — whether it was read for this
+            // preview or was already in hand makes no difference to the rows.
+            self.refresh_palette(cx);
             self.render_template_with(index, source, (*table).clone(), cx);
             return;
         }
@@ -5599,6 +5603,193 @@ mod tests {
         window
             .update(cx, |workspace, _window, _cx| workspace.close_session())
             .expect("the window is open");
+    }
+
+    /// The palette's examples follow the preview's table even when that table
+    /// came out of the inspector's cache.
+    ///
+    /// A table the user has already looked at is described once and kept, so a
+    /// preview of it is rendered from the cache and never reads anything. The
+    /// palette takes its examples from the very same table, and rebuilding it
+    /// only on the path that reads afresh left the examples on whichever table
+    /// happened to be in hand before — the rows would sit there with no `→`
+    /// beside them, or with the wrong one, until something else refreshed them.
+    #[gpui::test]
+    fn the_palette_follows_a_preview_table_taken_from_the_cache(cx: &mut gpui::TestAppContext) {
+        use rudbgen_jdbc::StatementSpec;
+
+        let dir = tempfile::tempdir().expect("tempdir");
+        let file = dir.path().join("model.java");
+        std::fs::write(&file, "class ${name} {}\n").expect("the template is written");
+
+        let profile = connection::h2::profile("palette");
+        let driver = connection::h2::driver();
+        let session = connection::connect(
+            &profile,
+            &driver,
+            &Credentials::typed(Some(String::new()), None),
+            &AppSettings::default(),
+        )
+        .expect("H2 opens an in-memory database without a server");
+        // Two tables, because the second half of this is the dropdown moving
+        // from one to the other.
+        for statement in [
+            "create table T_SAMPLE_ALBUM (ALBUM_ID integer not null, TITLE varchar(120), constraint PK_ALBUM primary key (ALBUM_ID))",
+            "create table T_SAMPLE_ARTIST (ARTIST_ID integer not null, ARTIST_NAME varchar(120), constraint PK_ARTIST primary key (ARTIST_ID))",
+        ] {
+            session
+                .session()
+                .execute(&StatementSpec::new(statement))
+                .expect("the table is created");
+        }
+
+        cx.update(|cx| {
+            app_settings::init(cx);
+            rudbgen_ui::init(cx);
+            rudbgen_grid::init(cx);
+            rudbgen_editor::init(cx);
+        });
+        cx.executor().allow_parking();
+        let window = cx.add_window(|window, cx| Workspace::new(TitlebarStyle::Custom, window, cx));
+        window
+            .update(cx, |workspace, _window, cx| {
+                workspace.connection = ConnectionState::Open {
+                    profile: Box::new(profile.clone()),
+                    driver: Box::new(driver.clone()),
+                    session: Box::new(session),
+                };
+                workspace.reset_panels(cx);
+            })
+            .expect("the window is open");
+        cx.run_until_parked();
+
+        // Tick the schema, so both tables are on offer to the preview.
+        let public = window
+            .update(cx, |workspace, _window, cx| {
+                workspace
+                    .explorer
+                    .read(cx)
+                    .row_ids(cx)
+                    .into_iter()
+                    .flatten()
+                    .find_map(|id| match id {
+                        explorer::NodeId::Schema(key) if key.name == "PUBLIC" => Some(key),
+                        _ => None,
+                    })
+                    .expect("H2 answers with a PUBLIC schema")
+            })
+            .expect("the window is open");
+        window
+            .update(cx, |workspace, _window, cx| {
+                workspace.explorer.update(cx, |explorer, cx| {
+                    explorer.expand(&explorer::NodeId::Schema(public.clone()), cx);
+                });
+            })
+            .expect("the window is open");
+        cx.run_until_parked();
+        window
+            .update(cx, |workspace, _window, cx| {
+                workspace.explorer.update(cx, |explorer, cx| {
+                    explorer.toggle_tick(&explorer::NodeId::Schema(public.clone()), cx);
+                });
+            })
+            .expect("the window is open");
+        cx.run_until_parked();
+
+        // Both tables are described before the template is opened, which is
+        // what a walk through the tree does: from here on nothing has to be
+        // read, and every preview is a cache hit.
+        let choices = window
+            .update(cx, |workspace, _window, cx| {
+                let (handle, driver, _) = workspace.meta_context().expect("the session is open");
+                let keys = workspace.preview_tables(cx);
+                for (key, _) in &keys {
+                    let reference = workspace
+                        .explorer
+                        .read(cx)
+                        .table_ref(key, cx)
+                        .expect("the ticked table is in the tree");
+                    let table = MetaReader::new(handle.session(), &driver)
+                        .table(&reference)
+                        .expect("H2 describes the table");
+                    workspace
+                        .inspector
+                        .update(cx, |panel, _cx| panel.remember(key.clone(), table));
+                }
+                keys
+            })
+            .expect("the window is open");
+        assert_eq!(choices.len(), 2, "the two tables are what is on offer");
+
+        window
+            .update(cx, |workspace, _window, cx| {
+                workspace.open_template(file.clone(), cx);
+            })
+            .expect("the window is open");
+        cx.run_until_parked();
+
+        // The tab renders against the first of the two, and so does the
+        // palette: `name` is the table's own name, and the example says so.
+        window
+            .update(cx, |workspace, _window, cx| {
+                let first = choices[0].0.name.clone();
+                assert!(
+                    workspace.templates[0].read(cx).preview_text(cx).contains(&first),
+                    "the preview is of another table"
+                );
+                assert_eq!(
+                    palette_example(workspace, cx),
+                    Some(SharedString::from(first.clone())),
+                    "the palette's examples are not of {first}"
+                );
+            })
+            .expect("the window is open");
+
+        // The dropdown moves to the other table. It is cached too, so nothing
+        // is read — and the palette still has to follow.
+        window
+            .update(cx, |workspace, _window, cx| {
+                workspace.templates[0]
+                    .clone()
+                    .update(cx, |pane, cx| pane.choose(1, cx));
+            })
+            .expect("the window is open");
+        cx.run_until_parked();
+
+        window
+            .update(cx, |workspace, _window, cx| {
+                let second = choices[1].0.name.clone();
+                assert!(
+                    workspace.templates[0]
+                        .read(cx)
+                        .preview_text(cx)
+                        .contains(&second),
+                    "the preview did not follow the dropdown"
+                );
+                assert_eq!(
+                    palette_example(workspace, cx),
+                    Some(SharedString::from(second.clone())),
+                    "the palette did not follow the dropdown to {second}"
+                );
+            })
+            .expect("the window is open");
+
+        window
+            .update(cx, |workspace, _window, _cx| workspace.close_session())
+            .expect("the window is open");
+    }
+
+    /// What the palette is showing beside the table's `name` field.
+    fn palette_example(workspace: &Workspace, cx: &App) -> Option<SharedString> {
+        workspace
+            .palette
+            .read(cx)
+            .items()
+            .iter()
+            .find(|item| item.section == palette::Section::Table && item.name == "name")
+            .expect("the palette lists the table's name")
+            .example
+            .clone()
     }
 
     /// M5's promise, against a real database: a rule typed into the editor is

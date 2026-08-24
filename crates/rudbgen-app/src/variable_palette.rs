@@ -84,6 +84,15 @@ impl VariablePalette {
         self.items.len()
     }
 
+    /// What is on offer, filter and all.
+    ///
+    /// For the tests: the examples are the half of an entry that depends on the
+    /// table, and counting the rows says nothing about them.
+    #[cfg(test)]
+    pub fn items(&self) -> &[PaletteItem] {
+        &self.items
+    }
+
     /// What the filter box holds.
     fn query(&self, cx: &App) -> String {
         self.search.read(cx).content().trim().to_ascii_lowercase()

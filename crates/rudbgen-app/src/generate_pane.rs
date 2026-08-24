@@ -839,16 +839,15 @@ impl GeneratePane {
             .iter()
             .map(|set| SharedString::from(set.name.clone()))
             .collect();
-        // `Custom` is a row of the list rather than only a label, so that the
-        // trigger has something to show while the list is open; picking it does
-        // nothing, because the list it describes is already on screen.
-        let mut rows = options.clone();
-        let custom = ts!("generate.set_custom");
-        rows.push(custom.clone());
+        // `Custom` is a label and not a row: it names the state the list is in
+        // once it matches no set, and there is nothing to pick that would put
+        // the list there. The trigger shows it without the list offering it,
+        // which `Select` allows — a selection outside the options just
+        // highlights no row.
         let selected = matched
             .and_then(|id| self.sets.get(id))
             .map(|set| SharedString::from(set.name.clone()))
-            .unwrap_or_else(|| custom.clone());
+            .unwrap_or_else(|| ts!("generate.set_custom"));
 
         let ids: Vec<Uuid> = self.sets.sets.iter().map(|set| set.id).collect();
         let this = cx.entity();
@@ -862,9 +861,8 @@ impl GeneratePane {
             .gap(px(8.))
             .child(
                 Select::new("generate-set")
-                    .options(rows)
+                    .options(options)
                     .selected(Some(selected))
-                    .placeholder(custom)
                     .open(self.set_open)
                     .width(px(SET_WIDTH))
                     .tab_index(FIRST_TAB - 2)

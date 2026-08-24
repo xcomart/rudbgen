@@ -511,7 +511,8 @@ impl EditorView {
     /// Changes the highlighter and re-lexes the buffer.
     ///
     /// [`None`] is a plain-text document: no colours, no comment toggle, and
-    /// every `;` a statement terminator.
+    /// no statement concept at all — plain text has no `;`-terminated
+    /// statements to highlight or run.
     pub fn set_highlighter(
         &mut self,
         highlighter: Option<Arc<dyn Highlighter>>,
@@ -1382,9 +1383,21 @@ impl EditorView {
 
     /// The statement the caret is in.
     ///
-    /// The same answer [`syntax::statement_at`] gives for the whole buffer;
-    /// [`crate::syntax`] is where the windowing that makes it affordable lives.
+    /// `None` when the buffer has no highlighter, or the highlighter's
+    /// language is not `;`-terminated statements ([`Highlighter::statements`])
+    /// — a Java template's semicolons are not SQL statements, and highlighting
+    /// or running "the statement" there would be nonsense. Gating here, rather
+    /// than at each caller, is what keeps both the caret-statement paint in
+    /// `element.rs` and [`Self::run_statement`]'s `RunStatement` event off for
+    /// every editor but the SQL one.
+    ///
+    /// Otherwise, the same answer [`syntax::statement_at`] gives for the whole
+    /// buffer; [`crate::syntax`] is where the windowing that makes it
+    /// affordable lives.
     pub fn statement_at_caret(&self) -> Option<StatementSpan> {
+        if !self.syntax.highlighter()?.statements() {
+            return None;
+        }
         syntax::statement_at(&self.buffer, &self.syntax, self.caret())
     }
 

@@ -237,6 +237,10 @@ impl Highlighter for SqlHighlighter {
     fn line_comment(&self) -> Option<&'static str> {
         Some("--")
     }
+
+    fn statements(&self) -> bool {
+        true
+    }
 }
 
 /// One line's worth of scanning.

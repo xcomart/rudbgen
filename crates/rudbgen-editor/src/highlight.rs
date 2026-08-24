@@ -196,6 +196,19 @@ pub trait Highlighter: Send + Sync + 'static {
     fn line_comment(&self) -> Option<&'static str> {
         None
     }
+
+    /// Whether this language is written as `;`-terminated statements, such
+    /// that the editor should highlight the statement the caret sits in and
+    /// let it be run on its own.
+    ///
+    /// `false` — the default — turns that behaviour off. Statement highlight
+    /// and statement execution belong to the SQL editor; a language that
+    /// happens to use `;` for something else (a Java template, say) would
+    /// only get a misleading selection-like band drawn across unrelated
+    /// lines.
+    fn statements(&self) -> bool {
+        false
+    }
 }
 
 /// Per-line syntax state, kept in step with a [`Buffer`].

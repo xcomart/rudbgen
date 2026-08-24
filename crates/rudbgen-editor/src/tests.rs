@@ -14,6 +14,7 @@ use std::rc::Rc;
 use std::sync::Arc;
 
 use crate::editor::{EditorEvent, EditorView, MarkKind, NavKey};
+use crate::highlight::Highlighter;
 use crate::sql_syntax::SqlHighlighter;
 use gpui::{
     Context, Entity, EntityInputHandler, Focusable, IntoElement, Render, TestAppContext,
@@ -89,6 +90,21 @@ impl Handles {
 
 /// Opens a window holding an editor over `text`, focused.
 fn open(text: &str, cx: &mut TestAppContext) -> (Handles, VisualTestContext) {
+    // SQL, because most of what the tests below cover is about strings,
+    // comments and semicolons, and a highlighter that has all three is what
+    // makes those tests say anything. The template highlighter has its own
+    // tests in `crate::template_syntax`, and a plain-text editor -- what
+    // `EditorView::new` makes on its own -- has one below.
+    open_with_highlighter(text, Some(Arc::new(SqlHighlighter)), cx)
+}
+
+/// Opens a window holding an editor over `text` under a given highlighter
+/// (`None` for plain text), focused.
+fn open_with_highlighter(
+    text: &str,
+    highlighter: Option<Arc<dyn Highlighter>>,
+    cx: &mut TestAppContext,
+) -> (Handles, VisualTestContext) {
     cx.update(rudbgen_ui::init);
     cx.update(crate::init);
 
@@ -98,13 +114,10 @@ fn open(text: &str, cx: &mut TestAppContext) -> (Handles, VisualTestContext) {
         let events = events.clone();
         move |_, cx| {
             let editor = cx.new(|cx| {
-                // SQL, because most of what is held down below is about
-                // strings, comments and semicolons, and a highlighter that has
-                // all three is what makes those tests say anything. The
-                // template highlighter has its own tests in
-                // `crate::template_syntax`, and a plain-text editor -- what
-                // `EditorView::new` makes on its own -- has one below.
-                let mut editor = EditorView::new(cx).highlighter(Arc::new(SqlHighlighter));
+                let mut editor = EditorView::new(cx);
+                if let Some(highlighter) = highlighter {
+                    editor = editor.highlighter(highlighter);
+                }
                 editor.set_text(&text, cx);
                 editor.mark_clean(cx);
                 editor
@@ -706,6 +719,42 @@ fn the_statement_under_the_caret_changes_at_a_semicolon(cx: &mut TestAppContext)
     assert_eq!(sql(&editor, &mut cx, 3).as_deref(), Some("select 1"));
     assert_eq!(sql(&editor, &mut cx, 9).as_deref(), Some("select 1"));
     assert_eq!(sql(&editor, &mut cx, 13).as_deref(), Some("select 2"));
+}
+
+#[gpui::test]
+fn statement_at_caret_is_only_for_a_highlighter_that_says_so(cx: &mut TestAppContext) {
+    // Two semicolons a Java template would use for two unrelated statements
+    // that are not SQL and should not be highlighted or run as one.
+    let script = "int a = 1;\nint b = 2;\n";
+
+    let (sql, mut sql_cx) =
+        open_with_highlighter(script, Some(Arc::new(SqlHighlighter)), cx);
+    sql.update(&mut sql_cx, |editor, cx| editor.move_to(3, cx));
+    assert!(
+        sql.read(&mut sql_cx, EditorView::statement_at_caret)
+            .is_some(),
+        "a highlighter whose `statements()` is true gets a statement"
+    );
+
+    let (java, mut java_cx) = open_with_highlighter(
+        script,
+        Some(Arc::new(crate::lang::java::JavaHighlighter)),
+        cx,
+    );
+    java.update(&mut java_cx, |editor, cx| editor.move_to(3, cx));
+    assert_eq!(
+        java.read(&mut java_cx, EditorView::statement_at_caret),
+        None,
+        "a highlighter whose `statements()` is false (the default) gets none"
+    );
+
+    let (plain, mut plain_cx) = open_with_highlighter(script, None, cx);
+    plain.update(&mut plain_cx, |editor, cx| editor.move_to(3, cx));
+    assert_eq!(
+        plain.read(&mut plain_cx, EditorView::statement_at_caret),
+        None,
+        "no highlighter at all gets none"
+    );
 }
 
 #[gpui::test]

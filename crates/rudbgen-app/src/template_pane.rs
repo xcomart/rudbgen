@@ -44,7 +44,7 @@ use gpui::{
 };
 use rudbgen_editor::{EditorEvent, EditorView, MarkKind, NavKey};
 use rudbgen_template::{ParseError, Template, Warning};
-use rudbgen_ui::{Select, editor_theme, theme, tooltip_label};
+use rudbgen_ui::{Button, ButtonVariant, Select, editor_theme, theme, tooltip_label};
 
 use crate::app_settings;
 use crate::i18n::ts;
@@ -863,10 +863,12 @@ impl TemplatePane {
 
     // --- rendering --------------------------------------------------------
 
-    /// The strip over the two halves: the file, the dirty marker, the toggle.
+    /// The strip over the two halves: the file, the dirty marker, the save
+    /// button, and the toggle.
     fn render_header(&self, cx: &mut Context<Self>) -> impl IntoElement + use<> {
         let theme = theme(cx);
         let dirty = self.is_dirty(cx);
+        let save = cx.entity();
         let toggle = cx.entity();
         let open = self.preview_open;
 
@@ -896,6 +898,17 @@ impl TemplatePane {
                     .text_color(theme.accent)
                     .child(ts!("template.unsaved"))
             }))
+            .child(
+                Button::new("template-save", ts!("common.save"))
+                    .variant(ButtonVariant::Secondary)
+                    .compact()
+                    .disabled(!dirty)
+                    .on_click(move |_, _window, cx| {
+                        save.update(cx, |pane, cx| {
+                            pane.save(cx);
+                        });
+                    }),
+            )
             .child(
                 div()
                     .id("template-preview-toggle")

@@ -666,6 +666,13 @@ pub struct Explorer {
     filter: Entity<TextInput>,
     /// The right-click menu, while one is open, and where it hangs from.
     menu: Option<(NodeId, Point<Pixels>)>,
+    /// Schemas ticked before their tables arrived.
+    ///
+    /// A tick on an unexpanded schema is still a promise — "select this whole
+    /// schema" — even though [`ExplorerSource::visible_keys`] has nothing to
+    /// give it yet. The tick is remembered here and made good the moment the
+    /// tables land; see [`Explorer::deliver_tables`].
+    pending_ticks: BTreeSet<SchemaKey>,
     focus_handle: FocusHandle,
     /// Keeps the tree's subscription alive.
     _events: Subscription,
@@ -730,6 +737,7 @@ impl Explorer {
             tree,
             filter,
             menu: None,
+            pending_ticks: BTreeSet::new(),
             focus_handle: cx.focus_handle(),
             _events: events,
             _filter_events: filter_events,
@@ -772,13 +780,24 @@ impl Explorer {
     }
 
     /// Records what one schema's table fetch produced, or why it failed.
+    ///
+    /// If the schema was ticked before it expanded (see [`Explorer::pending_ticks`]
+    /// and [`Explorer::toggle_tick`]), that promise is made good here: a
+    /// successful fetch selects every table it brought.
     pub fn deliver_tables(
         &mut self,
         key: SchemaKey,
         outcome: Result<Vec<TableRef>, SharedString>,
         cx: &mut Context<Self>,
     ) {
-        self.update_source(cx, |source| source.set_tables(key, outcome));
+        self.update_source(cx, |source| source.set_tables(key.clone(), outcome));
+        if self.pending_ticks.remove(&key) {
+            let members = self.tree.read(cx).source().visible_keys(&key);
+            if !members.is_empty() {
+                self.update_source(cx, |source| select_all(&mut source.selection, &members));
+                cx.emit(ExplorerEvent::SelectionChanged);
+            }
+        }
     }
 
     /// Everything the last connection put here, gone.
@@ -788,6 +807,7 @@ impl Explorer {
     /// of names that happen to match.
     pub fn reset(&mut self, cx: &mut Context<Self>) {
         self.menu = None;
+        self.pending_ticks.clear();
         self.update_source(cx, ExplorerSource::clear);
         self.filter.update(cx, |input, cx| input.clear(cx));
         cx.emit(ExplorerEvent::SelectionChanged);
@@ -898,8 +918,32 @@ impl Explorer {
     ///
     /// A table is itself; a schema is every table of it that is on screen, and
     /// a schema that is partly ticked fills up rather than emptying — the
-    /// gesture that finishes a job is the more likely one.
+    /// gesture that finishes a job is the more likely one. A schema whose
+    /// tables have not arrived yet has nothing on screen to tick, so the press
+    /// is taken as "select this whole schema", kept in `pending_ticks`, and
+    /// made good once [`Explorer::deliver_tables`] answers — and a second
+    /// press while the fetch is still out takes the promise back, as unticking
+    /// a box should.
     pub fn toggle_tick(&mut self, id: &NodeId, cx: &mut Context<Self>) {
+        if let NodeId::Schema(key) = id {
+            let (not_loaded, loading) = match self.tree.read(cx).source().tables.get(key) {
+                None | Some(Fetch::NotLoaded) => (true, false),
+                Some(Fetch::Loading) => (false, true),
+                Some(Fetch::Failed(_)) | Some(Fetch::Loaded(_)) => (false, false),
+            };
+            if not_loaded {
+                self.pending_ticks.insert(key.clone());
+                self.request_tables(key.clone(), cx);
+                return;
+            }
+            if loading {
+                if !self.pending_ticks.remove(key) {
+                    self.pending_ticks.insert(key.clone());
+                }
+                return;
+            }
+        }
+
         let members = match id {
             NodeId::Table(key) => vec![key.clone()],
             NodeId::Schema(key) => self.tree.read(cx).source().visible_keys(key),
@@ -1453,6 +1497,68 @@ mod tests {
         });
         cx.run_until_parked();
         assert_eq!(cx.update(|_, cx| explorer.read(cx).selected_count(cx)), 0);
+    }
+
+    #[gpui::test]
+    fn a_tick_on_an_unexpanded_schema_loads_it_and_then_selects_it_whole(
+        cx: &mut TestAppContext,
+    ) {
+        let (explorer, events, mut cx) = open(cx);
+        cx.update(|_, cx| {
+            explorer.update(cx, |explorer, cx| {
+                explorer.deliver_schemas(Ok(vec![schema("", "PUBLIC")]), cx);
+            });
+        });
+        cx.run_until_parked();
+        drain(&events);
+
+        // The schema is not expanded — no fetch has ever been asked for it —
+        // so the tick has nothing to select yet.
+        cx.update(|_, cx| {
+            explorer.update(cx, |explorer, cx| {
+                explorer.toggle_tick(&NodeId::Schema(public()), cx);
+            });
+        });
+        cx.run_until_parked();
+        assert_eq!(cx.update(|_, cx| explorer.read(cx).selected_count(cx)), 0);
+        // But the press asked the workspace to load the schema's tables.
+        assert_eq!(
+            drain(&events),
+            vec![Announced::Tables("PUBLIC".to_string())]
+        );
+
+        // A second press while the fetch is still out unticks the box — the
+        // promise is taken back, without asking the workspace again — and a
+        // third records it once more.
+        for _ in 0..2 {
+            cx.update(|_, cx| {
+                explorer.update(cx, |explorer, cx| {
+                    explorer.toggle_tick(&NodeId::Schema(public()), cx);
+                });
+            });
+            cx.run_until_parked();
+            assert!(drain(&events).is_empty(), "a fetch already out was re-asked");
+        }
+
+        // When the tables land, the whole schema is selected and the status
+        // bar is told, with no second click needed.
+        cx.update(|_, cx| {
+            explorer.update(cx, |explorer, cx| {
+                explorer.deliver_tables(
+                    public(),
+                    Ok(vec![table("T_ALBUM"), table("T_ARTIST")]),
+                    cx,
+                );
+            });
+        });
+        cx.run_until_parked();
+        assert_eq!(
+            cx.update(|_, cx| explorer.read(cx).selection(cx)),
+            [key("T_ALBUM"), key("T_ARTIST")]
+                .into_iter()
+                .collect::<BTreeSet<_>>()
+        );
+        assert_eq!(drain(&events), vec![Announced::Selection]);
     }
 
     #[gpui::test]

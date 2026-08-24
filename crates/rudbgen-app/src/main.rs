@@ -5738,7 +5738,10 @@ mod tests {
             .update(cx, |workspace, _window, cx| {
                 let first = choices[0].0.name.clone();
                 assert!(
-                    workspace.templates[0].read(cx).preview_text(cx).contains(&first),
+                    workspace.templates[0]
+                        .read(cx)
+                        .preview_text(cx)
+                        .contains(&first),
                     "the preview is of another table"
                 );
                 assert_eq!(

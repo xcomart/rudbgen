@@ -727,8 +727,7 @@ fn statement_at_caret_is_only_for_a_highlighter_that_says_so(cx: &mut TestAppCon
     // that are not SQL and should not be highlighted or run as one.
     let script = "int a = 1;\nint b = 2;\n";
 
-    let (sql, mut sql_cx) =
-        open_with_highlighter(script, Some(Arc::new(SqlHighlighter)), cx);
+    let (sql, mut sql_cx) = open_with_highlighter(script, Some(Arc::new(SqlHighlighter)), cx);
     sql.update(&mut sql_cx, |editor, cx| editor.move_to(3, cx));
     assert!(
         sql.read(&mut sql_cx, EditorView::statement_at_caret)

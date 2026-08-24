@@ -1500,9 +1500,7 @@ mod tests {
     }
 
     #[gpui::test]
-    fn a_tick_on_an_unexpanded_schema_loads_it_and_then_selects_it_whole(
-        cx: &mut TestAppContext,
-    ) {
+    fn a_tick_on_an_unexpanded_schema_loads_it_and_then_selects_it_whole(cx: &mut TestAppContext) {
         let (explorer, events, mut cx) = open(cx);
         cx.update(|_, cx| {
             explorer.update(cx, |explorer, cx| {
@@ -1537,7 +1535,10 @@ mod tests {
                 });
             });
             cx.run_until_parked();
-            assert!(drain(&events).is_empty(), "a fetch already out was re-asked");
+            assert!(
+                drain(&events).is_empty(),
+                "a fetch already out was re-asked"
+            );
         }
 
         // When the tables land, the whole schema is selected and the status

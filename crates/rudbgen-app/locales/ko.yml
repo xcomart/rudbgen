@@ -265,6 +265,8 @@ generate:
   template_set: 템플릿 세트
   set_custom: 사용자 지정
   save_as_set: 세트로 저장…
+  delete_set: 세트 삭제
+  delete_set_confirm: "템플릿 세트 “%{name}”을(를) 삭제할까요?"
   set_name: 이름
   templates: 템플릿
   no_templates: 아직 템플릿이 없습니다. 하나 추가하면 실행이 쓸 것이 생깁니다.

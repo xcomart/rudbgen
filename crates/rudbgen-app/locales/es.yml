@@ -267,6 +267,8 @@ generate:
   template_set: Conjunto de plantillas
   set_custom: Personalizado
   save_as_set: Guardar como conjunto…
+  delete_set: Eliminar conjunto
+  delete_set_confirm: "¿Eliminar el conjunto de plantillas «%{name}»?"
   set_name: Nombre
   templates: Plantillas
   no_templates: "Aún no hay plantillas: añada una y la ejecución tendrá algo que escribir."

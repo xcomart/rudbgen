@@ -274,6 +274,8 @@ pub struct GeneratePane {
     naming_set: bool,
     /// The name being typed into that prompt.
     set_name: Entity<TextInput>,
+    /// The set the delete-confirmation prompt is up for, if any.
+    deleting_set: Option<Uuid>,
     /// Vertical scroll of the panel.
     scroll: ScrollHandle,
     /// Whether the panel's overlay scroll indicator is on screen.
@@ -317,6 +319,7 @@ impl GeneratePane {
             set_open: false,
             naming_set: false,
             set_name,
+            deleting_set: None,
             scroll: ScrollHandle::new(),
             scrollbar: ScrollbarState::new(),
             _debounce: None,
@@ -665,6 +668,18 @@ impl GeneratePane {
         cx.notify();
     }
 
+    /// Removes a saved set. The template list on screen is untouched — a
+    /// deleted set is one fewer thing to pick, not an instruction to clear
+    /// what is already ticked.
+    fn delete_set(&mut self, id: Uuid, cx: &mut Context<Self>) {
+        self.sets.remove(id);
+        if let Err(error) = self.sets.save() {
+            log::error!("could not write template-sets.json: {error:#}");
+        }
+        self.deleting_set = None;
+        cx.notify();
+    }
+
     /// Asks the platform for template files and appends what it hands back.
     ///
     /// §4.4 asks for the picker to start in `<config>/templates`, which is
@@ -853,6 +868,7 @@ impl GeneratePane {
         let this = cx.entity();
         let toggle = cx.entity();
         let naming = cx.entity();
+        let deleting = cx.entity();
 
         div()
             .flex()
@@ -865,7 +881,7 @@ impl GeneratePane {
                     .selected(Some(selected))
                     .open(self.set_open)
                     .width(px(SET_WIDTH))
-                    .tab_index(FIRST_TAB - 2)
+                    .tab_index(FIRST_TAB - 3)
                     .on_select(move |index, _text, _window, cx| {
                         this.update(cx, |pane, cx| {
                             pane.set_open = false;
@@ -886,7 +902,7 @@ impl GeneratePane {
                 Button::new("generate-save-set", ts!("generate.save_as_set"))
                     .variant(ButtonVariant::Secondary)
                     .disabled(self.templates.is_empty())
-                    .tab_index(FIRST_TAB - 1)
+                    .tab_index(FIRST_TAB - 2)
                     .on_click(move |_, window, cx| {
                         naming.update(cx, |pane, cx| {
                             pane.naming_set = true;
@@ -895,6 +911,18 @@ impl GeneratePane {
                         });
                         let handle = naming.read(cx).set_name.read(cx).focus_handle(cx);
                         window.focus(&handle, cx);
+                    }),
+            )
+            .child(
+                Button::new("generate-delete-set", ts!("generate.delete_set"))
+                    .variant(ButtonVariant::Secondary)
+                    .disabled(matched.is_none())
+                    .tab_index(FIRST_TAB - 1)
+                    .on_click(move |_, _window, cx| {
+                        deleting.update(cx, |pane, cx| {
+                            pane.deleting_set = matched;
+                            cx.notify();
+                        });
                     }),
             )
     }
@@ -1137,6 +1165,63 @@ impl GeneratePane {
             },
         )
     }
+
+    /// The "Delete set" confirmation prompt.
+    fn render_delete_set_prompt(
+        &self,
+        id: Uuid,
+        cx: &mut Context<Self>,
+    ) -> impl IntoElement + use<> {
+        let name = self
+            .sets
+            .get(id)
+            .map(|set| set.name.clone())
+            .unwrap_or_default();
+        let cancel = cx.entity();
+        let delete = cx.entity();
+        modal(
+            "generate-delete-set",
+            ts!("generate.delete_set"),
+            px(360.),
+            div()
+                .flex()
+                .flex_col()
+                .gap(px(12.))
+                .child(ts!("generate.delete_set_confirm", name = name))
+                .child(
+                    div()
+                        .flex()
+                        .flex_row()
+                        .justify_end()
+                        .gap(px(8.))
+                        .child(
+                            Button::new("generate-delete-set-cancel", ts!("common.cancel"))
+                                .on_click({
+                                    let cancel = cancel.clone();
+                                    move |_, _window, cx| {
+                                        cancel.update(cx, |pane, cx| {
+                                            pane.deleting_set = None;
+                                            cx.notify();
+                                        });
+                                    }
+                                }),
+                        )
+                        .child(
+                            Button::new("generate-delete-set-confirm", ts!("generate.delete_set"))
+                                .variant(ButtonVariant::Danger)
+                                .on_click(move |_, _window, cx| {
+                                    delete.update(cx, |pane, cx| pane.delete_set(id, cx));
+                                }),
+                        ),
+                ),
+            move |_window, cx| {
+                cancel.update(cx, |pane, cx| {
+                    pane.deleting_set = None;
+                    cx.notify();
+                });
+            },
+        )
+    }
 }
 
 impl EventEmitter<GeneratePaneEvent> for GeneratePane {}
@@ -1213,6 +1298,9 @@ impl Render for GeneratePane {
                 pane.hover_scrollbar(*hovered, cx);
             }));
         let prompt = self.naming_set.then(|| self.render_set_prompt(cx));
+        let delete_prompt = self
+            .deleting_set
+            .map(|id| self.render_delete_set_prompt(id, cx));
 
         div()
             .key_context("GeneratePane")
@@ -1236,6 +1324,7 @@ impl Render for GeneratePane {
             )
             .children(bar.render(&theme))
             .children(prompt)
+            .children(delete_prompt)
     }
 }
 

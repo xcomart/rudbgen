@@ -267,6 +267,8 @@ generate:
   template_set: Набор шаблонов
   set_custom: Свой
   save_as_set: Сохранить как набор…
+  delete_set: Удалить набор
+  delete_set_confirm: "Удалить набор шаблонов «%{name}»?"
   set_name: Имя
   templates: Шаблоны
   no_templates: Шаблонов пока нет — добавьте один, и запуску будет что писать.

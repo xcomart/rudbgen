@@ -264,6 +264,8 @@ generate:
   template_set: 模板集
   set_custom: 自定义
   save_as_set: 另存为模板集…
+  delete_set: 删除模板集
+  delete_set_confirm: "删除模板集“%{name}”？"
   set_name: 名称
   templates: 模板
   no_templates: 还没有模板 —— 添加一个，这次运行才有东西可写。

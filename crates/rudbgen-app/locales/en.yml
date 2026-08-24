@@ -389,6 +389,8 @@ generate:
   # Shown while the list matches no saved set (§4.4).
   set_custom: Custom
   save_as_set: Save as set…
+  delete_set: Delete set
+  delete_set_confirm: "Delete the template set “%{name}”?"
   set_name: Name
   templates: Templates
   no_templates: No templates yet — add one, and the run has something to write.

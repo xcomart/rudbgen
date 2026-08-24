@@ -267,6 +267,8 @@ generate:
   template_set: Vorlagensatz
   set_custom: Eigene
   save_as_set: Als Satz speichern…
+  delete_set: Satz löschen
+  delete_set_confirm: "Den Vorlagensatz „%{name}“ löschen?"
   set_name: Name
   templates: Vorlagen
   no_templates: Noch keine Vorlagen — fügen Sie eine hinzu, damit der Lauf etwas zu schreiben hat.

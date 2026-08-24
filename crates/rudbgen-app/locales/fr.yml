@@ -267,6 +267,8 @@ generate:
   template_set: Jeu de modèles
   set_custom: Personnalisé
   save_as_set: Enregistrer comme jeu…
+  delete_set: Supprimer le jeu
+  delete_set_confirm: "Supprimer le jeu de modèles « %{name} » ?"
   set_name: Nom
   templates: Modèles
   no_templates: Aucun modèle pour l'instant — ajoutez-en un, et l'exécution aura de quoi écrire.

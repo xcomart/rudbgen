@@ -46,6 +46,7 @@ pub struct Button {
     variant: ButtonVariant,
     disabled: bool,
     full_width: bool,
+    compact: bool,
     tab_index: Option<isize>,
     on_click: Option<ClickHandler>,
 }
@@ -61,6 +62,7 @@ impl Button {
             variant: ButtonVariant::default(),
             disabled: false,
             full_width: false,
+            compact: false,
             tab_index: None,
             on_click: None,
         }
@@ -81,6 +83,12 @@ impl Button {
     /// Stretches the button across the width of its parent.
     pub fn full_width(mut self, full_width: bool) -> Self {
         self.full_width = full_width;
+        self
+    }
+
+    /// Shrinks the button to fit inside a dense toolbar or status bar.
+    pub fn compact(mut self) -> Self {
+        self.compact = true;
         self
     }
 
@@ -157,16 +165,22 @@ impl RenderOnce for Button {
             None => gpui::transparent_black(),
         };
 
+        let (height, pad_x, text) = if self.compact {
+            (20., 8., 11.)
+        } else {
+            (30., 12., 13.)
+        };
+
         div()
             .id(self.id)
             .flex()
             .flex_none()
             .items_center()
             .justify_center()
-            .h(px(30.))
-            .px(px(12.))
+            .h(px(height))
+            .px(px(pad_x))
             .rounded_md()
-            .text_size(px(13.))
+            .text_size(px(text))
             .whitespace_nowrap()
             .bg(if disabled {
                 colors.background.opacity(0.5)

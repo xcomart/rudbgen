@@ -3763,6 +3763,7 @@ impl Workspace {
                             ButtonVariant::Secondary
                         })
                         .disabled(blocker.is_some())
+                        .compact()
                         .on_click(move |_, window, cx| window.dispatch_action(action(), cx)),
                 )
                 .into_any_element()

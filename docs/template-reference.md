@@ -136,7 +136,7 @@ A statement without a `:` is shorthand for `item:key=`, so `${name.camel}` and
 ### Whitespace, quoting and escapes
 
 - Whitespace inside a statement is insignificant, including line breaks. Both
-  `${item:key=name}` and
+  `${item:key=name,padSize=15}` and
 
   ```
   ${

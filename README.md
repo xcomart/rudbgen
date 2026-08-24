@@ -63,6 +63,7 @@ Written against jdbgen, because that is what most of this is for:
   all / Skip all / Cancel; and it ends in a summary of every file written,
   skipped and failed, with a button to open the output directory. Files are
   written atomically — a crash cannot truncate one.
+  ![The overwrite question, mid-run](docs/screenshots/overwrite.png)
 - **Any JDBC driver.** Drivers are downloaded from Maven Central by coordinate
   or picked from disk, the driver class is detected from the JAR without running
   a static initialiser, and each connection gets its own isolated class loader.
@@ -82,17 +83,20 @@ Written against jdbgen, because that is what most of this is for:
   clickable variable palette of every field the model offers, and completion on
   <kbd>Ctrl</kbd>+<kbd>Space</kbd>.
   ![The template editor with its live preview](docs/screenshots/template-editor.png)
+  ![Completion offering the model's fields, each with what it renders to](docs/screenshots/completion.png)
 - **An abbreviation rules editor.** The four-column table jdbgen kept in its
   configuration window, with a trailing empty row, a table-name picker for
   whole-name rules, and a refusal to save two rules that would silently become
   one. Word rules now match **whatever the case**, which is the one deliberate
   behavioural break from jdbgen — where they only ever matched lower-case
   segments and so never fired on `TB_USR`.
+  ![The abbreviation rules editor](docs/screenshots/abbreviations.png)
 - **A one-time import from jdbgen.** Point it at a `config.json`, type the
   master password once, and it reads both of jdbgen's encryption formats, shows
   what it found with a checkbox each, and writes your connections, drivers,
   template sets and abbreviation rules — passwords into the OS keychain. Your
   jdbgen configuration is opened read-only and left exactly as it was.
+  ![The import wizard's checklist](docs/screenshots/import.png)
 - **Themes and languages**: UI and editor theme registries with live preview,
   import/export and a user theme directory; eight interface languages (en, ko,
   ja, zh-CN, de, es, fr, ru), switched live.

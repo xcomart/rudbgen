@@ -233,11 +233,10 @@ menu:
 
 titlebar:
   no_connection: 无连接
-  tip_settings: 设置
   # 用于断开而非打开会话的那一行，以及会话正在打开时触发按钮上的文字。
   disconnect: 断开连接
   connecting: "%{name} — 连接中…"
-  tip_help: 帮助
+  tip_menu: 菜单
 
 welcome:
   tagline: 指向一个数据库，选择表和模板，它就会生成代码。

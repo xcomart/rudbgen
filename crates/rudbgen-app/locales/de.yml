@@ -234,12 +234,11 @@ menu:
 
 titlebar:
   no_connection: Keine Verbindung
-  tip_settings: Einstellungen
   # Die Zeile, die die Sitzung schließt statt eine zu öffnen, und was der
   # Auslöser anzeigt, während eine Sitzung noch geöffnet wird.
   disconnect: Trennen
   connecting: "%{name} — verbinden…"
-  tip_help: Hilfe
+  tip_menu: Menü
 
 welcome:
   tagline: Auf eine Datenbank zeigen, Tabellen und Vorlagen wählen — der Code wird geschrieben.

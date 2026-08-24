@@ -233,12 +233,11 @@ menu:
 
 titlebar:
   no_connection: 接続なし
-  tip_settings: 設定
   # 接続を開くのではなく閉じる行と、セッションを開いている最中にトリガーが
   # 表示する文字列。
   disconnect: 切断
   connecting: "%{name} — 接続中…"
-  tip_help: ヘルプ
+  tip_menu: メニュー
 
 welcome:
   tagline: データベースを指定し、テーブルとテンプレートを選ぶと、コードを書き出します。

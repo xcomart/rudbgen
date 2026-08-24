@@ -2925,7 +2925,6 @@ impl Workspace {
             // The gap the window is dragged by: everything to its left and
             // right is a control, and this is what is left of the caption.
             .child(div().flex_1().min_w_0())
-            .child(self.render_settings_button(cx))
             .child(self.render_help_menu(cx))
             .children(trailing_controls)
             .into_any_element()
@@ -3015,30 +3014,6 @@ impl Workspace {
             )
     }
 
-    /// The settings button, drawn like a menu trigger so the two read as a pair.
-    fn render_settings_button(&self, cx: &mut Context<Self>) -> impl IntoElement + use<> {
-        let theme = theme(cx);
-        div()
-            .id("titlebar-settings")
-            // For [`Workspace::render_connection_select`]'s reason.
-            .occlude()
-            .flex()
-            .flex_none()
-            .items_center()
-            .justify_center()
-            .size(px(28.))
-            .rounded_md()
-            .text_size(px(14.))
-            .text_color(theme.icon)
-            .cursor_pointer()
-            .hover(|style| style.bg(theme.surface_hover).text_color(theme.text))
-            .tooltip(tooltip_label(ts!("titlebar.tip_settings")))
-            // The same action the menu row and `Ctrl+,` dispatch: one command,
-            // however it is reached.
-            .on_click(|_, window, cx| window.dispatch_action(Box::new(OpenSettings), cx))
-            .child("\u{2699}")
-    }
-
     /// The help menu: every command the shell has, on the platforms without a
     /// native menu bar.
     ///
@@ -3118,8 +3093,8 @@ impl Workspace {
         ];
 
         MenuButton::new("help-menu")
-            .glyph("?")
-            .tooltip(ts!("titlebar.tip_help"))
+            .icon(icons::MENU_DOTS)
+            .tooltip(ts!("titlebar.tip_menu"))
             .open(self.menu_open)
             .entries(entries)
             .on_open_change(move |open, _window, cx| {
@@ -4893,8 +4868,7 @@ mod tests {
             ts!("welcome.saved"),
             ts!("welcome.empty"),
             ts!("titlebar.no_connection"),
-            ts!("titlebar.tip_settings"),
-            ts!("titlebar.tip_help"),
+            ts!("titlebar.tip_menu"),
             ts!("statusbar.no_connection"),
             ts!("statusbar.no_selection"),
             ts!("statusbar.tables_selected", count = 2),

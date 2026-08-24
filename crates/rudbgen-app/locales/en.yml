@@ -334,13 +334,12 @@ menu:
 # always.
 titlebar:
   no_connection: No connection
-  tip_settings: Settings
   # The row that closes the session rather than opening one, on the end of
   # the list while one is open, and what the trigger reads while a session is
   # still opening.
   disconnect: Disconnect
   connecting: "%{name} — connecting…"
-  tip_help: Help
+  tip_menu: Menu
 
 # The welcome screen: the whole body of the window while no connection is
 # open. The name, what the application is for, the three ways in, and the

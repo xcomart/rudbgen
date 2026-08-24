@@ -41,6 +41,16 @@ pub const TAB_LIST: &str = "icons/tab-list.svg";
 /// to match.
 pub const NEW_TAB: &str = "icons/new-tab.svg";
 
+/// The title bar's application menu trigger.
+///
+/// Three stacked dots rather than the button's own [`glyph`](rudbgen_ui::menu)
+/// fallback: a font's `?` sits at whatever size and baseline the face gives
+/// it, but the row it opens has nothing to do with a question — it is every
+/// command the shell has. Three dots read as "more" on every desktop that has
+/// adopted them, and drawn as geometry they land dead centre and evenly spaced
+/// regardless of the font installed, which three glyph characters never would.
+pub const MENU_DOTS: &str = "icons/menu-dots.svg";
+
 /// The custom title bar's minimise button.
 ///
 /// The four window-control glyphs are drawn edge to edge of the 24×24 box
@@ -158,10 +168,11 @@ pub const CHEVRON_RIGHT: &str = "icons/chevron-right.svg";
 pub const CHEVRON_DOWN: &str = "icons/chevron-down.svg";
 
 /// Every icon, paired with the bytes [`Icons`] hands back for it.
-const ICONS: [(&str, &[u8]); 19] = [
+const ICONS: [(&str, &[u8]); 20] = [
     (APP_ICON, include_bytes!("../../../assets/icon.svg")),
     (TAB_LIST, include_bytes!("../assets/icons/tab-list.svg")),
     (NEW_TAB, include_bytes!("../assets/icons/new-tab.svg")),
+    (MENU_DOTS, include_bytes!("../assets/icons/menu-dots.svg")),
     (
         WINDOW_MINIMIZE,
         include_bytes!("../assets/icons/window-minimize.svg"),

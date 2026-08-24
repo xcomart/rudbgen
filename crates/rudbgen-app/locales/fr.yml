@@ -234,12 +234,11 @@ menu:
 
 titlebar:
   no_connection: Aucune connexion
-  tip_settings: Paramètres
   # La ligne qui ferme la session au lieu d'en ouvrir une, et ce qu'affiche
   # le contrôle pendant qu'une session s'ouvre.
   disconnect: Se déconnecter
   connecting: "%{name} — connexion…"
-  tip_help: Aide
+  tip_menu: Menu
 
 welcome:
   tagline: Pointez-le vers une base de données, choisissez des tables et des modèles, et le code est écrit.

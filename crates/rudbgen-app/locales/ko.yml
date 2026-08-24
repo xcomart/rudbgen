@@ -233,11 +233,10 @@ menu:
 
 titlebar:
   no_connection: 연결 없음
-  tip_settings: 설정
   # 연결을 여는 대신 닫는 항목과, 세션을 여는 동안 트리거에 보이는 문구.
   disconnect: 연결 끊기
   connecting: "%{name} — 연결 중…"
-  tip_help: 도움말
+  tip_menu: 메뉴
 
 welcome:
   tagline: 데이터베이스를 지정하고 테이블과 템플릿을 고르면 코드를 만들어 냅니다.

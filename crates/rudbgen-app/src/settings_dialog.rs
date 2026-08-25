@@ -700,16 +700,8 @@ impl SettingsDialog {
             // The files on disk moved under a palette that may already be in
             // use, so what the window is wearing has to be resolved again.
             CatalogActionEvent::Changed => self.refresh_preview(cx),
-            // The file travels in the event, but a gpui subscription only ever
-            // borrows one and `CatalogFile` is not `Clone` — a catalogue of a
-            // host's own may hold anything at all — so it is resolved again
-            // from the id. That is the same registry lookup the row itself made,
-            // over the registry it has just reloaded.
-            CatalogActionEvent::Edit { id, .. } => {
-                let source = self.catalog_of(catalog, cx);
-                if let Some(file) = source.load(id, cx) {
-                    self.open_editor(catalog, id.clone(), &file, cx);
-                }
+            CatalogActionEvent::Edit { id, file } => {
+                self.open_editor(catalog, id.clone(), file, cx);
             }
         }
     }
@@ -894,16 +886,14 @@ impl SettingsDialog {
     /// What `Escape` means, one layer at a time.
     ///
     /// Anything layered on top of the form takes the key first and only undoes
-    /// itself, so that backing out of a list or the colour editor does not also
-    /// throw away the whole form. The editor is checked before the dropdowns
-    /// because it replaces the form outright: while it is up there is no list to
-    /// close.
-    ///
-    /// A delete confirmation under one of the pickers is *not* a layer this can
-    /// see: it lives inside [`ruui_shell::CatalogActions`], which exposes
-    /// neither whether it is asking nor a way to take the question back, so
-    /// `Escape` there dismisses the dialog — which cancels the confirmation
-    /// along with everything else, and deletes nothing.
+    /// itself, so that backing out of a list, a delete confirmation or the
+    /// colour editor does not also throw away the whole form. The editor is
+    /// checked before the dropdowns because it replaces the form outright:
+    /// while it is up there is no list to close. A delete confirmation under
+    /// one of the pickers is checked last, through
+    /// [`ruui_shell::CatalogActions::is_confirming`] and
+    /// [`ruui_shell::CatalogActions::cancel_confirm`], so that the row's own
+    /// question is taken back before `Escape` reaches the dialog around it.
     ///
     /// Public because the key does not actually arrive here: gpui matches key
     /// bindings before it delivers key events, so the shell's `Escape` binding
@@ -917,6 +907,13 @@ impl SettingsDialog {
         if self.open_list.is_some() {
             self.close_lists(cx);
             return;
+        }
+        for catalog in [Catalog::UiTheme, Catalog::EditorTheme] {
+            let actions = self.actions(catalog).clone();
+            if actions.read(cx).is_confirming() {
+                actions.update(cx, |row, cx| row.cancel_confirm(cx));
+                return;
+            }
         }
         self.dismiss(cx);
     }

@@ -119,22 +119,19 @@ pub fn theme_dirs() -> Result<ThemeDirs> {
     })
 }
 
-/// The same two directories, with empty paths where there is no configuration
-/// directory at all.
+/// The same two directories, or [`ThemeDirs::default`] where there is no
+/// configuration directory at all.
 ///
 /// [`theme_dirs`] is the fallible answer, and every caller that is about to
 /// *write* wants it. This is for the two catalogues the settings dialog builds
 /// at construction, which have to exist before anyone asks them for anything:
-/// an empty path holds no palettes and refuses every write, which is the same
+/// the default holds no palettes and refuses every write, which is the same
 /// outcome as the error, reported at the moment the user can see it rather than
 /// while a dialog is being assembled.
 pub fn theme_dirs_or_empty() -> ThemeDirs {
     theme_dirs().unwrap_or_else(|err| {
         log::warn!("cannot locate the theme directories: {err:#}");
-        ThemeDirs {
-            ui_themes: std::path::PathBuf::new(),
-            editor_themes: None,
-        }
+        ThemeDirs::default()
     })
 }
 

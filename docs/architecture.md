@@ -91,8 +91,8 @@ rudbgen/
 The widget layer is not here: `ruui` (the gpui widget kit and themes), `ruui-grid`
 (the virtualized grid) and `ruui-editor` (the code editor with pluggable
 highlighting) come from [ruui](https://github.com/xcomart/ruui) at a pinned
-revision, along with the patched gpui they are written against (D13). Sibling
-checkouts taken by path today; see the root `Cargo.toml`.
+revision, along with the patched gpui they are written against (D13). Taken as
+`git` dependencies at that one revision; see the root `Cargo.toml`.
 
 Dependency direction (no cycles, no back-edges):
 

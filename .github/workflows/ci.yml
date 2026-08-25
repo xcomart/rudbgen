@@ -4,11 +4,10 @@
 # the `ring` backend so no NASM is needed anywhere, the OS-keychain tests are
 # `#[ignore]`d, and gpui comes from a pinned revision of Zed's monorepo with four
 # crates patched on top of it, which `ruui` vendors and this workspace's patch
-# table points at. The widgets themselves come from ruui too. Those are path
-# dependencies on a sibling checkout today, so nothing here runs until ruui is
-# published and the seven entries become `git` dependencies at one revision; see
-# the root Cargo.toml. After that the only network the build needs is crates.io
-# plus two git fetches — plus a JVM. The bridge JAR is
+# table points at. The widgets themselves come from ruui too, as `git`
+# dependencies pinned to one revision across all seven entries; see the root
+# Cargo.toml. The only network the build needs is crates.io plus two git
+# fetches — plus a JVM. The bridge JAR is
 # built and tested first, because `rudbgen-jdbc`'s build script refuses to build
 # without the JAR, and its integration tests then boot a real JVM against a real
 # H2. That H2 driver is handed to the tests explicitly through

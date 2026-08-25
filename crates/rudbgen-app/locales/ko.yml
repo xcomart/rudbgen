@@ -9,6 +9,12 @@ common:
   save: 저장
   close: 닫기
 
+input:
+  menu_cut: 잘라내기
+  menu_copy: 복사
+  menu_paste: 붙여넣기
+  menu_select_all: 모두 선택
+
 explorer:
   title: 탐색기
   filter_placeholder: 테이블 이름으로 거르기

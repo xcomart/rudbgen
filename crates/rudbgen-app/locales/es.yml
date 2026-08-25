@@ -9,6 +9,12 @@ common:
   save: Guardar
   close: Cerrar
 
+input:
+  menu_cut: Cortar
+  menu_copy: Copiar
+  menu_paste: Pegar
+  menu_select_all: Seleccionar todo
+
 explorer:
   title: Explorador
   filter_placeholder: Filtrar tablas

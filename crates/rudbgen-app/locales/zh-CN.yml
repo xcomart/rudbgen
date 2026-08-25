@@ -9,6 +9,12 @@ common:
   save: 保存
   close: 关闭
 
+input:
+  menu_cut: 剪切
+  menu_copy: 复制
+  menu_paste: 粘贴
+  menu_select_all: 全选
+
 explorer:
   title: 浏览器
   filter_placeholder: 筛选表

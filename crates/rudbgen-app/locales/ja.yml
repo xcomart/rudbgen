@@ -9,6 +9,12 @@ common:
   save: 保存
   close: 閉じる
 
+input:
+  menu_cut: 切り取り
+  menu_copy: コピー
+  menu_paste: 貼り付け
+  menu_select_all: すべて選択
+
 explorer:
   title: エクスプローラー
   filter_placeholder: テーブルを絞り込む

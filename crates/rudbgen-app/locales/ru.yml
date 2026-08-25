@@ -9,6 +9,12 @@ common:
   save: Сохранить
   close: Закрыть
 
+input:
+  menu_cut: Вырезать
+  menu_copy: Копировать
+  menu_paste: Вставить
+  menu_select_all: Выделить всё
+
 explorer:
   title: Обозреватель
   filter_placeholder: Фильтр таблиц

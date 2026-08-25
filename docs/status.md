@@ -80,8 +80,9 @@ write-atomic (`paths::write_atomic`).
 ### How `rudbgen-app` differs from `rudbman-app`
 
 - **`main.rs` is new.** rudbman's 8,400-line `Workspace` is not copied (§2.1).
-  What came over is the bootstrap sequence — `env_logger` → `update::apply_pending`
-  → `application().with_assets(Icons)` → keychain → settings → `i18n::apply` →
+  What came over is the bootstrap sequence — `env_logger` →
+  `ruui_shell::init_process_identity` → `update::apply_pending` →
+  `application().with_assets(Icons)` → keychain → settings → `i18n::apply` →
   `ruui::init` → shortcuts → menus → themes → the window-closed save →
   `open_window` — and every window-chrome helper: `draws_own_titlebar`,
   `titlebar_gestures`, `client_tiling`, `render_resize_edges`,

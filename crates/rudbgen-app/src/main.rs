@@ -853,6 +853,20 @@ impl Workspace {
                     // installed. The dialog stays on screen — the process is
                     // about to go, and closing it first would flash the window
                     // back into view for a fraction of a second.
+                    //
+                    // The path has to be pointed at explicitly: `install`
+                    // renames the running image aside and writes the new build
+                    // under the old name, and on Linux `current_exe()` follows
+                    // the *inode* into the renamed-away copy, so a bare
+                    // `cx.restart()` would come back up on the build that was
+                    // just replaced. `restart_path()` is the path as it stood
+                    // before anything moved, taken by `init_process_identity`
+                    // at the top of `main`; where the platform never answered
+                    // one, leaving `set_restart_path` uncalled is gpui's own
+                    // default and behaves the same as before this build.
+                    if let Some(path) = ruui_shell::restart_path() {
+                        cx.set_restart_path(path);
+                    }
                     cx.restart();
                 }
                 UpdateDialogEvent::Dismissed => {
@@ -4421,6 +4435,13 @@ fn install_builtins() {
 
 fn main() {
     env_logger::init();
+
+    // The half of `ruui_shell::init` that needs no `App`: `apply_pending` and
+    // `clean_leftovers` both read the identity through it, and with none
+    // installed they log an error and no-op rather than panic. It has to run
+    // ahead of both — and ahead of `current_exe()` moving under an install —
+    // which is why it is the very first thing `main` does.
+    ruui_shell::init_process_identity(IDENTITY);
 
     // An update the previous run could only stage — because a JVM was loaded
     // into it and Windows will not let its files be renamed — is applied here,

@@ -25,6 +25,15 @@ common:
   save: Save
   close: Close
 
+# The menu a right-click in a text field opens. Four rows the whole
+# application shares, which is why they are worded here rather than by the
+# dialogs that put the fields on screen.
+input:
+  menu_cut: Cut
+  menu_copy: Copy
+  menu_paste: Paste
+  menu_select_all: Select all
+
 # The explorer: the tree of tables down the left, and the ticks that say which
 # of them the generator will be run over.
 explorer:

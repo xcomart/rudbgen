@@ -283,10 +283,11 @@ oversights:
 
 Two things a first tag will want that no milestone owns:
 
-- `packaging/` and the release workflow exist and are unexercised by a real
-  tag. The Windows installer's `AppId`, the winget manifests' `ProductCode` and
-  `update::ARP_KEY` are checked against each other by a test, but the round
-  trip — build, install, self-update — has only been walked on Linux.
+- `packaging/` and the release workflow have now been exercised once: v0.1.0
+  built and published on all three platforms from the tag alone. The Windows
+  installer's `AppId`, the winget manifests' `ProductCode` and the uninstall
+  key the shell's updater reads are checked against each other by a test, but
+  the round trip — install, then self-update — has only been walked on Linux.
 - The screenshots in `docs/screenshots/` are captures of the whole window
   *surface*, which under client-side decorations carries a 12 px transparent
   band for the drop shadow all round. Every one of them is now cropped to the

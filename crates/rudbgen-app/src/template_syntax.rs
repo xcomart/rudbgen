@@ -3,7 +3,7 @@
 //!
 //! # Why it lives here
 //!
-//! `ruui-editor` ships lexers for the languages a generated file is written in
+//! `rugpui-editor` ships lexers for the languages a generated file is written in
 //! and a [`CompositeHighlighter`] that paints a second grammar over one of
 //! them, but no second grammar of its own: an [`Overlay`] *is* a grammar, and
 //! jdbgen's template language is rudbgen's business and not a widget kit's. So
@@ -71,7 +71,7 @@ use std::ops::Range;
 use std::path::Path;
 use std::sync::Arc;
 
-use ruui_editor::{
+use rugpui_editor::{
     CompositeHighlighter, Highlighter, LineState, Overlaid, Overlay, Span, Token,
     highlighter_for_extension,
 };
@@ -265,7 +265,7 @@ impl Highlighter for TemplateHighlighter {
 
 /// The highlighter for a template file at `path`: its base language, if
 /// [`highlighter_for_extension`] has one, with the template language painted
-/// over it — or the template language alone, for a base `ruui-editor` does not
+/// over it — or the template language alone, for a base `rugpui-editor` does not
 /// ship a lexer for.
 ///
 /// A trailing `.tpl` or `.tmpl` is stripped before the extension is read, so

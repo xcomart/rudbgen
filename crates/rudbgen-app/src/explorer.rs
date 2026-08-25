@@ -3,7 +3,7 @@
 //!
 //! Three things live here and only the first is a widget. The **tree** is
 //! catalog → schema → table, filled one round trip at a time through
-//! [`ruui::TreeView`]; the **selection** is a set of [`TableKey`]s that
+//! [`rugpui::TreeView`]; the **selection** is a set of [`TableKey`]s that
 //! survives everything the tree does to itself; and the **filter** is jdbgen's
 //! `filterTables` rule, which is a pure function over a name and therefore
 //! testable without a window.
@@ -44,7 +44,7 @@ use gpui::{
     px,
 };
 use rudbgen_meta::{Schema, TableRef};
-use ruui::{
+use rugpui::{
     ChildState, TextInput, Theme, TreeEvent, TreeRow, TreeRowInfo, TreeSource, TreeView, theme,
     tooltip_label,
 };
@@ -52,7 +52,7 @@ use ruui::{
 use crate::app_settings;
 use crate::i18n::ts;
 use crate::icons;
-use ruui_shell::{MenuRow, menu_rows};
+use rugpui_shell::{MenuRow, menu_rows};
 
 /// Key context the panel's own bindings would hang off.
 pub const KEY_CONTEXT: &str = "Explorer";
@@ -419,7 +419,7 @@ impl ExplorerSource {
 
     /// The tick box of a row, and what pressing it does.
     ///
-    /// Drawn here rather than with [`ruui::Checkbox`] for two reasons: it
+    /// Drawn here rather than with [`rugpui::Checkbox`] for two reasons: it
     /// has a third state, and it has to swallow its own press so that aiming at
     /// the box does not also move the tree's selection — the same trick the
     /// disclosure arrow plays one element to the left.
@@ -601,7 +601,7 @@ impl TreeSource for ExplorerSource {
             .gap(px(6.))
             .min_w_0()
             .children(tick)
-            .child(ruui_shell::icon(mark, px(14.), chrome.text_muted))
+            .child(rugpui_shell::icon(mark, px(14.), chrome.text_muted))
             .child(
                 div()
                     .flex_1()
@@ -974,7 +974,7 @@ impl Explorer {
     /// The rows of the right-click menu over `id`.
     ///
     /// Built as data rather than as widget entries so that what a row offers is
-    /// what a test reads; see [`ruui_shell::menu_rows`].
+    /// what a test reads; see [`rugpui_shell::menu_rows`].
     pub fn menu_rows(&self, id: &NodeId, cx: &mut Context<Self>) -> Vec<MenuRow> {
         let visible = self.visible_tables(cx);
         let this = cx.entity();
@@ -1106,7 +1106,7 @@ impl Explorer {
             .border_color(chrome.border)
             .child(self.filter.clone())
             .child(
-                ruui::Checkbox::new("explorer-views", ts!("explorer.show_views"))
+                rugpui::Checkbox::new("explorer-views", ts!("explorer.show_views"))
                     .checked(show_views)
                     .tab_index(1)
                     .on_toggle(move |checked, _window, cx| {
@@ -1133,7 +1133,7 @@ impl Render for Explorer {
         let menu = self.menu.clone().map(|(id, position)| {
             let this = cx.entity();
             let rows = self.menu_rows(&id, cx);
-            ruui::ContextMenu::new("explorer-context")
+            rugpui::ContextMenu::new("explorer-context")
                 .position(position)
                 .entries(menu_rows::entries(rows))
                 .on_dismiss(move |_window, cx| {
@@ -1270,7 +1270,7 @@ mod tests {
     /// laying anything out would be asserting about a state the panel never has
     /// on screen.
     fn open(cx: &mut TestAppContext) -> (Entity<Explorer>, Recorder, VisualTestContext) {
-        cx.update(ruui::init);
+        cx.update(rugpui::init);
 
         let events: Recorder = Rc::new(RefCell::new(Vec::new()));
         let window = cx.add_window({

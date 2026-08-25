@@ -29,8 +29,8 @@ this document.
 | D9 | **Custom queries stay** (the four per-driver SQL overrides) and gain a **Test** button that runs the SQL against a chosen connection and checks the result labels | They are the only way some drivers yield a table list at all. Their failure mode today — one missing label fails the whole run, silently — is what the test button is for |
 | D10 | **Abbreviation word rules match case-insensitively.** jdbgen's word rules only ever matched lower-case segments, which made them useless against upper-case identifiers | This is the one deliberate behavioural break from jdbgen. It is called out in the import wizard and in the template reference |
 | D11 | **Generation is a cancellable job with an overwrite policy** (overwrite / skip existing / ask) and a **result summary** listing every file written, skipped or failed. A **dry run** renders to memory only | jdbgen's progress window has no cancel, no close, and a failed run leaves half the files on disk with no list of which |
-| D13 | **The widget layer moves out to [`ruui`](https://github.com/xcomart/ruui)**, together with the patched gpui it is written against, and comes back as a dependency at a pinned revision | D1 and D2 had rulogman, rudbman and rudbgen carrying byte-identical copies of the same widget kit, grid, editor and four vendored gpui crates, kept in step by hand. ruui is that code with the host's concepts taken out: no configuration directory (the theme store is handed a `ThemeDirs`), no template grammar (the editor composes an `Overlay` the host supplies). What was `rudbgen-ui`, `rudbgen-grid` and `rudbgen-editor` is now `ruui`, `ruui-grid` and `ruui-editor`; the template highlighter stayed behind, in `rudbgen-app`, because it is jdbgen's grammar and not a widget kit's. The patch table has to point at ruui's vendored gpui rather than a copy of its own, or two gpui crates end up in one binary |
-| D13a | **The application-level shell follows it, as `ruui-shell`** — a fourth crate at the same revision | The same argument one layer up. Window chrome, the self-updater, the about and update dialogs, the palette catalogues and their editor, the split-pane tree, the context-menu rows and the pieces a settings form is built out of were application code, and therefore not D13's to take — but they were also written once and copied twice, so a fix to one of them was three fixes or, more often, one. `ruui-shell` is that code with rudbgen taken out of it: the name, the version, the release endpoints, the words and where the ignored-release tag is kept are injected by `main` through `AppIdentity`, `Strings` and `UpdatePolicy`. What stays here is what the shell cannot know — the `Workspace`, what a tab is (`PaneItem`), the body of the settings form, the domain icons, and the `i18n!` invocation with the locale files it compiles. Two consequences are deliberate: the restart after an update is an event the `Workspace` answers with `cx.restart()` — pointed first at `ruui_shell::restart_path()`, the path recorded before the install renamed the running image aside, since Linux's `current_exe()` would otherwise follow the swap back onto the build that was just replaced — not something a dialog does to its host; and `rudbgen_core::TitlebarStyle` stays where it is, converted at the two call sites, because `rudbgen-core` is gpui-free and `ruui-shell` is not. `main` also calls `ruui_shell::init_process_identity` before `update::apply_pending` and `gpui_platform::application()`, ahead of `ruui_shell::init` itself: those two update paths run before an `App` can exist and need the identity to answer through, not panic, if a host ever reached them without it |
+| D13 | **The widget layer moves out to [`rugpui`](https://github.com/xcomart/rugpui)**, together with the patched gpui it is written against, and comes back as a dependency at a pinned revision | D1 and D2 had rulogman, rudbman and rudbgen carrying byte-identical copies of the same widget kit, grid, editor and four vendored gpui crates, kept in step by hand. rugpui is that code with the host's concepts taken out: no configuration directory (the theme store is handed a `ThemeDirs`), no template grammar (the editor composes an `Overlay` the host supplies). What was `rudbgen-ui`, `rudbgen-grid` and `rudbgen-editor` is now `rugpui`, `rugpui-grid` and `rugpui-editor`; the template highlighter stayed behind, in `rudbgen-app`, because it is jdbgen's grammar and not a widget kit's. The patch table has to point at rugpui's vendored gpui rather than a copy of its own, or two gpui crates end up in one binary |
+| D13a | **The application-level shell follows it, as `rugpui-shell`** — a fourth crate at the same revision | The same argument one layer up. Window chrome, the self-updater, the about and update dialogs, the palette catalogues and their editor, the split-pane tree, the context-menu rows and the pieces a settings form is built out of were application code, and therefore not D13's to take — but they were also written once and copied twice, so a fix to one of them was three fixes or, more often, one. `rugpui-shell` is that code with rudbgen taken out of it: the name, the version, the release endpoints, the words and where the ignored-release tag is kept are injected by `main` through `AppIdentity`, `Strings` and `UpdatePolicy`. What stays here is what the shell cannot know — the `Workspace`, what a tab is (`PaneItem`), the body of the settings form, the domain icons, and the `i18n!` invocation with the locale files it compiles. Two consequences are deliberate: the restart after an update is an event the `Workspace` answers with `cx.restart()` — pointed first at `rugpui_shell::restart_path()`, the path recorded before the install renamed the running image aside, since Linux's `current_exe()` would otherwise follow the swap back onto the build that was just replaced — not something a dialog does to its host; and `rudbgen_core::TitlebarStyle` stays where it is, converted at the two call sites, because `rudbgen-core` is gpui-free and `rugpui-shell` is not. `main` also calls `rugpui_shell::init_process_identity` before `update::apply_pending` and `gpui_platform::application()`, ahead of `rugpui_shell::init` itself: those two update paths run before an `App` can exist and need the identity to answer through, not panic, if a host ever reached them without it |
 | D12 | **Templates are first-class documents**: an in-app editor with template-language highlighting, a variable palette, diagnostics for unknown fields, and a live preview against a selected table | This is where the port earns its keep. jdbgen stores a file path and nothing else; a typo in a field name is a silent empty string found in the output |
 
 ---
@@ -41,16 +41,16 @@ this document.
 
 | Source | Destination | Notes |
 |---|---|---|
-| `vendor/gpui{,_linux,_macos,_windows}` | ruui's `vendor/` (D13) | Byte-identical, `RULOGMAN PATCH` markers untouched. Held here until D13; the patch table now points at ruui's copies |
+| `vendor/gpui{,_linux,_macos,_windows}` | rugpui's `vendor/` (D13) | Byte-identical, `RULOGMAN PATCH` markers untouched. Held here until D13; the patch table now points at rugpui's copies |
 | `Cargo.toml` profile tables, `[patch]` table, `.gitattributes` | same | Dependency comments rewritten where the reason differs |
-| `crates/rudbman-ui/` (17 modules) | `ruui` (D13) | Whole. `actions!(rudbman_input, …)` → `ruui_input`. Grid tokens stay (the table inspector uses the grid). The theme store lost its `paths` dependency and takes a `ThemeDirs` instead |
+| `crates/rudbman-ui/` (17 modules) | `rugpui` (D13) | Whole. `actions!(rudbman_input, …)` → `rugpui_input`. Grid tokens stay (the table inspector uses the grid). The theme store lost its `paths` dependency and takes a `ThemeDirs` instead |
 | `crates/rudbman-core/` | `crates/rudbgen-core/` | `paths`, `secrets`, `settings` skeleton, `profile`'s `DriverDef`/`DriverStore`/`builtins()` and the `Redacted`/`MaskedUrl`/`MaskedProps` Debug impls. `ConnectionProfile` gains generation fields (§5). `known_hosts` stays with SSH |
 | `crates/rudbman-ssh/` | `crates/rudbgen-ssh/` | Whole. Tunnels are already wired into the connection dialog; removing them costs more than keeping them |
 | `crates/rudbman-jdbc/` | `crates/rudbgen-jdbc/` | `jvm`, `session`, `protocol`, `codec`, `error`, `response`; `spec` loses `ExtractSpec`/`TransferSpec`/`BackupSpec`; `Op` loses `Job*` and `LobRead` |
 | `bridge/` | `bridge/` | Per D3. Package renamed, `template/` dropped (it moves to Rust, D4) |
-| `crates/rudbman-grid/` | `ruui-grid` (D13) | Whole. Used by the table inspector and the custom-query test result |
-| `crates/rudbman-editor/` | `ruui-editor` (D13) | The `Highlighter` is made pluggable (a trait over a token stream) and the SQL highlighter's dependency on `rudbman-sql` is replaced by a lexer of its own. The template-language highlighter written for §8 stayed in `rudbgen-app` when the rest moved out, and composes over a base language through the crate's `Overlay` trait |
-| `crates/rudbman-app/src/`: `i18n.rs` + `locales/*.yml`, `app_settings.rs`, `caption.rs`, `icons.rs`, `about_dialog.rs`, `context_menu.rs`, `pane_tree.rs`, `theme_editor.rs`, `settings_dialog.rs`, `update.rs`, `update_dialog.rs`, `maven.rs`, `connection.rs`, `connection_dialog.rs`, `driver_manager.rs`, `explorer.rs` | `crates/rudbgen-app/src/` | Keys, strings, URLs and asset names replaced. The `Workspace` shell in `main.rs` is **not** copied — its bootstrap sequence, `actions!`, `bind_shortcuts`, menus and window-chrome helpers are. Eight of these have since moved on to `ruui-shell` (D13a): `caption.rs`, `about_dialog.rs`, `context_menu.rs`, `theme_editor.rs`, `update.rs` and `update_dialog.rs` whole, `pane_tree.rs` as `ruui_shell::pane` with `PaneItem` left behind, and the halves of `i18n.rs`, `app_settings.rs`, `icons.rs` and `settings_dialog.rs` that were not about rudbgen |
+| `crates/rudbman-grid/` | `rugpui-grid` (D13) | Whole. Used by the table inspector and the custom-query test result |
+| `crates/rudbman-editor/` | `rugpui-editor` (D13) | The `Highlighter` is made pluggable (a trait over a token stream) and the SQL highlighter's dependency on `rudbman-sql` is replaced by a lexer of its own. The template-language highlighter written for §8 stayed in `rudbgen-app` when the rest moved out, and composes over a base language through the crate's `Overlay` trait |
+| `crates/rudbman-app/src/`: `i18n.rs` + `locales/*.yml`, `app_settings.rs`, `caption.rs`, `icons.rs`, `about_dialog.rs`, `context_menu.rs`, `pane_tree.rs`, `theme_editor.rs`, `settings_dialog.rs`, `update.rs`, `update_dialog.rs`, `maven.rs`, `connection.rs`, `connection_dialog.rs`, `driver_manager.rs`, `explorer.rs` | `crates/rudbgen-app/src/` | Keys, strings, URLs and asset names replaced. The `Workspace` shell in `main.rs` is **not** copied — its bootstrap sequence, `actions!`, `bind_shortcuts`, menus and window-chrome helpers are. Eight of these have since moved on to `rugpui-shell` (D13a): `caption.rs`, `about_dialog.rs`, `context_menu.rs`, `theme_editor.rs`, `update.rs` and `update_dialog.rs` whole, `pane_tree.rs` as `rugpui_shell::pane` with `PaneItem` left behind, and the halves of `i18n.rs`, `app_settings.rs`, `icons.rs` and `settings_dialog.rs` that were not about rudbgen |
 | `.github/workflows/`, `packaging/`, `assets/render.py`, `docker/compose.yml` | same | Names and targets replaced. Container tests are opt-in exactly as in rudbman |
 
 Not brought over: `rudbman-sql` (DDL/DML planners, dialects — nothing here writes SQL to a server), `rudbman-erd`, the data/struct panes, backup/transfer/extract dialogs, `row_apply`, `data_edit`, `struct_edit`, `query*`.
@@ -89,12 +89,12 @@ rudbgen/
     └── rudbgen-app/            the binary
 ```
 
-The widget layer is not here: `ruui` (the gpui widget kit and themes), `ruui-grid`
-(the virtualized grid), `ruui-editor` (the code editor with pluggable
-highlighting) and `ruui-shell` (the application-level shell: window chrome, the
+The widget layer is not here: `rugpui` (the gpui widget kit and themes), `rugpui-grid`
+(the virtualized grid), `rugpui-editor` (the code editor with pluggable
+highlighting) and `rugpui-shell` (the application-level shell: window chrome, the
 self-updater, the about and update dialogs, the palette catalogues and their
 editor, the split-pane tree, the context-menu rows and the pieces a settings
-form is built out of) come from [ruui](https://github.com/xcomart/ruui) at a
+form is built out of) come from [rugpui](https://github.com/xcomart/rugpui) at a
 pinned revision, along with the patched gpui they are written against (D13).
 Taken as `git` dependencies at that one revision; see the root `Cargo.toml`.
 
@@ -102,9 +102,9 @@ Dependency direction (no cycles, no back-edges):
 
 ```
 rudbgen-app
- ├─→ ruui-shell ──┐
- ├─→ ruui-grid ───┤
- ├─→ ruui-editor ─┼─→ ruui ─→ gpui          (all four from ruui, D13)
+ ├─→ rugpui-shell ──┐
+ ├─→ rugpui-grid ───┤
+ ├─→ rugpui-editor ─┼─→ rugpui ─→ gpui          (all four from rugpui, D13)
  ├─→ rudbgen-template          (pure: encoding_rs, regex, chrono only)
  ├─→ rudbgen-meta ─→ rudbgen-jdbc, rudbgen-template, rudbgen-core
  ├─→ rudbgen-gen ─→ rudbgen-meta, rudbgen-template, rudbgen-core
@@ -170,7 +170,7 @@ Shown in the work area when no connection is open: saved connections as a list (
 
 ### 4.5 Template tab
 
-The editor (`ruui-editor`) with the template highlighter, split with a **live preview** rendered against the first ticked table (selectable from a dropdown in the preview header). The inspector becomes the **variable palette**: every field the current model offers (table fields, column fields inside a `for`, custom variables, statements, decorators) — clicking inserts `${…}` at the caret. Diagnostics are gutter marks with a message: parse errors from the engine, and *unknown field* warnings computed against the preview model. `Ctrl+S` writes the file; the tab shows a dirty marker.
+The editor (`rugpui-editor`) with the template highlighter, split with a **live preview** rendered against the first ticked table (selectable from a dropdown in the preview header). The inspector becomes the **variable palette**: every field the current model offers (table fields, column fields inside a `for`, custom variables, statements, decorators) — clicking inserts `${…}` at the caret. Diagnostics are gutter marks with a message: parse errors from the engine, and *unknown field* warnings computed against the preview model. `Ctrl+S` writes the file; the tab shows a dirty marker.
 
 ### 4.6 Dialogs
 
@@ -262,7 +262,7 @@ generated file is actually viewed in. Zero-width characters count zero.
 
 ## 8. The editor and highlighting
 
-`ruui-editor` is rudbman's editor with `Highlighter` behind a trait:
+`rugpui-editor` is rudbman's editor with `Highlighter` behind a trait:
 
 ```rust
 pub trait Highlighter: Send + Sync { fn tokens(&self, line: &str, state: State) -> (Vec<Span>, State); }
@@ -288,7 +288,7 @@ Dry run is the same function with a `Sink::Memory` and no policy. Preview is a d
 
 | | Scope | Done when |
 |---|---|---|
-| **M0** | Workspace shell: vendored gpui, the widget kit (now `ruui`, D13), `rudbgen-core` (settings/paths/secrets), i18n (8 locales, rudbgen keys), themes, settings dialog, about, update, window chrome, welcome screen placeholder | `cargo test --workspace` green on CI's three platforms; the window opens with the welcome screen |
+| **M0** | Workspace shell: vendored gpui, the widget kit (now `rugpui`, D13), `rudbgen-core` (settings/paths/secrets), i18n (8 locales, rudbgen keys), themes, settings dialog, about, update, window chrome, welcome screen placeholder | `cargo test --workspace` green on CI's three platforms; the window opens with the welcome screen |
 | **M1** | `rudbgen-template`: ported tests, engine, diagnostics, byte-identical fixtures | All ported tests pass; the three shipped templates match jdbgen's output |
 | **M2** | Bridge (trimmed, renamed) + `rudbgen-jdbc`, driver store with merged stock drivers, Maven download, connection dialog with test, SSH, explorer tree with ticks and filter, inspector | Connect to the sample H2, tick tables, read columns/keys/FKs in the inspector |
 | **M3** | Generate tab, template sets, generation job (cancel, policy, summary), status bar, preview & dry run | End-to-end generation against H2 produces jdbgen's fixture output |

@@ -19,11 +19,11 @@ use gpui::{
     App, Context, DragMoveEvent, Entity, EventEmitter, FocusHandle, Focusable, ScrollHandle,
     SharedString, Window, div, prelude::*, px,
 };
-use ruui::{
+use rugpui::{
     DraggedThumb, Scrollbar, ScrollbarAxis, ScrollbarState, Select, hide_later, hide_now,
     scroll_to, scrolled, theme,
 };
-use ruui_editor::EditorView;
+use rugpui_editor::EditorView;
 
 use crate::app_settings;
 use crate::i18n::ts;
@@ -218,7 +218,7 @@ impl PreviewPane {
         let highlighter = file.and_then(|file| {
             file.path
                 .extension()
-                .and_then(|ext| ruui_editor::highlighter_for_extension(&ext.to_string_lossy()))
+                .and_then(|ext| rugpui_editor::highlighter_for_extension(&ext.to_string_lossy()))
         });
         let text = file.map(|file| to_lf(&file.content)).unwrap_or_default();
         self.text.update(cx, |editor, cx| {

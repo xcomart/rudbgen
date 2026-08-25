@@ -21,10 +21,10 @@
 //! Only the marks that are *rudbgen's* are here. The four caption glyphs a
 //! self-drawn title bar needs are the same four files in every application that
 //! draws one, so they come from
-//! [`ruui_shell::WINDOW_CONTROL_ICONS`](ruui_shell::WINDOW_CONTROL_ICONS) and
+//! [`rugpui_shell::WINDOW_CONTROL_ICONS`](rugpui_shell::WINDOW_CONTROL_ICONS) and
 //! [`ICONS`] concatenates the two tables.
 
-use ruui_shell::IconSet;
+use rugpui_shell::IconSet;
 
 /// The button at the end of the tab strip that lists every open tab.
 ///
@@ -43,7 +43,7 @@ pub const NEW_TAB: &str = "icons/new-tab.svg";
 
 /// The title bar's application menu trigger.
 ///
-/// Three stacked dots rather than the button's own [`glyph`](ruui::menu)
+/// Three stacked dots rather than the button's own [`glyph`](rugpui::menu)
 /// fallback: a font's `?` sits at whatever size and baseline the face gives
 /// it, but the row it opens has nothing to do with a question — it is every
 /// command the shell has. Three dots read as "more" on every desktop that has
@@ -126,7 +126,7 @@ pub const SIDEBAR: &str = "icons/sidebar.svg";
 ///
 /// Like the window controls, it carries a heavier stroke than the set's usual
 /// `1.8` — `2.4` here. The tree renders it at 14 px (`ARROW_ICON_SIZE` in
-/// [`ruui::tree`]) out of the 24 of the viewBox, so what reaches the
+/// [`rugpui::tree`]) out of the 24 of the viewBox, so what reaches the
 /// screen is a little over half of what the file asks for: 1.4 px, which a row
 /// of pixels can hold, where `1.8` would have arrived as the same hairline the
 /// glyph was.
@@ -169,7 +169,7 @@ const APP_ICONS: &[(&str, &[u8])] = &[
 /// with [`Application::with_assets`](gpui::Application::with_assets); without
 /// it gpui's default source answers every path with `None` and the icons paint
 /// as nothing at all.
-pub const ICONS: IconSet = IconSet::new(&[ruui_shell::WINDOW_CONTROL_ICONS, APP_ICONS]);
+pub const ICONS: IconSet = IconSet::new(&[rugpui_shell::WINDOW_CONTROL_ICONS, APP_ICONS]);
 
 #[cfg(test)]
 mod tests {

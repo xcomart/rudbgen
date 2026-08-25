@@ -3,12 +3,12 @@
 //! Point it at a database, tick the tables, tick the templates, and it writes
 //! one file per table per template. This crate is the binary: the window, the
 //! chrome around it, the dialogs that hang over it, and the bootstrap sequence
-//! that gets all three on screen. Everything it draws with comes from `ruui`;
+//! that gets all three on screen. Everything it draws with comes from `rugpui`;
 //! everything it persists goes through `rudbgen-core`.
 //!
 //! # What the shell supplies
 //!
-//! `ruui-shell` is the layer above the widgets, and a good deal of what used to
+//! `rugpui-shell` is the layer above the widgets, and a good deal of what used to
 //! be here is now there: the window frame a self-decorated window has to draw
 //! for itself, the self-updater and its dialog, the about box, the palette
 //! catalogues and their colour editor, the split-pane tree, the context-menu
@@ -99,13 +99,13 @@ use rudbgen_core::{
 };
 use rudbgen_gen::{Plan, TemplateSpec};
 use rudbgen_meta::{MetaReader, Table};
-use ruui::{
+use rugpui::{
     Button, ButtonVariant, DraggedThumb, EditorThemeEntry, EditorThemeRegistry, MenuButton,
     MenuEntry, Scrollbar, ScrollbarAxis, ScrollbarState, Select, TabBar, TabItem, Theme,
     ThemeRegistry, hide_later, hide_now, scroll_to, scrolled, set_editor_theme, set_theme,
     set_window_tint, theme, tooltip_label,
 };
-use ruui_shell::{
+use rugpui_shell::{
     AboutDialog, AboutDialogEvent, AppIdentity, Pane, UpdateDialog, UpdateDialogEvent,
     apply_caption_theme, chrome, menu_rows, update,
 };
@@ -277,12 +277,12 @@ const ARP_KEY: &str = concat!(
     "{9A84AE34-E54B-46EA-B55D-61C0666D6890}_is1"
 );
 
-/// Everything `ruui-shell` has to be told about rudbgen.
+/// Everything `rugpui-shell` has to be told about rudbgen.
 ///
 /// Installed once in [`main`], before the first window and before anything can
 /// start an update check. The shell composes none of it — it only reads — which
 /// is why every field is a constant of this crate, [`AppIdentity::version`]
-/// above all: `ruui-shell` has a version of its own and it is not this one.
+/// above all: `rugpui-shell` has a version of its own and it is not this one.
 const IDENTITY: AppIdentity = AppIdentity {
     name: APP_NAME,
     version: env!("CARGO_PKG_VERSION"),
@@ -310,7 +310,7 @@ const IDENTITY: AppIdentity = AppIdentity {
 /// application name into a sentence whose key never mentions one.
 struct AppStrings;
 
-impl ruui_shell::Strings for AppStrings {
+impl rugpui_shell::Strings for AppStrings {
     fn text(&self, key: &str) -> SharedString {
         ts!(key)
     }
@@ -325,7 +325,7 @@ impl ruui_shell::Strings for AppStrings {
 /// saved setting does.
 struct IgnoredUpdate;
 
-impl ruui_shell::UpdatePolicy for IgnoredUpdate {
+impl rugpui_shell::UpdatePolicy for IgnoredUpdate {
     fn ignored(&self, cx: &App) -> Option<String> {
         app_settings::current(cx).ignored_update
     }
@@ -616,7 +616,7 @@ struct Workspace {
     job: Entity<GenerationJob>,
     /// The work area's tab strip.
     ///
-    /// A [`Pane`] rather than a [`ruui_shell::PaneTree`]: there is one pane,
+    /// A [`Pane`] rather than a [`rugpui_shell::PaneTree`]: there is one pane,
     /// and the template tab's side-by-side preview is a split *inside* the tab
     /// rather than a second pane beside it.
     pane: Pane<PaneItem>,
@@ -864,7 +864,7 @@ impl Workspace {
                     // at the top of `main`; where the platform never answered
                     // one, leaving `set_restart_path` uncalled is gpui's own
                     // default and behaves the same as before this build.
-                    if let Some(path) = ruui_shell::restart_path() {
+                    if let Some(path) = rugpui_shell::restart_path() {
                         cx.set_restart_path(path);
                     }
                     cx.restart();
@@ -890,11 +890,11 @@ impl Workspace {
         //
         // The guard is here, in this crate, rather than inside the check:
         // `cfg!(test)` compiled into a dependency is that dependency's build,
-        // so `ruui_shell::update::check` cannot tell a test build of *this*
+        // so `rugpui_shell::update::check` cannot tell a test build of *this*
         // crate from a release one, and every render test that opens a window
         // would make a real request to GitHub.
         //
-        // `ruui_shell::update::set_startup_check_enabled(false)` says the same
+        // `rugpui_shell::update::set_startup_check_enabled(false)` says the same
         // thing to the shell and is the other half of the guard; the tests
         // install it once, so that a path reaching the check some other way is
         // still silent. See [`tests::silence_the_update_check`].
@@ -2954,7 +2954,7 @@ impl Workspace {
     /// name at its left end, and — off macOS, which keeps its native traffic
     /// lights — grows a set of caption buttons at its right end. Every *control*
     /// inside it occludes, so the drag area only ever answers for the gaps
-    /// between them; see [`ruui::window_controls`]. The name is not a
+    /// between them; see [`rugpui::window_controls`]. The name is not a
     /// control and deliberately does not.
     fn render_toolbar(&self, window: &Window, cx: &mut Context<Self>) -> AnyElement {
         let theme = theme(cx);
@@ -2999,8 +2999,12 @@ impl Workspace {
 
         // The caption buttons the other two platforms have to draw themselves,
         // as the two ends a Linux desktop may ask for them at.
-        let (leading_controls, trailing_controls) =
-            chrome::window_control_strips(&ruui_shell::window_control_icons(), custom, window, cx);
+        let (leading_controls, trailing_controls) = chrome::window_control_strips(
+            &rugpui_shell::window_control_icons(),
+            custom,
+            window,
+            cx,
+        );
 
         div()
             .id("toolbar")
@@ -3485,7 +3489,7 @@ impl Workspace {
         let cancel = cx.entity();
         let dismissed = cx.entity();
 
-        ruui::modal(
+        rugpui::modal(
             "template-close",
             ts!("template.close_title"),
             px(400.),
@@ -4250,12 +4254,12 @@ fn editor_theme_for(
 
 /// Records the window's placement in the settings global.
 fn record_window_geometry(window: &Window, cx: &mut App) {
-    app_settings::record_window_geometry(ruui_shell::window_geometry(window), cx);
+    app_settings::record_window_geometry(rugpui_shell::window_geometry(window), cx);
 }
 
 /// The placement to open the window at.
 fn window_bounds(state: &WindowState, cx: &mut App) -> WindowBounds {
-    ruui_shell::window_bounds(
+    rugpui_shell::window_bounds(
         app_settings::saved_geometry(state),
         state.width,
         state.height,
@@ -4436,12 +4440,12 @@ fn install_builtins() {
 fn main() {
     env_logger::init();
 
-    // The half of `ruui_shell::init` that needs no `App`: `apply_pending` and
+    // The half of `rugpui_shell::init` that needs no `App`: `apply_pending` and
     // `clean_leftovers` both read the identity through it, and with none
     // installed they log an error and no-op rather than panic. It has to run
     // ahead of both — and ahead of `current_exe()` moving under an install —
     // which is why it is the very first thing `main` does.
-    ruui_shell::init_process_identity(IDENTITY);
+    rugpui_shell::init_process_identity(IDENTITY);
 
     // An update the previous run could only stage — because a JVM was loaded
     // into it and Windows will not let its files be renamed — is applied here,
@@ -4465,14 +4469,14 @@ fn main() {
         .with_assets(icons::ICONS)
         .with_quit_mode(QuitMode::LastWindowClosed);
     app.run(|cx: &mut App| {
-        // Everything `ruui-shell` is not allowed to guess at, handed over
+        // Everything `rugpui-shell` is not allowed to guess at, handed over
         // before anything that could read it runs. `set_strings` goes through
         // `ts!`, so the shell follows a language change without being told
         // again; `set_update_policy` is the two-line window onto the
         // `ignored_update` field of `settings.json`.
-        ruui_shell::init(IDENTITY, cx);
-        ruui_shell::set_strings(Box::new(AppStrings), cx);
-        ruui_shell::set_update_policy(Box::new(IgnoredUpdate), cx);
+        rugpui_shell::init(IDENTITY, cx);
+        rugpui_shell::set_strings(Box::new(AppStrings), cx);
+        rugpui_shell::set_update_policy(Box::new(IgnoredUpdate), cx);
 
         if let Err(error) = rudbgen_core::init_secrets() {
             log::warn!("the OS keychain is unavailable: {error}");
@@ -4497,13 +4501,13 @@ fn main() {
         // so nothing is ever built in the wrong language and then corrected.
         i18n::apply(settings.language.as_deref());
 
-        ruui::init(cx);
+        rugpui::init(cx);
         // The inspector's Columns tab is a grid, and the grid binds its own
         // keys; without this the panel draws and cannot be walked.
-        ruui_grid::init(cx);
+        rugpui_grid::init(cx);
         // The template tab's buffer and both read-only previews are
         // `EditorView`s, which bind their own keys to the `Editor` context.
-        ruui_editor::init(cx);
+        rugpui_editor::init(cx);
         // After the widget layers, because they scope their bindings to key
         // contexts the shell's own bindings have to be able to outrank.
         bind_shortcuts(cx);
@@ -4530,7 +4534,7 @@ fn main() {
         // The window's geometry is only in memory until here; this is the one
         // write of `settings.json` the shell performs. Nothing in the closure
         // re-enters gpui — the file write is the whole of it — which is what
-        // keeps it clear of the X11 backend's re-entrancy trap, the one ruui's
+        // keeps it clear of the X11 backend's re-entrancy trap, the one rugpui's
         // vendored `client.rs` patch exists for. Quitting is no longer this
         // closure's business: gpui does it, from the quit mode set on the
         // application above, and it runs these observers first — so the
@@ -4598,7 +4602,7 @@ mod tests {
     ///
     /// Belt and braces beside the `cfg!(test)` guard in [`Workspace::new`]:
     /// every test that builds a workspace calls this first, so that no path
-    /// into `ruui_shell::update::check` — this one or a later one — can put an
+    /// into `rugpui_shell::update::check` — this one or a later one — can put an
     /// HTTPS request to GitHub inside a test run.
     fn silence_the_update_check() {
         static ONCE: Once = Once::new();
@@ -4910,7 +4914,7 @@ mod tests {
     fn the_window_opens_on_the_welcome_screen(cx: &mut gpui::TestAppContext) {
         cx.update(|cx| {
             app_settings::init(cx);
-            ruui::init(cx);
+            rugpui::init(cx);
         });
         silence_the_update_check();
         let window = cx.add_window(|window, cx| Workspace::new(TitlebarStyle::Custom, window, cx));
@@ -4974,8 +4978,8 @@ mod tests {
 
         cx.update(|cx| {
             app_settings::init(cx);
-            ruui::init(cx);
-            ruui_grid::init(cx);
+            rugpui::init(cx);
+            rugpui_grid::init(cx);
         });
         silence_the_update_check();
         let window = cx.add_window(|window, cx| Workspace::new(TitlebarStyle::Custom, window, cx));
@@ -5156,8 +5160,8 @@ mod tests {
 
         cx.update(|cx| {
             app_settings::init(cx);
-            ruui::init(cx);
-            ruui_grid::init(cx);
+            rugpui::init(cx);
+            rugpui_grid::init(cx);
         });
         // The run happens on a thread of its own, and a thread of its own is
         // what the test scheduler otherwise refuses: it wakes gpui's tasks from
@@ -5358,9 +5362,9 @@ mod tests {
 
         cx.update(|cx| {
             app_settings::init(cx);
-            ruui::init(cx);
-            ruui_grid::init(cx);
-            ruui_editor::init(cx);
+            rugpui::init(cx);
+            rugpui_grid::init(cx);
+            rugpui_editor::init(cx);
         });
         cx.executor().allow_parking();
         silence_the_update_check();
@@ -5521,9 +5525,9 @@ mod tests {
 
         cx.update(|cx| {
             app_settings::init(cx);
-            ruui::init(cx);
-            ruui_grid::init(cx);
-            ruui_editor::init(cx);
+            rugpui::init(cx);
+            rugpui_grid::init(cx);
+            rugpui_editor::init(cx);
         });
         cx.executor().allow_parking();
         silence_the_update_check();
@@ -5710,9 +5714,9 @@ mod tests {
 
         cx.update(|cx| {
             app_settings::init(cx);
-            ruui::init(cx);
-            ruui_grid::init(cx);
-            ruui_editor::init(cx);
+            rugpui::init(cx);
+            rugpui_grid::init(cx);
+            rugpui_editor::init(cx);
         });
         cx.executor().allow_parking();
         silence_the_update_check();
@@ -5913,7 +5917,7 @@ mod tests {
     fn the_panels_toggle_and_the_layout_is_remembered(cx: &mut gpui::TestAppContext) {
         cx.update(|cx| {
             app_settings::init(cx);
-            ruui::init(cx);
+            rugpui::init(cx);
         });
         silence_the_update_check();
         let window = cx.add_window(|window, cx| Workspace::new(TitlebarStyle::Custom, window, cx));
@@ -5955,7 +5959,7 @@ mod tests {
     fn the_status_bar_counts_the_ticked_tables(cx: &mut gpui::TestAppContext) {
         cx.update(|cx| {
             app_settings::init(cx);
-            ruui::init(cx);
+            rugpui::init(cx);
         });
         silence_the_update_check();
         let window = cx.add_window(|window, cx| Workspace::new(TitlebarStyle::Custom, window, cx));
@@ -6030,8 +6034,8 @@ mod tests {
     fn a_template_opens_edits_diagnoses_and_saves(cx: &mut gpui::TestAppContext) {
         cx.update(|cx| {
             app_settings::init(cx);
-            ruui::init(cx);
-            ruui_editor::init(cx);
+            rugpui::init(cx);
+            rugpui_editor::init(cx);
         });
 
         let dir = tempfile::tempdir().expect("a temporary directory");
@@ -6155,8 +6159,8 @@ mod tests {
     fn the_completion_popup_offers_and_accepts(cx: &mut gpui::TestAppContext) {
         cx.update(|cx| {
             app_settings::init(cx);
-            ruui::init(cx);
-            ruui_editor::init(cx);
+            rugpui::init(cx);
+            rugpui_editor::init(cx);
         });
 
         let dir = tempfile::tempdir().expect("a temporary directory");
@@ -6203,7 +6207,7 @@ mod tests {
     fn the_dialogs_open_from_their_actions_and_close_on_escape(cx: &mut gpui::TestAppContext) {
         cx.update(|cx| {
             app_settings::init(cx);
-            ruui::init(cx);
+            rugpui::init(cx);
         });
         silence_the_update_check();
         let window = cx.add_window(|window, cx| Workspace::new(TitlebarStyle::Custom, window, cx));

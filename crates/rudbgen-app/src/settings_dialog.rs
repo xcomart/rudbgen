@@ -33,17 +33,17 @@ use gpui::{
     Subscription, Window, actions, div, prelude::*, px,
 };
 use rudbgen_core::{AppSettings, OverwritePolicy, TitlebarStyle};
-use ruui::{
+use rugpui::{
     Button, ButtonVariant, Checkbox, DraggedThumb, EditorTheme, EditorThemeRegistry, SchemePreview,
     SchemeSelect, SchemeSwatch, Scrollbar, ScrollbarAxis, ScrollbarState, Segmented, Select,
     TextInput, Theme, ThemeRegistry, form_row, hide_later, hide_now, modal, scroll_to, scrolled,
     theme,
 };
-use ruui_shell::form::{
+use rugpui_shell::form::{
     format_number, hint, installed_fonts, parse_number, restrict_to_number, section, set_text,
     suffixed, text,
 };
-use ruui_shell::{
+use rugpui_shell::{
     CatalogActionEvent, CatalogActions, CatalogFile, ThemeCatalog, ThemeEditor, ThemeEditorEvent,
 };
 
@@ -195,7 +195,7 @@ pub enum SettingsDialogEvent {
 
 /// Which of the two pickers a management row belongs to.
 ///
-/// Everything a row *does* is [`ruui_shell::CatalogActions`] over the catalogue
+/// Everything a row *does* is [`rugpui_shell::CatalogActions`] over the catalogue
 /// it was built with; what is left here is which of the dialog's own two form
 /// fields an event about a selection refers to.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -229,7 +229,7 @@ fn ui_theme_swatches(cx: &App) -> Vec<SchemeSwatch> {
 ///
 /// The four token colors a reader tells apart first — keyword, string, number
 /// and comment — on the editor's own page. A syntax palette really wants to be
-/// judged in arrangement, which is what [`ruui::EditorThemePicker`] is
+/// judged in arrangement, which is what [`rugpui::EditorThemePicker`] is
 /// for and what the theme editor still shows; a settings row that has to fit
 /// beside a dozen other settings gets the hues and the contrast, which is
 /// enough to choose between themes by name.
@@ -323,7 +323,7 @@ pub struct SettingsDialog {
     /// Keeps the two management rows' subscriptions alive.
     _catalog_events: [Subscription; 2],
     /// The colour editor, while one is open. The dialog renders it *instead of*
-    /// the form rather than over it; see [`ruui_shell::theme_editor`].
+    /// the form rather than over it; see [`rugpui_shell::theme_editor`].
     editor: Option<Entity<ThemeEditor>>,
     /// Keeps the open editor's subscription alive.
     editor_events: Option<Subscription>,
@@ -437,14 +437,13 @@ impl SettingsDialog {
         // rebuilt would drop the confirmation it was in the middle of asking.
         let defaults = AppSettings::default();
         let dirs = app_settings::theme_dirs_or_empty();
-        let ui_catalog: Arc<dyn ThemeCatalog> = Arc::new(ruui_shell::UiThemeCatalog::new(
+        let ui_catalog: Arc<dyn ThemeCatalog> = Arc::new(rugpui_shell::UiThemeCatalog::new(
             dirs.clone(),
             defaults.theme.clone(),
         ));
-        let editor_catalog: Arc<dyn ThemeCatalog> = Arc::new(ruui_shell::EditorThemeCatalog::new(
-            dirs,
-            defaults.editor_theme.clone(),
-        ));
+        let editor_catalog: Arc<dyn ThemeCatalog> = Arc::new(
+            rugpui_shell::EditorThemeCatalog::new(dirs, defaults.editor_theme.clone()),
+        );
         let ui_theme_actions = cx.new(|_| CatalogActions::new(ui_catalog, tab::UI_THEME_ACTIONS));
         let editor_theme_actions =
             cx.new(|_| CatalogActions::new(editor_catalog, tab::EDITOR_THEME_ACTIONS));
@@ -688,7 +687,7 @@ impl SettingsDialog {
     ///
     /// The row owns the files and the confirmation; the dialog owns the form
     /// field the selection lives in and the body the editor is drawn instead
-    /// of. See [`ruui_shell::catalog_ui`] for why the line is where it is.
+    /// of. See [`rugpui_shell::catalog_ui`] for why the line is where it is.
     fn on_catalog_event(
         &mut self,
         catalog: Catalog,
@@ -891,8 +890,8 @@ impl SettingsDialog {
     /// checked before the dropdowns because it replaces the form outright:
     /// while it is up there is no list to close. A delete confirmation under
     /// one of the pickers is checked last, through
-    /// [`ruui_shell::CatalogActions::is_confirming`] and
-    /// [`ruui_shell::CatalogActions::cancel_confirm`], so that the row's own
+    /// [`rugpui_shell::CatalogActions::is_confirming`] and
+    /// [`rugpui_shell::CatalogActions::cancel_confirm`], so that the row's own
     /// question is taken back before `Escape` reaches the dialog around it.
     ///
     /// Public because the key does not actually arrive here: gpui matches key
@@ -1518,7 +1517,7 @@ impl Render for SettingsDialog {
         // While a colour is being edited the form steps aside entirely rather
         // than being covered up, so that the window's tab ring holds only the
         // controls that are actually on screen; see
-        // [`ruui_shell::theme_editor`]. The form is not even built in that case
+        // [`rugpui_shell::theme_editor`]. The form is not even built in that case
         // — it would be built afresh on every keystroke in the editor and
         // thrown away again.
         let (title, body) = match self.editor.clone() {
@@ -1753,7 +1752,7 @@ mod tests {
             ts!("settings.system_default"),
             system_default(),
             // The words the two management rows say. Drawn by
-            // `ruui_shell::catalog_ui` out of these very keys, which is why a
+            // `rugpui_shell::catalog_ui` out of these very keys, which is why a
             // typo in one of them is still this crate's mistake to catch.
             ts!("settings.manage.duplicate"),
             ts!("settings.manage.edit"),

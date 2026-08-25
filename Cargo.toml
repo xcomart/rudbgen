@@ -16,40 +16,40 @@ members = ["crates/*"]
 # application's own, the X11 backend running its close callbacks with the client
 # `RefCell` borrowed, X11's `is_transparent` ignoring client-side decorations,
 # and X11 having no counterpart to Wayland's `org_kde_kwin_blur`. rudbgen does
-# not carry those trees itself: `ruui` — the widget kit this application draws
+# not carry those trees itself: `rugpui` — the widget kit this application draws
 # with, and which is written against the same gpui — vendors them and documents
 # them hunk by hunk in its own root manifest. The table below simply points at
-# ruui's copies, so that there is one vendored gpui and not two.
+# rugpui's copies, so that there is one vendored gpui and not two.
 #
 # The patch table is not optional and its four entries are not optional either.
-# Without it this workspace would resolve gpui from Zed's monorepo while `ruui`
+# Without it this workspace would resolve gpui from Zed's monorepo while `rugpui`
 # resolved it from the patched copy, two gpui crates would end up in one binary,
 # and the `Global`s the widgets install would be invisible to the application.
 #
-# `ruui` and the three crates built on it are `git` dependencies now that
-# `https://github.com/xcomart/ruui` is published, and the four gpui crates
+# `rugpui` and the three crates built on it are `git` dependencies now that
+# `https://github.com/xcomart/rugpui` is published, and the four gpui crates
 # below are pinned the same way. All eight entries — the four crates in
 # `[workspace.dependencies]` and the four here — name the *same* revision:
 # that is what makes them one source rather than several checkouts of the
 # same repository, and so what keeps one gpui in the link. Bumping to a newer
-# ruui revision means moving all eight together.
+# rugpui revision means moving all eight together.
 #
-# Working on ruui and rudbgen at once still works without publishing every
+# Working on rugpui and rudbgen at once still works without publishing every
 # change: a `.cargo/config.toml` at the repository root (not committed) can
 # carry
-#     [patch."https://github.com/xcomart/ruui"]
-#     ruui = { path = "../ruui/crates/ruui" }
-#     ruui-grid = { path = "../ruui/crates/ruui-grid" }
-#     ruui-editor = { path = "../ruui/crates/ruui-editor" }
-#     ruui-shell = { path = "../ruui/crates/ruui-shell" }
+#     [patch."https://github.com/xcomart/rugpui"]
+#     rugpui = { path = "../rugpui/crates/rugpui" }
+#     rugpui-grid = { path = "../rugpui/crates/rugpui-grid" }
+#     rugpui-editor = { path = "../rugpui/crates/rugpui-editor" }
+#     rugpui-shell = { path = "../rugpui/crates/rugpui-shell" }
 # to override the git dependencies with a sibling checkout; the four vendored
 # gpui crates below can be overridden by path the same way if they, too, are
 # being edited locally.
 [patch."https://github.com/zed-industries/zed"]
-gpui = { git = "https://github.com/xcomart/ruui", rev = "041fa13c5225a6601a61476572ba75b387248f63" }
-gpui_linux = { git = "https://github.com/xcomart/ruui", rev = "041fa13c5225a6601a61476572ba75b387248f63" }
-gpui_macos = { git = "https://github.com/xcomart/ruui", rev = "041fa13c5225a6601a61476572ba75b387248f63" }
-gpui_windows = { git = "https://github.com/xcomart/ruui", rev = "041fa13c5225a6601a61476572ba75b387248f63" }
+gpui = { git = "https://github.com/xcomart/rugpui", rev = "8810c93ddc2382276c60f20d5317b87f8cf7e31b" }
+gpui_linux = { git = "https://github.com/xcomart/rugpui", rev = "8810c93ddc2382276c60f20d5317b87f8cf7e31b" }
+gpui_macos = { git = "https://github.com/xcomart/rugpui", rev = "8810c93ddc2382276c60f20d5317b87f8cf7e31b" }
+gpui_windows = { git = "https://github.com/xcomart/rugpui", rev = "8810c93ddc2382276c60f20d5317b87f8cf7e31b" }
 
 [workspace.package]
 version = "0.1.0"
@@ -103,7 +103,7 @@ ropey = { version = "1.6", default-features = false, features = [
 ] }
 
 # --- HTTP: the driver downloader ---
-# Maven Central is the only host rudbgen itself fetches from — `ruui-shell`'s
+# Maven Central is the only host rudbgen itself fetches from — `rugpui-shell`'s
 # updater talks to the GitHub releases API through a client of its own — and it
 # is fetched from a background thread that is already blocking on a file write,
 # so a synchronous client is the right shape and an async runtime would be a
@@ -159,7 +159,7 @@ zeroize = "1"
 # The three crates that used to sit beside it — `windows`, `windows-registry`
 # and `raw-window-handle` — went with the code that named them: pinning the DWM
 # caption to the app theme and correcting the `DisplayVersion` in the uninstall
-# entry after a self-update are both `ruui-shell`'s now, and it declares them
+# entry after a self-update are both `rugpui-shell`'s now, and it declares them
 # itself.
 winresource = "0.1"
 
@@ -220,11 +220,11 @@ russh = { version = "0.62", default-features = false, features = [
 jni = { version = "0.22", features = ["invocation"] }
 
 # --- the widget kit ---
-# `ruui` is the gpui widget kit these three applications share — rulogman,
+# `rugpui` is the gpui widget kit these three applications share — rulogman,
 # rudbman and rudbgen — extracted so that a fix made once is a fix everywhere.
-# `ruui-grid` is the virtualised result grid and `ruui-editor` the code editor.
+# `rugpui-grid` is the virtualised result grid and `rugpui-editor` the code editor.
 #
-# `ruui-shell` is the layer *above* the widgets, and it is here for the same
+# `rugpui-shell` is the layer *above* the widgets, and it is here for the same
 # reason the kit is: the window that draws its own title bar, the self-updater,
 # the about and update dialogs, the split-pane tree, the palette editor and the
 # pieces a settings form is built out of were each written once in this
@@ -232,12 +232,12 @@ jni = { version = "0.22", features = ["invocation"] }
 # the version, the release endpoints, the words and the ignored-release tag are
 # all injected by `main` at start-up.
 #
-# All four are built on `ruui` and taken at one revision along with the gpui the
+# All four are built on `rugpui` and taken at one revision along with the gpui the
 # patch table at the top of this file points at.
-ruui = { git = "https://github.com/xcomart/ruui", rev = "041fa13c5225a6601a61476572ba75b387248f63" }
-ruui-grid = { git = "https://github.com/xcomart/ruui", rev = "041fa13c5225a6601a61476572ba75b387248f63" }
-ruui-editor = { git = "https://github.com/xcomart/ruui", rev = "041fa13c5225a6601a61476572ba75b387248f63" }
-ruui-shell = { git = "https://github.com/xcomart/ruui", rev = "041fa13c5225a6601a61476572ba75b387248f63" }
+rugpui = { git = "https://github.com/xcomart/rugpui", rev = "8810c93ddc2382276c60f20d5317b87f8cf7e31b" }
+rugpui-grid = { git = "https://github.com/xcomart/rugpui", rev = "8810c93ddc2382276c60f20d5317b87f8cf7e31b" }
+rugpui-editor = { git = "https://github.com/xcomart/rugpui", rev = "8810c93ddc2382276c60f20d5317b87f8cf7e31b" }
+rugpui-shell = { git = "https://github.com/xcomart/rugpui", rev = "8810c93ddc2382276c60f20d5317b87f8cf7e31b" }
 
 # --- internal crates ---
 rudbgen-core = { path = "crates/rudbgen-core" }

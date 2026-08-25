@@ -632,7 +632,7 @@ settings:
 # puts up when GitHub has a newer release than the running build, the manual
 # check from the menu, and the download that installs it. Both version numbers
 # are values, not words, and so is `%{app}` — the application's own name, which
-# `ruui-shell` fills in and which is never translated.
+# `rugpui-shell` fills in and which is never translated.
 update:
   title: Update available
   available: "%{app} %{version} is available."

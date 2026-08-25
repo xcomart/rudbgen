@@ -7,7 +7,7 @@ The mark is a sheet of generated source — corner folded, `</>` printed on it �
 on a dark One Dark tile. One subject, filling the tile, because 16 px — a
 taskbar, a window list — is the size an app icon is mostly seen at and there is
 room for one shape there. The page is the app's `grid_pk` gold and the glyph is
-its `accent` blue, both from ruui's `crates/ruui/src/theme.rs`; they are
+its `accent` blue, both from rugpui's `crates/rugpui/src/theme.rs`; they are
 rudbman's two colours swapped, so the two marks are told apart at 16 px by
 which colour holds the silhouette. The reasoning, and why not the palette's
 green, is in the comment at the top of `icon.svg`.

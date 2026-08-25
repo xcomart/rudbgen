@@ -35,7 +35,7 @@ use rudbgen_core::{
     AbbreviationStore, ConnectionStore, GenerationProfile, TemplateRef, TemplateSet,
     TemplateSetStore, config_dir,
 };
-use ruui::{
+use rugpui::{
     Button, ButtonVariant, Checkbox, Scrollbar, ScrollbarAxis, ScrollbarState, Select, TextInput,
     Theme, form_row, hide_later, hide_now, modal, scroll_to, scrolled, theme, tooltip_label,
 };
@@ -807,7 +807,7 @@ impl GeneratePane {
     /// Scrolls the panel when its thumb is dragged.
     pub fn drag_scrollbar(
         &mut self,
-        event: &gpui::DragMoveEvent<ruui::DraggedThumb>,
+        event: &gpui::DragMoveEvent<rugpui::DraggedThumb>,
         cx: &mut Context<Self>,
     ) {
         let Some(progress) = self.bar().dragged(event, cx) else {
@@ -1330,7 +1330,7 @@ impl Render for GeneratePane {
 
 /// A labelled row of the options block.
 ///
-/// [`ruui::form_row`]'s label column is sized for a dialog; the options
+/// [`rugpui::form_row`]'s label column is sized for a dialog; the options
 /// here sit beside a template list and need a wider one, so the shape is
 /// repeated rather than the widget parameterised for one caller.
 fn labelled(label: SharedString, control: impl IntoElement) -> impl IntoElement {

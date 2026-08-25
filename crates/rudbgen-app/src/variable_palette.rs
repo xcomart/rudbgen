@@ -15,7 +15,7 @@ use gpui::{
     App, Context, DragMoveEvent, Entity, EventEmitter, FocusHandle, Focusable, ScrollHandle,
     SharedString, Subscription, Window, div, prelude::*, px,
 };
-use ruui::{
+use rugpui::{
     DraggedThumb, Scrollbar, ScrollbarAxis, ScrollbarState, TextInput, hide_later, hide_now,
     scroll_to, scrolled, theme, tooltip_label,
 };

@@ -184,25 +184,25 @@ job and the milestone plan — lives in
 [docs/architecture.md](docs/architecture.md). Current progress and open items are
 tracked in [docs/status.md](docs/status.md).
 
-Everything rudbgen draws with comes from **ruui** — the gpui widget kit, the
-virtualised grid, the code editor and **ruui-shell**, the layer above them,
+Everything rudbgen draws with comes from **rugpui** — the gpui widget kit, the
+virtualised grid, the code editor and **rugpui-shell**, the layer above them,
 extracted so that the three applications that had been carrying byte-identical
 copies of them ([rulogman](https://github.com/xcomart/rulogman),
 [rudbman](https://github.com/xcomart/rudbman) and this one) share one copy and
-one fix. `ruui-shell` is the application-shaped half of that: the window that
+one fix. `rugpui-shell` is the application-shaped half of that: the window that
 draws its own title bar, the self-updater, the about and update dialogs, the
 palette catalogues and their editor, the split-pane tree and the pieces a
 settings form is built out of. It knows nothing about rudbgen — the name, the
 version, the release endpoints, the words and the ignored-release tag are
-injected at start-up. ruui also vendors the gpui these widgets are written
+injected at start-up. rugpui also vendors the gpui these widgets are written
 against: a pinned
 revision of Zed's monorepo rather than crates.io, whose newest release (0.2.2)
 predates the split of the crate into a platform-independent core, a
 `gpui_platform` facade and per-OS backends, with four crates patched on top of
 it for the live title-bar switch and three X11 fixes upstream has no answer for.
 The root [`Cargo.toml`](Cargo.toml) explains why the patch table here has to
-point at ruui's copies rather than carry its own.
+point at rugpui's copies rather than carry its own.
 
 ## License
 
-[MIT](LICENSE). The gpui crates ruui vendors keep their upstream licenses.
+[MIT](LICENSE). The gpui crates rugpui vendors keep their upstream licenses.

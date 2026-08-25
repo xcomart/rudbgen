@@ -6,7 +6,7 @@ the work up. The design and the contracts all live in
 work has come, what is left, and how work is done in this repository**. It is
 updated whenever a milestone ends.
 
-Last updated: 2026-08-25 (the application-level shell extracted to [ruui](https://github.com/xcomart/ruui) as `ruui-shell`, D13a — `caption.rs`, `about_dialog.rs`, `context_menu.rs`, `pane_tree.rs`, `theme_editor.rs`, `update.rs` and `update_dialog.rs` are gone from `rudbgen-app`, along with the halves of `i18n.rs`, `app_settings.rs`, `icons.rs` and `settings_dialog.rs` that were not about rudbgen; what the shell has to be told is injected in `main` through `AppIdentity`, `Strings` and `UpdatePolicy`. Before that: the widget layer extracted to the same repository, D13 — `rudbgen-ui`, `rudbgen-grid`, `rudbgen-editor` and `vendor/` come back as `ruui`, `ruui-grid` and `ruui-editor`; the template highlighter stayed, in `rudbgen-app`. Before that: M5 done — the abbreviation rules editor, the jdbgen import wizard and the custom-query Test's remaining half. Every milestone M0–M6 is now closed on Linux).
+Last updated: 2026-08-25 (the application-level shell extracted to [rugpui](https://github.com/xcomart/rugpui) as `rugpui-shell`, D13a — `caption.rs`, `about_dialog.rs`, `context_menu.rs`, `pane_tree.rs`, `theme_editor.rs`, `update.rs` and `update_dialog.rs` are gone from `rudbgen-app`, along with the halves of `i18n.rs`, `app_settings.rs`, `icons.rs` and `settings_dialog.rs` that were not about rudbgen; what the shell has to be told is injected in `main` through `AppIdentity`, `Strings` and `UpdatePolicy`. Before that: the widget layer extracted to the same repository, D13 — `rudbgen-ui`, `rudbgen-grid`, `rudbgen-editor` and `vendor/` come back as `rugpui`, `rugpui-grid` and `rugpui-editor`; the template highlighter stayed, in `rudbgen-app`. Before that: M5 done — the abbreviation rules editor, the jdbgen import wizard and the custom-query Test's remaining half. Every milestone M0–M6 is now closed on Linux).
 
 ## Where things stand
 
@@ -24,14 +24,14 @@ Last updated: 2026-08-25 (the application-level shell extracted to [ruui](https:
 
 | Piece | Notes |
 |---|---|
-| `ruui`, `ruui-grid`, `ruui-editor` | Not in this tree at all (D13). The widget kit, the virtualised grid and the code editor live in [ruui](https://github.com/xcomart/ruui), together with the four patched gpui crates they are written against — `RULOGMAN PATCH` markers and all — because rulogman, rudbman and rudbgen were carrying byte-identical copies of every one of them. They come back as dependencies at one pinned revision, and the `[patch."https://github.com/zed-industries/zed"]` table has to name that same revision or two gpui crates end up in one binary. Nothing in ruui is rudbgen-specific and nothing in it may become so: the theme store is handed a `ThemeDirs` rather than knowing a configuration directory, and the editor composes an `Overlay` the host supplies rather than knowing a template grammar |
-| `Cargo.toml` | The workspace, the `[patch."https://github.com/zed-industries/zed"]` table pinning gpui to one revision of Zed's monorepo — pointed at ruui's vendored copies (D13) — `[workspace.dependencies]` for what the crates use, and rudbman's profile tables. Every dependency still carries its "why" comment, rewritten where the reason differs. `rudbgen-app` pulls in `gpui_platform`, so all four patches are live |
+| `rugpui`, `rugpui-grid`, `rugpui-editor` | Not in this tree at all (D13). The widget kit, the virtualised grid and the code editor live in [rugpui](https://github.com/xcomart/rugpui), together with the four patched gpui crates they are written against — `RULOGMAN PATCH` markers and all — because rulogman, rudbman and rudbgen were carrying byte-identical copies of every one of them. They come back as dependencies at one pinned revision, and the `[patch."https://github.com/zed-industries/zed"]` table has to name that same revision or two gpui crates end up in one binary. Nothing in rugpui is rudbgen-specific and nothing in it may become so: the theme store is handed a `ThemeDirs` rather than knowing a configuration directory, and the editor composes an `Overlay` the host supplies rather than knowing a template grammar |
+| `Cargo.toml` | The workspace, the `[patch."https://github.com/zed-industries/zed"]` table pinning gpui to one revision of Zed's monorepo — pointed at rugpui's vendored copies (D13) — `[workspace.dependencies]` for what the crates use, and rudbman's profile tables. Every dependency still carries its "why" comment, rewritten where the reason differs. `rudbgen-app` pulls in `gpui_platform`, so all four patches are live |
 | `crates/rudbgen-core` | rudbman's core with the fields rudbgen does not have removed and the ones it needs added — see the next table |
 | `crates/rudbgen-ssh` | rudbman's tunnel crate, whole: russh, a bastion without a PTY, loopback binds, the trusted-host-key check against `known_hosts`. Tunnels are already wired into the connection dialog rudbgen inherits, so removing them would cost more than keeping them (§2.1) |
-| `crates/rudbgen-app` | The binary, `rudbgen`. rudbman's bootstrap sequence, `actions!`, `bind_shortcuts`, menus and window-chrome helpers; its `app_settings`, `caption`, `icons`, `about_dialog`, `theme_editor`, `settings_dialog`, `update` and `update_dialog` with the names, URLs and settings that changed; `i18n.rs` and eight locale files trimmed to rudbgen's keys; a `Workspace` written from scratch around §4.2's sketch. Most of that shell has since gone to `ruui-shell` (D13a); see the third table below for what diverged and what is left |
+| `crates/rudbgen-app` | The binary, `rudbgen`. rudbman's bootstrap sequence, `actions!`, `bind_shortcuts`, menus and window-chrome helpers; its `app_settings`, `caption`, `icons`, `about_dialog`, `theme_editor`, `settings_dialog`, `update` and `update_dialog` with the names, URLs and settings that changed; `i18n.rs` and eight locale files trimmed to rudbgen's keys; a `Workspace` written from scratch around §4.2's sketch. Most of that shell has since gone to `rugpui-shell` (D13a); see the third table below for what diverged and what is left |
 | `bridge/` | rudbman's JDBC bridge, package `comart.rudbgen.bridge`, artefact `rudbgen-bridge.jar`, **trimmed per D3** — see the table below for what went. 58 JUnit tests against in-memory H2; `cd bridge && ./gradlew build` runs them |
 | `crates/rudbgen-jdbc` | rudbman's JNI crate against that JAR: `jvm`, `session`, `protocol`, `codec`, `error`, `response`, `spec`, minus the data plane (D3). Env names are `RUDBGEN_JAVA_HOME`, `RUDBGEN_BRIDGE_JAR`, `RUDBGEN_TEST_H2_JAR`. 46 unit tests, 22 H2 integration tests that boot a real JVM, and two opt-in suites (five servers, SQLite) |
-| `crates/rudbgen-app/src/template_syntax.rs` | The one piece of the editor that did not go to ruui (D13): jdbgen's template grammar, tokenized a second time — line by line and never failing, because the engine's parser either parses a whole template or returns a `ParseError`, and an editor whose colours vanish on every other keystroke is worse than one with none. It implements `ruui_editor::Overlay` — spans plus the byte ranges it took charge of — and `template_highlighter_for_path` composes it over the base language the file's extension names, through `ruui_editor::CompositeHighlighter`. 27 tests. See the M4 row above and §8 |
+| `crates/rudbgen-app/src/template_syntax.rs` | The one piece of the editor that did not go to rugpui (D13): jdbgen's template grammar, tokenized a second time — line by line and never failing, because the engine's parser either parses a whole template or returns a `ParseError`, and an editor whose colours vanish on every other keystroke is worse than one with none. It implements `rugpui_editor::Overlay` — spans plus the byte ranges it took charge of — and `template_highlighter_for_path` composes it over the base language the file's extension names, through `rugpui_editor::CompositeHighlighter`. 27 tests. See the M4 row above and §8 |
 | `docker/compose.yml` | The five servers the opt-in `containers` suite runs against, on non-standard ports so a developer's own server is never shadowed. `rudbgen`/`rudbgen` everywhere but SQL Server, whose `sa` complexity rule forces `sa`/`Rudbgen!Passw0rd` |
 | `assets/` | `icon.svg` — the master mark, a sheet of generated source with `</>` on it, rudbman's two colours swapped — with `icon-128.png`, `icon-256.png`, `icon.ico` and `icon.icns` rendered from it by `render.py`. `assets/drivers/` holds jdbgen's eleven driver icons, unused until M2 |
 | `.github/workflows/ci.yml` | rudbman's `check` job — three platforms, `cargo fmt --check` once, `clippy --workspace --all-targets --locked -- -D warnings`, `cargo test --workspace --locked` — now with the JDK/Gradle steps in front of it (`cd bridge && ./gradlew build`, then the H2 JAR handed to the Rust tests through `RUDBGEN_TEST_H2_JAR`), plus the opt-in `containers` job: five servers from `docker/compose.yml`'s ports, SQLite riding along, all of them reading metadata only |
@@ -81,9 +81,9 @@ write-atomic (`paths::write_atomic`).
 
 - **`main.rs` is new.** rudbman's 8,400-line `Workspace` is not copied (§2.1).
   What came over is the bootstrap sequence — `env_logger` →
-  `ruui_shell::init_process_identity` → `update::apply_pending` →
+  `rugpui_shell::init_process_identity` → `update::apply_pending` →
   `application().with_assets(Icons)` → keychain → settings → `i18n::apply` →
-  `ruui::init` → shortcuts → menus → themes → the window-closed save →
+  `rugpui::init` → shortcuts → menus → themes → the window-closed save →
   `open_window` — and every window-chrome helper: `draws_own_titlebar`,
   `titlebar_gestures`, `client_tiling`, `render_resize_edges`,
   `window_appearance`, `window_bounds`, `record_window_geometry`, the caption
@@ -106,15 +106,15 @@ write-atomic (`paths::write_atomic`).
   `Segmented` of overwrite / skip / ask (D11). Everything else — the two theme
   pickers with their management rows, the live preview, the colour editor, the
   language switch — is unchanged.
-- **`context_menu.rs`** and **`pane_tree.rs`** have since gone to `ruui-shell`
+- **`context_menu.rs`** and **`pane_tree.rs`** have since gone to `rugpui-shell`
   (D13a) as `menu_rows` and `pane`; what stayed is `pane_item.rs` — rudbgen's
   three tabs, `Generate`, `Template { file, title, dirty }` and `Preview`,
   carrying identities rather than views — and the two lookups over them, written
-  as an extension trait over `ruui_shell::Pane::position`.
+  as an extension trait over `rugpui_shell::Pane::position`.
 - **The updater** carries a **fresh `ProductCode` GUID**: a product code names a
   product, and sharing rudbman's would have winget treat an installed rudbman
   as an installed rudbgen. It is `IDENTITY.windows_arp_key` in `main.rs` now,
-  handed to `ruui-shell` along with the payload, the release endpoints and
+  handed to `rugpui-shell` along with the payload, the release endpoints and
   `must_defer`, which answers `false` — the question it asks is "is a JVM loaded
   into this process", and no path reachable from an update check loads one. The
   test that checked the GUID against `packaging/windows/rudbgen.iss` comes back
@@ -227,16 +227,16 @@ suite is the bulk), `rudbgen-template` (130), `rudbgen-meta` (50),
 `rudbgen-jdbc` (75), `rudbgen-gen` (55), `rudbgen-import` (68) and
 `rudbgen-app` (225), doc tests included. The ones that need a JVM run against a
 real H2 and are counted above; the ones that need a server or a keychain are
-`#[ignore]`d. The widget layer's own tests — some 350 of them — moved to ruui
+`#[ignore]`d. The widget layer's own tests — some 350 of them — moved to rugpui
 with the code (D13) and run in that workspace; the 95 that covered the
-application shell followed them there with `ruui-shell` (D13a), the updater's
+application shell followed them there with `rugpui-shell` (D13a), the updater's
 46 among them. The 27 that cover the template grammar stayed and are counted in
 `rudbgen-app`.
 
 ## What is next
 
 Every milestone M0–M6 is done on Linux: `cargo build --workspace`,
-`cargo test --workspace` (726 passing, 7 `#[ignore]`d, plus ruui's own suite),
+`cargo test --workspace` (726 passing, 7 `#[ignore]`d, plus rugpui's own suite),
 `cargo clippy --workspace --all-targets -- -D warnings` and
 `cargo fmt --all --check` are all green, and `cargo run -p rudbgen-app` opens
 the sample H2 connection, generates against it, edits a template with the live

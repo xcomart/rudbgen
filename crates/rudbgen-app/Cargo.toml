@@ -34,7 +34,7 @@ rudbgen-meta.workspace = true
 # The inspector's Columns tab. The grid is the one widget in the tree that
 # already lays a header, resizable columns and a virtualised body out, and a
 # column list is exactly what it draws.
-ruui-grid.workspace = true
+rugpui-grid.workspace = true
 # The generation job behind the Generate tab: `Plan`, `generate`, `dry_run` and
 # `preview`. It knows nothing of gpui by design, so the shell is what puts the
 # run on a background thread, pumps its `Progress` into the progress dialog and
@@ -43,7 +43,7 @@ rudbgen-gen.workspace = true
 # The template tab's buffer (M4): `EditorView` under `src/template_syntax.rs`'s
 # template highlighter, composed over the base language the file's extension
 # names, and the same widget read-only for the live preview and the Preview tab.
-ruui-editor.workspace = true
+rugpui-editor.workspace = true
 # The engine itself, for the two things the app does with a template that the
 # generation job does not: parsing the buffer for the diagnostics list, and
 # rendering the output-name template for the live preview's header.
@@ -60,7 +60,7 @@ rudbgen-import.workspace = true
 rudbgen-ssh.workspace = true
 # The widget kit everything here is drawn with: the palettes and their file
 # store, the text field, the buttons, tabs, menus, selects, trees and modals.
-ruui.workspace = true
+rugpui.workspace = true
 # The layer above the widgets, and the reason this crate no longer carries a
 # `caption.rs`, an `update.rs` or a theme editor of its own: the window chrome,
 # the self-updater and its dialog, the about box, the palette catalogues and
@@ -68,7 +68,7 @@ ruui.workspace = true
 # settings form is built out of. Everything it needs to know about rudbgen — the
 # name, the version, the release endpoints, the words and where the ignored
 # release tag is kept — is injected by `main` at start-up.
-ruui-shell.workspace = true
+rugpui-shell.workspace = true
 
 # The tunnel registry in `src/connection.rs` is a process-wide map reached from
 # background threads, and a panic while a tunnel is being opened must not make

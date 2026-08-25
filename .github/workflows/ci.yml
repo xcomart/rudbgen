@@ -3,8 +3,8 @@
 # Inherited from rudbman, whose notes still hold — russh and ureq are pinned to
 # the `ring` backend so no NASM is needed anywhere, the OS-keychain tests are
 # `#[ignore]`d, and gpui comes from a pinned revision of Zed's monorepo with four
-# crates patched on top of it, which `ruui` vendors and this workspace's patch
-# table points at. The widgets themselves come from ruui too, as `git`
+# crates patched on top of it, which `rugpui` vendors and this workspace's patch
+# table points at. The widgets themselves come from rugpui too, as `git`
 # dependencies pinned to one revision across all seven entries; see the root
 # Cargo.toml. The only network the build needs is crates.io plus two git
 # fetches — plus a JVM. The bridge JAR is

@@ -43,8 +43,8 @@ use gpui::{
     anchored, deferred, div, point, prelude::*, px,
 };
 use rudbgen_template::{ParseError, Template, Warning};
-use ruui::{Button, ButtonVariant, Select, editor_theme, theme, tooltip_label};
-use ruui_editor::{EditorEvent, EditorView, MarkKind, NavKey};
+use rugpui::{Button, ButtonVariant, Select, editor_theme, theme, tooltip_label};
+use rugpui_editor::{EditorEvent, EditorView, MarkKind, NavKey};
 
 use crate::app_settings;
 use crate::i18n::ts;
@@ -587,9 +587,9 @@ impl TemplatePane {
                 self.preview_path = Some(SharedString::from(path.display().to_string()));
                 // The preview is the *output* file, so it is coloured by the
                 // output file's language rather than by the template's.
-                let highlighter = path
-                    .extension()
-                    .and_then(|ext| ruui_editor::highlighter_for_extension(&ext.to_string_lossy()));
+                let highlighter = path.extension().and_then(|ext| {
+                    rugpui_editor::highlighter_for_extension(&ext.to_string_lossy())
+                });
                 self.preview.update(cx, |editor, cx| {
                     editor.set_highlighter(highlighter, cx);
                     editor.set_text(&to_lf(&content), cx);

@@ -1,13 +1,13 @@
 //! What one tab of the work area shows.
 //!
-//! The split layout itself is [`ruui_shell::pane`]: a binary tree whose leaves
+//! The split layout itself is [`rugpui_shell::pane`]: a binary tree whose leaves
 //! are panes and whose panes are strips of tabs, generic over what a tab is
 //! because none of its rules depend on that. This module supplies the missing
 //! half — rudbgen's own answer to "what is a tab" — and the one lookup over it
 //! the shell around the strip needs.
 //!
 //! The work area uses [`Pane`] — the tab strip's list and its active index —
-//! but not [`PaneTree`](ruui_shell::PaneTree): the template tab splits itself
+//! but not [`PaneTree`](rugpui_shell::PaneTree): the template tab splits itself
 //! down the middle rather than splitting the *pane*, so the tree's own
 //! operations are the shell's and go unused here.
 //!
@@ -29,7 +29,7 @@
 use std::path::{Path, PathBuf};
 
 use gpui::SharedString;
-use ruui_shell::Pane;
+use rugpui_shell::Pane;
 
 /// What one tab of a pane shows.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -66,7 +66,7 @@ pub enum PaneItem {
 /// The lookups rudbgen's own tabs answer to.
 ///
 /// An extension trait rather than inherent methods, because the strip itself is
-/// [`ruui_shell::Pane`] and every one of these is a question about
+/// [`rugpui_shell::Pane`] and every one of these is a question about
 /// [`PaneItem`]. Both are [`Pane::position`] with a predicate, which is the
 /// hook the shell leaves for exactly this.
 pub trait WorkTabs {

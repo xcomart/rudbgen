@@ -10,7 +10,7 @@
 //! the last window closes. Writing it as it changes would put a file write in
 //! the middle of a resize drag — a lot of syscalls to record a number nobody
 //! reads until the next start. The *shape* of that geometry is
-//! [`ruui_shell::WindowGeometry`]; what is here is the two lines that move it
+//! [`rugpui_shell::WindowGeometry`]; what is here is the two lines that move it
 //! in and out of [`WindowState`], which is rudbgen's own.
 //!
 //! # Two snapshots
@@ -26,15 +26,15 @@
 use anyhow::Result;
 use gpui::{App, Global, Hsla, SharedString};
 use rudbgen_core::{AppSettings, WindowState};
-use ruui::{ThemeDirs, theme_store};
-use ruui_shell::{WindowGeometry, monospace_family};
+use rugpui::{ThemeDirs, theme_store};
+use rugpui_shell::{WindowGeometry, monospace_family};
 
 /// The font family every piece of code text in rudbgen should render with.
 ///
 /// The user's configured family — [`effective`], not [`current`], so a face
 /// being previewed in the settings dialog shows up before it is saved — or,
 /// absent one, the per-OS monospace default from
-/// [`ruui_shell::monospace_family`]. This is the app layer keeping the promise
+/// [`rugpui_shell::monospace_family`]. This is the app layer keeping the promise
 /// [`rudbgen_core::AppSettings::editor_font_family`] documents: a `None` there
 /// means "the per-OS monospace default chosen by the app layer".
 ///
@@ -100,13 +100,13 @@ pub fn init(cx: &mut App) {
     cx.set_global(CurrentSettings(settings));
 }
 
-/// The two directories `ruui`'s theme store reads and writes.
+/// The two directories `rugpui`'s theme store reads and writes.
 ///
 /// The widget kit has no configuration directory of its own and never guesses
 /// at one — which is the point of it not knowing what application it is drawn
 /// into — so this is where rudbgen's answer is given, once, from
 /// `rudbgen-core`'s paths. Every call into
-/// [`theme_store`](ruui::theme_store) that touches the disk takes it.
+/// [`theme_store`](rugpui::theme_store) that touches the disk takes it.
 ///
 /// # Errors
 ///
@@ -241,7 +241,7 @@ pub fn save(cx: &App) {
 /// What sits *over* the work area's fill would each be a second fill on the same
 /// pixels, so while the window is translucent the result grid and the ERD and
 /// query-builder canvases paint no background at all: they ask
-/// [`ruui::window_translucent`] and skip it, leaving the fill below as the
+/// [`rugpui::window_translucent`] and skip it, leaving the fill below as the
 /// only tinted one. Tinting them instead of skipping is the trap this whole
 /// comment is about.
 ///
@@ -254,7 +254,7 @@ pub fn save(cx: &App) {
 ///
 /// The opacity itself lives in a widget-layer global, so that the leaves which
 /// have to agree with this can reach it; the shell pushes it there with
-/// [`ruui::set_window_tint`] at start-up and on a settings *save*. Which
+/// [`rugpui::set_window_tint`] at start-up and on a settings *save*. Which
 /// means this follows neither [`current`] nor [`effective`] directly, and in
 /// particular does not follow a preview — deliberately. The fill is only half of
 /// what makes a window translucent: the other half is the platform surface being
@@ -266,7 +266,7 @@ pub fn window_tint(color: Hsla, cx: &App) -> Hsla {
     // Deferred to the widget layer, which is where the leaves that have to agree
     // with this can reach it; `current` and the global are set from the same
     // value at the same moment.
-    ruui_shell::window_tint(color, cx)
+    rugpui_shell::window_tint(color, cx)
 }
 
 #[cfg(test)]

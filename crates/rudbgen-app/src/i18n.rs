@@ -8,7 +8,7 @@
 //! [`SharedString`][gpui::SharedString].
 //!
 //! The arithmetic under all of that — matching one tag against the set that
-//! ships, and the resolution order — is [`ruui_shell::locale`], because it is
+//! ships, and the resolution order — is [`rugpui_shell::locale`], because it is
 //! the same in all three applications. What cannot move is the table:
 //! `rust-i18n` compiles a crate's locale files into *that* crate and keeps the
 //! active locale in a process global, so the `i18n!` invocation, `ts!` and
@@ -19,7 +19,7 @@
 //!
 //! 1. the tag stored in `settings.json`, when rudbgen ships that language;
 //! 2. the operating system's locale, matched loosely (see
-//!    [`ruui_shell::locale::match_tag`]);
+//!    [`rugpui_shell::locale::match_tag`]);
 //! 3. English.
 //!
 //! Step 3 is also `rust-i18n`'s compile-time `fallback`, so a key missing from
@@ -35,7 +35,7 @@
 use std::sync::OnceLock;
 
 use gpui::SharedString;
-use ruui_shell::locale;
+use rugpui_shell::locale;
 
 /// Translates a key and hands the result back as a [`SharedString`].
 ///
@@ -73,7 +73,7 @@ fn tags() -> &'static [String] {
     })
 }
 
-/// The shipped tags as the borrowed slice [`ruui_shell::locale`] takes.
+/// The shipped tags as the borrowed slice [`rugpui_shell::locale`] takes.
 fn codes() -> &'static [&'static str] {
     static CODES: OnceLock<Vec<&'static str>> = OnceLock::new();
     CODES.get_or_init(|| tags().iter().map(String::as_str).collect())
@@ -111,7 +111,7 @@ pub fn display_name(tag: &str) -> Option<SharedString> {
 ///
 /// `None`, a blank string, or a tag rudbgen has no translation for all fall
 /// through to the system locale, and from there to
-/// [`FALLBACK`](ruui_shell::locale::FALLBACK).
+/// [`FALLBACK`](rugpui_shell::locale::FALLBACK).
 pub fn apply(language: Option<&str>) {
     let system = sys_locale::get_locale();
     rust_i18n::set_locale(&locale::resolve(codes(), language, system.as_deref()));
@@ -121,8 +121,8 @@ pub fn apply(language: Option<&str>) {
 mod tests {
     use std::path::Path;
 
+    use rugpui_shell::locale::FALLBACK;
     use rust_i18n::t;
-    use ruui_shell::locale::FALLBACK;
 
     use super::*;
 

@@ -3,8 +3,20 @@
 //! Point it at a database, tick the tables, tick the templates, and it writes
 //! one file per table per template. This crate is the binary: the window, the
 //! chrome around it, the dialogs that hang over it, and the bootstrap sequence
-//! that gets all three on screen. Everything it draws with comes from
-//! `ruui`; everything it persists goes through `rudbgen-core`.
+//! that gets all three on screen. Everything it draws with comes from `ruui`;
+//! everything it persists goes through `rudbgen-core`.
+//!
+//! # What the shell supplies
+//!
+//! `ruui-shell` is the layer above the widgets, and a good deal of what used to
+//! be here is now there: the window frame a self-decorated window has to draw
+//! for itself, the self-updater and its dialog, the about box, the palette
+//! catalogues and their colour editor, the split-pane tree, the context-menu
+//! rows and the pieces a settings form is built out of. It knows nothing about
+//! rudbgen, so [`main`] hands it three things before the first window opens —
+//! [`IDENTITY`], [`AppStrings`] and [`IgnoredUpdate`] — and takes back the one
+//! decision a dialog must not make on its own: a finished update ends in
+//! [`UpdateDialogEvent::Installed`], and the restart is the [`Workspace`]'s.
 //!
 //! # The window
 //!
@@ -46,17 +58,10 @@
 //! than either.
 
 mod abbreviation_dialog;
-mod about_dialog;
 mod app_settings;
 mod builtin_templates;
-mod caption;
 mod connection;
 mod connection_dialog;
-// The explorer's rows press this; the work area's tabs and the template list
-// (M3) are the call sites still to come, so a builder or two — a shortcut hint,
-// a tick — has no caller yet and reads as dead code inside a binary crate.
-#[allow(dead_code)]
-mod context_menu;
 mod driver_manager;
 mod explorer;
 mod generate_job;
@@ -67,19 +72,11 @@ mod import_dialog;
 mod inspector;
 mod maven;
 mod palette;
-// The work area uses `Pane` — the tab strip's list and its active index — but
-// not `PaneTree`: the template tab splits itself down the middle rather than
-// splitting the *pane*, so the tree's own operations (splitting, merging a
-// subtree, walking the leaves) still read as dead code inside a binary crate.
-#[allow(dead_code)]
-mod pane_tree;
+mod pane_item;
 mod preview_pane;
 mod settings_dialog;
 mod template_pane;
 mod template_syntax;
-mod theme_editor;
-mod update;
-mod update_dialog;
 mod variable_palette;
 
 // Compiles `locales/*.yml` into the binary and defines the machinery `t!`
@@ -91,10 +88,10 @@ rust_i18n::i18n!("locales", fallback = "en");
 use std::path::{Path, PathBuf};
 
 use gpui::{
-    AnyElement, App, Bounds, Context, Div, DragMoveEvent, Entity, FocusHandle, Hsla, KeyBinding,
-    Menu, MenuItem, MouseButton, MouseUpEvent, Pixels, Point, QuitMode, ScrollHandle, SharedString,
-    Stateful, Subscription, Task, TitlebarOptions, Window, WindowBackgroundAppearance,
-    WindowBounds, WindowControlArea, WindowOptions, actions, div, img, prelude::*, px, size,
+    AnyElement, App, Context, Div, DragMoveEvent, Entity, FocusHandle, Hsla, KeyBinding, Menu,
+    MenuItem, MouseButton, MouseUpEvent, Pixels, Point, QuitMode, ScrollHandle, SharedString,
+    Subscription, Task, TitlebarOptions, Window, WindowBackgroundAppearance, WindowBounds,
+    WindowControlArea, WindowOptions, actions, div, img, prelude::*, px,
 };
 use rudbgen_core::{
     AppSettings, ConnectionProfile, ConnectionStore, DriverDef, DriverStore, TemplateSetStore,
@@ -105,28 +102,27 @@ use rudbgen_meta::{MetaReader, Table};
 use ruui::{
     Button, ButtonVariant, DraggedThumb, EditorThemeEntry, EditorThemeRegistry, MenuButton,
     MenuEntry, Scrollbar, ScrollbarAxis, ScrollbarState, Select, TabBar, TabItem, Theme,
-    ThemeRegistry, WindowControlIcons, WindowControls, hide_later, hide_now, scroll_to, scrolled,
-    set_editor_theme, set_theme, set_window_tint, theme, tooltip_label, window_controls,
+    ThemeRegistry, hide_later, hide_now, scroll_to, scrolled, set_editor_theme, set_theme,
+    set_window_tint, theme, tooltip_label,
+};
+use ruui_shell::{
+    AboutDialog, AboutDialogEvent, AppIdentity, Pane, UpdateDialog, UpdateDialogEvent,
+    apply_caption_theme, chrome, menu_rows, update,
 };
 
 use abbreviation_dialog::{AbbreviationDialog, AbbreviationDialogEvent};
-use about_dialog::{AboutDialog, AboutDialogEvent};
-use app_settings::WindowGeometry;
-use caption::apply_caption_theme;
 use connection::{ConnectError, Connected, Credentials, SessionHandle};
 use connection_dialog::{ConnectionDialog, ConnectionDialogEvent};
 use explorer::{Explorer, ExplorerEvent, SchemaKey, TableKey};
 use generate_job::{GenerationJob, JobEvent};
 use generate_pane::{Blocker, GeneratePane, GeneratePaneEvent};
 use i18n::ts;
-use icons::Icons;
 use import_dialog::{ImportDialog, ImportDialogEvent};
 use inspector::{Inspector, InspectorEvent};
-use pane_tree::{Pane, PaneItem};
+use pane_item::{PaneItem, WorkTabs};
 use preview_pane::{PreviewEvent, PreviewFile, PreviewPane};
 use settings_dialog::{SettingsDialog, SettingsDialogEvent};
 use template_pane::{PreviewOutcome, TemplatePane, TemplatePaneEvent};
-use update_dialog::{UpdateDialog, UpdateDialogEvent};
 use variable_palette::{PaletteEvent, VariablePalette};
 
 actions!(
@@ -233,15 +229,114 @@ const LIGHT_THEME: &str = "one-light";
 /// `com.aihouse.rudbgen.desktop` and nothing else.
 const APP_ID: &str = "com.aihouse.rudbgen";
 
-/// Modifier key named in the shortcut hints of the dropdown menu.
+/// What a release archive holds that has to end up on disk, in install order.
 ///
-/// Never translated: it is the name printed on the key. It follows
-/// [`bind_shortcuts`] on every platform so the two never drift.
-const SHORTCUT_MODIFIER: &str = if cfg!(target_os = "macos") {
-    "Cmd"
-} else {
-    "Ctrl"
+/// The macOS archive carries one thing, the whole application bundle, and
+/// everything rudbgen loads at runtime is inside it. The Windows and Linux
+/// archives carry the executable and the two directories it resolves relative
+/// to itself, and all three move together.
+///
+/// The first entry is always the executable (or the bundle), because that is
+/// the one whose *installed* name may differ from the published one — a binary
+/// someone renamed still updates, and the directories beside it never are.
+#[cfg(windows)]
+const PAYLOAD: &[&str] = &["rudbgen.exe", "lib", "runtime"];
+/// See the Windows variant above.
+#[cfg(target_os = "macos")]
+const PAYLOAD: &[&str] = &["rudbgen.app"];
+/// See the Windows variant above.
+#[cfg(all(unix, not(target_os = "macos")))]
+const PAYLOAD: &[&str] = &["rudbgen", "lib", "runtime"];
+
+/// The "Apps & features" entry the Windows installer leaves behind, relative to
+/// `HKEY_CURRENT_USER` or `HKEY_LOCAL_MACHINE`.
+///
+/// The GUID in the middle of it is one corner of a triangle that has to agree,
+/// and it is a published identifier rather than an implementation detail:
+///
+/// * `packaging/windows/rudbgen.iss` sets it as Inno Setup's `AppId`, and Inno
+///   derives this key's name from it by appending `_is1`;
+/// * the manifests under `packaging/winget/*/` record the same string, braces
+///   and suffix included, as the package's `ProductCode`;
+/// * and the shell's updater is what finds the entry again by it, to correct
+///   the `DisplayVersion` after a self-update.
+///
+/// Move any one corner without the other two and winget stops recognising an
+/// installed rudbgen: `winget list` finds nothing, `winget upgrade` offers a
+/// fresh install to sit beside the existing one, and `winget uninstall` has
+/// nothing to remove — all silently, because a key that is not there is
+/// indistinguishable from a copy that was never installed. None of the three
+/// ever changes.
+///
+/// A GUID of rudbgen's own, minted for this repository: a product code names a
+/// *product*, so sharing a sibling application's would have winget treat an
+/// installed one as an installed rudbgen and offer to upgrade one into the
+/// other.
+const ARP_KEY: &str = concat!(
+    r"Software\Microsoft\Windows\CurrentVersion\Uninstall\",
+    "{9A84AE34-E54B-46EA-B55D-61C0666D6890}_is1"
+);
+
+/// Everything `ruui-shell` has to be told about rudbgen.
+///
+/// Installed once in [`main`], before the first window and before anything can
+/// start an update check. The shell composes none of it — it only reads — which
+/// is why every field is a constant of this crate, [`AppIdentity::version`]
+/// above all: `ruui-shell` has a version of its own and it is not this one.
+const IDENTITY: AppIdentity = AppIdentity {
+    name: APP_NAME,
+    version: env!("CARGO_PKG_VERSION"),
+    repository_url: "https://github.com/xcomart/rudbgen",
+    repository_label: "github.com/xcomart/rudbgen",
+    latest_release_api: "https://api.github.com/repos/xcomart/rudbgen/releases/latest",
+    releases_page: "https://github.com/xcomart/rudbgen/releases",
+    fallback_archive: "rudbgen-update",
+    payload: PAYLOAD,
+    bundle_executable: "Contents/MacOS/rudbgen",
+    windows_arp_key: ARP_KEY,
+    // Whether an install has to leave its renames to the next launch. The
+    // question is "is a JVM loaded into this process", because on Windows one
+    // holds open handles on the very files the swap renames — and the answer is
+    // `false` until `rudbgen-jdbc` starts one, which no path reachable from an
+    // update check does.
+    must_defer: || false,
 };
+
+/// The shell's window onto rudbgen's translations.
+///
+/// One line over `t!`, and deliberately no more: the shell looks its words up
+/// by the very keys `locales/*.yml` already carries, and the `%{marker}`s come
+/// back intact for it to fill in — which is what lets it interpolate an
+/// application name into a sentence whose key never mentions one.
+struct AppStrings;
+
+impl ruui_shell::Strings for AppStrings {
+    fn text(&self, key: &str) -> SharedString {
+        ts!(key)
+    }
+}
+
+/// The shell's window onto the "never tell me about this version again" tag.
+///
+/// The tag lives in `settings.json`, which the shell does not own; both halves
+/// run on the UI thread, so the settings global is reachable directly. Written
+/// through immediately rather than at the next save: this is a decision the
+/// user has just made in a dialog, and it should survive a crash the way a
+/// saved setting does.
+struct IgnoredUpdate;
+
+impl ruui_shell::UpdatePolicy for IgnoredUpdate {
+    fn ignored(&self, cx: &App) -> Option<String> {
+        app_settings::current(cx).ignored_update
+    }
+
+    fn set_ignored(&self, tag: Option<String>, cx: &mut App) {
+        let mut settings = app_settings::current(cx);
+        settings.ignored_update = tag;
+        app_settings::replace(settings, cx);
+        app_settings::save(cx);
+    }
+}
 
 /// Width of the grab area between two panels of the body, in logical pixels.
 ///
@@ -521,10 +616,10 @@ struct Workspace {
     job: Entity<GenerationJob>,
     /// The work area's tab strip.
     ///
-    /// A [`Pane`] rather than a [`pane_tree::PaneTree`]: there is one pane, and
-    /// the template tab's side-by-side preview is a split *inside* the tab
+    /// A [`Pane`] rather than a [`ruui_shell::PaneTree`]: there is one pane,
+    /// and the template tab's side-by-side preview is a split *inside* the tab
     /// rather than a second pane beside it.
-    pane: Pane,
+    pane: Pane<PaneItem>,
     /// Whether the tab strip's dropdown is showing.
     pane_menu_open: bool,
     /// The ticked tables, as the last run read them.
@@ -750,6 +845,16 @@ impl Workspace {
                     update::remember_ignored(tag, cx);
                     this.focus_shell(window, cx);
                 }
+                UpdateDialogEvent::Installed(_) => {
+                    // The new build is on disk and the restart is the
+                    // application's to perform: `cx.restart()` spawns a watcher
+                    // that waits for this pid to exit and starts rudbgen again
+                    // from the same path, which by then holds what was
+                    // installed. The dialog stays on screen — the process is
+                    // about to go, and closing it first would flash the window
+                    // back into view for a fraction of a second.
+                    cx.restart();
+                }
                 UpdateDialogEvent::Dismissed => {
                     dialog.update(cx, |dialog, cx| dialog.close(cx));
                     this.focus_shell(window, cx);
@@ -769,30 +874,40 @@ impl Workspace {
         // already up, the check simply says nothing and tries again next
         // launch.
         //
-        // `update::check` answers `None` outright in a test build; see the note
-        // on it for why the guard is there and not here.
-        let ignored = app_settings::current(cx).ignored_update;
-        cx.spawn(async move |this, cx| {
-            let found = cx
-                .background_executor()
-                .spawn(async move { update::check(ignored.as_deref()) })
-                .await;
-            let Some(release) = found else {
-                return;
-            };
-            this.update(cx, |workspace, cx| {
-                if workspace.dialog_open(cx) {
-                    log::debug!("update {} announced while a dialog is open", release.tag);
+        // The guard is here, in this crate, rather than inside the check:
+        // `cfg!(test)` compiled into a dependency is that dependency's build,
+        // so `ruui_shell::update::check` cannot tell a test build of *this*
+        // crate from a release one, and every render test that opens a window
+        // would make a real request to GitHub.
+        //
+        // `ruui_shell::update::set_startup_check_enabled(false)` says the same
+        // thing to the shell and is the other half of the guard; the tests
+        // install it once, so that a path reaching the check some other way is
+        // still silent. See [`tests::silence_the_update_check`].
+        if !cfg!(test) {
+            let ignored = update::ignored_release(cx);
+            cx.spawn(async move |this, cx| {
+                let found = cx
+                    .background_executor()
+                    .spawn(async move { update::check(ignored.as_deref()) })
+                    .await;
+                let Some(release) = found else {
                     return;
-                }
-                workspace.update.update(cx, |dialog, cx| {
-                    dialog.open(release, cx);
-                });
-                cx.notify();
+                };
+                this.update(cx, |workspace, cx| {
+                    if workspace.dialog_open(cx) {
+                        log::debug!("update {} announced while a dialog is open", release.tag);
+                        return;
+                    }
+                    workspace.update.update(cx, |dialog, cx| {
+                        dialog.open(release, cx);
+                    });
+                    cx.notify();
+                })
+                .ok();
             })
-            .ok();
-        })
-        .detach();
+            .detach();
+        }
 
         // The two panels of the body. Both are built empty and stay out of the
         // frame until a session opens; see [`Workspace::render_body`].
@@ -1685,10 +1800,7 @@ impl Workspace {
 
     /// Where the preview tab is on the strip, if it is open.
     fn preview_tab(&self) -> Option<usize> {
-        self.pane
-            .items()
-            .iter()
-            .position(|item| matches!(item, PaneItem::Preview { .. }))
+        self.pane.preview()
     }
 
     /// Relabels the preview tab with the file it now shows.
@@ -2832,7 +2944,7 @@ impl Workspace {
     /// control and deliberately does not.
     fn render_toolbar(&self, window: &Window, cx: &mut Context<Self>) -> AnyElement {
         let theme = theme(cx);
-        let custom = draws_own_titlebar(self.titlebar, window);
+        let custom = chrome::draws_own_titlebar(chrome_style(self.titlebar), window);
 
         // Room for the traffic lights AppKit still draws over the transparent
         // title bar. Fullscreen hides the buttons, and the gap goes with them.
@@ -2871,34 +2983,10 @@ impl Workspace {
                 .child(APP_NAME)
         });
 
-        // The caption buttons the other two platforms have to draw themselves.
-        //
-        // Two strips rather than one, because a Linux desktop decides where its
-        // caption buttons go and putting them on the left is a setting people
-        // actually use; [`ruui::window_controls::split`] turns what the
-        // platform reports into the two ends. Off Linux nothing is reported,
-        // which is the same answer as "the usual three on the right".
-        let (leading_buttons, trailing_buttons) = if custom && !cfg!(target_os = "macos") {
-            window_controls::split(cx.button_layout(), window.window_controls())
-        } else {
-            (Vec::new(), Vec::new())
-        };
-        let strip = |id: &'static str, buttons: Vec<gpui::WindowButton>| {
-            (!buttons.is_empty()).then(|| {
-                WindowControls::new(
-                    id,
-                    WindowControlIcons {
-                        minimize: icons::WINDOW_MINIMIZE.into(),
-                        maximize: icons::WINDOW_MAXIMIZE.into(),
-                        restore: icons::WINDOW_RESTORE.into(),
-                        close: icons::WINDOW_CLOSE.into(),
-                    },
-                    buttons,
-                )
-            })
-        };
-        let leading_controls = strip("window-controls-leading", leading_buttons);
-        let trailing_controls = strip("window-controls-trailing", trailing_buttons);
+        // The caption buttons the other two platforms have to draw themselves,
+        // as the two ends a Linux desktop may ask for them at.
+        let (leading_controls, trailing_controls) =
+            chrome::window_control_strips(&ruui_shell::window_control_icons(), custom, window, cx);
 
         div()
             .id("toolbar")
@@ -2921,7 +3009,9 @@ impl Workspace {
                 // `HTCAPTION` down that would have started the system drag.
                 // Cutting the root's hitbox out from under the strip keeps the
                 // press unclaimed.
-                titlebar_gestures(this.occlude().window_control_area(WindowControlArea::Drag))
+                chrome::titlebar_gestures(
+                    this.occlude().window_control_area(WindowControlArea::Drag),
+                )
             })
             // Ahead of the wordmark, which is where a desktop that asks for
             // left-hand caption buttons expects them: the buttons are the
@@ -3034,21 +3124,21 @@ impl Workspace {
         let this = cx.entity();
         let entries = vec![
             MenuEntry::new(ts!("menu.new_connection"))
-                .shortcut(format!("{SHORTCUT_MODIFIER}+N"))
+                .shortcut(format!("{}+N", menu_rows::SHORTCUT_MODIFIER))
                 .on_activate(|window, cx| window.dispatch_action(Box::new(NewConnection), cx)),
             MenuEntry::new(ts!("menu.settings"))
-                .shortcut(format!("{SHORTCUT_MODIFIER}+,"))
+                .shortcut(format!("{}+,", menu_rows::SHORTCUT_MODIFIER))
                 .on_activate(|window, cx| window.dispatch_action(Box::new(OpenSettings), cx)),
             // Greyed while nothing is connected, which is when the two panels
             // are out of the frame altogether and the command would flip a
             // switch with nothing behind it.
             MenuEntry::new(ts!("menu.toggle_explorer"))
-                .shortcut(format!("{SHORTCUT_MODIFIER}+B"))
+                .shortcut(format!("{}+B", menu_rows::SHORTCUT_MODIFIER))
                 .checked(self.explorer_visible)
                 .disabled(!matches!(self.connection, ConnectionState::Open { .. }))
                 .on_activate(|window, cx| window.dispatch_action(Box::new(ToggleExplorer), cx)),
             MenuEntry::new(ts!("menu.toggle_inspector"))
-                .shortcut(format!("{SHORTCUT_MODIFIER}+I"))
+                .shortcut(format!("{}+I", menu_rows::SHORTCUT_MODIFIER))
                 .checked(self.inspector_visible)
                 .disabled(!matches!(self.connection, ConnectionState::Open { .. }))
                 .on_activate(|window, cx| window.dispatch_action(Box::new(ToggleInspector), cx)),
@@ -3058,11 +3148,11 @@ impl Workspace {
             MenuEntry::new(ts!("menu.open_template"))
                 .on_activate(|window, cx| window.dispatch_action(Box::new(OpenTemplate), cx)),
             MenuEntry::new(ts!("menu.save_template"))
-                .shortcut(format!("{SHORTCUT_MODIFIER}+S"))
+                .shortcut(format!("{}+S", menu_rows::SHORTCUT_MODIFIER))
                 .disabled(self.active_template(cx).is_none())
                 .on_activate(|window, cx| window.dispatch_action(Box::new(SaveTemplate), cx)),
             MenuEntry::new(ts!("menu.toggle_live_preview"))
-                .shortcut(format!("{SHORTCUT_MODIFIER}+Shift+P"))
+                .shortcut(format!("{}+Shift+P", menu_rows::SHORTCUT_MODIFIER))
                 .disabled(self.active_template(cx).is_none())
                 .on_activate(|window, cx| window.dispatch_action(Box::new(ToggleLivePreview), cx)),
             MenuEntry::separator(),
@@ -3076,7 +3166,7 @@ impl Workspace {
                 .disabled(!self.can_render(cx))
                 .on_activate(|window, cx| window.dispatch_action(Box::new(DryRun), cx)),
             MenuEntry::new(ts!("menu.generate"))
-                .shortcut(format!("{SHORTCUT_MODIFIER}+G"))
+                .shortcut(format!("{}+G", menu_rows::SHORTCUT_MODIFIER))
                 .disabled(!self.can_generate(cx))
                 .on_activate(|window, cx| window.dispatch_action(Box::new(Generate), cx)),
             MenuEntry::new(ts!("menu.abbreviations"))
@@ -3096,7 +3186,7 @@ impl Workspace {
                 .on_activate(|window, cx| window.dispatch_action(Box::new(ShowAbout), cx)),
             MenuEntry::separator(),
             MenuEntry::new(ts!("menu.quit"))
-                .shortcut(format!("{SHORTCUT_MODIFIER}+Q"))
+                .shortcut(format!("{}+Q", menu_rows::SHORTCUT_MODIFIER))
                 .on_activate(|window, cx| window.dispatch_action(Box::new(Quit), cx)),
         ];
 
@@ -3488,7 +3578,7 @@ impl Workspace {
                 .text_color(theme.text_muted)
                 .child(ts!(
                     "welcome.hint",
-                    shortcut = format!("{SHORTCUT_MODIFIER}+N")
+                    shortcut = format!("{}+N", menu_rows::SHORTCUT_MODIFIER)
                 ))
         });
 
@@ -3932,9 +4022,9 @@ impl Render for Workspace {
         // it, and the shadow is painted into it. The inset call keeps
         // `_GTK_FRAME_EXTENTS` in step so the compositor treats the content
         // edge, not the surface edge, as the window.
-        let tiling = client_tiling(window);
+        let tiling = chrome::client_tiling(window);
         if tiling.is_some() {
-            window.set_client_inset(px(SHADOW_BAND));
+            window.set_client_inset(px(chrome::SHADOW_BAND));
         } else {
             // Clears the extents a client-side frame may have left behind when
             // the setting switches back to the system title bar on a live
@@ -4033,10 +4123,10 @@ impl Render for Workspace {
             .size_full()
             .relative()
             .bg(gpui::transparent_black())
-            .when(!tiling.top, |outer| outer.pt(px(SHADOW_BAND)))
-            .when(!tiling.bottom, |outer| outer.pb(px(SHADOW_BAND)))
-            .when(!tiling.left, |outer| outer.pl(px(SHADOW_BAND)))
-            .when(!tiling.right, |outer| outer.pr(px(SHADOW_BAND)))
+            .when(!tiling.top, |outer| outer.pt(px(chrome::SHADOW_BAND)))
+            .when(!tiling.bottom, |outer| outer.pb(px(chrome::SHADOW_BAND)))
+            .when(!tiling.left, |outer| outer.pl(px(chrome::SHADOW_BAND)))
+            .when(!tiling.right, |outer| outer.pr(px(chrome::SHADOW_BAND)))
             .child(
                 content
                     // A hairline where the frame's own outline used to be, per
@@ -4050,7 +4140,7 @@ impl Render for Workspace {
                     .when(!tiling.is_tiled(), |content| {
                         content.shadow(vec![gpui::BoxShadow {
                             color: gpui::hsla(0., 0., 0., 0.35),
-                            blur_radius: px(SHADOW_BAND / 2.),
+                            blur_radius: px(chrome::SHADOW_BAND / 2.),
                             spread_radius: px(0.),
                             offset: gpui::point(px(0.), px(2.)),
                             // The band is drawn outside the window, not inside
@@ -4061,7 +4151,7 @@ impl Render for Workspace {
             )
             // Last on purpose: the window border outranks whatever it crosses,
             // dialogs included, the way a compositor frame would.
-            .children(render_resize_edges(tiling))
+            .children(chrome::render_resize_edges(tiling))
             .into_any_element()
     }
 }
@@ -4145,303 +4235,38 @@ fn editor_theme_for(
 }
 
 /// Records the window's placement in the settings global.
-///
-/// Fullscreen is knowingly stored as "not maximized". gpui hands out the
-/// restore bounds either way, so the size survives; coming back fullscreen with
-/// no title bar and no way to tell why would read as a broken window.
 fn record_window_geometry(window: &Window, cx: &mut App) {
-    let (bounds, maximized) = match window.window_bounds() {
-        WindowBounds::Windowed(bounds) => (bounds, false),
-        WindowBounds::Maximized(bounds) => (bounds, true),
-        WindowBounds::Fullscreen(bounds) => (bounds, false),
-    };
-    app_settings::record_window_geometry(WindowGeometry::of(bounds, maximized), cx);
+    app_settings::record_window_geometry(ruui_shell::window_geometry(window), cx);
 }
 
 /// The placement to open the window at.
-///
-/// A saved position is used as it stands; without one the saved *size* is
-/// centred on the active display, which is what a first run does and what a
-/// window that has never been moved deserves.
 fn window_bounds(state: &WindowState, cx: &mut App) -> WindowBounds {
-    let bounds = match WindowGeometry::saved(state) {
-        Some(geometry) => geometry.bounds(),
-        None => Bounds::centered(
-            None,
-            size(px(state.width as f32), px(state.height as f32)),
-            cx,
-        ),
-    };
-    if state.maximized {
-        WindowBounds::Maximized(bounds)
-    } else {
-        WindowBounds::Windowed(bounds)
-    }
+    ruui_shell::window_bounds(
+        app_settings::saved_geometry(state),
+        state.width,
+        state.height,
+        state.maximized,
+        cx,
+    )
 }
 
-/// Whether the title bar row has to stand in for the window's caption.
+/// rudbgen's title bar setting, as the shell spells it.
 ///
-/// On Windows and macOS the style applied to the window settles it: a
-/// transparent title bar leaves no platform caption, so the row is all there
-/// is.
-#[cfg(any(target_os = "windows", target_os = "macos"))]
-fn draws_own_titlebar(style: TitlebarStyle, _window: &Window) -> bool {
-    style == TitlebarStyle::Custom
-}
-
-/// Whether the title bar row has to stand in for the window's caption.
-///
-/// Linux is not the configured style alone. The custom style makes the window
-/// ask for client-side decorations, but the ask can be declined — gpui falls
-/// back to server decorations when no compositor is running — so what the window
-/// actually ended up with is what decides here. Deciding from the style alone
-/// would draw a second caption under the compositor's own.
-#[cfg(not(any(target_os = "windows", target_os = "macos")))]
-fn draws_own_titlebar(style: TitlebarStyle, window: &Window) -> bool {
-    style == TitlebarStyle::Custom
-        && matches!(
-            window.window_decorations(),
-            gpui::Decorations::Client { .. }
-        )
-}
-
-/// Wires the gestures a system title bar answers to onto the custom one.
-///
-/// Windows needs none of them. The row reports itself as
-/// [`WindowControlArea::Drag`], the hit test turns that into `HTCAPTION`, and
-/// the window procedure then does the dragging, the aero-snap gestures and the
-/// double-click to maximise on its own — before the app is ever told a button
-/// went down.
-#[cfg(target_os = "windows")]
-fn titlebar_gestures(row: Stateful<Div>) -> Stateful<Div> {
-    row
-}
-
-/// Wires the gestures a system title bar answers to onto the custom one.
-///
-/// AppKit still drags the window for the strip its own title bar would have
-/// covered, so only the double-click is left to answer — and it has to go
-/// through [`Window::titlebar_double_click`], which follows whatever the user
-/// picked in System Settings (zoom, minimise, or nothing at all).
-#[cfg(target_os = "macos")]
-fn titlebar_gestures(row: Stateful<Div>) -> Stateful<Div> {
-    row.on_click(|event, window, _cx| {
-        if event.standard_click() && event.click_count() == 2 {
-            window.titlebar_double_click();
-        }
-    })
-}
-
-/// Wires the gestures a system title bar answers to onto the custom one.
-///
-/// Everything is the app's here: the compositor is told to take over the move,
-/// and the window menu and the zoom have to be asked for explicitly. Only
-/// meaningful once the window carries client-side decorations, which is why the
-/// caller gates them on [`Window::window_decorations`].
-///
-/// The move starts on the press rather than the click because the compositor
-/// takes the pointer with it, so a release would never arrive.
-#[cfg(not(any(target_os = "windows", target_os = "macos")))]
-fn titlebar_gestures(row: Stateful<Div>) -> Stateful<Div> {
-    row.on_click(|event, window, _cx| {
-        if event.standard_click() && event.click_count() == 2 {
-            window.zoom_window();
-        }
-    })
-    .on_mouse_down(MouseButton::Left, |_, window, _cx| {
-        window.start_window_move();
-    })
-    .on_mouse_down(MouseButton::Right, |event, window, _cx| {
-        window.show_window_menu(event.position);
-    })
-}
-
-/// Width of the transparent band around a self-decorated window.
-///
-/// The band carries the drop shadow the compositor no longer draws once the
-/// window asks for client-side decorations, and doubles as the resize grip. It
-/// is part of the window's surface but not of the window as the user
-/// understands it: [`Window::set_client_inset`] publishes the visible bounds
-/// through `_GTK_FRAME_EXTENTS`, so the compositor snaps, maximises and stacks
-/// by the visible edge, exactly as it does for GTK's frames.
-const SHADOW_BAND: f32 = 12.;
-
-/// Edge length of the corner squares, where the resize goes diagonal.
-const RESIZE_CORNER: f32 = 24.;
-
-/// The tiling state of a window that draws its own frame, `None` under a
-/// server-side one.
-///
-/// Always `None` here: Windows keeps resizing and framing the window through the
-/// caption hit test even under a custom title bar, and AppKit never gives the
-/// frame up at all — neither window ever carries the shadow band.
-#[cfg(any(target_os = "windows", target_os = "macos"))]
-fn client_tiling(_window: &Window) -> Option<gpui::Tiling> {
-    None
-}
-
-/// The tiling state of a window that draws its own frame, `None` under a
-/// server-side one.
-///
-/// `Some` exactly when the compositor granted client-side decorations, with the
-/// edges that currently touch a screen or neighbour edge marked tiled — those
-/// edges get no band, no shadow and no resize grip. Fullscreen counts as tiled
-/// all round.
-#[cfg(not(any(target_os = "windows", target_os = "macos")))]
-fn client_tiling(window: &Window) -> Option<gpui::Tiling> {
-    match window.window_decorations() {
-        gpui::Decorations::Client { tiling } => Some(tiling),
-        gpui::Decorations::Server => None,
+/// The two enums are the same two variants with the same `snake_case`
+/// serialisation, and they are two enums because [`rudbgen_core`] is
+/// deliberately free of gpui: the shell's copy is what
+/// [`chrome::draws_own_titlebar`] and the window options branch on, and the
+/// settings file is `rudbgen-core`'s. This is the one line between them.
+fn chrome_style(style: TitlebarStyle) -> chrome::TitlebarStyle {
+    match style {
+        TitlebarStyle::Custom => chrome::TitlebarStyle::Custom,
+        TitlebarStyle::System => chrome::TitlebarStyle::System,
     }
-}
-
-/// The resize handles the compositor's frame would have provided.
-///
-/// Asking for client-side decorations takes the frame away, resize borders
-/// included, so the shadow band has to start the resize itself — the compositor
-/// takes over once told, exactly as it does for the title-bar drag. The strips
-/// cover the band, the corner squares reach past it into the window, and every
-/// tiled edge goes without: a maximised or snapped window has no border to drag
-/// there.
-fn render_resize_edges(tiling: gpui::Tiling) -> Vec<AnyElement> {
-    use gpui::{CursorStyle, ResizeEdge};
-
-    let strip = px(SHADOW_BAND);
-    let corner = px(RESIZE_CORNER);
-    // A strip stops short of a corner square only where that square exists;
-    // against a tiled perpendicular edge it runs to the end of the band.
-    let inset = |tiled: bool| if tiled { px(0.) } else { corner };
-    let handle = |id: &'static str, cursor: CursorStyle, edge: ResizeEdge| {
-        div()
-            .id(id)
-            .occlude()
-            .absolute()
-            .cursor(cursor)
-            .on_mouse_down(MouseButton::Left, move |_, window, _cx| {
-                window.start_window_resize(edge);
-            })
-    };
-
-    let mut handles: Vec<AnyElement> = Vec::new();
-    if !tiling.top {
-        handles.push(
-            handle("resize-top", CursorStyle::ResizeUpDown, ResizeEdge::Top)
-                .top_0()
-                .left(inset(tiling.left))
-                .right(inset(tiling.right))
-                .h(strip)
-                .into_any_element(),
-        );
-    }
-    if !tiling.bottom {
-        handles.push(
-            handle(
-                "resize-bottom",
-                CursorStyle::ResizeUpDown,
-                ResizeEdge::Bottom,
-            )
-            .bottom_0()
-            .left(inset(tiling.left))
-            .right(inset(tiling.right))
-            .h(strip)
-            .into_any_element(),
-        );
-    }
-    if !tiling.left {
-        handles.push(
-            handle(
-                "resize-left",
-                CursorStyle::ResizeLeftRight,
-                ResizeEdge::Left,
-            )
-            .left_0()
-            .top(inset(tiling.top))
-            .bottom(inset(tiling.bottom))
-            .w(strip)
-            .into_any_element(),
-        );
-    }
-    if !tiling.right {
-        handles.push(
-            handle(
-                "resize-right",
-                CursorStyle::ResizeLeftRight,
-                ResizeEdge::Right,
-            )
-            .right_0()
-            .top(inset(tiling.top))
-            .bottom(inset(tiling.bottom))
-            .w(strip)
-            .into_any_element(),
-        );
-    }
-    if !tiling.top && !tiling.left {
-        handles.push(
-            handle(
-                "resize-top-left",
-                CursorStyle::ResizeUpLeftDownRight,
-                ResizeEdge::TopLeft,
-            )
-            .top_0()
-            .left_0()
-            .size(corner)
-            .into_any_element(),
-        );
-    }
-    if !tiling.top && !tiling.right {
-        handles.push(
-            handle(
-                "resize-top-right",
-                CursorStyle::ResizeUpRightDownLeft,
-                ResizeEdge::TopRight,
-            )
-            .top_0()
-            .right_0()
-            .size(corner)
-            .into_any_element(),
-        );
-    }
-    if !tiling.bottom && !tiling.left {
-        handles.push(
-            handle(
-                "resize-bottom-left",
-                CursorStyle::ResizeUpRightDownLeft,
-                ResizeEdge::BottomLeft,
-            )
-            .bottom_0()
-            .left_0()
-            .size(corner)
-            .into_any_element(),
-        );
-    }
-    if !tiling.bottom && !tiling.right {
-        handles.push(
-            handle(
-                "resize-bottom-right",
-                CursorStyle::ResizeUpLeftDownRight,
-                ResizeEdge::BottomRight,
-            )
-            .bottom_0()
-            .right_0()
-            .size(corner)
-            .into_any_element(),
-        );
-    }
-    handles
 }
 
 /// Maps the window settings onto a gpui background appearance.
-///
-/// Blur wins when requested; failing that, any opacity below fully opaque asks
-/// for a plain transparent window; otherwise the window stays opaque.
 fn window_appearance(window: &WindowState) -> WindowBackgroundAppearance {
-    if window.background_blur {
-        WindowBackgroundAppearance::Blurred
-    } else if window.background_opacity < 1.0 {
-        WindowBackgroundAppearance::Transparent
-    } else {
-        WindowBackgroundAppearance::Opaque
-    }
+    chrome::window_appearance(window.background_blur, window.background_opacity)
 }
 
 /// The application menu bar, in macOS layout.
@@ -4616,9 +4441,18 @@ fn main() {
     // alive in the background. One rule on every platform is what the sibling
     // applications do too.
     let app = gpui_platform::application()
-        .with_assets(Icons)
+        .with_assets(icons::ICONS)
         .with_quit_mode(QuitMode::LastWindowClosed);
     app.run(|cx: &mut App| {
+        // Everything `ruui-shell` is not allowed to guess at, handed over
+        // before anything that could read it runs. `set_strings` goes through
+        // `ts!`, so the shell follows a language change without being told
+        // again; `set_update_policy` is the two-line window onto the
+        // `ignored_update` field of `settings.json`.
+        ruui_shell::init(IDENTITY, cx);
+        ruui_shell::set_strings(Box::new(AppStrings), cx);
+        ruui_shell::set_update_policy(Box::new(IgnoredUpdate), cx);
+
         if let Err(error) = rudbgen_core::init_secrets() {
             log::warn!("the OS keychain is unavailable: {error}");
         }
@@ -4735,7 +4569,20 @@ fn main() {
 
 #[cfg(test)]
 mod tests {
+    use std::sync::Once;
+
     use super::*;
+
+    /// Turns the shell's start-up release check off, once per test process.
+    ///
+    /// Belt and braces beside the `cfg!(test)` guard in [`Workspace::new`]:
+    /// every test that builds a workspace calls this first, so that no path
+    /// into `ruui_shell::update::check` — this one or a later one — can put an
+    /// HTTPS request to GitHub inside a test run.
+    fn silence_the_update_check() {
+        static ONCE: Once = Once::new();
+        ONCE.call_once(|| update::set_startup_check_enabled(false));
+    }
 
     /// A stand-in registry listing: the six built-in ids, each of which a
     /// chrome theme shares a name with, plus one dark theme of the user's own
@@ -4998,7 +4845,7 @@ mod tests {
             maximized: true,
             ..WindowState::default()
         };
-        let geometry = WindowGeometry::saved(&state).expect("the position is set");
+        let geometry = app_settings::saved_geometry(&state).expect("the position is set");
         assert_eq!(geometry.bounds().size.width, px(1280.));
         assert_eq!(geometry.bounds().origin.x, px(10.));
         assert!(state.maximized);
@@ -5044,6 +4891,7 @@ mod tests {
             app_settings::init(cx);
             ruui::init(cx);
         });
+        silence_the_update_check();
         let window = cx.add_window(|window, cx| Workspace::new(TitlebarStyle::Custom, window, cx));
 
         window
@@ -5108,6 +4956,7 @@ mod tests {
             ruui::init(cx);
             ruui_grid::init(cx);
         });
+        silence_the_update_check();
         let window = cx.add_window(|window, cx| Workspace::new(TitlebarStyle::Custom, window, cx));
         window
             .update(cx, |workspace, _window, cx| {
@@ -5297,6 +5146,7 @@ mod tests {
         // when interacting with I/O". `run_until_parked` itself never blocks;
         // it steps until no work remains either way.
         cx.executor().allow_parking();
+        silence_the_update_check();
         let window = cx.add_window(|window, cx| Workspace::new(TitlebarStyle::Custom, window, cx));
         window
             .update(cx, |workspace, _window, cx| {
@@ -5492,6 +5342,7 @@ mod tests {
             ruui_editor::init(cx);
         });
         cx.executor().allow_parking();
+        silence_the_update_check();
         let window = cx.add_window(|window, cx| Workspace::new(TitlebarStyle::Custom, window, cx));
         window
             .update(cx, |workspace, _window, cx| {
@@ -5654,6 +5505,7 @@ mod tests {
             ruui_editor::init(cx);
         });
         cx.executor().allow_parking();
+        silence_the_update_check();
         let window = cx.add_window(|window, cx| Workspace::new(TitlebarStyle::Custom, window, cx));
         window
             .update(cx, |workspace, _window, cx| {
@@ -5842,6 +5694,7 @@ mod tests {
             ruui_editor::init(cx);
         });
         cx.executor().allow_parking();
+        silence_the_update_check();
         let window = cx.add_window(|window, cx| Workspace::new(TitlebarStyle::Custom, window, cx));
         window
             .update(cx, |workspace, _window, cx| {
@@ -6041,6 +5894,7 @@ mod tests {
             app_settings::init(cx);
             ruui::init(cx);
         });
+        silence_the_update_check();
         let window = cx.add_window(|window, cx| Workspace::new(TitlebarStyle::Custom, window, cx));
 
         window
@@ -6082,6 +5936,7 @@ mod tests {
             app_settings::init(cx);
             ruui::init(cx);
         });
+        silence_the_update_check();
         let window = cx.add_window(|window, cx| Workspace::new(TitlebarStyle::Custom, window, cx));
 
         window
@@ -6162,6 +6017,7 @@ mod tests {
         let file = dir.path().join("java_model.java");
         std::fs::write(&file, "public class ${name.pascal} {\r\n}\r\n").expect("the file");
 
+        silence_the_update_check();
         let window = cx.add_window(|window, cx| Workspace::new(TitlebarStyle::Custom, window, cx));
         window
             .update(cx, |workspace, _window, cx| {
@@ -6286,6 +6142,7 @@ mod tests {
         let file = dir.path().join("model.java");
         std::fs::write(&file, "class X {\n}\n").expect("the file");
 
+        silence_the_update_check();
         let window = cx.add_window(|window, cx| Workspace::new(TitlebarStyle::Custom, window, cx));
         window
             .update(cx, |workspace, _window, cx| {
@@ -6327,6 +6184,7 @@ mod tests {
             app_settings::init(cx);
             ruui::init(cx);
         });
+        silence_the_update_check();
         let window = cx.add_window(|window, cx| Workspace::new(TitlebarStyle::Custom, window, cx));
 
         window
@@ -6424,7 +6282,7 @@ mod centered_scroll_tests {
         });
 
         let mut cx = VisualTestContext::from_window(*window.deref(), cx);
-        cx.simulate_resize(size(px(WIDTH), px(height)));
+        cx.simulate_resize(gpui::size(px(WIDTH), px(height)));
         cx.run_until_parked();
         cx.update(|window, _| window.refresh());
         cx.run_until_parked();

@@ -50,9 +50,9 @@ use ruui::{
 };
 
 use crate::app_settings;
-use crate::context_menu::{self, MenuRow};
 use crate::i18n::ts;
 use crate::icons;
+use ruui_shell::{MenuRow, menu_rows};
 
 /// Key context the panel's own bindings would hang off.
 pub const KEY_CONTEXT: &str = "Explorer";
@@ -601,7 +601,7 @@ impl TreeSource for ExplorerSource {
             .gap(px(6.))
             .min_w_0()
             .children(tick)
-            .child(icons::icon(mark, px(14.), chrome.text_muted))
+            .child(ruui_shell::icon(mark, px(14.), chrome.text_muted))
             .child(
                 div()
                     .flex_1()
@@ -974,7 +974,7 @@ impl Explorer {
     /// The rows of the right-click menu over `id`.
     ///
     /// Built as data rather than as widget entries so that what a row offers is
-    /// what a test reads; see [`crate::context_menu`].
+    /// what a test reads; see [`ruui_shell::menu_rows`].
     pub fn menu_rows(&self, id: &NodeId, cx: &mut Context<Self>) -> Vec<MenuRow> {
         let visible = self.visible_tables(cx);
         let this = cx.entity();
@@ -1135,7 +1135,7 @@ impl Render for Explorer {
             let rows = self.menu_rows(&id, cx);
             ruui::ContextMenu::new("explorer-context")
                 .position(position)
-                .entries(context_menu::entries(rows))
+                .entries(menu_rows::entries(rows))
                 .on_dismiss(move |_window, cx| {
                     this.update(cx, |explorer, cx| {
                         explorer.close_menu(cx);
@@ -1617,7 +1617,7 @@ mod tests {
 
         let labels = cx.update(|_, cx| {
             explorer.update(cx, |explorer, cx| {
-                context_menu::labels(&explorer.menu_rows(&NodeId::Table(key("T_ALBUM")), cx))
+                menu_rows::labels(&explorer.menu_rows(&NodeId::Table(key("T_ALBUM")), cx))
             })
         });
         assert_eq!(
@@ -1638,7 +1638,7 @@ mod tests {
         // half of the rule and not an accident of this menu.
         let greyed = cx.update(|_, cx| {
             explorer.update(cx, |explorer, cx| {
-                context_menu::greyed(&explorer.menu_rows(&NodeId::Schema(public()), cx))
+                menu_rows::greyed(&explorer.menu_rows(&NodeId::Schema(public()), cx))
             })
         });
         assert_eq!(
@@ -1651,7 +1651,7 @@ mod tests {
         // On a table row the inspector command is live.
         let greyed = cx.update(|_, cx| {
             explorer.update(cx, |explorer, cx| {
-                context_menu::greyed(&explorer.menu_rows(&NodeId::Table(key("T_ALBUM")), cx))
+                menu_rows::greyed(&explorer.menu_rows(&NodeId::Table(key("T_ALBUM")), cx))
             })
         });
         assert_eq!(greyed, vec![ts!("explorer.menu_clear").to_string()]);
@@ -1665,7 +1665,7 @@ mod tests {
                     explorer.menu_rows(&NodeId::Table(key("T_ALBUM")), cx)
                 })
             });
-            cx.update(|window, cx| context_menu::row(&rows, &label).activate(window, cx));
+            cx.update(|window, cx| menu_rows::row(&rows, &label).activate(window, cx));
             cx.run_until_parked();
         };
 

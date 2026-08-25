@@ -1,10 +1,11 @@
-//! The vector icon set, embedded in the binary.
+//! rudbgen's own vector icons, embedded in the binary.
 //!
 //! gpui's [`svg`](gpui::svg) element resolves its `path` through the
-//! [`AssetSource`] the application was built with — [`Icons`] here — and paints
-//! the result as a *monochrome* sprite: resvg rasterises the file, only the
-//! alpha channel survives, and the element's `text_color` supplies the colour.
-//! Two things follow, and both are why these files look the way they do:
+//! [`AssetSource`](gpui::AssetSource) the application was built with — [`ICONS`]
+//! here — and paints the result as a *monochrome* sprite: resvg rasterises the
+//! file, only the alpha channel survives, and the element's `text_color`
+//! supplies the colour. Two things follow, and both are why these files look
+//! the way they do:
 //!
 //! * the colours written in an icon never reach the screen, only its coverage
 //!   does, so a `fill-opacity` below `1` reads as a lighter shade of the tint;
@@ -17,14 +18,13 @@
 //! nothing extra to ship. Cargo tracks the embedded files itself, so an edited
 //! icon rebuilds the crate without help from `build.rs`.
 //!
-//! The set is deliberately the M0 shell's and nothing more: the window
-//! controls, the two buttons of the tab strip and the application mark. The
-//! database marks — driver badges, table and view and procedure glyphs — arrive
-//! with the explorer tree in M1/M2, where there is something to put them on.
+//! Only the marks that are *rudbgen's* are here. The four caption glyphs a
+//! self-drawn title bar needs are the same four files in every application that
+//! draws one, so they come from
+//! [`ruui_shell::WINDOW_CONTROL_ICONS`](ruui_shell::WINDOW_CONTROL_ICONS) and
+//! [`ICONS`] concatenates the two tables.
 
-use std::borrow::Cow;
-
-use gpui::{AssetSource, Hsla, Pixels, Result, SharedString, Styled, Svg, svg};
+use ruui_shell::IconSet;
 
 /// The button at the end of the tab strip that lists every open tab.
 ///
@@ -50,36 +50,6 @@ pub const NEW_TAB: &str = "icons/new-tab.svg";
 /// adopted them, and drawn as geometry they land dead centre and evenly spaced
 /// regardless of the font installed, which three glyph characters never would.
 pub const MENU_DOTS: &str = "icons/menu-dots.svg";
-
-/// The custom title bar's minimise button.
-///
-/// The four window-control glyphs are drawn edge to edge of the 24×24 box
-/// rather than inset like the rest of the set: they are painted at half the
-/// size of a toolbar icon, and a glyph that kept the usual margin would come
-/// out thinner and smaller than the caption buttons of the platform they stand
-/// in for.
-///
-/// They carry a heavier stroke than the rest of the set for the same reason —
-/// `2.2` against the usual `1.8`. The caption strip renders them at 12 px
-/// (`GLYPH_SIZE` in [`ruui::window_controls`]), which is half the
-/// viewBox, so the stroke that reaches the screen is half what the file asks
-/// for: `1.8` arrived as 0.9 px, a hairline no row of pixels could hold at full
-/// coverage once it had been antialiased, and `2.2` arrives as 1.1 px instead.
-/// All four share the value, including both rectangles of [`WINDOW_RESTORE`],
-/// so that the strip reads as one set.
-pub const WINDOW_MINIMIZE: &str = "icons/window-minimize.svg";
-
-/// The custom title bar's maximise button, while the window is not maximised.
-pub const WINDOW_MAXIMIZE: &str = "icons/window-maximize.svg";
-
-/// The custom title bar's maximise button, while the window *is* maximised.
-///
-/// Two offset squares, the shape every desktop uses for "put it back": the
-/// button keeps its place and only the glyph says which way it will go.
-pub const WINDOW_RESTORE: &str = "icons/window-restore.svg";
-
-/// The custom title bar's close button.
-pub const WINDOW_CLOSE: &str = "icons/window-close.svg";
 
 /// The application mark, drawn at the left end of the custom title bar.
 ///
@@ -167,28 +137,12 @@ pub const CHEVRON_RIGHT: &str = "icons/chevron-right.svg";
 /// rather than as a different mark.
 pub const CHEVRON_DOWN: &str = "icons/chevron-down.svg";
 
-/// Every icon, paired with the bytes [`Icons`] hands back for it.
-const ICONS: [(&str, &[u8]); 20] = [
+/// rudbgen's own icons, paired with the bytes [`ICONS`] hands back for them.
+const APP_ICONS: &[(&str, &[u8])] = &[
     (APP_ICON, include_bytes!("../../../assets/icon.svg")),
     (TAB_LIST, include_bytes!("../assets/icons/tab-list.svg")),
     (NEW_TAB, include_bytes!("../assets/icons/new-tab.svg")),
     (MENU_DOTS, include_bytes!("../assets/icons/menu-dots.svg")),
-    (
-        WINDOW_MINIMIZE,
-        include_bytes!("../assets/icons/window-minimize.svg"),
-    ),
-    (
-        WINDOW_MAXIMIZE,
-        include_bytes!("../assets/icons/window-maximize.svg"),
-    ),
-    (
-        WINDOW_RESTORE,
-        include_bytes!("../assets/icons/window-restore.svg"),
-    ),
-    (
-        WINDOW_CLOSE,
-        include_bytes!("../assets/icons/window-close.svg"),
-    ),
     (TABLE, include_bytes!("../assets/icons/table.svg")),
     (VIEW, include_bytes!("../assets/icons/view.svg")),
     (FOLDER, include_bytes!("../assets/icons/folder.svg")),
@@ -211,52 +165,22 @@ const ICONS: [(&str, &[u8]); 20] = [
 
 /// The asset source backing every [`svg`](gpui::svg) element in the app.
 ///
-/// Install it with [`Application::with_assets`](gpui::Application::with_assets);
-/// without it gpui's default source answers every path with `None` and the
-/// icons paint as nothing at all.
-pub struct Icons;
-
-impl AssetSource for Icons {
-    fn load(&self, path: &str) -> Result<Option<Cow<'static, [u8]>>> {
-        Ok(ICONS
-            .iter()
-            .find(|(name, _)| *name == path)
-            .map(|(_, bytes)| Cow::Borrowed(*bytes)))
-    }
-
-    fn list(&self, path: &str) -> Result<Vec<SharedString>> {
-        Ok(ICONS
-            .iter()
-            .map(|(name, _)| *name)
-            .filter(|name| name.starts_with(path))
-            .map(SharedString::from)
-            .collect())
-    }
-}
-
-/// A square icon, sized and tinted.
-///
-/// The result is still an [`Svg`], so a caller can go on styling it — which is
-/// what the hover states do.
-///
-/// Unused in M0: the shell draws its window controls through
-/// [`WindowControls`](ruui::WindowControls) and its application mark
-/// through [`img`](gpui::img), and every other icon in the set belongs to the
-/// explorer tree (M2). It is the one helper those call sites all want, so it
-/// arrives with the set rather than after it.
-#[allow(dead_code)]
-pub fn icon(path: &'static str, size: Pixels, color: Hsla) -> Svg {
-    svg().size(size).flex_none().path(path).text_color(color)
-}
+/// Two tables: the shell's caption glyphs and rudbgen's own marks. Install it
+/// with [`Application::with_assets`](gpui::Application::with_assets); without
+/// it gpui's default source answers every path with `None` and the icons paint
+/// as nothing at all.
+pub const ICONS: IconSet = IconSet::new(&[ruui_shell::WINDOW_CONTROL_ICONS, APP_ICONS]);
 
 #[cfg(test)]
 mod tests {
+    use gpui::AssetSource;
+
     use super::*;
 
     #[test]
     fn every_icon_loads_and_is_an_svg() {
-        for (name, _) in ICONS {
-            let bytes = Icons
+        for (name, _) in ICONS.all() {
+            let bytes = ICONS
                 .load(name)
                 .expect("loading an embedded icon cannot fail")
                 .unwrap_or_else(|| panic!("{name} is missing from the asset source"));
@@ -276,7 +200,7 @@ mod tests {
     #[test]
     fn an_unknown_path_is_not_an_error() {
         assert!(
-            Icons
+            ICONS
                 .load("icons/nothing.svg")
                 .expect("a missing asset is not a failure")
                 .is_none()
@@ -284,7 +208,9 @@ mod tests {
     }
 
     #[test]
-    fn listing_returns_the_whole_set() {
-        assert_eq!(Icons.list("icons/").unwrap().len(), ICONS.len());
+    fn listing_returns_both_tables() {
+        assert_eq!(ICONS.list("icons/").unwrap().len(), ICONS.len());
+        // rudbgen's own marks, and the four caption glyphs the shell owns.
+        assert_eq!(ICONS.len(), APP_ICONS.len() + 4);
     }
 }

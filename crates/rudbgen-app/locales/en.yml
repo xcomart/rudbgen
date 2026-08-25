@@ -612,6 +612,8 @@ settings:
       type: Type names
       operator: Operators
       identifier: Identifiers
+      key: Keys
+      variable: Variables
       punctuation: Punctuation
       bracket_match: Matching bracket
       error: Errors
@@ -620,10 +622,11 @@ settings:
 # The update dialog, in all of its states: the announcement the start-up check
 # puts up when GitHub has a newer release than the running build, the manual
 # check from the menu, and the download that installs it. Both version numbers
-# are values, not words, and the name `rudbgen` is not translated either.
+# are values, not words, and so is `%{app}` — the application's own name, which
+# `ruui-shell` fills in and which is never translated.
 update:
   title: Update available
-  available: "rudbgen %{version} is available."
+  available: "%{app} %{version} is available."
   # Second line, quieter than the first: which build the user is looking at
   # right now, so the offer means something without them going to the about box.
   installed: "You are currently running %{version}."

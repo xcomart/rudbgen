@@ -517,7 +517,7 @@ impl Inspector {
             .px(px(10.))
             .border_b_1()
             .border_color(chrome.border)
-            .child(icons::icon(mark, px(14.), chrome.text_muted))
+            .child(ruui_shell::icon(mark, px(14.), chrome.text_muted))
             .child(
                 div()
                     .id("inspector-name")

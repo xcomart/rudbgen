@@ -447,6 +447,8 @@ settings:
       type: Имена типов
       operator: Операторы
       identifier: Идентификаторы
+      key: Ключи
+      variable: Переменные
       punctuation: Пунктуация
       bracket_match: Парная скобка
       error: Ошибки
@@ -454,7 +456,7 @@ settings:
 
 update:
   title: Доступно обновление
-  available: "Доступна версия rudbgen %{version}."
+  available: "Доступна версия %{app} %{version}."
   installed: "Сейчас у вас запущена версия %{version}."
   update: Обновить
   ignore: Игнорировать эту версию

@@ -19,16 +19,6 @@ path = "src/main.rs"
 [target.'cfg(windows)'.build-dependencies]
 winresource.workspace = true
 
-# `windows` and `raw-window-handle` are used only by `src/caption.rs`, to colour
-# the DWM title bar from the app theme. `windows-registry` is used only by
-# `src/update.rs`, which rewrites the `DisplayVersion` of the "Apps & features"
-# entry the Inno installer left behind, so that a copy which updates itself does
-# not go on looking out of date to winget.
-[target.'cfg(windows)'.dependencies]
-windows.workspace = true
-windows-registry.workspace = true
-raw-window-handle.workspace = true
-
 [dependencies]
 rudbgen-core.workspace = true
 # The session behind a connection: `Jvm::start`, `Session::open` and the
@@ -71,6 +61,14 @@ rudbgen-ssh.workspace = true
 # The widget kit everything here is drawn with: the palettes and their file
 # store, the text field, the buttons, tabs, menus, selects, trees and modals.
 ruui.workspace = true
+# The layer above the widgets, and the reason this crate no longer carries a
+# `caption.rs`, an `update.rs` or a theme editor of its own: the window chrome,
+# the self-updater and its dialog, the about box, the palette catalogues and
+# their editor, the split-pane tree, the context-menu rows and the pieces a
+# settings form is built out of. Everything it needs to know about rudbgen — the
+# name, the version, the release endpoints, the words and where the ignored
+# release tag is kept — is injected by `main` at start-up.
+ruui-shell.workspace = true
 
 # The tunnel registry in `src/connection.rs` is a process-wide map reached from
 # background threads, and a panic while a tunnel is being opened must not make
@@ -80,21 +78,22 @@ parking_lot.workspace = true
 # implements it for the verifier that reads `known_hosts`.
 async-trait.workspace = true
 
-# The update check parses the GitHub releases API's answer, which is the one
-# JSON document the shell reads that nothing in `rudbgen-core` owns.
+# The jdbgen import and the connection store both read JSON documents that
+# nothing in `rudbgen-core` owns.
 serde_json.workspace = true
-# The staging directory a self-update unpacks into is named after a fresh
-# UUID, so two runs cannot collide in the temporary directory.
+# A generated template file and a fresh connection profile are both named after
+# a UUID, so two of them cannot collide.
 uuid.workspace = true
-# The update dialog's download reports its progress back over a channel, which
-# is what lets the bar move while the transfer is on a background thread.
+# The generation run and the driver download report their progress back over a
+# channel, which is what lets a bar move while the work is on a background
+# thread.
 futures.workspace = true
-# The theme editor's catalogue hands file writes and deletions straight back
-# from `ruui::theme_store`, which reports them as `anyhow::Result`.
+# `rudbgen-core`'s settings and the theme directories both report their file
+# errors as `anyhow::Result`.
 anyhow.workspace = true
-# The export save dialog falls back to the user's home directory when the
-# catalogue's own directory does not exist yet; `rudbgen-core` resolves the
-# configuration directory but has no reason to expose the home one.
+# The jdbgen import and the output directory picker both fall back to the user's
+# home directory; `rudbgen-core` resolves the configuration directory but has no
+# reason to expose the home one.
 directories.workspace = true
 gpui.workspace = true
 # One call, in `main`: `gpui_platform::application()`. gpui's core no longer
@@ -105,18 +104,12 @@ log.workspace = true
 env_logger.workspace = true
 rust-i18n.workspace = true
 sys-locale.workspace = true
-# One caller today — `src/update.rs`, which asks the GitHub releases API for
-# the latest tag and then downloads the archive it names; the Maven driver
-# downloader is the second, in M2. gpui's own `cx.http_client()` is a
-# `NullHttpClient` unless the application installs one, and installing a real
-# one to serve two background requests would be a much larger dependency. See
-# the note beside the entry in the workspace manifest.
+# One caller — `src/maven.rs`, the driver downloader, which asks Maven Central
+# for a coordinate and then fetches the jar it names. gpui's own
+# `cx.http_client()` is a `NullHttpClient` unless the application installs one,
+# and installing a real one to serve one background request would be a much
+# larger dependency. See the note beside the entry in the workspace manifest.
 ureq.workspace = true
-# Only for `src/update.rs`: the SHA-256 the self-updater checks a downloaded
-# release asset against. Already linked as the crypto backend of both `russh`
-# and `ureq`'s `rustls`, so this is an edge in the graph rather than a crate in
-# the build.
-ring.workspace = true
 # One use, in `src/import_dialog.rs`: the buffer the jdbgen master password is
 # moved into for the one call that needs it, so that it is wiped rather than
 # left in a freed allocation once the configuration is open.

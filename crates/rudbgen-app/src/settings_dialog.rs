@@ -25,25 +25,30 @@
 //! re-entrantly in the first place; they are applied once, on save, from the
 //! shell's event handler.
 
-use std::path::{Path, PathBuf};
-use std::sync::Once;
+use std::sync::{Arc, Once};
 
 use gpui::{
     App, Context, DragMoveEvent, Entity, EventEmitter, FocusHandle, Focusable, Hsla, IntoElement,
-    KeyBinding, KeyDownEvent, MouseButton, MouseUpEvent, PathPromptOptions, Render, ScrollHandle,
-    SharedString, Subscription, Window, actions, div, prelude::*, px,
+    KeyBinding, KeyDownEvent, MouseButton, MouseUpEvent, Render, ScrollHandle, SharedString,
+    Subscription, Window, actions, div, prelude::*, px,
 };
 use rudbgen_core::{AppSettings, OverwritePolicy, TitlebarStyle};
 use ruui::{
     Button, ButtonVariant, Checkbox, DraggedThumb, EditorTheme, EditorThemeRegistry, SchemePreview,
     SchemeSelect, SchemeSwatch, Scrollbar, ScrollbarAxis, ScrollbarState, Segmented, Select,
     TextInput, Theme, ThemeRegistry, form_row, hide_later, hide_now, modal, scroll_to, scrolled,
-    theme, theme_store,
+    theme,
+};
+use ruui_shell::form::{
+    format_number, hint, installed_fonts, parse_number, restrict_to_number, section, set_text,
+    suffixed, text,
+};
+use ruui_shell::{
+    CatalogActionEvent, CatalogActions, CatalogFile, ThemeCatalog, ThemeEditor, ThemeEditorEvent,
 };
 
 use crate::app_settings;
 use crate::i18n::{self, ts};
-use crate::theme_editor::{Catalog, CatalogFile, ThemeEditor, ThemeEditorEvent};
 
 /// The dialog's five scrolling surfaces, and the element id of each one's
 /// overlay scroll indicator.
@@ -188,95 +193,17 @@ pub enum SettingsDialogEvent {
     Dismissed,
 }
 
-/// What a management row under a picker can be asked to do.
+/// Which of the two pickers a management row belongs to.
 ///
-/// Shared by both catalogues; which of them a given selection permits is worked
-/// out in [`SettingsDialog::render_actions`].
+/// Everything a row *does* is [`ruui_shell::CatalogActions`] over the catalogue
+/// it was built with; what is left here is which of the dialog's own two form
+/// fields an event about a selection refers to.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-enum Action {
-    /// Copy the selected entry into a new file and open it for editing.
-    ///
-    /// Also the "save under another name" of the editor: a built-in palette is
-    /// duplicated to be edited, and a custom one is duplicated to be varied.
-    Duplicate,
-    /// Open the selected custom entry for editing.
-    Edit,
-    /// Remove the selected custom entry's file, once confirmed.
-    Delete,
-    /// Read files the user picks into the catalogue's own directory.
-    Import,
-    /// Write the selected entry out to a file the user picks.
-    Export,
-}
-
-/// The five actions in the order they are drawn.
-const ACTIONS: [Action; 5] = [
-    Action::Duplicate,
-    Action::Edit,
-    Action::Delete,
-    Action::Import,
-    Action::Export,
-];
-
-/// Element id fragment and tab offset of the confirmation's "cancel".
-const SLOT_CONFIRM_CANCEL: usize = 5;
-
-/// Element id fragment and tab offset of the confirmation's "delete".
-const SLOT_CONFIRM_DELETE: usize = 6;
-
-impl Action {
-    /// Position of the action within its row, used for both the element id and
-    /// the tab index so the two can never drift apart.
-    fn slot(self) -> usize {
-        match self {
-            Self::Duplicate => 0,
-            Self::Edit => 1,
-            Self::Delete => 2,
-            Self::Import => 3,
-            Self::Export => 4,
-        }
-    }
-
-    /// The button's label in the active language.
-    fn label(self) -> SharedString {
-        match self {
-            Self::Duplicate => ts!("settings.manage.duplicate"),
-            Self::Edit => ts!("settings.manage.edit"),
-            Self::Delete => ts!("settings.manage.delete"),
-            Self::Import => ts!("settings.manage.import"),
-            Self::Export => ts!("settings.manage.export"),
-        }
-    }
-
-    /// Whether the action applies to the entry currently selected.
-    ///
-    /// `known` is whether the selected id resolves at all — a hand-edited
-    /// `settings.json` can name one that does not — and `custom` whether what it
-    /// resolves to came from a file, which is the only kind rudbgen may rewrite
-    /// or remove.
-    fn enabled(self, known: bool, custom: bool) -> bool {
-        match self {
-            // Exporting resolves the entry through the registry rather than off
-            // the disk, so a built-in one exports as readily as a custom one.
-            Self::Duplicate | Self::Export => known,
-            Self::Edit | Self::Delete => custom,
-            // Importing does not look at the selection at all.
-            Self::Import => true,
-        }
-    }
-}
-
-/// State of one picker's management row.
-///
-/// One per catalogue, since the two rows ask and report independently: a delete
-/// waiting to be confirmed under the chrome themes must not disappear because
-/// something went wrong under the editor themes.
-#[derive(Debug, Default)]
-struct CatalogActions {
-    /// Whether the delete confirmation is showing.
-    confirming: bool,
-    /// What went wrong the last time this row was used, if anything.
-    status: Option<SharedString>,
+enum Catalog {
+    /// The chrome themes.
+    UiTheme,
+    /// The syntax palettes.
+    EditorTheme,
 }
 
 /// The chrome themes as dropdown entries.
@@ -389,12 +316,14 @@ pub struct SettingsDialog {
     overwrite_policy: OverwritePolicy,
     /// Editor font family; `None` means the per-OS default.
     font_family: Option<SharedString>,
-    /// State of the management row under the chrome theme picker.
-    ui_theme_actions: CatalogActions,
-    /// State of the management row under the editor theme picker.
-    editor_theme_actions: CatalogActions,
+    /// The management row under the chrome theme picker.
+    ui_theme_actions: Entity<CatalogActions>,
+    /// The management row under the editor theme picker.
+    editor_theme_actions: Entity<CatalogActions>,
+    /// Keeps the two management rows' subscriptions alive.
+    _catalog_events: [Subscription; 2],
     /// The colour editor, while one is open. The dialog renders it *instead of*
-    /// the form rather than over it; see [`crate::theme_editor`].
+    /// the form rather than over it; see [`ruui_shell::theme_editor`].
     editor: Option<Entity<ThemeEditor>>,
     /// Keeps the open editor's subscription alive.
     editor_events: Option<Subscription>,
@@ -502,7 +431,32 @@ impl SettingsDialog {
                 .detach();
         }
 
+        // The two catalogues, over rudbgen's own theme directories, with the
+        // ids to fall back on when the selected entry is deleted. Built once:
+        // the directories are fixed for the run, and a row that had to be
+        // rebuilt would drop the confirmation it was in the middle of asking.
         let defaults = AppSettings::default();
+        let dirs = app_settings::theme_dirs_or_empty();
+        let ui_catalog: Arc<dyn ThemeCatalog> = Arc::new(ruui_shell::UiThemeCatalog::new(
+            dirs.clone(),
+            defaults.theme.clone(),
+        ));
+        let editor_catalog: Arc<dyn ThemeCatalog> = Arc::new(ruui_shell::EditorThemeCatalog::new(
+            dirs,
+            defaults.editor_theme.clone(),
+        ));
+        let ui_theme_actions = cx.new(|_| CatalogActions::new(ui_catalog, tab::UI_THEME_ACTIONS));
+        let editor_theme_actions =
+            cx.new(|_| CatalogActions::new(editor_catalog, tab::EDITOR_THEME_ACTIONS));
+        let catalog_events = [
+            cx.subscribe(&ui_theme_actions, |dialog, _row, event, cx| {
+                dialog.on_catalog_event(Catalog::UiTheme, event, cx);
+            }),
+            cx.subscribe(&editor_theme_actions, |dialog, _row, event, cx| {
+                dialog.on_catalog_event(Catalog::EditorTheme, event, cx);
+            }),
+        ];
+
         Self {
             open: false,
             ui_theme: defaults.theme.into(),
@@ -513,8 +467,9 @@ impl SettingsDialog {
             titlebar: defaults.window.titlebar,
             overwrite_policy: defaults.overwrite_policy,
             font_family: defaults.editor_font_family.map(SharedString::from),
-            ui_theme_actions: CatalogActions::default(),
-            editor_theme_actions: CatalogActions::default(),
+            ui_theme_actions,
+            editor_theme_actions,
+            _catalog_events: catalog_events,
             editor: None,
             editor_events: None,
             status: None,
@@ -651,8 +606,9 @@ impl SettingsDialog {
         self.fonts = installed_fonts(cx);
         self.fill_form(&settings, cx);
         self.status = None;
-        self.ui_theme_actions = CatalogActions::default();
-        self.editor_theme_actions = CatalogActions::default();
+        for row in [&self.ui_theme_actions, &self.editor_theme_actions] {
+            row.update(cx, |row, cx| row.clear_status(cx));
+        }
         self.editor = None;
         self.editor_events = None;
         self.open = true;
@@ -695,116 +651,79 @@ impl SettingsDialog {
         cx.emit(SettingsDialogEvent::Previewed);
     }
 
-    /// The management state of one catalogue.
-    fn actions(&self, catalog: Catalog) -> &CatalogActions {
+    /// The management row under one catalogue's picker.
+    fn actions(&self, catalog: Catalog) -> &Entity<CatalogActions> {
         match catalog {
             Catalog::UiTheme => &self.ui_theme_actions,
             Catalog::EditorTheme => &self.editor_theme_actions,
         }
     }
 
-    /// The same, for the callers that change it.
-    fn actions_mut(&mut self, catalog: Catalog) -> &mut CatalogActions {
-        match catalog {
-            Catalog::UiTheme => &mut self.ui_theme_actions,
-            Catalog::EditorTheme => &mut self.editor_theme_actions,
-        }
-    }
-
-    /// The id currently highlighted in one catalogue's picker.
-    fn selection(&self, catalog: Catalog) -> SharedString {
-        match catalog {
-            Catalog::UiTheme => self.ui_theme.clone(),
-            Catalog::EditorTheme => self.editor_theme.clone(),
-        }
+    /// The catalogue behind one of the two rows.
+    fn catalog_of(&self, catalog: Catalog, cx: &App) -> Arc<dyn ThemeCatalog> {
+        self.actions(catalog).read(cx).catalog().clone()
     }
 
     /// Highlights `id` in one catalogue's picker and previews it.
     ///
     /// Nothing is persisted; the preview is dropped again if the dialog is
-    /// cancelled, exactly as when the user picks a row of the dropdown.
+    /// cancelled, exactly as when the user picks a row of the dropdown. The
+    /// management row is told too, because everything it offers is about the
+    /// selection and a row that had not been told would grey the wrong buttons
+    /// out.
     fn select(&mut self, catalog: Catalog, id: impl Into<SharedString>, cx: &mut Context<Self>) {
+        let id = id.into();
         match catalog {
-            Catalog::UiTheme => self.ui_theme = id.into(),
-            Catalog::EditorTheme => self.editor_theme = id.into(),
+            Catalog::UiTheme => self.ui_theme = id.clone(),
+            Catalog::EditorTheme => self.editor_theme = id.clone(),
         }
+        self.actions(catalog)
+            .clone()
+            .update(cx, |row, cx| row.set_selection(id.to_string(), cx));
         self.refresh_preview(cx);
         cx.notify();
     }
 
-    /// Runs one of the management actions against `catalog`.
+    /// What one of the two management rows asked the dialog to do.
     ///
-    /// Every one of them starts by clearing whatever the last one had to
-    /// report, so a message never outlives the situation it described.
-    fn run(&mut self, catalog: Catalog, action: Action, cx: &mut Context<Self>) {
-        self.actions_mut(catalog).status = None;
-        match action {
-            Action::Duplicate => self.duplicate(catalog, cx),
-            Action::Edit => self.edit(catalog, cx),
-            Action::Delete => {
-                // Deleting is the one action here that cannot be undone by
-                // doing it again, so it asks first.
-                self.actions_mut(catalog).confirming = true;
-                cx.notify();
+    /// The row owns the files and the confirmation; the dialog owns the form
+    /// field the selection lives in and the body the editor is drawn instead
+    /// of. See [`ruui_shell::catalog_ui`] for why the line is where it is.
+    fn on_catalog_event(
+        &mut self,
+        catalog: Catalog,
+        event: &CatalogActionEvent,
+        cx: &mut Context<Self>,
+    ) {
+        match event {
+            CatalogActionEvent::Select(id) => self.select(catalog, id.clone(), cx),
+            // The files on disk moved under a palette that may already be in
+            // use, so what the window is wearing has to be resolved again.
+            CatalogActionEvent::Changed => self.refresh_preview(cx),
+            // The file travels in the event, but a gpui subscription only ever
+            // borrows one and `CatalogFile` is not `Clone` — a catalogue of a
+            // host's own may hold anything at all — so it is resolved again
+            // from the id. That is the same registry lookup the row itself made,
+            // over the registry it has just reloaded.
+            CatalogActionEvent::Edit { id, .. } => {
+                let source = self.catalog_of(catalog, cx);
+                if let Some(file) = source.load(id, cx) {
+                    self.open_editor(catalog, id.clone(), &file, cx);
+                }
             }
-            Action::Import => self.import(catalog, cx),
-            Action::Export => self.export(catalog, cx),
         }
     }
 
-    /// Reports why an action could not be carried out.
-    fn report(&mut self, catalog: Catalog, message: SharedString, cx: &mut Context<Self>) {
-        self.actions_mut(catalog).status = Some(message);
-        cx.notify();
-    }
-
-    /// Copies the selected entry into a file of its own and opens it.
-    ///
-    /// Works on a built-in entry as readily as on a custom one — that is the
-    /// point of it, since the built-in palettes are where a user's own theme
-    /// usually starts, and rudbgen refuses to write over a built-in id.
-    fn duplicate(&mut self, catalog: Catalog, cx: &mut Context<Self>) {
-        let selection = self.selection(catalog);
-        let Some(mut file) = catalog.file_for(&selection, cx) else {
-            return;
-        };
-
-        let name = ts!("settings.manage.copy_name", name = file.name().to_owned()).to_string();
-        let id = theme_store::unique_id(
-            &[name.as_str()],
-            catalog.generated_id_prefix(),
-            &catalog.taken_ids(cx),
-        );
-        file.set_name(name);
-
-        if let Err(err) = file.save(&id) {
-            log::error!("could not write the duplicated {id}: {err:#}");
-            let message = ts!("settings.manage.write_failed", error = format!("{err:#}"));
-            self.report(catalog, message, cx);
-            return;
-        }
-
-        crate::app_settings::reload_themes(cx);
-        self.select(catalog, id.clone(), cx);
-        self.open_editor(id, file, cx);
-    }
-
-    /// Opens the selected custom entry in the editor.
-    fn edit(&mut self, catalog: Catalog, cx: &mut Context<Self>) {
-        let selection = self.selection(catalog);
-        let Some((id, file)) = catalog
-            .entry(&selection, cx)
-            .filter(|entry| !entry.builtin)
-            .and_then(|entry| catalog.file_for(&entry.id, cx).map(|file| (entry.id, file)))
-        else {
-            return;
-        };
-        self.open_editor(id, file, cx);
-    }
-
-    /// Puts the editor in front of the form, over `file`.
-    fn open_editor(&mut self, id: String, file: CatalogFile, cx: &mut Context<Self>) {
-        let editor = cx.new(|cx| ThemeEditor::new(id, &file, cx));
+    /// Puts the editor in front of the form, over the file a row handed out.
+    fn open_editor(
+        &mut self,
+        catalog: Catalog,
+        id: String,
+        file: &CatalogFile,
+        cx: &mut Context<Self>,
+    ) {
+        let source = self.catalog_of(catalog, cx);
+        let editor = cx.new(|cx| ThemeEditor::new(source, id, file, cx));
         self.editor_events = Some(cx.subscribe(&editor, |dialog, _editor, event, cx| {
             let saved = matches!(event, ThemeEditorEvent::Saved);
             dialog.close_editor(saved, cx);
@@ -829,192 +748,6 @@ impl SettingsDialog {
         cx.notify();
     }
 
-    /// Drops the delete confirmation without acting on it.
-    fn cancel_confirm(&mut self, catalog: Catalog, cx: &mut Context<Self>) {
-        if self.actions_mut(catalog).confirming {
-            self.actions_mut(catalog).confirming = false;
-            cx.notify();
-        }
-    }
-
-    /// Removes the selected custom entry's file.
-    ///
-    /// The selection then moves to the default id, because the one it held no
-    /// longer resolves; the *setting* still names it until the dialog is saved,
-    /// which is why the preview is refreshed — the running window falls back to
-    /// the default palette in the same breath as the picker does.
-    fn delete(&mut self, catalog: Catalog, cx: &mut Context<Self>) {
-        self.actions_mut(catalog).confirming = false;
-        let selection = self.selection(catalog);
-        let Some(entry) = catalog.entry(&selection, cx).filter(|entry| !entry.builtin) else {
-            cx.notify();
-            return;
-        };
-
-        if let Err(err) = catalog.delete(&entry.id) {
-            log::error!("could not remove {}: {err:#}", entry.id);
-            let message = ts!("settings.manage.delete_failed", error = format!("{err:#}"));
-            self.report(catalog, message, cx);
-            return;
-        }
-
-        crate::app_settings::reload_themes(cx);
-        self.select(catalog, catalog.default_id(), cx);
-        cx.notify();
-    }
-
-    /// Asks the platform for theme files and installs what it hands back.
-    ///
-    /// The dialog is a platform call, and on X11 that is the call gpui was
-    /// patched over in the first place, so nothing here waits on it: the prompt
-    /// hands back a channel straight away, the click that started it returns,
-    /// and the answer is picked up on a task of its own. By the time
-    /// [`SettingsDialog::install`] runs, this update — and the borrow it holds
-    /// — is long over.
-    fn import(&mut self, catalog: Catalog, cx: &mut Context<Self>) {
-        let paths = cx.prompt_for_paths(PathPromptOptions {
-            files: true,
-            directories: false,
-            multiple: true,
-            prompt: Some(ts!("settings.manage.import_select")),
-        });
-
-        cx.spawn(async move |dialog, cx| {
-            let chosen = match paths.await {
-                Ok(Ok(Some(paths))) => paths,
-                Ok(Ok(None)) | Err(_) => return,
-                Ok(Err(error)) => {
-                    log::warn!("the file picker could not be opened: {error:#}");
-                    return;
-                }
-            };
-            dialog
-                .update(cx, |dialog, cx| dialog.install(catalog, chosen, cx))
-                .ok();
-        })
-        .detach();
-    }
-
-    /// Copies `paths` into the catalogue's directory, one file at a time.
-    ///
-    /// A file that is not a theme file of this kind is counted and skipped
-    /// rather than failing the batch: a user who picks a folder full of
-    /// palettes should get the ones that parse. Nothing is ever written over —
-    /// the id each file lands under comes from its own `name`, then from its
-    /// file name, and is suffixed until it is free, which is why `taken` grows
-    /// as the batch goes: two files that would both like to be `one-dark`
-    /// become `one-dark` and `one-dark-2`, and neither touches the `one-dark`
-    /// the user already had.
-    ///
-    /// When nothing at all could be installed the first refusal is what gets
-    /// reported, which is what makes picking a single file of the wrong kind
-    /// say so in as many words instead of counting to one.
-    fn install(&mut self, catalog: Catalog, paths: Vec<PathBuf>, cx: &mut Context<Self>) {
-        let mut taken = catalog.taken_ids(cx);
-        let mut installed = None;
-        let mut refused: Option<SharedString> = None;
-        let mut skipped = 0usize;
-
-        // Only the first refusal is kept; the rest are in the log. The count is
-        // what the user gets for the others, since a management row cannot hold
-        // one sentence per file without pushing the pickers off the dialog.
-        let refuse = |path: &Path, message: SharedString, first: &mut Option<SharedString>| {
-            log::warn!("skipping {}: {message}", path.display());
-            if first.is_none() {
-                *first = Some(message);
-            }
-        };
-
-        for path in &paths {
-            let name = path
-                .file_name()
-                .and_then(|name| name.to_str())
-                .unwrap_or_default();
-            let file = match catalog.read(path) {
-                Ok(file) => file,
-                Err(err) => {
-                    refuse(path, err.message(name), &mut refused);
-                    skipped += 1;
-                    continue;
-                }
-            };
-            let stem = path
-                .file_stem()
-                .and_then(|stem| stem.to_str())
-                .unwrap_or_default();
-            let id =
-                theme_store::unique_id(&[file.name(), stem], catalog.generated_id_prefix(), &taken);
-            if let Err(err) = file.save(&id) {
-                let message = ts!("settings.manage.write_failed", error = format!("{err:#}"));
-                refuse(path, message, &mut refused);
-                skipped += 1;
-                continue;
-            }
-            taken.push(id.clone());
-            installed = Some(id);
-        }
-
-        let Some(id) = installed else {
-            if let Some(message) = refused {
-                self.report(catalog, message, cx);
-            }
-            return;
-        };
-
-        crate::app_settings::reload_themes(cx);
-        if skipped > 0 {
-            self.actions_mut(catalog).status =
-                Some(ts!("settings.manage.import_skipped", count = skipped));
-        }
-        // The last one installed, so that picking a single file selects it —
-        // and so that a file which had to be renamed around a collision shows
-        // the user which entry it became.
-        self.select(catalog, id, cx);
-        cx.notify();
-    }
-
-    /// Writes the selected entry out to a file the user picks.
-    ///
-    /// Built-in entries included: the palette is resolved from the registry
-    /// rather than read off the disk, so exporting one is how a user gets a
-    /// starting point they can edit outside rudbgen or hand to somebody else.
-    /// Whether an existing file may be replaced is the platform save dialog's
-    /// question, not ours.
-    ///
-    /// Asynchronous for the same reason [`SettingsDialog::import`] is, and the
-    /// file is collected *before* the prompt so the task owns everything it
-    /// needs and never has to reach back into the dialog except to complain.
-    fn export(&mut self, catalog: Catalog, cx: &mut Context<Self>) {
-        let selection = self.selection(catalog);
-        let Some(file) = catalog.file_for(&selection, cx) else {
-            return;
-        };
-        let suggested = format!("{selection}.{}", theme_store::FILE_EXTENSION);
-        let prompt = cx.prompt_for_new_path(&export_directory(catalog), Some(&suggested));
-
-        cx.spawn(async move |dialog, cx| {
-            let path = match prompt.await {
-                Ok(Ok(Some(path))) => path,
-                Ok(Ok(None)) | Err(_) => return,
-                Ok(Err(error)) => {
-                    log::warn!("the save dialog could not be opened: {error:#}");
-                    return;
-                }
-            };
-            let Err(err) = file.write(&path) else {
-                return;
-            };
-            log::error!("could not write {}: {err:#}", path.display());
-            dialog
-                .update(cx, |dialog, cx| {
-                    let message = ts!("settings.manage.write_failed", error = format!("{err:#}"));
-                    dialog.report(catalog, message, cx);
-                })
-                .ok();
-        })
-        .detach();
-    }
-
     /// Copy `settings` into every control.
     fn fill_form(&mut self, settings: &AppSettings, cx: &mut Context<Self>) {
         self.ui_theme = settings.theme.clone().into();
@@ -1025,6 +758,16 @@ impl SettingsDialog {
         self.titlebar = settings.window.titlebar;
         self.overwrite_policy = settings.overwrite_policy;
         self.font_family = settings.editor_font_family.clone().map(SharedString::from);
+        // Everything the two management rows offer is about the selection, so a
+        // row that had not been told would grey the wrong buttons out.
+        for (catalog, id) in [
+            (Catalog::UiTheme, &settings.theme),
+            (Catalog::EditorTheme, &settings.editor_theme),
+        ] {
+            self.actions(catalog)
+                .clone()
+                .update(cx, |row, cx| row.set_selection(id.clone(), cx));
+        }
 
         set_text(
             &self.ui_font_size_input,
@@ -1151,10 +894,16 @@ impl SettingsDialog {
     /// What `Escape` means, one layer at a time.
     ///
     /// Anything layered on top of the form takes the key first and only undoes
-    /// itself, so that backing out of a list, a question or the colour editor
-    /// does not also throw away the whole form. The editor is checked before the
-    /// dropdowns because it replaces the form outright: while it is up there is
-    /// no list to close.
+    /// itself, so that backing out of a list or the colour editor does not also
+    /// throw away the whole form. The editor is checked before the dropdowns
+    /// because it replaces the form outright: while it is up there is no list to
+    /// close.
+    ///
+    /// A delete confirmation under one of the pickers is *not* a layer this can
+    /// see: it lives inside [`ruui_shell::CatalogActions`], which exposes
+    /// neither whether it is asking nor a way to take the question back, so
+    /// `Escape` there dismisses the dialog — which cancels the confirmation
+    /// along with everything else, and deletes nothing.
     ///
     /// Public because the key does not actually arrive here: gpui matches key
     /// bindings before it delivers key events, so the shell's `Escape` binding
@@ -1168,12 +917,6 @@ impl SettingsDialog {
         if self.open_list.is_some() {
             self.close_lists(cx);
             return;
-        }
-        for catalog in [Catalog::UiTheme, Catalog::EditorTheme] {
-            if self.actions(catalog).confirming {
-                self.cancel_confirm(catalog, cx);
-                return;
-            }
         }
         self.dismiss(cx);
     }
@@ -1223,7 +966,11 @@ impl SettingsDialog {
         let supported = i18n::supported();
         let mut options = Vec::with_capacity(supported.len() + 1);
         options.push(system_default());
-        options.extend(supported.iter().map(|(_, name)| name.clone()));
+        options.extend(
+            supported
+                .iter()
+                .map(|(_, name)| SharedString::from(name.clone())),
+        );
         options
     }
 
@@ -1288,117 +1035,6 @@ impl SettingsDialog {
         self.pending_focus = false;
         let handle = self.ui_font_size_input.read(cx).focus_handle(cx);
         window.focus(&handle, cx);
-    }
-
-    /// The row of management buttons drawn under one picker.
-    ///
-    /// `base` is the first of the [`Action::slot`] consecutive tab indices the
-    /// row takes; the confirmation's two buttons continue from there, so a row
-    /// occupies seven indices whether or not it is currently asking anything.
-    fn render_actions(
-        &self,
-        catalog: Catalog,
-        base: isize,
-        cx: &mut Context<Self>,
-    ) -> impl IntoElement + use<> {
-        let chrome = theme(cx);
-        let this = cx.entity();
-        let prefix = catalog.element_prefix();
-
-        let entry = catalog.entry(&self.selection(catalog), cx);
-        let known = entry.is_some();
-        let custom = entry.as_ref().is_some_and(|entry| !entry.builtin);
-        let confirming = self.actions(catalog).confirming;
-
-        let buttons = ACTIONS.map(|action| {
-            Button::new((prefix, action.slot()), action.label())
-                .variant(ButtonVariant::Secondary)
-                // Everything is held while the confirmation is up, so that the
-                // question can only be answered, not walked away from.
-                .disabled(confirming || !action.enabled(known, custom))
-                .tab_index(base + action.slot() as isize)
-                .on_click({
-                    let this = this.clone();
-                    move |_, _window, cx| {
-                        this.update(cx, |dialog, cx| dialog.run(catalog, action, cx));
-                    }
-                })
-                .into_any_element()
-        });
-
-        let confirm = confirming.then(|| {
-            let name = entry.map(|entry| entry.name).unwrap_or_default();
-            let question = match catalog {
-                Catalog::UiTheme => ts!("settings.manage.delete_theme_confirm", name = name),
-                Catalog::EditorTheme => {
-                    ts!("settings.manage.delete_editor_theme_confirm", name = name)
-                }
-            };
-
-            div()
-                .flex()
-                .flex_row()
-                // Wraps rather than overflowing: a locale that spells the
-                // question out at length would otherwise push a button past the
-                // edge of the section.
-                .flex_wrap()
-                .items_center()
-                .justify_end()
-                .gap(px(8.))
-                .child(
-                    div()
-                        .flex_1()
-                        .min_w_0()
-                        .truncate()
-                        .text_size(px(12.))
-                        .text_color(chrome.text)
-                        .child(question),
-                )
-                .child(
-                    Button::new((prefix, SLOT_CONFIRM_CANCEL), ts!("common.cancel"))
-                        .variant(ButtonVariant::Secondary)
-                        .tab_index(base + SLOT_CONFIRM_CANCEL as isize)
-                        .on_click({
-                            let this = this.clone();
-                            move |_, _window, cx| {
-                                this.update(cx, |dialog, cx| dialog.cancel_confirm(catalog, cx));
-                            }
-                        }),
-                )
-                .child(
-                    Button::new((prefix, SLOT_CONFIRM_DELETE), ts!("settings.manage.delete"))
-                        .variant(ButtonVariant::Danger)
-                        .tab_index(base + SLOT_CONFIRM_DELETE as isize)
-                        .on_click({
-                            let this = this.clone();
-                            move |_, _window, cx| {
-                                this.update(cx, |dialog, cx| dialog.delete(catalog, cx));
-                            }
-                        }),
-                )
-        });
-
-        let status = self.actions(catalog).status.clone().map(|message| {
-            div()
-                .text_size(px(11.))
-                .text_color(StatusLevel::Error.color(&chrome))
-                .child(message)
-        });
-
-        div()
-            .flex()
-            .flex_col()
-            .gap(px(6.))
-            .child(
-                div()
-                    .flex()
-                    .flex_row()
-                    .flex_wrap()
-                    .gap(px(6.))
-                    .children(buttons),
-            )
-            .children(confirm)
-            .children(status)
     }
 
     /// The editor theme dropdown, or — while the choice follows the chrome theme
@@ -1471,11 +1107,11 @@ impl SettingsDialog {
         let this = cx.entity();
         let font_bar = self.hovering_scrollbar(SCROLLBARS[1].0, Surface::Font, cx);
         let ui_theme_bar = self.hovering_scrollbar(SCROLLBARS[3].0, Surface::UiTheme, cx);
-        // Built before the section is assembled, because `section` borrows the
-        // context to read the theme and these borrow it mutably to listen.
-        let theme_actions = self.render_actions(Catalog::UiTheme, tab::UI_THEME_ACTIONS, cx);
-        let editor_theme_actions =
-            self.render_actions(Catalog::EditorTheme, tab::EDITOR_THEME_ACTIONS, cx);
+        // Two views of their own, each drawn under the picker it manages; the
+        // tab indices they take are `tab::UI_THEME_ACTIONS` and
+        // `tab::EDITOR_THEME_ACTIONS` onwards, fixed at construction.
+        let theme_actions = self.ui_theme_actions.clone();
+        let editor_theme_actions = self.editor_theme_actions.clone();
         let editor_theme = self.render_editor_theme(cx);
 
         let theme_picker = SchemeSelect::new("settings-ui-theme")
@@ -1884,11 +1520,12 @@ impl Render for SettingsDialog {
 
         // While a colour is being edited the form steps aside entirely rather
         // than being covered up, so that the window's tab ring holds only the
-        // controls that are actually on screen; see [`crate::theme_editor`]. The
-        // form is not even built in that case — it would be built afresh on
-        // every keystroke in the editor and thrown away again.
+        // controls that are actually on screen; see
+        // [`ruui_shell::theme_editor`]. The form is not even built in that case
+        // — it would be built afresh on every keystroke in the editor and
+        // thrown away again.
         let (title, body) = match self.editor.clone() {
-            Some(editor) => (editor.read(cx).title(), editor.into_any_element()),
+            Some(editor) => (editor.read(cx).title(cx), editor.into_any_element()),
             None => (
                 ts!("settings.title"),
                 self.render_form(body_bar, &chrome, cx).into_any_element(),
@@ -1968,87 +1605,6 @@ fn section_of(tab_index: isize) -> usize {
     }
 }
 
-/// Where the export save dialog should open.
-///
-/// The catalogue's own directory, since that is where a file the user then
-/// wants rudbgen to *load* has to end up — but only once it exists: a save
-/// dialog pointed at a directory that has never been created opens somewhere
-/// arbitrary on some platforms, so a user who has added no theme of their own
-/// yet gets their home directory instead.
-fn export_directory(catalog: Catalog) -> PathBuf {
-    catalog
-        .directory()
-        .ok()
-        .filter(|directory| directory.is_dir())
-        .or_else(|| directories::UserDirs::new().map(|dirs| dirs.home_dir().to_owned()))
-        .unwrap_or_default()
-}
-
-/// Wraps `body` in a titled card.
-fn section<E: IntoElement>(title: SharedString, cx: &App, body: E) -> impl IntoElement + use<E> {
-    let chrome = theme(cx);
-    div()
-        .flex()
-        .flex_col()
-        .gap(px(10.))
-        .p(px(12.))
-        .rounded_lg()
-        .border_1()
-        .border_color(chrome.border)
-        .bg(chrome.surface)
-        .child(
-            div()
-                .text_size(px(11.))
-                .text_color(chrome.text_muted)
-                .child(title),
-        )
-        .child(body)
-}
-
-/// A muted paragraph explaining something a form row cannot say on its own.
-fn hint(text: SharedString, cx: &App) -> impl IntoElement + use<> {
-    let chrome = theme(cx);
-    div()
-        .text_size(px(11.))
-        .text_color(chrome.text_muted)
-        .child(text)
-}
-
-/// Lays a short unit hint out to the right of a narrow control.
-fn suffixed<E: IntoElement>(control: E, hint: SharedString, cx: &App) -> impl IntoElement + use<E> {
-    let chrome = theme(cx);
-    div()
-        .flex()
-        .flex_row()
-        .items_center()
-        .gap(px(8.))
-        .w_full()
-        .child(div().flex_none().w(px(96.)).child(control))
-        .child(
-            div()
-                .flex_1()
-                .min_w_0()
-                .text_size(px(11.))
-                .text_color(chrome.text_muted)
-                .child(hint),
-        )
-}
-
-/// The font families the platform offers, in the order gpui reports them —
-/// sorted and deduplicated already.
-///
-/// Names starting with a dot are dropped: those are the platform's private
-/// aliases, such as `.SystemUIFont` on macOS, which are not meant to be chosen
-/// by name.
-fn installed_fonts(cx: &App) -> Vec<SharedString> {
-    cx.text_system()
-        .all_font_names()
-        .into_iter()
-        .filter(|name| !name.starts_with('.'))
-        .map(SharedString::from)
-        .collect()
-}
-
 /// Splits the extra JVM arguments field into the arguments it names.
 ///
 /// Whitespace separated, which is what the field's one-line shape allows and
@@ -2058,65 +1614,6 @@ fn installed_fonts(cx: &App) -> Vec<SharedString> {
 /// on, since the JVM rejects an empty argument outright.
 fn split_arguments(value: &str) -> Vec<String> {
     value.split_whitespace().map(ToOwned::to_owned).collect()
-}
-
-/// Trimmed content of `input`.
-fn text(input: &Entity<TextInput>, cx: &App) -> String {
-    input.read(cx).content().trim().to_owned()
-}
-
-/// Parses `input` into `T`, or `None` when it is blank or malformed.
-fn parse_number<T: std::str::FromStr>(input: &Entity<TextInput>, cx: &App) -> Option<T> {
-    text(input, cx).parse::<T>().ok()
-}
-
-/// Replaces the contents of `input`.
-fn set_text(input: &Entity<TextInput>, value: impl Into<SharedString>, cx: &mut App) {
-    input.update(cx, |input, cx| input.set_content(value, cx));
-}
-
-/// Renders `value` without a trailing `.0`, so 14.0 shows as "14".
-fn format_number(value: f32) -> String {
-    if value.fract() == 0.0 {
-        format!("{value:.0}")
-    } else {
-        format!("{value}")
-    }
-}
-
-/// Installs an observer that keeps `input` numeric.
-///
-/// The text field has no input filter, so the content is rewritten after every
-/// edit. Rewriting only when the text actually changes stops the observer from
-/// re-triggering itself.
-fn restrict_to_number(
-    cx: &mut Context<SettingsDialog>,
-    input: &Entity<TextInput>,
-    decimals: bool,
-    max_len: usize,
-) {
-    cx.observe(input, move |_this, input, cx| {
-        let content = input.read(cx).content().to_owned();
-        let mut seen_dot = false;
-        let filtered: String = content
-            .chars()
-            .filter(|c| {
-                if c.is_ascii_digit() {
-                    true
-                } else if decimals && *c == '.' && !seen_dot {
-                    seen_dot = true;
-                    true
-                } else {
-                    false
-                }
-            })
-            .take(max_len)
-            .collect();
-        if filtered != content {
-            input.update(cx, |input, cx| input.set_content(filtered, cx));
-        }
-    })
-    .detach();
 }
 
 #[cfg(test)]
@@ -2224,9 +1721,6 @@ mod tests {
             assert!(!label.contains("settings."), "untranslated label {label:?}");
         };
 
-        for action in ACTIONS {
-            translated(action.label());
-        }
         for (_, label) in titlebar_options() {
             translated(label);
         }
@@ -2261,12 +1755,26 @@ mod tests {
             ts!("settings.jvm_hint"),
             ts!("settings.system_default"),
             system_default(),
+            // The words the two management rows say. Drawn by
+            // `ruui_shell::catalog_ui` out of these very keys, which is why a
+            // typo in one of them is still this crate's mistake to catch.
+            ts!("settings.manage.duplicate"),
+            ts!("settings.manage.edit"),
+            ts!("settings.manage.delete"),
+            ts!("settings.manage.import"),
+            ts!("settings.manage.export"),
+            ts!("settings.editor.theme_title"),
+            ts!("settings.editor.editor_theme_title"),
             ts!("settings.manage.delete_theme_confirm", name = "X"),
             ts!("settings.manage.delete_editor_theme_confirm", name = "X"),
             ts!("settings.manage.write_failed", error = "e"),
             ts!("settings.manage.delete_failed", error = "e"),
             ts!("settings.manage.import_select"),
             ts!("settings.manage.import_skipped", count = 2),
+            ts!("settings.manage.import_unreadable", file = "f", error = "e"),
+            ts!("settings.manage.import_not_a_theme", file = "f"),
+            ts!("settings.manage.import_not_an_editor_theme", file = "f"),
+            ts!("settings.manage.import_bad_color", file = "f", slot = "s"),
             ts!("settings.save_failed", error = "e"),
         ] {
             translated(label);
@@ -2281,43 +1789,15 @@ mod tests {
 
     #[test]
     fn the_two_management_rows_never_share_a_tab_index() {
-        // Each row takes one index per action plus the two the confirmation
-        // adds, and has to stay clear of the control that follows it.
-        let last = |base: isize| base + SLOT_CONFIRM_DELETE as isize;
+        // A row takes `CatalogActions::TAB_SPAN` consecutive indices from the
+        // base it was built with, whether or not it is currently asking
+        // anything, and has to stay clear of the control that follows it.
+        let last = |base: isize| base + CatalogActions::TAB_SPAN - 1;
         assert!(last(tab::UI_THEME_ACTIONS) < tab::EDITOR_THEME);
         assert!(last(tab::EDITOR_THEME_ACTIONS) < tab::FOLLOWS_UI);
         // Each row follows the picker it belongs to.
         const { assert!(tab::UI_THEME < tab::UI_THEME_ACTIONS) };
         const { assert!(tab::EDITOR_THEME < tab::EDITOR_THEME_ACTIONS) };
-
-        let mut slots: Vec<usize> = ACTIONS.iter().map(|action| action.slot()).collect();
-        slots.extend([SLOT_CONFIRM_CANCEL, SLOT_CONFIRM_DELETE]);
-        let unique = slots.len();
-        slots.sort_unstable();
-        slots.dedup();
-        assert_eq!(slots.len(), unique, "two actions share a slot");
-    }
-
-    #[test]
-    fn only_a_custom_entry_may_be_edited_or_removed() {
-        for action in ACTIONS {
-            // Nothing at all is selected — a settings file naming a theme whose
-            // file has since gone — so nothing may be done to it. Importing is
-            // the exception: it reads no selection, and it is the one way back
-            // out of exactly that state.
-            assert_eq!(
-                action.enabled(false, false),
-                action == Action::Import,
-                "{action:?}"
-            );
-        }
-        // A built-in entry can be copied and exported, but not rewritten.
-        assert!(Action::Duplicate.enabled(true, false));
-        assert!(Action::Export.enabled(true, false));
-        assert!(!Action::Edit.enabled(true, false));
-        assert!(!Action::Delete.enabled(true, false));
-        assert!(Action::Edit.enabled(true, true));
-        assert!(Action::Delete.enabled(true, true));
     }
 
     #[test]
@@ -2336,9 +1816,11 @@ mod tests {
         for index in [tab::JVM_HEAP, tab::JVM_ARGS, tab::CANCEL, tab::SAVE] {
             assert_eq!(section_of(index), 4, "{index}");
         }
-        // And the management rows stay with their pickers.
-        assert_eq!(section_of(tab::UI_THEME_ACTIONS + 6), 0);
-        assert_eq!(section_of(tab::EDITOR_THEME_ACTIONS + 6), 0);
+        // And the management rows stay with their pickers, right to the end of
+        // the span each one takes.
+        let last = |base: isize| base + CatalogActions::TAB_SPAN - 1;
+        assert_eq!(section_of(last(tab::UI_THEME_ACTIONS)), 0);
+        assert_eq!(section_of(last(tab::EDITOR_THEME_ACTIONS)), 0);
     }
 
     #[test]
@@ -2374,11 +1856,5 @@ mod tests {
         );
         assert!(split_arguments("").is_empty());
         assert!(split_arguments("   ").is_empty());
-    }
-
-    #[test]
-    fn a_font_size_is_shown_without_a_pointless_decimal() {
-        assert_eq!(format_number(14.0), "14");
-        assert_eq!(format_number(13.5), "13.5");
     }
 }

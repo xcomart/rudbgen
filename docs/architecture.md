@@ -30,6 +30,7 @@ this document.
 | D10 | **Abbreviation word rules match case-insensitively.** jdbgen's word rules only ever matched lower-case segments, which made them useless against upper-case identifiers | This is the one deliberate behavioural break from jdbgen. It is called out in the import wizard and in the template reference |
 | D11 | **Generation is a cancellable job with an overwrite policy** (overwrite / skip existing / ask) and a **result summary** listing every file written, skipped or failed. A **dry run** renders to memory only | jdbgen's progress window has no cancel, no close, and a failed run leaves half the files on disk with no list of which |
 | D13 | **The widget layer moves out to [`ruui`](https://github.com/xcomart/ruui)**, together with the patched gpui it is written against, and comes back as a dependency at a pinned revision | D1 and D2 had rulogman, rudbman and rudbgen carrying byte-identical copies of the same widget kit, grid, editor and four vendored gpui crates, kept in step by hand. ruui is that code with the host's concepts taken out: no configuration directory (the theme store is handed a `ThemeDirs`), no template grammar (the editor composes an `Overlay` the host supplies). What was `rudbgen-ui`, `rudbgen-grid` and `rudbgen-editor` is now `ruui`, `ruui-grid` and `ruui-editor`; the template highlighter stayed behind, in `rudbgen-app`, because it is jdbgen's grammar and not a widget kit's. The patch table has to point at ruui's vendored gpui rather than a copy of its own, or two gpui crates end up in one binary |
+| D13a | **The application-level shell follows it, as `ruui-shell`** — a fourth crate at the same revision | The same argument one layer up. Window chrome, the self-updater, the about and update dialogs, the palette catalogues and their editor, the split-pane tree, the context-menu rows and the pieces a settings form is built out of were application code, and therefore not D13's to take — but they were also written once and copied twice, so a fix to one of them was three fixes or, more often, one. `ruui-shell` is that code with rudbgen taken out of it: the name, the version, the release endpoints, the words and where the ignored-release tag is kept are injected by `main` through `AppIdentity`, `Strings` and `UpdatePolicy`. What stays here is what the shell cannot know — the `Workspace`, what a tab is (`PaneItem`), the body of the settings form, the domain icons, and the `i18n!` invocation with the locale files it compiles. Two consequences are deliberate: the restart after an update is an event the `Workspace` answers with `cx.restart()`, not something a dialog does to its host; and `rudbgen_core::TitlebarStyle` stays where it is, converted at the two call sites, because `rudbgen-core` is gpui-free and `ruui-shell` is not |
 | D12 | **Templates are first-class documents**: an in-app editor with template-language highlighting, a variable palette, diagnostics for unknown fields, and a live preview against a selected table | This is where the port earns its keep. jdbgen stores a file path and nothing else; a typo in a field name is a silent empty string found in the output |
 
 ---
@@ -49,7 +50,7 @@ this document.
 | `bridge/` | `bridge/` | Per D3. Package renamed, `template/` dropped (it moves to Rust, D4) |
 | `crates/rudbman-grid/` | `ruui-grid` (D13) | Whole. Used by the table inspector and the custom-query test result |
 | `crates/rudbman-editor/` | `ruui-editor` (D13) | The `Highlighter` is made pluggable (a trait over a token stream) and the SQL highlighter's dependency on `rudbman-sql` is replaced by a lexer of its own. The template-language highlighter written for §8 stayed in `rudbgen-app` when the rest moved out, and composes over a base language through the crate's `Overlay` trait |
-| `crates/rudbman-app/src/`: `i18n.rs` + `locales/*.yml`, `app_settings.rs`, `caption.rs`, `icons.rs`, `about_dialog.rs`, `context_menu.rs`, `pane_tree.rs`, `theme_editor.rs`, `settings_dialog.rs`, `update.rs`, `update_dialog.rs`, `maven.rs`, `connection.rs`, `connection_dialog.rs`, `driver_manager.rs`, `explorer.rs` | `crates/rudbgen-app/src/` | Keys, strings, URLs and asset names replaced. The `Workspace` shell in `main.rs` is **not** copied — its bootstrap sequence, `actions!`, `bind_shortcuts`, menus and window-chrome helpers are |
+| `crates/rudbman-app/src/`: `i18n.rs` + `locales/*.yml`, `app_settings.rs`, `caption.rs`, `icons.rs`, `about_dialog.rs`, `context_menu.rs`, `pane_tree.rs`, `theme_editor.rs`, `settings_dialog.rs`, `update.rs`, `update_dialog.rs`, `maven.rs`, `connection.rs`, `connection_dialog.rs`, `driver_manager.rs`, `explorer.rs` | `crates/rudbgen-app/src/` | Keys, strings, URLs and asset names replaced. The `Workspace` shell in `main.rs` is **not** copied — its bootstrap sequence, `actions!`, `bind_shortcuts`, menus and window-chrome helpers are. Eight of these have since moved on to `ruui-shell` (D13a): `caption.rs`, `about_dialog.rs`, `context_menu.rs`, `theme_editor.rs`, `update.rs` and `update_dialog.rs` whole, `pane_tree.rs` as `ruui_shell::pane` with `PaneItem` left behind, and the halves of `i18n.rs`, `app_settings.rs`, `icons.rs` and `settings_dialog.rs` that were not about rudbgen |
 | `.github/workflows/`, `packaging/`, `assets/render.py`, `docker/compose.yml` | same | Names and targets replaced. Container tests are opt-in exactly as in rudbman |
 
 Not brought over: `rudbman-sql` (DDL/DML planners, dialects — nothing here writes SQL to a server), `rudbman-erd`, the data/struct panes, backup/transfer/extract dialogs, `row_apply`, `data_edit`, `struct_edit`, `query*`.
@@ -89,17 +90,21 @@ rudbgen/
 ```
 
 The widget layer is not here: `ruui` (the gpui widget kit and themes), `ruui-grid`
-(the virtualized grid) and `ruui-editor` (the code editor with pluggable
-highlighting) come from [ruui](https://github.com/xcomart/ruui) at a pinned
-revision, along with the patched gpui they are written against (D13). Taken as
-`git` dependencies at that one revision; see the root `Cargo.toml`.
+(the virtualized grid), `ruui-editor` (the code editor with pluggable
+highlighting) and `ruui-shell` (the application-level shell: window chrome, the
+self-updater, the about and update dialogs, the palette catalogues and their
+editor, the split-pane tree, the context-menu rows and the pieces a settings
+form is built out of) come from [ruui](https://github.com/xcomart/ruui) at a
+pinned revision, along with the patched gpui they are written against (D13).
+Taken as `git` dependencies at that one revision; see the root `Cargo.toml`.
 
 Dependency direction (no cycles, no back-edges):
 
 ```
 rudbgen-app
- ├─→ ruui-grid ───┐
- ├─→ ruui-editor ─┼─→ ruui ─→ gpui          (all three from ruui, D13)
+ ├─→ ruui-shell ──┐
+ ├─→ ruui-grid ───┤
+ ├─→ ruui-editor ─┼─→ ruui ─→ gpui          (all four from ruui, D13)
  ├─→ rudbgen-template          (pure: encoding_rs, regex, chrono only)
  ├─→ rudbgen-meta ─→ rudbgen-jdbc, rudbgen-template, rudbgen-core
  ├─→ rudbgen-gen ─→ rudbgen-meta, rudbgen-template, rudbgen-core

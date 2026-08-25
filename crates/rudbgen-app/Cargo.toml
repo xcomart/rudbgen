@@ -44,16 +44,16 @@ rudbgen-meta.workspace = true
 # The inspector's Columns tab. The grid is the one widget in the tree that
 # already lays a header, resizable columns and a virtualised body out, and a
 # column list is exactly what it draws.
-rudbgen-grid.workspace = true
+ruui-grid.workspace = true
 # The generation job behind the Generate tab: `Plan`, `generate`, `dry_run` and
 # `preview`. It knows nothing of gpui by design, so the shell is what puts the
 # run on a background thread, pumps its `Progress` into the progress dialog and
 # answers its overwrite question from a modal.
 rudbgen-gen.workspace = true
-# The template tab's buffer (M4): `EditorView` with the template highlighter
-# over it, the composite one when the file's extension names a base language,
-# and the same widget read-only for the live preview and the Preview tab.
-rudbgen-editor.workspace = true
+# The template tab's buffer (M4): `EditorView` under `src/template_syntax.rs`'s
+# template highlighter, composed over the base language the file's extension
+# names, and the same widget read-only for the live preview and the Preview tab.
+ruui-editor.workspace = true
 # The engine itself, for the two things the app does with a template that the
 # generation job does not: parsing the buffer for the diagnostics list, and
 # rendering the output-name template for the live preview's header.
@@ -68,7 +68,9 @@ rudbgen-import.workspace = true
 # block. Set up before the session opens and taken down after it closes; see
 # `src/connection.rs`.
 rudbgen-ssh.workspace = true
-rudbgen-ui.workspace = true
+# The widget kit everything here is drawn with: the palettes and their file
+# store, the text field, the buttons, tabs, menus, selects, trees and modals.
+ruui.workspace = true
 
 # The tunnel registry in `src/connection.rs` is a process-wide map reached from
 # background threads, and a panic while a tunnel is being opened must not make
@@ -88,7 +90,7 @@ uuid.workspace = true
 # is what lets the bar move while the transfer is on a background thread.
 futures.workspace = true
 # The theme editor's catalogue hands file writes and deletions straight back
-# from `rudbgen-ui::theme_store`, which reports them as `anyhow::Result`.
+# from `ruui::theme_store`, which reports them as `anyhow::Result`.
 anyhow.workspace = true
 # The export save dialog falls back to the user's home directory when the
 # catalogue's own directory does not exist yet; `rudbgen-core` resolves the

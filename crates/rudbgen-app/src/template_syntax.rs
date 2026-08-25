@@ -1,4 +1,14 @@
-//! The template-language highlighter.
+//! The template-language highlighter, and the composite that paints it over a
+//! base language.
+//!
+//! # Why it lives here
+//!
+//! `ruui-editor` ships lexers for the languages a generated file is written in
+//! and a [`CompositeHighlighter`] that paints a second grammar over one of
+//! them, but no second grammar of its own: an [`Overlay`] *is* a grammar, and
+//! jdbgen's template language is rudbgen's business and not a widget kit's. So
+//! the tokenizer is here, in the application, and reaches the widget kit only
+//! for the trait it is painted through.
 //!
 //! # Why a tokenizer of its own
 //!
@@ -10,8 +20,8 @@
 //! keystroke is worse than one with no colours at all. So the editor knows the
 //! grammar twice: once in the engine, which decides what a template *means*,
 //! and once here, which decides what it *looks like*, line by line and never
-//! failing. That is also why this crate does not depend on `rudbgen-template`:
-//! the editor knows `rudbgen-ui` and nothing else (architecture document, §3).
+//! failing. The engine is next door and is still not asked: the whole point of
+//! the second reading is that it answers when the first one cannot.
 //!
 //! The two have to agree on the grammar, and the places where agreement is
 //! easy to lose are exactly jdbgen's oddities, so they are written out here:
@@ -58,8 +68,13 @@
 //! a whole-document verdict belongs.
 
 use std::ops::Range;
+use std::path::Path;
+use std::sync::Arc;
 
-use crate::highlight::{Highlighter, LineState, Span, Token};
+use ruui_editor::{
+    CompositeHighlighter, Highlighter, LineState, Overlaid, Overlay, Span, Token,
+    highlighter_for_extension,
+};
 
 /// The statement names, lower-cased and sorted. Matched case-insensitively,
 /// exactly as `parse_one` lower-cases the name before it dispatches.
@@ -197,18 +212,21 @@ impl State {
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
 pub struct TemplateHighlighter;
 
-impl TemplateHighlighter {
+impl Overlay for TemplateHighlighter {
     /// The spans of `text`, the byte ranges its `${…}` statements cover, and
     /// the state the next line starts in.
     ///
-    /// The regions are what
-    /// [`CompositeHighlighter`](crate::composite::CompositeHighlighter) needs
-    /// and [`Highlighter::line`] throws away: to paint template statements over
-    /// a Java or XML file, the base language's spans have to be cut out
-    /// wherever a statement stands, and only the tokenizer knows where that is.
-    /// They are sorted, do not overlap, and a statement that runs over a line
-    /// break contributes one region to each line it touches.
-    pub fn statements(&self, text: &str, state: LineState) -> Statements {
+    /// The regions are what [`CompositeHighlighter`] needs and
+    /// [`Highlighter::line`] throws away: to paint template statements over a
+    /// Java or XML file, the base language's spans have to be cut out wherever
+    /// a statement stands, and only the tokenizer knows where that is. They are
+    /// sorted, do not overlap, and a statement that runs over a line break
+    /// contributes one region to each line it touches.
+    ///
+    /// The state fits in nine bits, well inside
+    /// [`LineState::COMPOSABLE_BITS`], which is what lets it share one
+    /// `LineState` with the base language's.
+    fn regions(&self, text: &str, state: LineState) -> Overlaid {
         let mut lexer = Lexer {
             text,
             bytes: text.as_bytes(),
@@ -225,7 +243,7 @@ impl TemplateHighlighter {
         if let Some(open) = lexer.region.take() {
             lexer.regions.push(open..text.len());
         }
-        Statements {
+        Overlaid {
             spans: lexer.spans,
             regions: lexer.regions,
             state: end.encode(),
@@ -233,20 +251,9 @@ impl TemplateHighlighter {
     }
 }
 
-/// What [`TemplateHighlighter::statements`] found on one line.
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub struct Statements {
-    /// The coloured runs, as [`Highlighter::line`] would answer with them.
-    pub spans: Vec<Span>,
-    /// The byte ranges the line's `${…}` statements cover.
-    pub regions: Vec<Range<usize>>,
-    /// The state the next line starts in.
-    pub state: LineState,
-}
-
 impl Highlighter for TemplateHighlighter {
     fn line(&self, text: &str, state: LineState) -> (Vec<Span>, LineState) {
-        let found = self.statements(text, state);
+        let found = self.regions(text, state);
         (found.spans, found.state)
     }
 
@@ -254,6 +261,39 @@ impl Highlighter for TemplateHighlighter {
     // editor's comment toggle does nothing in one. Commenting a line out of a
     // Java template would have to write the *output* language's comment, which
     // this crate cannot know.
+}
+
+/// The highlighter for a template file at `path`: its base language, if
+/// [`highlighter_for_extension`] has one, with the template language painted
+/// over it — or the template language alone, for a base `ruui-editor` does not
+/// ship a lexer for.
+///
+/// A trailing `.tpl` or `.tmpl` is stripped before the extension is read, so
+/// `Model.java.tpl` resolves on `java` exactly as `Model.java` would. Neither
+/// suffix is itself a language, so a bare `Model.tpl` — no second extension —
+/// resolves to the template language alone, the same as a `.tpl` file with an
+/// extension there is no base lexer for.
+pub fn template_highlighter_for_path(path: &Path) -> Arc<dyn Highlighter> {
+    let raw_ext = path
+        .extension()
+        .and_then(|e| e.to_str())
+        .unwrap_or_default();
+    let lang_ext = if raw_ext.eq_ignore_ascii_case("tpl") || raw_ext.eq_ignore_ascii_case("tmpl") {
+        path.file_stem()
+            .map(Path::new)
+            .and_then(|stem| stem.extension())
+            .and_then(|e| e.to_str())
+            .unwrap_or_default()
+    } else {
+        raw_ext
+    };
+    match highlighter_for_extension(lang_ext) {
+        Some(base) => Arc::new(CompositeHighlighter::new(
+            base,
+            Arc::new(TemplateHighlighter),
+        )),
+        None => Arc::new(TemplateHighlighter),
+    }
 }
 
 /// One line's worth of scanning.
@@ -1115,5 +1155,44 @@ mod tests {
         }
         assert_eq!(State::decode(LineState::START), State::default());
         assert!(State::default().encode().is_start());
+        const {
+            assert!(
+                9 <= LineState::COMPOSABLE_BITS,
+                "the state has to fit in the half of a LineState a composition leaves it"
+            );
+        }
+    }
+
+    #[test]
+    fn a_template_path_composes_over_its_base_language() {
+        let h = template_highlighter_for_path(Path::new("Model.java.tpl"));
+        // A Java keyword, painted through the composite, is still a keyword.
+        let (spans, _) = h.line("public class ${name} {", LineState::START);
+        assert!(
+            spans
+                .iter()
+                .any(|s| s.range == (0..6) && s.token == Token::Keyword),
+            "the base language survives composition: {spans:?}"
+        );
+        assert_eq!(
+            h.line_comment(),
+            Some("//"),
+            "the base's comment, not the template's"
+        );
+    }
+
+    #[test]
+    fn a_double_extension_resolves_on_the_inner_one() {
+        for (path, expect_comment) in [
+            ("Model.java.tpl", Some("//")),
+            ("Model.java.tmpl", Some("//")),
+            ("query.sql", Some("--")),
+            ("mapping.xml.TPL", None),
+            ("plain.tpl", None),
+            ("no_extension_at_all", None),
+        ] {
+            let h = template_highlighter_for_path(Path::new(path));
+            assert_eq!(h.line_comment(), expect_comment, "for {path}");
+        }
     }
 }

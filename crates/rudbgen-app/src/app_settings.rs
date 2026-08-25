@@ -23,8 +23,10 @@
 
 use std::sync::OnceLock;
 
+use anyhow::Result;
 use gpui::{App, Bounds, Global, Hsla, Pixels, Point, SharedString, Size, px};
 use rudbgen_core::{AppSettings, WindowState};
+use ruui::{ThemeDirs, theme_store};
 
 /// fontconfig's generic alias for a fixed-pitch face.
 ///
@@ -240,6 +242,39 @@ pub fn init(cx: &mut App) {
     cx.set_global(CurrentSettings(settings));
 }
 
+/// The two directories `ruui`'s theme store reads and writes.
+///
+/// The widget kit has no configuration directory of its own and never guesses
+/// at one — which is the point of it not knowing what application it is drawn
+/// into — so this is where rudbgen's answer is given, once, from
+/// `rudbgen-core`'s paths. Every call into
+/// [`theme_store`](ruui::theme_store) that touches the disk takes it.
+///
+/// # Errors
+///
+/// Fails when no configuration directory can be determined for the current
+/// user, which is what `rudbgen-core` reports when there is no home directory.
+pub fn theme_dirs() -> Result<ThemeDirs> {
+    Ok(ThemeDirs {
+        ui_themes: rudbgen_core::ui_themes_dir()?,
+        editor_themes: Some(rudbgen_core::editor_themes_dir()?),
+    })
+}
+
+/// Reads both theme directories and installs what they hold.
+///
+/// Called at start-up and again after every change rudbgen makes to the files,
+/// since the two registries are swapped whole rather than edited in place. A
+/// configuration directory that cannot be located is logged and no more:
+/// nothing here is worth refusing to draw a window over, and the built-in
+/// palettes are still there.
+pub fn reload_themes(cx: &mut App) {
+    match theme_dirs() {
+        Ok(dirs) => theme_store::reload(&dirs, cx),
+        Err(err) => log::warn!("cannot locate the theme directories: {err:#}"),
+    }
+}
+
 /// A snapshot of the current settings.
 pub fn current(cx: &App) -> AppSettings {
     cx.try_global::<CurrentSettings>()
@@ -332,7 +367,7 @@ pub fn save(cx: &App) {
 /// What sits *over* the work area's fill would each be a second fill on the same
 /// pixels, so while the window is translucent the result grid and the ERD and
 /// query-builder canvases paint no background at all: they ask
-/// [`rudbgen_ui::window_translucent`] and skip it, leaving the fill below as the
+/// [`ruui::window_translucent`] and skip it, leaving the fill below as the
 /// only tinted one. Tinting them instead of skipping is the trap this whole
 /// comment is about.
 ///
@@ -345,7 +380,7 @@ pub fn save(cx: &App) {
 ///
 /// The opacity itself lives in a widget-layer global, so that the leaves which
 /// have to agree with this can reach it; the shell pushes it there with
-/// [`rudbgen_ui::set_window_tint`] at start-up and on a settings *save*. Which
+/// [`ruui::set_window_tint`] at start-up and on a settings *save*. Which
 /// means this follows neither [`current`] nor [`effective`] directly, and in
 /// particular does not follow a preview — deliberately. The fill is only half of
 /// what makes a window translucent: the other half is the platform surface being
@@ -357,7 +392,7 @@ pub fn window_tint(color: Hsla, cx: &App) -> Hsla {
     // Deferred to the widget layer, which is where the leaves that have to agree
     // with this can reach it; `current` and the global are set from the same
     // value at the same moment.
-    rudbgen_ui::window_tint(color, cx)
+    ruui::window_tint(color, cx)
 }
 
 #[cfg(test)]

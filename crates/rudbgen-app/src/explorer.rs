@@ -3,7 +3,7 @@
 //!
 //! Three things live here and only the first is a widget. The **tree** is
 //! catalog → schema → table, filled one round trip at a time through
-//! [`rudbgen_ui::TreeView`]; the **selection** is a set of [`TableKey`]s that
+//! [`ruui::TreeView`]; the **selection** is a set of [`TableKey`]s that
 //! survives everything the tree does to itself; and the **filter** is jdbgen's
 //! `filterTables` rule, which is a pure function over a name and therefore
 //! testable without a window.
@@ -44,7 +44,7 @@ use gpui::{
     px,
 };
 use rudbgen_meta::{Schema, TableRef};
-use rudbgen_ui::{
+use ruui::{
     ChildState, TextInput, Theme, TreeEvent, TreeRow, TreeRowInfo, TreeSource, TreeView, theme,
     tooltip_label,
 };
@@ -419,7 +419,7 @@ impl ExplorerSource {
 
     /// The tick box of a row, and what pressing it does.
     ///
-    /// Drawn here rather than with [`rudbgen_ui::Checkbox`] for two reasons: it
+    /// Drawn here rather than with [`ruui::Checkbox`] for two reasons: it
     /// has a third state, and it has to swallow its own press so that aiming at
     /// the box does not also move the tree's selection — the same trick the
     /// disclosure arrow plays one element to the left.
@@ -1106,7 +1106,7 @@ impl Explorer {
             .border_color(chrome.border)
             .child(self.filter.clone())
             .child(
-                rudbgen_ui::Checkbox::new("explorer-views", ts!("explorer.show_views"))
+                ruui::Checkbox::new("explorer-views", ts!("explorer.show_views"))
                     .checked(show_views)
                     .tab_index(1)
                     .on_toggle(move |checked, _window, cx| {
@@ -1133,7 +1133,7 @@ impl Render for Explorer {
         let menu = self.menu.clone().map(|(id, position)| {
             let this = cx.entity();
             let rows = self.menu_rows(&id, cx);
-            rudbgen_ui::ContextMenu::new("explorer-context")
+            ruui::ContextMenu::new("explorer-context")
                 .position(position)
                 .entries(context_menu::entries(rows))
                 .on_dismiss(move |_window, cx| {
@@ -1270,7 +1270,7 @@ mod tests {
     /// laying anything out would be asserting about a state the panel never has
     /// on screen.
     fn open(cx: &mut TestAppContext) -> (Entity<Explorer>, Recorder, VisualTestContext) {
-        cx.update(rudbgen_ui::init);
+        cx.update(ruui::init);
 
         let events: Recorder = Rc::new(RefCell::new(Vec::new()));
         let window = cx.add_window({

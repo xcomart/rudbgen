@@ -4,7 +4,7 @@
 //! one file per table per template. This crate is the binary: the window, the
 //! chrome around it, the dialogs that hang over it, and the bootstrap sequence
 //! that gets all three on screen. Everything it draws with comes from
-//! `rudbgen-ui`; everything it persists goes through `rudbgen-core`.
+//! `ruui`; everything it persists goes through `rudbgen-core`.
 //!
 //! # The window
 //!
@@ -76,6 +76,7 @@ mod pane_tree;
 mod preview_pane;
 mod settings_dialog;
 mod template_pane;
+mod template_syntax;
 mod theme_editor;
 mod update;
 mod update_dialog;
@@ -101,12 +102,11 @@ use rudbgen_core::{
 };
 use rudbgen_gen::{Plan, TemplateSpec};
 use rudbgen_meta::{MetaReader, Table};
-use rudbgen_ui::{
+use ruui::{
     Button, ButtonVariant, DraggedThumb, EditorThemeEntry, EditorThemeRegistry, MenuButton,
     MenuEntry, Scrollbar, ScrollbarAxis, ScrollbarState, Select, TabBar, TabItem, Theme,
     ThemeRegistry, WindowControlIcons, WindowControls, hide_later, hide_now, scroll_to, scrolled,
-    set_editor_theme, set_theme, set_window_tint, theme, theme_store, tooltip_label,
-    window_controls,
+    set_editor_theme, set_theme, set_window_tint, theme, tooltip_label, window_controls,
 };
 
 use abbreviation_dialog::{AbbreviationDialog, AbbreviationDialogEvent};
@@ -2828,7 +2828,7 @@ impl Workspace {
     /// name at its left end, and — off macOS, which keeps its native traffic
     /// lights — grows a set of caption buttons at its right end. Every *control*
     /// inside it occludes, so the drag area only ever answers for the gaps
-    /// between them; see [`rudbgen_ui::window_controls`]. The name is not a
+    /// between them; see [`ruui::window_controls`]. The name is not a
     /// control and deliberately does not.
     fn render_toolbar(&self, window: &Window, cx: &mut Context<Self>) -> AnyElement {
         let theme = theme(cx);
@@ -2875,7 +2875,7 @@ impl Workspace {
         //
         // Two strips rather than one, because a Linux desktop decides where its
         // caption buttons go and putting them on the left is a setting people
-        // actually use; [`rudbgen_ui::window_controls::split`] turns what the
+        // actually use; [`ruui::window_controls::split`] turns what the
         // platform reports into the two ends. Off Linux nothing is reported,
         // which is the same answer as "the usual three on the right".
         let (leading_buttons, trailing_buttons) = if custom && !cfg!(target_os = "macos") {
@@ -3381,7 +3381,7 @@ impl Workspace {
         let cancel = cx.entity();
         let dismissed = cx.entity();
 
-        rudbgen_ui::modal(
+        ruui::modal(
             "template-close",
             ts!("template.close_title"),
             px(400.),
@@ -4642,13 +4642,13 @@ fn main() {
         // so nothing is ever built in the wrong language and then corrected.
         i18n::apply(settings.language.as_deref());
 
-        rudbgen_ui::init(cx);
+        ruui::init(cx);
         // The inspector's Columns tab is a grid, and the grid binds its own
         // keys; without this the panel draws and cannot be walked.
-        rudbgen_grid::init(cx);
+        ruui_grid::init(cx);
         // The template tab's buffer and both read-only previews are
         // `EditorView`s, which bind their own keys to the `Editor` context.
-        rudbgen_editor::init(cx);
+        ruui_editor::init(cx);
         // After the widget layers, because they scope their bindings to key
         // contexts the shell's own bindings have to be able to outrank.
         bind_shortcuts(cx);
@@ -4664,7 +4664,7 @@ fn main() {
 
         // Before the palettes are applied: the ids in the settings may well
         // name themes of the user's own.
-        theme_store::reload(cx);
+        app_settings::reload_themes(cx);
         apply_themes(&settings, cx);
         // The same value `window_appearance` below reads, handed to the widget
         // layer so the widgets know whether to paint a background of their own;
@@ -4675,7 +4675,7 @@ fn main() {
         // The window's geometry is only in memory until here; this is the one
         // write of `settings.json` the shell performs. Nothing in the closure
         // re-enters gpui — the file write is the whole of it — which is what
-        // keeps it clear of the X11 backend's re-entrancy trap, the one the
+        // keeps it clear of the X11 backend's re-entrancy trap, the one ruui's
         // vendored `client.rs` patch exists for. Quitting is no longer this
         // closure's business: gpui does it, from the quit mode set on the
         // application above, and it runs these observers first — so the
@@ -5042,7 +5042,7 @@ mod tests {
     fn the_window_opens_on_the_welcome_screen(cx: &mut gpui::TestAppContext) {
         cx.update(|cx| {
             app_settings::init(cx);
-            rudbgen_ui::init(cx);
+            ruui::init(cx);
         });
         let window = cx.add_window(|window, cx| Workspace::new(TitlebarStyle::Custom, window, cx));
 
@@ -5105,8 +5105,8 @@ mod tests {
 
         cx.update(|cx| {
             app_settings::init(cx);
-            rudbgen_ui::init(cx);
-            rudbgen_grid::init(cx);
+            ruui::init(cx);
+            ruui_grid::init(cx);
         });
         let window = cx.add_window(|window, cx| Workspace::new(TitlebarStyle::Custom, window, cx));
         window
@@ -5286,8 +5286,8 @@ mod tests {
 
         cx.update(|cx| {
             app_settings::init(cx);
-            rudbgen_ui::init(cx);
-            rudbgen_grid::init(cx);
+            ruui::init(cx);
+            ruui_grid::init(cx);
         });
         // The run happens on a thread of its own, and a thread of its own is
         // what the test scheduler otherwise refuses: it wakes gpui's tasks from
@@ -5487,9 +5487,9 @@ mod tests {
 
         cx.update(|cx| {
             app_settings::init(cx);
-            rudbgen_ui::init(cx);
-            rudbgen_grid::init(cx);
-            rudbgen_editor::init(cx);
+            ruui::init(cx);
+            ruui_grid::init(cx);
+            ruui_editor::init(cx);
         });
         cx.executor().allow_parking();
         let window = cx.add_window(|window, cx| Workspace::new(TitlebarStyle::Custom, window, cx));
@@ -5649,9 +5649,9 @@ mod tests {
 
         cx.update(|cx| {
             app_settings::init(cx);
-            rudbgen_ui::init(cx);
-            rudbgen_grid::init(cx);
-            rudbgen_editor::init(cx);
+            ruui::init(cx);
+            ruui_grid::init(cx);
+            ruui_editor::init(cx);
         });
         cx.executor().allow_parking();
         let window = cx.add_window(|window, cx| Workspace::new(TitlebarStyle::Custom, window, cx));
@@ -5837,9 +5837,9 @@ mod tests {
 
         cx.update(|cx| {
             app_settings::init(cx);
-            rudbgen_ui::init(cx);
-            rudbgen_grid::init(cx);
-            rudbgen_editor::init(cx);
+            ruui::init(cx);
+            ruui_grid::init(cx);
+            ruui_editor::init(cx);
         });
         cx.executor().allow_parking();
         let window = cx.add_window(|window, cx| Workspace::new(TitlebarStyle::Custom, window, cx));
@@ -6039,7 +6039,7 @@ mod tests {
     fn the_panels_toggle_and_the_layout_is_remembered(cx: &mut gpui::TestAppContext) {
         cx.update(|cx| {
             app_settings::init(cx);
-            rudbgen_ui::init(cx);
+            ruui::init(cx);
         });
         let window = cx.add_window(|window, cx| Workspace::new(TitlebarStyle::Custom, window, cx));
 
@@ -6080,7 +6080,7 @@ mod tests {
     fn the_status_bar_counts_the_ticked_tables(cx: &mut gpui::TestAppContext) {
         cx.update(|cx| {
             app_settings::init(cx);
-            rudbgen_ui::init(cx);
+            ruui::init(cx);
         });
         let window = cx.add_window(|window, cx| Workspace::new(TitlebarStyle::Custom, window, cx));
 
@@ -6154,8 +6154,8 @@ mod tests {
     fn a_template_opens_edits_diagnoses_and_saves(cx: &mut gpui::TestAppContext) {
         cx.update(|cx| {
             app_settings::init(cx);
-            rudbgen_ui::init(cx);
-            rudbgen_editor::init(cx);
+            ruui::init(cx);
+            ruui_editor::init(cx);
         });
 
         let dir = tempfile::tempdir().expect("a temporary directory");
@@ -6278,8 +6278,8 @@ mod tests {
     fn the_completion_popup_offers_and_accepts(cx: &mut gpui::TestAppContext) {
         cx.update(|cx| {
             app_settings::init(cx);
-            rudbgen_ui::init(cx);
-            rudbgen_editor::init(cx);
+            ruui::init(cx);
+            ruui_editor::init(cx);
         });
 
         let dir = tempfile::tempdir().expect("a temporary directory");
@@ -6325,7 +6325,7 @@ mod tests {
     fn the_dialogs_open_from_their_actions_and_close_on_escape(cx: &mut gpui::TestAppContext) {
         cx.update(|cx| {
             app_settings::init(cx);
-            rudbgen_ui::init(cx);
+            ruui::init(cx);
         });
         let window = cx.add_window(|window, cx| Workspace::new(TitlebarStyle::Custom, window, cx));
 

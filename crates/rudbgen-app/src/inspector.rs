@@ -16,7 +16,7 @@
 //! which way the key points. Indexes are last because they are the only tab a
 //! template does not read.
 //!
-//! Columns is drawn with [`rudbgen_grid::GridView`] and the other three with a
+//! Columns is drawn with [`ruui_grid::GridView`] and the other three with a
 //! flex table of a hundred lines. That is not an inconsistency: a column list
 //! is the one of the four that runs to hundreds of rows and six columns of
 //! wildly different widths, so it is the one that wants a header it can be
@@ -42,13 +42,13 @@ use gpui::{
     AnyElement, App, Context, DragMoveEvent, Entity, EventEmitter, FocusHandle, Focusable, Hsla,
     ScrollHandle, SharedString, Window, div, prelude::*, px,
 };
-use rudbgen_grid::{
-    GridCell, GridColumn, GridColumnKind, GridSource, GridView, source::GridColumnAlign,
-};
 use rudbgen_meta::Table;
-use rudbgen_ui::{
+use ruui::{
     Button, ButtonVariant, DraggedThumb, Scrollbar, ScrollbarAxis, ScrollbarState, Segmented,
     Theme, hide_later, hide_now, scroll_to, scrolled, theme,
+};
+use ruui_grid::{
+    GridCell, GridColumn, GridColumnKind, GridSource, GridView, source::GridColumnAlign,
 };
 
 use crate::app_settings;
@@ -531,9 +531,7 @@ impl Inspector {
                     // reachable somewhere, and here is where the reader is
                     // already pointing.
                     .when_some(self.target.as_ref(), |name, key| {
-                        name.tooltip(rudbgen_ui::tooltip_label(SharedString::from(
-                            key.qualified(),
-                        )))
+                        name.tooltip(ruui::tooltip_label(SharedString::from(key.qualified())))
                     })
                     .child(name),
             )
@@ -1027,8 +1025,8 @@ mod tests {
     /// Opens the panel in a window and hands back it and what it asked for.
     fn open(cx: &mut TestAppContext) -> (Entity<Inspector>, Asked, VisualTestContext) {
         cx.update(|cx| {
-            rudbgen_ui::init(cx);
-            rudbgen_grid::init(cx);
+            ruui::init(cx);
+            ruui_grid::init(cx);
         });
 
         let asked: Asked = Rc::new(RefCell::new(Vec::new()));

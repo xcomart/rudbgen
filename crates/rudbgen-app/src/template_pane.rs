@@ -10,8 +10,8 @@
 //!
 //! # The two verdicts
 //!
-//! The highlighter in `rudbgen-editor` paints line by line and never fails, so
-//! it says nothing about a template as a whole. This is where the whole-document
+//! The highlighter in [`crate::template_syntax`] paints line by line and never
+//! fails, so it says nothing about a template as a whole. This is where the whole-document
 //! verdict lives, and there are two of them:
 //!
 //! * **the parse**, which is local — [`rudbgen_template::Template::parse`] over
@@ -42,9 +42,9 @@ use gpui::{
     FocusHandle, Focusable, MouseButton, Pixels, SharedString, Subscription, Task, Window,
     anchored, deferred, div, point, prelude::*, px,
 };
-use rudbgen_editor::{EditorEvent, EditorView, MarkKind, NavKey};
 use rudbgen_template::{ParseError, Template, Warning};
-use rudbgen_ui::{Button, ButtonVariant, Select, editor_theme, theme, tooltip_label};
+use ruui::{Button, ButtonVariant, Select, editor_theme, theme, tooltip_label};
+use ruui_editor::{EditorEvent, EditorView, MarkKind, NavKey};
 
 use crate::app_settings;
 use crate::i18n::ts;
@@ -345,7 +345,7 @@ impl TemplatePane {
     /// and offers nothing to type into, because a save would then overwrite
     /// whatever is there with nothing.
     pub fn open(path: PathBuf, cx: &mut Context<Self>) -> Self {
-        let highlighter = rudbgen_editor::template_highlighter_for_path(&path);
+        let highlighter = crate::template_syntax::template_highlighter_for_path(&path);
         let editor = cx.new(|cx| EditorView::new(cx).highlighter(highlighter));
         let preview = cx.new(|cx| EditorView::new(cx).read_only(true));
         let editor_events = cx.subscribe(&editor, |pane, _editor, event, cx| match event {
@@ -418,7 +418,7 @@ impl TemplatePane {
         // The preview highlighter follows the *output* file, which is only
         // known once the shell has rendered one; until then the template's own
         // extension is the better guess than none.
-        let highlighter = rudbgen_editor::template_highlighter_for_path(&self.path);
+        let highlighter = crate::template_syntax::template_highlighter_for_path(&self.path);
         self.preview.update(cx, |editor, cx| {
             editor.set_highlighter(Some(highlighter), cx)
         });
@@ -587,9 +587,9 @@ impl TemplatePane {
                 self.preview_path = Some(SharedString::from(path.display().to_string()));
                 // The preview is the *output* file, so it is coloured by the
                 // output file's language rather than by the template's.
-                let highlighter = path.extension().and_then(|ext| {
-                    rudbgen_editor::highlighter_for_extension(&ext.to_string_lossy())
-                });
+                let highlighter = path
+                    .extension()
+                    .and_then(|ext| ruui_editor::highlighter_for_extension(&ext.to_string_lossy()));
                 self.preview.update(cx, |editor, cx| {
                     editor.set_highlighter(highlighter, cx);
                     editor.set_text(&to_lf(&content), cx);

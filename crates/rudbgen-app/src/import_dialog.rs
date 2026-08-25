@@ -51,7 +51,7 @@ use rudbgen_core::{
     TemplateSetStore,
 };
 use rudbgen_import::{Decrypted, Error, MapOptions, Mapped, Note, PathKind, Preview, SettingsHint};
-use rudbgen_ui::{
+use ruui::{
     Button, ButtonVariant, Checkbox, DraggedThumb, Scrollbar, ScrollbarAxis, ScrollbarState,
     TextInput, Theme, hide_later, modal, scroll_to, scrolled, theme,
 };
@@ -2061,7 +2061,7 @@ mod tests {
     ) -> (Entity<ImportDialog>, gpui::WindowHandle<ImportDialog>) {
         cx.update(|cx| {
             crate::app_settings::init(cx);
-            rudbgen_ui::init(cx);
+            ruui::init(cx);
         });
         let window = cx.add_window(|_, cx| ImportDialog::new(cx));
         let dialog = window

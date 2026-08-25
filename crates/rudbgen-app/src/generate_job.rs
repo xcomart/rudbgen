@@ -27,7 +27,7 @@ use rudbgen_core::OverwritePolicy;
 use rudbgen_gen::{
     CancelHandle, CancelToken, Decision, FileStatus, Outcome, Overwrite, Plan, Progress, generate,
 };
-use rudbgen_ui::{Button, ButtonVariant, modal, theme};
+use ruui::{Button, ButtonVariant, modal, theme};
 
 use crate::i18n::ts;
 

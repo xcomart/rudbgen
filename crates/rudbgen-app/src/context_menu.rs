@@ -23,7 +23,7 @@
 use std::rc::Rc;
 
 use gpui::{App, SharedString, Window};
-use rudbgen_ui::MenuEntry;
+use ruui::MenuEntry;
 
 /// What a row does when it is run.
 type Activate = Rc<dyn Fn(&mut Window, &mut App)>;

@@ -184,17 +184,19 @@ job and the milestone plan — lives in
 [docs/architecture.md](docs/architecture.md). Current progress and open items are
 tracked in [docs/status.md](docs/status.md).
 
-gpui comes from a pinned revision of Zed's monorepo rather than from crates.io,
-whose newest release (0.2.2) predates the split of the crate into a
-platform-independent core, a `gpui_platform` facade and per-OS backends. Four of
-those crates — `gpui`, `gpui_linux`, `gpui_macos`, `gpui_windows` — are vendored
-under `vendor/` and patched back over the git source, each change marked
-`RULOGMAN PATCH`: the live title-bar switch, and three X11 fixes upstream has no
-answer for. The trees are kept byte-identical with the same four in
-[rulogman](https://github.com/xcomart/rulogman) and
-[rudbman](https://github.com/xcomart/rudbman), so a fix moves between the three
-projects as a plain diff.
+Everything rudbgen draws with comes from **ruui** — the gpui widget kit, the
+virtualised grid and the code editor, extracted so that the three applications
+that had been carrying byte-identical copies of them
+([rulogman](https://github.com/xcomart/rulogman),
+[rudbman](https://github.com/xcomart/rudbman) and this one) share one copy and
+one fix. It also vendors the gpui these widgets are written against: a pinned
+revision of Zed's monorepo rather than crates.io, whose newest release (0.2.2)
+predates the split of the crate into a platform-independent core, a
+`gpui_platform` facade and per-OS backends, with four crates patched on top of
+it for the live title-bar switch and three X11 fixes upstream has no answer for.
+The root [`Cargo.toml`](Cargo.toml) explains why the patch table here has to
+point at ruui's copies rather than carry its own.
 
 ## License
 
-[MIT](LICENSE). The vendored gpui crates keep their upstream licenses.
+[MIT](LICENSE). The gpui crates ruui vendors keep their upstream licenses.

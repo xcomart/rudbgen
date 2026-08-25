@@ -65,12 +65,12 @@ use gpui::{
     div, prelude::*, px,
 };
 use rudbgen_core::{ConnectionProfile, CustomQueryKind, DriverDef, DriverStore, drivers_dir};
-use rudbgen_editor::{EditorView, SqlHighlighter};
 use rudbgen_jdbc::{BridgeErrorKind, DriverProbe, Error as JdbcError, StatementSpec};
-use rudbgen_ui::{
+use ruui::{
     Button, ButtonVariant, Checkbox, DraggedThumb, Scrollbar, ScrollbarAxis, ScrollbarState,
     TextInput, Theme, form_row, hide_later, hide_now, scroll_to, scrolled, theme,
 };
+use ruui_editor::{EditorView, SqlHighlighter};
 
 use crate::app_settings;
 use crate::connection::{self, ConnectError, Connected, Credentials, SessionHandle};
@@ -2371,7 +2371,7 @@ mod tests {
     ) -> gpui::Entity<DriverManager> {
         cx.update(|cx| {
             app_settings::init(cx);
-            rudbgen_ui::init(cx);
+            ruui::init(cx);
         });
         let manager = cx.new(DriverManager::new);
         cx.update(|cx| {

@@ -38,7 +38,7 @@ use gpui::{
     Window, div, prelude::*, px,
 };
 use rudbgen_core::{AbbreviationRule, AbbreviationStore};
-use rudbgen_ui::{
+use ruui::{
     Button, ButtonVariant, Checkbox, DraggedThumb, Scrollbar, ScrollbarAxis, ScrollbarState,
     Select, TextInput, Theme, hide_later, modal, scroll_to, scrolled, theme, tooltip_label,
 };

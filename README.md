@@ -199,7 +199,8 @@ against: a pinned
 revision of Zed's monorepo rather than crates.io, whose newest release (0.2.2)
 predates the split of the crate into a platform-independent core, a
 `gpui_platform` facade and per-OS backends, with four crates patched on top of
-it for the live title-bar switch and three X11 fixes upstream has no answer for.
+it for the live title-bar switch, three X11 fixes and a macOS 26 blur fix
+upstream has no answer for.
 The root [`Cargo.toml`](Cargo.toml) explains why the patch table here has to
 point at rugpui's copies rather than carry its own.
 

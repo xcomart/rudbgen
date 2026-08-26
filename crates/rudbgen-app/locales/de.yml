@@ -369,6 +369,7 @@ settings:
   ui_font_size: Schriftgröße der Oberfläche
   editor_font: Editor-Schriftart
   editor_font_size: Schriftgröße im Editor
+  editor_word_wrap: Lange Zeilen im Editor umbrechen
   font_size_hint: 6 – 32 pt
 
   opacity: Deckkraft

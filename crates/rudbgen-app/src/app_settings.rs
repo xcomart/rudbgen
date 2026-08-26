@@ -24,9 +24,10 @@
 //! still saves the settings the user last committed to.
 
 use anyhow::Result;
-use gpui::{App, Global, Hsla, SharedString};
+use gpui::{App, Entity, Global, Hsla, SharedString};
 use rudbgen_core::{AppSettings, WindowState};
 use rugpui::{ThemeDirs, theme_store};
+use rugpui_editor::EditorView;
 use rugpui_shell::{WindowGeometry, monospace_family};
 
 /// The font family every piece of code text in rudbgen should render with.
@@ -46,6 +47,24 @@ pub fn editor_font(cx: &App) -> SharedString {
         .editor_font_family
         .map(SharedString::from)
         .unwrap_or_else(|| monospace_family(cx))
+}
+
+/// Puts the configured line-wrapping mode on `editor`.
+///
+/// Called from the render of every view that owns an editor, for the same
+/// reason those renders read [`editor_font`]: a saved settings file has to
+/// reach editors that already exist, and a repaint is the one thing every
+/// settings change is guaranteed to cause. The comparison is not an
+/// optimisation — [`EditorView::set_word_wrap`] re-measures the buffer, and
+/// calling it unconditionally from a render would do that on every frame.
+///
+/// Reads [`effective`], so an editor created while the settings dialog is open
+/// still comes up wrapped the way the rest of them are.
+pub fn apply_word_wrap(editor: &Entity<EditorView>, cx: &mut App) {
+    let wrap = effective(cx).editor_word_wrap;
+    if editor.read(cx).is_word_wrap() != wrap {
+        editor.update(cx, |editor, cx| editor.set_word_wrap(wrap, cx));
+    }
 }
 
 /// Global wrapper holding the current [`AppSettings`].

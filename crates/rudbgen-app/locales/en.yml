@@ -514,6 +514,7 @@ settings:
   ui_font_size: Interface size
   editor_font: Editor font
   editor_font_size: Editor size
+  editor_word_wrap: Wrap long lines in the editor
   # Unit hint after a narrow field. A range, so it reads the same everywhere.
   font_size_hint: 6 – 32 pt
 

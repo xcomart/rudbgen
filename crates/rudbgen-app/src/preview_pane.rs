@@ -121,7 +121,11 @@ impl PreviewPane {
             selected: 0,
             diagnostics: Vec::new(),
             error: None,
-            text: cx.new(|cx| EditorView::new(cx).read_only(true)),
+            text: cx.new(|cx| {
+                EditorView::new(cx)
+                    .read_only(true)
+                    .word_wrap(app_settings::effective(cx).editor_word_wrap)
+            }),
             scroll: ScrollHandle::new(),
             scrollbar: ScrollbarState::new(),
         }
@@ -471,6 +475,7 @@ impl Render for PreviewPane {
         self.watch_scroll(cx);
         let mono = app_settings::editor_font(cx);
         let font_size = app_settings::effective(cx).editor_font_size;
+        app_settings::apply_word_wrap(&self.text, cx);
 
         let header = match self.kind {
             PreviewKind::Single => Some(self.render_header(cx).into_any_element()),

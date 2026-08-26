@@ -367,6 +367,7 @@ settings:
   ui_font_size: インターフェイスの文字サイズ
   editor_font: エディターのフォント
   editor_font_size: エディターの文字サイズ
+  editor_word_wrap: エディターで長い行を折り返す
   font_size_hint: 6 – 32 pt
 
   opacity: 不透明度

@@ -341,8 +341,9 @@ impl TemplatePane {
     /// whatever is there with nothing.
     pub fn open(path: PathBuf, cx: &mut Context<Self>) -> Self {
         let highlighter = crate::template_syntax::template_highlighter_for_path(&path);
-        let editor = cx.new(|cx| EditorView::new(cx).highlighter(highlighter));
-        let preview = cx.new(|cx| EditorView::new(cx).read_only(true));
+        let wrap = app_settings::effective(cx).editor_word_wrap;
+        let editor = cx.new(|cx| EditorView::new(cx).highlighter(highlighter).word_wrap(wrap));
+        let preview = cx.new(|cx| EditorView::new(cx).read_only(true).word_wrap(wrap));
         let editor_events = cx.subscribe(&editor, |pane, _editor, event, cx| match event {
             EditorEvent::Changed => pane.changed(cx),
             EditorEvent::SelectionChanged => pane.moved(cx),
@@ -931,6 +932,7 @@ impl TemplatePane {
         let chosen = self.choices.get(self.choice).cloned();
         let mono = app_settings::editor_font(cx);
         let font_size = app_settings::effective(cx).editor_font_size;
+        app_settings::apply_word_wrap(&self.preview, cx);
 
         div()
             .flex()
@@ -1212,6 +1214,7 @@ impl Render for TemplatePane {
         let theme = theme(cx);
         let mono = app_settings::editor_font(cx);
         let font_size = app_settings::effective(cx).editor_font_size;
+        app_settings::apply_word_wrap(&self.editor, cx);
 
         if let Some(failure) = &self.failure {
             return div()

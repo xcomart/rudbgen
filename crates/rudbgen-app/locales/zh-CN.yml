@@ -366,6 +366,7 @@ settings:
   ui_font_size: 界面字号
   editor_font: 编辑器字体
   editor_font_size: 编辑器字号
+  editor_word_wrap: 在编辑器中自动换行长行
   font_size_hint: 6 – 32 pt
 
   opacity: 不透明度

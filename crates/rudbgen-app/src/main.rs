@@ -3097,6 +3097,7 @@ impl Workspace {
             .child(
                 div().flex_1().min_w_0().child(
                     Select::new("connection-select")
+                        .chevron_icon(icons::CHEVRON_DOWN)
                         .placeholder(ts!("titlebar.no_connection"))
                         .options(options)
                         .selected(selected)

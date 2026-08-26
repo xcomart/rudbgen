@@ -165,11 +165,15 @@ const APP_ICONS: &[(&str, &[u8])] = &[
 
 /// The asset source backing every [`svg`](gpui::svg) element in the app.
 ///
-/// Two tables: the shell's caption glyphs and rudbgen's own marks. Install it
-/// with [`Application::with_assets`](gpui::Application::with_assets); without
-/// it gpui's default source answers every path with `None` and the icons paint
-/// as nothing at all.
-pub const ICONS: IconSet = IconSet::new(&[rugpui_shell::WINDOW_CONTROL_ICONS, APP_ICONS]);
+/// Three tables: the shell's caption glyphs, the disclosure carets the widget
+/// kit draws for a collapsible, a tree or a dropdown that has not been given
+/// an icon of its own, and rudbgen's own marks. Install it with
+/// [`Application::with_assets`](gpui::Application::with_assets); without it
+/// gpui's default source answers every path with `None` and the icons paint as
+/// nothing at all — and leaving [`rugpui::ICONS`] out of the chain does the
+/// same to the arrows alone, which is what `rugpui::init` warns about.
+pub const ICONS: IconSet =
+    IconSet::new(&[rugpui_shell::WINDOW_CONTROL_ICONS, rugpui::ICONS, APP_ICONS]);
 
 #[cfg(test)]
 mod tests {
@@ -210,7 +214,24 @@ mod tests {
     #[test]
     fn listing_returns_both_tables() {
         assert_eq!(ICONS.list("icons/").unwrap().len(), ICONS.len());
-        // rudbgen's own marks, and the four caption glyphs the shell owns.
-        assert_eq!(ICONS.len(), APP_ICONS.len() + 4);
+        // rudbgen's own marks, the four caption glyphs the shell owns, and the
+        // widget kit's two disclosure carets.
+        assert_eq!(ICONS.len(), APP_ICONS.len() + 4 + rugpui::ICONS.len());
+    }
+
+    /// The widget kit resolves its default arrows through the host's asset
+    /// source, so dropping [`rugpui::ICONS`] from the chain would leave every
+    /// collapsible and tree with an invisible disclosure mark.
+    #[test]
+    fn the_widget_kit_carets_are_in_the_chain() {
+        for path in [rugpui::CARET_RIGHT, rugpui::CARET_DOWN] {
+            assert!(
+                ICONS
+                    .load(path)
+                    .expect("loading an embedded icon cannot fail")
+                    .is_some(),
+                "{path} is missing from the asset source"
+            );
+        }
     }
 }

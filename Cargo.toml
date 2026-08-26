@@ -11,15 +11,17 @@ members = ["crates/*"]
 # day and a floating dependency would make two checkouts of this repository
 # build different applications.
 #
-# Four of those crates carry patches, for four things Zed has no answer of its
+# Four of those crates carry patches, for five things Zed has no answer of its
 # own for: moving an open window between the platform's caption and the
 # application's own, the X11 backend running its close callbacks with the client
 # `RefCell` borrowed, X11's `is_transparent` ignoring client-side decorations,
-# and X11 having no counterpart to Wayland's `org_kde_kwin_blur`. rudbgen does
-# not carry those trees itself: `rugpui` — the widget kit this application draws
-# with, and which is written against the same gpui — vendors them and documents
-# them hunk by hunk in its own root manifest. The table below simply points at
-# rugpui's copies, so that there is one vendored gpui and not two.
+# X11 having no counterpart to Wayland's `org_kde_kwin_blur`, and macOS 26
+# blurring nothing behind a window whose `NSVisualEffectView` Liquid Glass
+# rebuilt. rudbgen does not carry those trees itself: `rugpui` — the widget kit
+# this application draws with, and which is written against the same gpui —
+# vendors them and documents them hunk by hunk in its own root manifest. The
+# table below simply points at rugpui's copies, so that there is one vendored
+# gpui and not two.
 #
 # The patch table is not optional and its four entries are not optional either.
 # Without it this workspace would resolve gpui from Zed's monorepo while `rugpui`
@@ -46,10 +48,10 @@ members = ["crates/*"]
 # gpui crates below can be overridden by path the same way if they, too, are
 # being edited locally.
 [patch."https://github.com/zed-industries/zed"]
-gpui = { git = "https://github.com/xcomart/rugpui", rev = "8810c93ddc2382276c60f20d5317b87f8cf7e31b" }
-gpui_linux = { git = "https://github.com/xcomart/rugpui", rev = "8810c93ddc2382276c60f20d5317b87f8cf7e31b" }
-gpui_macos = { git = "https://github.com/xcomart/rugpui", rev = "8810c93ddc2382276c60f20d5317b87f8cf7e31b" }
-gpui_windows = { git = "https://github.com/xcomart/rugpui", rev = "8810c93ddc2382276c60f20d5317b87f8cf7e31b" }
+gpui = { git = "https://github.com/xcomart/rugpui", rev = "d4f59e93d518bbfe00e5128f24d2d452ca6a8a28" }
+gpui_linux = { git = "https://github.com/xcomart/rugpui", rev = "d4f59e93d518bbfe00e5128f24d2d452ca6a8a28" }
+gpui_macos = { git = "https://github.com/xcomart/rugpui", rev = "d4f59e93d518bbfe00e5128f24d2d452ca6a8a28" }
+gpui_windows = { git = "https://github.com/xcomart/rugpui", rev = "d4f59e93d518bbfe00e5128f24d2d452ca6a8a28" }
 
 [workspace.package]
 version = "0.1.0"
@@ -234,10 +236,10 @@ jni = { version = "0.22", features = ["invocation"] }
 #
 # All four are built on `rugpui` and taken at one revision along with the gpui the
 # patch table at the top of this file points at.
-rugpui = { git = "https://github.com/xcomart/rugpui", rev = "8810c93ddc2382276c60f20d5317b87f8cf7e31b" }
-rugpui-grid = { git = "https://github.com/xcomart/rugpui", rev = "8810c93ddc2382276c60f20d5317b87f8cf7e31b" }
-rugpui-editor = { git = "https://github.com/xcomart/rugpui", rev = "8810c93ddc2382276c60f20d5317b87f8cf7e31b" }
-rugpui-shell = { git = "https://github.com/xcomart/rugpui", rev = "8810c93ddc2382276c60f20d5317b87f8cf7e31b" }
+rugpui = { git = "https://github.com/xcomart/rugpui", rev = "d4f59e93d518bbfe00e5128f24d2d452ca6a8a28" }
+rugpui-grid = { git = "https://github.com/xcomart/rugpui", rev = "d4f59e93d518bbfe00e5128f24d2d452ca6a8a28" }
+rugpui-editor = { git = "https://github.com/xcomart/rugpui", rev = "d4f59e93d518bbfe00e5128f24d2d452ca6a8a28" }
+rugpui-shell = { git = "https://github.com/xcomart/rugpui", rev = "d4f59e93d518bbfe00e5128f24d2d452ca6a8a28" }
 
 # --- internal crates ---
 rudbgen-core = { path = "crates/rudbgen-core" }

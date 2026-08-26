@@ -27,6 +27,7 @@ use rugpui_editor::EditorView;
 
 use crate::app_settings;
 use crate::i18n::ts;
+use crate::icons;
 use crate::template_pane::to_lf;
 
 /// Element id of the panel's scrolling box.
@@ -321,6 +322,7 @@ impl PreviewPane {
             .gap(px(8.))
             .child(
                 Select::new("preview-table")
+                    .chevron_icon(icons::CHEVRON_DOWN)
                     .options(self.tables.clone())
                     .selected(chosen_table)
                     .placeholder(ts!("generate.preview_table"))
@@ -346,6 +348,7 @@ impl PreviewPane {
             )
             .child(
                 Select::new("preview-template")
+                    .chevron_icon(icons::CHEVRON_DOWN)
                     .options(self.templates.clone())
                     .selected(chosen_template)
                     .placeholder(ts!("generate.preview_template"))

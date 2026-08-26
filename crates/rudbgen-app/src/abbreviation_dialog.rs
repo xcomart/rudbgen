@@ -44,6 +44,7 @@ use rugpui::{
 };
 
 use crate::i18n::ts;
+use crate::icons;
 
 /// Width of the dialog panel.
 const DIALOG_WIDTH: f32 = 720.;
@@ -500,6 +501,7 @@ impl AbbreviationDialog {
             let pick = this.clone();
             let toggle = this.clone();
             Select::new(("abbr-table", index))
+                .chevron_icon(icons::CHEVRON_DOWN)
                 .options(self.tables.clone())
                 .placeholder(ts!("abbr.pick_table"))
                 .width(px(260.))

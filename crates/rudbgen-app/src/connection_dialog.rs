@@ -48,9 +48,9 @@ use rudbgen_core::{
     TunnelAuth, TunnelConfig,
 };
 use rugpui::{
-    Button, ButtonVariant, Checkbox, DraggedThumb, Scrollbar, ScrollbarAxis, ScrollbarState,
-    Segmented, Select, TextInput, Theme, form_row, hide_later, hide_now, modal, scroll_to,
-    scrolled, theme,
+    Button, ButtonVariant, Checkbox, Collapsible, DraggedThumb, Scrollbar, ScrollbarAxis,
+    ScrollbarState, Segmented, Select, TextInput, Theme, form_row, hide_later, hide_now, modal,
+    scroll_to, scrolled, theme,
 };
 use uuid::Uuid;
 
@@ -61,6 +61,7 @@ use crate::connection::{
 };
 use crate::driver_manager::{DriverManager, DriverManagerEvent, TestTarget};
 use crate::i18n::ts;
+use crate::icons;
 
 /// Width of the dialog panel.
 ///
@@ -160,22 +161,28 @@ mod tab {
     pub const KEEP_ALIVE_QUERY: isize = 192;
     /// The tunnel section's disclosure.
     pub const TUNNEL: isize = 200;
+    /// The checkbox beside it, which arms the tunnel.
+    ///
+    /// Its own stop rather than the disclosure's: the two sit in one row and do
+    /// two different things, and the header is skipped entirely while the
+    /// tunnel is off, which would otherwise take the checkbox with it.
+    pub const TUNNEL_ENABLED: isize = 201;
     /// Bastion host.
-    pub const TUNNEL_HOST: isize = 201;
+    pub const TUNNEL_HOST: isize = 202;
     /// Bastion port.
-    pub const TUNNEL_PORT: isize = 202;
+    pub const TUNNEL_PORT: isize = 203;
     /// Bastion user.
-    pub const TUNNEL_USER: isize = 203;
+    pub const TUNNEL_USER: isize = 204;
     /// Authentication method.
-    pub const TUNNEL_AUTH: isize = 204;
+    pub const TUNNEL_AUTH: isize = 205;
     /// Private key path.
-    pub const TUNNEL_KEY: isize = 205;
+    pub const TUNNEL_KEY: isize = 206;
     /// Tunnel password or passphrase.
-    pub const TUNNEL_SECRET: isize = 206;
+    pub const TUNNEL_SECRET: isize = 207;
     /// Target host, as named inside the remote network.
-    pub const TUNNEL_REMOTE_HOST: isize = 207;
+    pub const TUNNEL_REMOTE_HOST: isize = 208;
     /// Target port.
-    pub const TUNNEL_REMOTE_PORT: isize = 208;
+    pub const TUNNEL_REMOTE_PORT: isize = 209;
     /// New profile.
     pub const NEW: isize = 220;
     /// Duplicate profile.
@@ -1314,6 +1321,7 @@ impl ConnectionDialog {
             });
 
         let select = Select::new("connect-driver")
+            .chevron_icon(icons::CHEVRON_DOWN)
             .options(options)
             .selected(selected)
             .placeholder(ts!("connect.pick_driver"))
@@ -1479,14 +1487,20 @@ impl ConnectionDialog {
         )
     }
 
-    /// The tunnel section: a switch, and the settings behind it.
+    /// The tunnel section: a checkbox in the header, and the settings behind it.
+    ///
+    /// A [`Collapsible`] rather than a card with a title, so the eight questions
+    /// about a bastion can be folded away once they are answered. The checkbox
+    /// is the header's `trailing` element and so a sibling of the disclosure:
+    /// arming the tunnel and folding the section are two gestures, and one
+    /// press must not do both.
     fn render_tunnel(&self, chrome: &Theme, cx: &mut Context<Self>) -> impl IntoElement + use<> {
         let this = cx.entity();
         let enabled = self.tunnel_enabled;
 
         let toggle = Checkbox::new("connect-tunnel", ts!("connect.tunnel_enabled"))
             .checked(enabled)
-            .tab_index(tab::TUNNEL)
+            .tab_index(tab::TUNNEL_ENABLED)
             .on_toggle({
                 let this = this.clone();
                 move |checked, _window, cx| {
@@ -1600,11 +1614,22 @@ impl ConnectionDialog {
                 )
         });
 
-        div()
-            .flex()
-            .flex_col()
-            .gap(px(8.))
-            .child(toggle)
+        Collapsible::new("connect-tunnel-section", ts!("connect.section.tunnel"))
+            .open(enabled && self.tunnel_open)
+            // Nothing to disclose while the tunnel is off, and the header says
+            // so rather than folding to an empty body. The checkbox is the
+            // host's own element and stays live, which is what turns it back on.
+            .disabled(!enabled)
+            .tab_index(tab::TUNNEL)
+            // The same pair the explorer's tree discloses with: a form's
+            // sections and a tree's branches should not disagree about which
+            // way the triangle points.
+            .arrow_icons(icons::CHEVRON_RIGHT, icons::CHEVRON_DOWN)
+            .trailing(toggle)
+            .on_toggle(cx.processor(|dialog, open, _window, cx| {
+                dialog.tunnel_open = open;
+                cx.notify();
+            }))
             .children(body)
     }
 
@@ -1733,7 +1758,7 @@ impl ConnectionDialog {
                     })
                     .child(form_row(ts!("connect.props"), props))
                     .child(section(ts!("connect.section.behaviour"), chrome, behaviour))
-                    .child(section(ts!("connect.section.tunnel"), chrome, tunnel)),
+                    .child(card(chrome, tunnel)),
             )
             .children(
                 self.hovering_scrollbar(SCROLLBARS[1].0, Surface::Body, cx)
@@ -2210,21 +2235,36 @@ fn section<E: IntoElement>(
     chrome: &Theme,
     body: E,
 ) -> impl IntoElement + use<E> {
+    card(
+        chrome,
+        div()
+            .flex()
+            .flex_col()
+            .gap(px(10.))
+            .child(
+                div()
+                    .text_size(px(11.))
+                    .text_color(chrome.text_muted)
+                    .child(title),
+            )
+            .child(body),
+    )
+}
+
+/// The frame a [`section`] is drawn in, without the title.
+///
+/// For a body that titles itself — a [`Collapsible`], whose header *is* the
+/// title and has to answer a press — where a second heading above it would read
+/// as the section being named twice.
+fn card<E: IntoElement>(chrome: &Theme, body: E) -> impl IntoElement + use<E> {
     div()
         .flex()
         .flex_col()
-        .gap(px(10.))
         .p(px(12.))
         .rounded_lg()
         .border_1()
         .border_color(chrome.border)
         .bg(chrome.surface)
-        .child(
-            div()
-                .text_size(px(11.))
-                .text_color(chrome.text_muted)
-                .child(title),
-        )
         .child(body)
 }
 

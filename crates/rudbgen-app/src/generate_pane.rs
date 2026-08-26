@@ -42,6 +42,7 @@ use rugpui::{
 use uuid::Uuid;
 
 use crate::i18n::ts;
+use crate::icons;
 
 /// How long the panel waits after the last edit before writing
 /// `connections.json`.
@@ -877,6 +878,7 @@ impl GeneratePane {
             .gap(px(8.))
             .child(
                 Select::new("generate-set")
+                    .chevron_icon(icons::CHEVRON_DOWN)
                     .options(options)
                     .selected(Some(selected))
                     .open(self.set_open)

@@ -38,16 +38,17 @@ use std::path::{Path, PathBuf};
 use std::time::Duration;
 
 use gpui::{
-    Anchor, AnchoredPositionMode, App, Bounds, Context, DragMoveEvent, Entity, EventEmitter,
-    FocusHandle, Focusable, MouseButton, Pixels, SharedString, Subscription, Task, Window,
-    anchored, deferred, div, point, prelude::*, px,
+    Anchor, AnchoredPositionMode, App, Axis, Bounds, Context, Entity, EventEmitter, FocusHandle,
+    Focusable, MouseButton, Pixels, SharedString, Subscription, Task, Window, anchored, deferred,
+    div, point, prelude::*, px,
 };
 use rudbgen_template::{ParseError, Template, Warning};
-use rugpui::{Button, ButtonVariant, Select, editor_theme, theme, tooltip_label};
+use rugpui::{Button, ButtonVariant, Select, Splitter, editor_theme, theme, tooltip_label};
 use rugpui_editor::{EditorEvent, EditorView, MarkKind, NavKey};
 
 use crate::app_settings;
 use crate::i18n::ts;
+use crate::icons;
 use crate::palette::{self, CompletionKind, CompletionRequest, PaletteItem};
 
 /// How long the buffer has to stand still before it is parsed and rendered.
@@ -58,16 +59,14 @@ use crate::palette::{self, CompletionKind, CompletionRequest, PaletteItem};
 const DEBOUNCE: Duration = Duration::from_millis(300);
 
 /// Narrowest either half of the split may be dragged, as a fraction.
+///
+/// [`Splitter`] reads it as both ends of the range: the trailing half is held
+/// to the same minimum, so the divider stops at `1 - MIN_SPLIT` on the way
+/// right without a second constant.
 const MIN_SPLIT: f32 = 0.15;
-
-/// Widest either half may be dragged, as a fraction.
-const MAX_SPLIT: f32 = 0.85;
 
 /// Where the split starts.
 const DEFAULT_SPLIT: f32 = 0.55;
-
-/// Width of the grab area over the split.
-const SPLIT_HANDLE: f32 = 6.;
 
 /// Height of the diagnostics list when there is anything in it.
 const DIAGNOSTICS_HEIGHT: f32 = 120.;
@@ -83,10 +82,6 @@ const POPUP_ROW_HEIGHT: f32 = 20.;
 
 /// Width of the preview header's table selector.
 const CHOICE_WIDTH: f32 = 190.;
-
-/// The payload of a drag of the split between the editor and the preview.
-#[derive(Clone, Debug, PartialEq, Eq)]
-struct DraggedSplit;
 
 /// What a file's lines end with.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -853,25 +848,6 @@ impl TemplatePane {
         self.close_completion(cx);
     }
 
-    // --- the split --------------------------------------------------------
-
-    /// Moves the split to wherever the pointer has dragged it.
-    fn drag_split(&mut self, event: &DragMoveEvent<DraggedSplit>, cx: &mut Context<Self>) {
-        let width = f32::from(event.bounds.size.width);
-        if width <= 0. {
-            return;
-        }
-        let at = f32::from(event.event.position.x - event.bounds.left()) / width;
-        if !at.is_finite() {
-            return;
-        }
-        let at = at.clamp(MIN_SPLIT, MAX_SPLIT);
-        if (self.split - at).abs() > f32::EPSILON {
-            self.split = at;
-            cx.notify();
-        }
-    }
-
     // --- rendering --------------------------------------------------------
 
     /// The strip over the two halves: the file, the dirty marker, the save
@@ -975,6 +951,7 @@ impl TemplatePane {
                     .border_color(theme.border)
                     .child(
                         Select::new("template-preview-table")
+                            .chevron_icon(icons::CHEVRON_DOWN)
                             .options(self.choices.clone())
                             .selected(chosen)
                             .placeholder(ts!("template.preview_table"))
@@ -1254,28 +1231,35 @@ impl Render for TemplatePane {
         let editor = div()
             .flex()
             .flex_col()
+            .flex_1()
             .min_w_0()
             .min_h_0()
-            .when(self.preview_open, |half| half.w(gpui::relative(self.split)))
-            .when(!self.preview_open, |half| half.flex_1())
             .font_family(mono)
             .text_size(px(font_size))
             .child(self.editor.clone());
 
-        let handle = self.preview_open.then(|| {
-            div()
-                .id("template-split")
-                .occlude()
-                .flex_none()
-                .w(px(SPLIT_HANDLE))
-                .cursor_ew_resize()
-                .bg(theme.border)
-                .on_drag(DraggedSplit, |_, _, _, cx| cx.new(|_| gpui::Empty))
-        });
-
-        let preview = self
-            .preview_open
-            .then(|| self.render_preview(cx).into_any_element());
+        // With the preview up the two halves are a `Splitter`, which owns the
+        // divider, the drag and the grab band; the pane keeps nothing but the
+        // ratio it is drawn at. With the preview away there is nothing to
+        // divide and the editor simply fills the row.
+        let body = if self.preview_open {
+            let preview = self.render_preview(cx).into_any_element();
+            let this = cx.entity();
+            Splitter::new("template-split", Axis::Horizontal)
+                .ratio(self.split)
+                .min_ratio(MIN_SPLIT)
+                .first(editor)
+                .second(preview)
+                .on_change(move |ratio, _window, cx| {
+                    this.update(cx, |pane, cx| {
+                        pane.split = ratio;
+                        cx.notify();
+                    });
+                })
+                .into_any_element()
+        } else {
+            editor.into_any_element()
+        };
 
         div()
             .key_context("TemplatePane")
@@ -1302,14 +1286,7 @@ impl Render for TemplatePane {
                     .flex_grow_1()
                     .min_h_0()
                     .min_w_0()
-                    .on_drag_move::<DraggedSplit>(cx.listener(
-                        |pane, event: &DragMoveEvent<DraggedSplit>, _window, cx| {
-                            pane.drag_split(event, cx);
-                        },
-                    ))
-                    .child(editor)
-                    .children(handle)
-                    .children(preview),
+                    .child(body),
             )
             .children((!self.diagnostics.is_empty()).then(|| self.render_diagnostics(cx)))
             .children(self.render_completion(cx))

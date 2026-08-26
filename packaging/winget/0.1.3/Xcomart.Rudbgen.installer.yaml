@@ -12,8 +12,7 @@ InstallModes:
 - silent
 - silentWithProgress
 UpgradeBehavior: install
-# Placeholder until the release exists; see packaging/winget/README.md, step 2.
-ReleaseDate: 1970-01-01
+ReleaseDate: 2026-08-26
 Installers:
 # The x64 build also runs under emulation on ARM64 Windows, but there is no native
 # arm64 artifact to declare here yet.
@@ -26,9 +25,8 @@ Installers:
   #
   # The winget-pkgs PR pipeline downloads the URL and compares, so a wrong hash
   # fails validation. `wingetcreate update` computes it by itself for every
-  # release after this first hand-made one. Sixty-four zeros is the placeholder
-  # that has to be replaced before the first pull request.
-  InstallerSha256: '0000000000000000000000000000000000000000000000000000000000000000'
+  # release after this first hand-made one.
+  InstallerSha256: 0BD56A26AA5CE1A641E8E0DD79EB8B92268969BC7700ED805C85F84A5B7FA056
   # Inno Setup appends "_is1" to the AppId when it writes its Uninstall registry key,
   # so this is packaging/windows/rudbgen.iss's AppId plus that suffix. It is how winget
   # recognises an already-installed copy, and it is the same string

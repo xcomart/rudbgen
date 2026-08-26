@@ -278,6 +278,17 @@ pub struct AppSettings {
     /// Font size of the SQL editor and the result grid; clamped like
     /// [`AppSettings::ui_font_size`].
     pub editor_font_size: f32,
+    /// Whether the editors break long lines at the width of their text area.
+    ///
+    /// Off by default, which is how an editor without the setting behaved: a
+    /// template is written against its own indentation, and a line that moves
+    /// as the pane is resized is harder to follow than one that stays put. On,
+    /// nothing runs off to the right — which is what reading a generated file,
+    /// or a query someone else wrote on one long line, wants instead.
+    ///
+    /// Nothing sanitises it: a bool has no invalid value, and a file written by
+    /// an older build simply arrives without the key and takes the default.
+    pub editor_word_wrap: bool,
     /// Maximum Java heap in megabytes, passed to the JVM as `-Xmx`.
     ///
     /// The JVM is started once per process and its heap cannot be resized
@@ -354,6 +365,7 @@ impl Default for AppSettings {
             ui_font_size: DEFAULT_UI_FONT_SIZE,
             editor_font_family: None,
             editor_font_size: DEFAULT_EDITOR_FONT_SIZE,
+            editor_word_wrap: false,
             jvm_heap_mb: DEFAULT_JVM_HEAP_MB,
             jvm_extra_args: Vec::new(),
             overwrite_policy: OverwritePolicy::default(),
@@ -489,6 +501,7 @@ mod tests {
         assert_eq!(settings.ui_font_size, 14.0);
         assert_eq!(settings.editor_font_family, None);
         assert_eq!(settings.editor_font_size, 14.0);
+        assert!(!settings.editor_word_wrap);
         assert_eq!(settings.jvm_heap_mb, 1024);
         assert!(settings.jvm_extra_args.is_empty());
         assert_eq!(settings.overwrite_policy, OverwritePolicy::Ask);
@@ -512,6 +525,7 @@ mod tests {
             ui_font_size: 15.0,
             editor_font_family: Some("Cascadia Mono".to_string()),
             editor_font_size: 16.5,
+            editor_word_wrap: true,
             jvm_heap_mb: 4096,
             jvm_extra_args: vec!["-Doracle.jdbc.timezoneAsRegion=false".to_string()],
             overwrite_policy: OverwritePolicy::Skip,
@@ -572,6 +586,28 @@ mod tests {
         assert_eq!(settings.window.width, DEFAULT_WINDOW_WIDTH);
         assert_eq!(settings.editor_font_size, 14.0);
         assert_eq!(settings.jvm_heap_mb, 1024);
+    }
+
+    #[test]
+    fn a_settings_file_written_before_word_wrap_existed_still_loads() {
+        // The switch was added after the first releases, so every settings file
+        // already on disk is missing the key. Such a file has to load with word
+        // wrap off — the behaviour those users have — rather than fail, and the
+        // very next save has to write the key out so the round trip closes.
+        let dir = tempfile::tempdir().expect("tempdir");
+        let path = dir.path().join("settings.json");
+        fs::write(&path, br#"{"theme":"one-dark","editor_font_size":13}"#).expect("write");
+
+        let mut settings = AppSettings::load_from(&path).expect("load");
+        assert!(!settings.editor_word_wrap);
+
+        settings.editor_word_wrap = true;
+        settings.save_to(&path).expect("save");
+        assert!(
+            AppSettings::load_from(&path)
+                .expect("reload")
+                .editor_word_wrap
+        );
     }
 
     #[test]

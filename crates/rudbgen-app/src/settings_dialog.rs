@@ -158,6 +158,8 @@ mod tab {
     pub const EDITOR_FONT_FAMILY: isize = 50;
     /// Editor font size.
     pub const EDITOR_FONT_SIZE: isize = 60;
+    /// "Wrap long lines" toggle.
+    pub const EDITOR_WORD_WRAP: isize = 65;
     /// Background opacity, in percent.
     pub const OPACITY: isize = 70;
     /// Background blur toggle.
@@ -305,6 +307,8 @@ pub struct SettingsDialog {
     editor_theme: SharedString,
     /// Whether the editor theme is picked from the chrome theme's cast.
     editor_theme_follows_ui: bool,
+    /// Whether the editors break long lines at the width of their text area.
+    editor_word_wrap: bool,
     /// BCP 47 tag of the interface language; `None` follows the system locale.
     /// Holds the tag rather than the label, because the label is what the
     /// dropdown shows and the tag is what gets persisted.
@@ -462,6 +466,7 @@ impl SettingsDialog {
             ui_theme: defaults.theme.into(),
             editor_theme: defaults.editor_theme.into(),
             editor_theme_follows_ui: defaults.editor_theme_follows_ui,
+            editor_word_wrap: defaults.editor_word_wrap,
             language: defaults.language,
             background_blur: defaults.window.background_blur,
             titlebar: defaults.window.titlebar,
@@ -745,6 +750,7 @@ impl SettingsDialog {
         self.ui_theme = settings.theme.clone().into();
         self.editor_theme = settings.editor_theme.clone().into();
         self.editor_theme_follows_ui = settings.editor_theme_follows_ui;
+        self.editor_word_wrap = settings.editor_word_wrap;
         self.language = settings.language.clone();
         self.background_blur = settings.window.background_blur;
         self.titlebar = settings.window.titlebar;
@@ -794,6 +800,7 @@ impl SettingsDialog {
         settings.theme = self.ui_theme.to_string();
         settings.editor_theme = self.editor_theme.to_string();
         settings.editor_theme_follows_ui = self.editor_theme_follows_ui;
+        settings.editor_word_wrap = self.editor_word_wrap;
         settings.language = self.language.clone();
         settings.editor_font_family = self.font_family.as_ref().map(ToString::to_string);
         settings.overwrite_policy = self.overwrite_policy;
@@ -1151,6 +1158,25 @@ impl SettingsDialog {
                 }
             });
 
+        // No preview: wrapping re-measures every line in every open editor, and
+        // doing that per click of a checkbox that is not even saved yet would
+        // cost more than seeing the answer a moment early is worth.
+        let word_wrap = Checkbox::new(
+            "settings-editor-word-wrap",
+            ts!("settings.editor_word_wrap"),
+        )
+        .checked(self.editor_word_wrap)
+        .tab_index(tab::EDITOR_WORD_WRAP)
+        .on_toggle({
+            let this = this.clone();
+            move |checked, _window, cx| {
+                this.update(cx, |dialog, cx| {
+                    dialog.editor_word_wrap = checked;
+                    cx.notify();
+                });
+            }
+        });
+
         let font = Select::new("settings-editor-font")
             .chevron_icon(icons::CHEVRON_DOWN)
             .options(self.font_options())
@@ -1224,7 +1250,8 @@ impl SettingsDialog {
                         ts!("settings.font_size_hint"),
                         cx,
                     ),
-                )),
+                ))
+                .child(form_row("", word_wrap)),
         )
     }
 
@@ -1599,7 +1626,7 @@ impl Render for SettingsDialog {
 /// against each other in a test.
 fn section_of(tab_index: isize) -> usize {
     match tab_index {
-        index if index <= tab::EDITOR_FONT_SIZE => 0,
+        index if index <= tab::EDITOR_WORD_WRAP => 0,
         index if index <= tab::TITLEBAR => 1,
         index if index <= tab::LANGUAGE => 2,
         index if index <= tab::OVERWRITE_POLICY => 3,
@@ -1635,6 +1662,7 @@ mod tests {
             ui_font_size: 15.0,
             editor_font_family: Some("Cascadia Mono".to_string()),
             editor_font_size: 16.5,
+            editor_word_wrap: true,
             jvm_heap_mb: 4096,
             jvm_extra_args: vec!["-Xss4m".to_string(), "-Dfoo=bar".to_string()],
             overwrite_policy: OverwritePolicy::Skip,
@@ -1742,6 +1770,7 @@ mod tests {
             ts!("settings.ui_font_size"),
             ts!("settings.editor_font"),
             ts!("settings.editor_font_size"),
+            ts!("settings.editor_word_wrap"),
             ts!("settings.font_size_hint"),
             ts!("settings.opacity"),
             ts!("settings.opacity_hint"),
@@ -1807,7 +1836,12 @@ mod tests {
         // The body scrolls by section index, so a control whose tab index falls
         // on the wrong side of a boundary would scroll the form away from the
         // ring it just moved into.
-        for index in [tab::UI_THEME, tab::FOLLOWS_UI, tab::EDITOR_FONT_SIZE] {
+        for index in [
+            tab::UI_THEME,
+            tab::FOLLOWS_UI,
+            tab::EDITOR_FONT_SIZE,
+            tab::EDITOR_WORD_WRAP,
+        ] {
             assert_eq!(section_of(index), 0, "{index}");
         }
         for index in [tab::OPACITY, tab::BLUR, tab::TITLEBAR] {

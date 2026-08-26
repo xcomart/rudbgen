@@ -369,6 +369,7 @@ settings:
   ui_font_size: Размер шрифта интерфейса
   editor_font: Шрифт редактора
   editor_font_size: Размер шрифта редактора
+  editor_word_wrap: Переносить длинные строки в редакторе
   font_size_hint: 6 – 32 pt
 
   opacity: Непрозрачность

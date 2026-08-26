@@ -534,7 +534,11 @@ impl DriverManager {
             // state from the selected driver; nothing here depends on which
             // one that is.
             query_editors: std::array::from_fn(|_| {
-                cx.new(|cx| EditorView::new(cx).highlighter(Arc::new(SqlHighlighter)))
+                cx.new(|cx| {
+                    EditorView::new(cx)
+                        .highlighter(Arc::new(SqlHighlighter))
+                        .word_wrap(app_settings::effective(cx).editor_word_wrap)
+                })
             }),
             test_catalog_input: field(cx, "".into(), tab::TEST_CATALOG),
             test_schema_input: field(cx, "PUBLIC".into(), tab::TEST_SCHEMA),
@@ -1739,6 +1743,7 @@ impl DriverManager {
 
         let mono = app_settings::editor_font(cx);
         let font_size = app_settings::effective(cx).editor_font_size;
+        app_settings::apply_word_wrap(&self.query_editors[index], cx);
         let editor = div()
             .flex()
             .flex_col()

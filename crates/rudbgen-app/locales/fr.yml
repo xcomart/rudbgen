@@ -369,6 +369,7 @@ settings:
   ui_font_size: Taille de l’interface
   editor_font: Police de l’éditeur
   editor_font_size: Taille de l’éditeur
+  editor_word_wrap: Renvoyer les lignes longues à la ligne dans l’éditeur
   font_size_hint: 6 – 32 pt
 
   opacity: Opacité

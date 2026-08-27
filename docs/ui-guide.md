@@ -105,7 +105,7 @@ handed to every connection that uses it.
 Once connected the window is three columns over a status bar:
 
 ```
-┌ [⌂ rudbgen]  [● Sample H2 ▾]                      [⚙] [?]  ─ □ ✕ ┐
+┌ [⌂ rudbgen] [☰] [● Sample H2 ▾]                              ─ □ ✕ ┐
 ├──────────────┬─────────────────────────────────┬─────────────────┤
 │ EXPLORER     │ WORK AREA (tabs)                │ INSPECTOR       │
 │ 🔍 filter    │ ┌ Generate ┐┌ Preview ┐         │ T_SAMPLE_ALBUM  │

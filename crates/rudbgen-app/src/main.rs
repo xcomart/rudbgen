@@ -2946,8 +2946,11 @@ impl Workspace {
 
     // --- rendering --------------------------------------------------------
 
-    /// Renders the title bar: the application mark, the connection selector,
-    /// the settings button and the help menu.
+    /// Renders the title bar: the application mark, the application menu
+    /// button and the connection selector.
+    ///
+    /// The button is left out on macOS, where [`app_menus`] puts the same
+    /// commands in the system menu bar.
     ///
     /// In the custom title bar style this row *is* the title bar. It then marks
     /// itself as the window's drag area, takes over writing the application's
@@ -2959,6 +2962,7 @@ impl Workspace {
     fn render_toolbar(&self, window: &Window, cx: &mut Context<Self>) -> AnyElement {
         let theme = theme(cx);
         let custom = chrome::draws_own_titlebar(chrome_style(self.titlebar), window);
+        let menu = (!cfg!(target_os = "macos")).then(|| self.render_app_menu(cx));
 
         // Room for the traffic lights AppKit still draws over the transparent
         // title bar. Fullscreen hides the buttons, and the gap goes with them.
@@ -3037,11 +3041,11 @@ impl Workspace {
             .children(leading_controls)
             .children(traffic_lights)
             .children(title)
+            .children(menu)
             .child(self.render_connection_select(cx))
             // The gap the window is dragged by: everything to its left and
             // right is a control, and this is what is left of the caption.
             .child(div().flex_1().min_w_0())
-            .child(self.render_help_menu(cx))
             .children(trailing_controls)
             .into_any_element()
     }
@@ -3131,15 +3135,15 @@ impl Workspace {
             )
     }
 
-    /// The help menu: every command the shell has, on the platforms without a
-    /// native menu bar.
+    /// The application menu: every command the shell has, on the platforms
+    /// without a native menu bar.
     ///
     /// Every row dispatches the action its keyboard shortcut dispatches, so the
     /// menu adds a way in rather than a second implementation. A row is greyed
     /// exactly when the action behind it would return without doing anything,
     /// and drawn rather than dropped: a command that is missing tells the reader
     /// nothing about what the application can do.
-    fn render_help_menu(&self, cx: &mut Context<Self>) -> MenuButton {
+    fn render_app_menu(&self, cx: &mut Context<Self>) -> MenuButton {
         let this = cx.entity();
         let entries = vec![
             MenuEntry::new(ts!("menu.new_connection"))
@@ -3209,8 +3213,7 @@ impl Workspace {
                 .on_activate(|window, cx| window.dispatch_action(Box::new(Quit), cx)),
         ];
 
-        MenuButton::new("help-menu")
-            .icon(icons::MENU_DOTS)
+        MenuButton::new("app-menu")
             .tooltip(ts!("titlebar.tip_menu"))
             .open(self.menu_open)
             .entries(entries)
@@ -4292,7 +4295,7 @@ fn window_appearance(window: &WindowState) -> WindowBackgroundAppearance {
 ///
 /// gpui only turns this into a real menu bar on macOS — the Windows and Linux
 /// backends store it and draw nothing — so the other platforms get the same
-/// commands from the help menu built by [`Workspace::render_help_menu`].
+/// commands from the application menu built by [`Workspace::render_app_menu`].
 /// Every item dispatches an action that is also bound to a shortcut in
 /// [`bind_shortcuts`], which is what lets the macOS backend label the items with
 /// their key equivalents; register the bindings first so the keymap it reads is

@@ -49,11 +49,23 @@ time rudbgen starts; editing the copy in the download changes nothing.
 something to generate from before there is a server to connect to. It holds
 `T_SAMPLE_ALBUM` and `T_SAMPLE_MUSIC` in schema `PUBLIC`, both commented, and it
 is the table every example in the [template
-reference](template-reference.md) is written against. To open it: driver **H2
-Embedded**, URL `jdbc:h2:<path>/sample_h2.db` — the path without the `.mv.db`
-suffix — and no user name or password. Copy it somewhere writable first; H2
-opens an embedded database read-write and the copy in an installed tree may not
-be.
+reference](template-reference.md) is written against.
+
+You do not have to set it up. The first time rudbgen starts — precisely, the
+first start that finds no `connections.json` in your configuration directory —
+it copies this file next to that configuration and adds a connection called
+**Sample H2 Embedded** that opens the copy. The copy is what the connection
+names because H2 opens an embedded database read-write and takes a lock on it,
+which an installed tree under `C:\Program Files`, `/opt` or a signed `.app`
+bundle will not allow. Neither the copy nor the connection is ever made twice: a
+`sample_h2.db.mv.db` already beside your configuration is left exactly as it is,
+and a `connections.json` that exists — even one listing nothing, because you
+deleted the sample — is never seeded again.
+
+To open a second copy by hand, or to open one after deleting the connection:
+driver **H2 Embedded**, URL `jdbc:h2:<path>/sample_h2.db` — the path without the
+`.mv.db` suffix, and with `/` separators on Windows too — and no user name or
+password. Copy the file somewhere writable first, for the reason above.
 
 Moving `rudbgen.exe` out of its folder produces a program that opens its window
 and then fails on the first connection, because `lib/` and `runtime/` are no

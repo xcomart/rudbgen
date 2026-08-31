@@ -149,10 +149,12 @@ jobs:
           cp bridge/build/libs/rudbgen-bridge.jar "$app/Contents/lib/"
           cp -R runtime "$app/Contents/runtime"
           cp assets/icon.icns "$app/Contents/Resources/rudbgen.icns"
-          # Reference copies, not something the program loads: the three
-          # built-in templates are compiled into the binary and written to the
-          # configuration directory on first run, and the sample H2 database is
-          # there for a first connection with no server to set up.
+          # templates/ is a reference copy: the three built-in templates are
+          # compiled into the binary and written to the configuration directory
+          # on first run. sample/ is read by the program — a first run with no
+          # connections.json copies the H2 database out of Resources/sample into
+          # the configuration directory, where H2 may open it read-write, and
+          # seeds the connection that opens the copy.
           cp -R templates "$app/Contents/Resources/templates"
           cp -R assets/sample "$app/Contents/Resources/sample"
           sed "s/__VERSION__/$version/g" packaging/macos/Info.plist > "$app/Contents/Info.plist"

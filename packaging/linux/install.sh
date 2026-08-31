@@ -19,11 +19,14 @@ mkdir -p "$appdir"
 cp -R "$here/rudbgen" "$here/lib" "$here/runtime" "$appdir/"
 chmod 755 "$appdir/rudbgen"
 
-# Reference copies, not something the program loads. The three built-in
-# templates are compiled into the binary and written into the configuration
-# directory on first run (architecture.md 5), and the sample H2 database is
-# there to be opened by hand. They are installed because a tarball the user
-# deletes after running this script should not take them with it.
+# templates/ is a reference copy: the three built-in templates are compiled
+# into the binary and written into the configuration directory on first run
+# (architecture.md 5). sample/ is not — the program reads it. A first run with
+# no connections.json copies sample/sample_h2.db.mv.db next to the
+# configuration, where H2 may open it read-write, and seeds the connection that
+# opens the copy; without this directory beside the binary that first run has
+# nothing to seed. Both are installed because a tarball the user deletes after
+# running this script should not take them with it.
 for extra in templates sample; do
     [ -d "$here/$extra" ] && cp -R "$here/$extra" "$appdir/" || true
 done

@@ -22,10 +22,10 @@
 ;
 ; Compiled from CI with:
 ;
-;   ISCC.exe /DVersion=0.1.3 ^
+;   ISCC.exe /DVersion=0.1.4 ^
 ;            /DSourceDir=<staging tree> ^
 ;            /DOutputDir=<where the .exe lands> ^
-;            /DOutputBaseFilename=rudbgen-v0.1.3-x86_64-pc-windows-msvc-setup
+;            /DOutputBaseFilename=rudbgen-v0.1.4-x86_64-pc-windows-msvc-setup
 ;
 ; Version carries no "v" prefix — VersionInfoVersion is a numeric quad and
 ; rejects one.

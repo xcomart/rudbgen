@@ -538,12 +538,6 @@ pub struct ConnectionProfile {
     /// Idle keep-alive probe; `None` disables it.
     #[serde(deserialize_with = "deserialize_gated_block")]
     pub keep_alive: Option<KeepAlive>,
-    /// Open the session with `Connection.setReadOnly(true)` and refuse DDL/DML.
-    pub read_only: bool,
-    /// Whether statements commit as they run.
-    pub auto_commit: bool,
-    /// Ask before executing a statement that modifies data.
-    pub confirm_writes: bool,
     /// SSH tunnel to open before connecting; `None` connects directly.
     #[serde(deserialize_with = "deserialize_gated_block")]
     pub tunnel: Option<TunnelConfig>,
@@ -555,11 +549,9 @@ pub struct ConnectionProfile {
 impl Default for ConnectionProfile {
     /// A blank profile with a fresh id and the safe answer to every switch.
     ///
-    /// `auto_commit` and `confirm_writes` both start on: the first is what
-    /// every JDBC driver does by default, and the second is the cheap half of
-    /// the production-accident guard rudbman describes
-    /// in its architecture document, §8. `read_only` starts off — a profile
-    /// the user cannot write through is a deliberate choice, not a default.
+    /// There is no write-behavior switch to answer: rudbgen reads metadata to
+    /// generate code and never modifies data, so every session it opens is
+    /// read-only regardless of the profile (see the app's connection layer).
     fn default() -> Self {
         Self {
             id: Uuid::new_v4(),
@@ -571,9 +563,6 @@ impl Default for ConnectionProfile {
             username: String::new(),
             props: BTreeMap::new(),
             keep_alive: None,
-            read_only: false,
-            auto_commit: true,
-            confirm_writes: true,
             tunnel: None,
             generation: GenerationProfile::default(),
         }
@@ -630,9 +619,6 @@ impl fmt::Debug for ConnectionProfile {
             .field("username", &self.username)
             .field("props", &MaskedProps(&self.props))
             .field("keep_alive", &self.keep_alive)
-            .field("read_only", &self.read_only)
-            .field("auto_commit", &self.auto_commit)
-            .field("confirm_writes", &self.confirm_writes)
             .field("tunnel", &self.tunnel)
             // Nothing in here can be a credential: paths, a name and the
             // variables the user typed into the template palette.
@@ -1627,9 +1613,6 @@ mod tests {
         let a = sample("a");
         let b = sample("b");
         assert_ne!(a.id, b.id);
-        assert!(!a.read_only);
-        assert!(a.auto_commit);
-        assert!(a.confirm_writes);
         assert_eq!(a.keep_alive, None);
         assert_eq!(a.tunnel, None);
         assert!(a.props.is_empty());
@@ -1888,11 +1871,35 @@ mod tests {
         let store: ConnectionStore = serde_json::from_str(json).expect("parse");
         let profile = &store.connections()[0];
         assert_eq!(profile.name, "scratch");
-        assert!(profile.auto_commit);
-        assert!(profile.confirm_writes);
-        assert!(!profile.read_only);
         assert!(profile.driver_id.is_empty());
+        assert_eq!(profile.username, "");
+        assert_eq!(profile.keep_alive, None);
         assert_ne!(profile.id, Uuid::nil(), "a missing id gets a fresh one");
+    }
+
+    /// rudbgen once carried rudbman's three write-behavior switches —
+    /// `read_only`, `auto_commit` and `confirm_writes` — before it settled on
+    /// opening every session read-only. Files written by those builds are on
+    /// disk, and the unknown keys in them must be skipped, not rejected.
+    #[test]
+    fn a_profile_with_the_removed_write_switches_still_loads() {
+        let json = r#"{
+            "connections": [{
+                "name": "prod",
+                "driver_id": "h2",
+                "url": "jdbc:h2:mem:test",
+                "username": "sa",
+                "read_only": true,
+                "auto_commit": false,
+                "confirm_writes": true
+            }]
+        }"#;
+        let store: ConnectionStore = serde_json::from_str(json).expect("parse");
+        let profile = &store.connections()[0];
+        assert_eq!(profile.name, "prod");
+        assert_eq!(profile.driver_id, "h2");
+        assert_eq!(profile.url, "jdbc:h2:mem:test");
+        assert_eq!(profile.username, "sa");
     }
 
     /// A `connections.json` written before the generation fields existed —
@@ -2003,7 +2010,6 @@ mod tests {
             query: "select 1".to_string(),
         });
         first.tunnel = Some(sample_tunnel());
-        first.read_only = true;
 
         let second =
             ConnectionProfile::new("second", "oracle-thin", "jdbc:oracle:thin:@//h/S", "s");

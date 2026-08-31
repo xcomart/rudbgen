@@ -91,9 +91,6 @@ connect:
     behaviour: 動作
     tunnel: SSH トンネル
 
-  read_only: 読み取り専用で接続する
-  auto_commit: 文を実行するたびにコミットする
-  confirm_writes: 書き込み文を実行する前に確認する
   keep_alive: 定期的なクエリで接続を維持する
 
   tunnel_enabled: SSH 踏み台を経由して接続する

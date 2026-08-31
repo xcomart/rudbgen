@@ -91,9 +91,6 @@ connect:
     behaviour: 行为
     tunnel: SSH 隧道
 
-  read_only: 以只读方式打开连接
-  auto_commit: 每条语句执行后立即提交
-  confirm_writes: 执行写入语句前先确认
   keep_alive: 用定期查询保持连接
 
   tunnel_enabled: 通过 SSH 堡垒机连接

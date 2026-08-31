@@ -141,9 +141,6 @@ connect:
     behaviour: Behaviour
     tunnel: SSH tunnel
 
-  read_only: Open the connection read-only
-  auto_commit: Commit each statement as it runs
-  confirm_writes: Ask before running a write statement
   keep_alive: Keep the connection alive with a periodic query
 
   # The tunnel block. A production database usually sits behind a bastion host;

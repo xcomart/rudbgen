@@ -122,7 +122,9 @@ Name: "desktopicon"; Description: "{cm:CreateDesktopIcon}"; GroupDescription: "{
 ; including templates\, a reference copy, and sample\, which the program reads:
 ; a first run with no connections.json copies sample\sample_h2.db.mv.db into
 ; the configuration directory, where H2 may open it read-write, and seeds the
-; connection that opens the copy.
+; connection that opens the copy. drivers\ comes along for the same reason: the
+; bundled H2 JAR is what that seeded connection loads, so it opens with no trip
+; to Maven Central.
 Source: "{#SourceDir}\*"; DestDir: "{app}"; Flags: ignoreversion recursesubdirs createallsubdirs
 
 [Icons]

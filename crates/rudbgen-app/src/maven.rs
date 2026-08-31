@@ -1,8 +1,13 @@
 //! Downloading a JDBC driver JAR from Maven Central.
 //!
 //! A [`DriverDef`](rudbgen_core::DriverDef) carries a `group:artifact:version`
-//! coordinate rather than a JAR, because none of the drivers rudbgen knows about
-//! are redistributable. This module turns that coordinate into the two URLs
+//! coordinate rather than a JAR, because almost none of the drivers rudbgen
+//! knows about are redistributable — Oracle, IBM and Microsoft each attach terms
+//! to theirs that a third party cannot ship under. H2 is the exception, dual
+//! licensed under MPL 2.0 and EPL 1.0, and it is the one JAR the release
+//! bundles, so that the sample connection [`crate::sample_db`] seeds opens
+//! offline; everything else arrives through here. This module turns that
+//! coordinate into the two URLs
 //! Maven Central publishes — the artefact and its `.sha1` — fetches both, checks
 //! one against the other, and lands the result in
 //! [`drivers_dir`](rudbgen_core::drivers_dir).

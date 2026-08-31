@@ -29,6 +29,7 @@ rudbgen-vX.Y.Z-<target>/          Windows (zip and installer) and Linux
 ├── runtime/                      the jlink Java runtime
 ├── templates/                    the three shipped templates, for reference
 ├── sample/sample_h2.db.mv.db     a sample H2 database to try a connection on
+├── drivers/h2-2.4.240.jar        the H2 JDBC driver, so that sample opens offline
 └── README.md
                                   Linux also: install.sh, the .desktop file, icons/
 
@@ -37,7 +38,7 @@ rudbgen.app/                      macOS
     ├── MacOS/rudbgen
     ├── lib/rudbgen-bridge.jar
     ├── runtime/
-    ├── Resources/rudbgen.icns, templates/, sample/
+    ├── Resources/rudbgen.icns, templates/, sample/, drivers/
     └── Info.plist
 ```
 
@@ -61,6 +62,16 @@ bundle will not allow. Neither the copy nor the connection is ever made twice: a
 `sample_h2.db.mv.db` already beside your configuration is left exactly as it is,
 and a `connections.json` that exists — even one listing nothing, because you
 deleted the sample — is never seeded again.
+
+`drivers/h2-2.4.240.jar` is installed by that same first run: the JAR is copied
+into `drivers/` in your configuration directory and put on the **H2 Embedded**
+driver's class path, so the sample connection opens straight away with no
+network. It is the only driver rudbgen ships. Every other one is downloaded from
+Maven Central through **Drivers** in the toolbar, because their licences do not
+allow anyone else to redistribute them; H2 is dual licensed under MPL 2.0 and
+EPL 1.0, which do. A JAR of the same name already in your configuration — one
+you downloaded yourself — is left alone, and the file name carries the version,
+so it is the same artefact either way.
 
 To open a second copy by hand, or to open one after deleting the connection:
 driver **H2 Embedded**, URL `jdbc:h2:<path>/sample_h2.db` — the path without the
@@ -203,7 +214,7 @@ Inside it:
 | `template-sets.json` | Named template sets (jdbgen's presets) |
 | `abbreviations.json` | The abbreviation rules |
 | `templates/` | Your template files. The three shipped ones are written here on first run and **never overwritten afterwards**, so an edit survives an update |
-| `drivers/` | JDBC driver JARs downloaded from Maven Central |
+| `drivers/` | JDBC driver JARs: the bundled H2 one, copied here on first run, and whatever you download from Maven Central |
 | `themes/`, `editor-themes/` | User theme files |
 | `known_hosts` | SSH host keys you have accepted |
 

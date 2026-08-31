@@ -121,6 +121,47 @@ jobs:
       - name: Build
         run: cargo build --release --locked -p rudbgen-app --target ${{ matrix.target }}
 
+      # The one JDBC driver the archive carries. A first run seeds a connection
+      # to the sample H2 database (crates/rudbgen-app/src/sample_db.rs), and a
+      # DriverDef with nothing on its class path fails with NoDriverJar before
+      # it reaches JDBC — so without this the sample connection would need a
+      # trip to Maven Central through the driver manager before it opened at
+      # all. Every other driver still goes that way, because their licences do
+      # not allow a third party to redistribute them; H2 is dual licensed under
+      # MPL 2.0 and EPL 1.0, which do.
+      #
+      # The coordinate is the `h2-embedded` one from rudbgen-core's built-in
+      # driver list, and the file name is what rudbgen looks for beside the
+      # executable; sample_db's `the_bundled_jar_matches_the_builtin_coordinate`
+      # is what fails when one of the three moves without the others.
+      #
+      # The digest is pinned rather than fetched: Central publishes a `.sha1`
+      # beside every artefact, which is an integrity check against a truncated
+      # transfer and nothing more, where a digest written down here also says
+      # the release ships the bytes that were reviewed. It was taken from the
+      # artefact at this URL and cross-checked against that published `.sha1`
+      # (686180ad33981ad943fdc0ab381e619b2c2fdfe5).
+      - name: Fetch the bundled H2 driver JAR
+        shell: bash
+        env:
+          H2_JAR: h2-2.4.240.jar
+          H2_URL: https://repo1.maven.org/maven2/com/h2database/h2/2.4.240/h2-2.4.240.jar
+          H2_SHA256: 29b70e427cc1c40cdc376283adbb0cc62853073797bb5fe5761f81fe73d57ce0
+        run: |
+          mkdir -p drivers
+          curl --fail --silent --show-error --location --retry 3 \
+            --output "drivers/$H2_JAR" "$H2_URL"
+          # sha256sum on Linux and in Git for Windows' bash; shasum on macOS.
+          if command -v sha256sum >/dev/null 2>&1; then
+            actual=$(sha256sum "drivers/$H2_JAR" | cut -d' ' -f1)
+          else
+            actual=$(shasum -a 256 "drivers/$H2_JAR" | cut -d' ' -f1)
+          fi
+          if [ "$actual" != "$H2_SHA256" ]; then
+            echo "$H2_URL hashes to $actual, not $H2_SHA256"
+            exit 1
+          fi
+
       # A bare Mach-O binary cannot carry an icon; macOS wants an .app bundle
       # with an Info.plist and an .icns. The runtime and the bridge JAR both go
       # under Contents/, one level above the executable, which is the second
@@ -154,9 +195,12 @@ jobs:
           # on first run. sample/ is read by the program — a first run with no
           # connections.json copies the H2 database out of Resources/sample into
           # the configuration directory, where H2 may open it read-write, and
-          # seeds the connection that opens the copy.
+          # seeds the connection that opens the copy. drivers/ is read by the
+          # same first run: the H2 JAR is copied into the configuration and put
+          # on the h2-embedded class path, so that connection opens offline.
           cp -R templates "$app/Contents/Resources/templates"
           cp -R assets/sample "$app/Contents/Resources/sample"
+          cp -R drivers "$app/Contents/Resources/drivers"
           sed "s/__VERSION__/$version/g" packaging/macos/Info.plist > "$app/Contents/Info.plist"
           plutil -lint "$app/Contents/Info.plist"
           codesign --force --sign - "$app"
@@ -180,6 +224,7 @@ jobs:
           cp -R runtime "$staging/runtime"
           cp -R templates "$staging/templates"
           cp -R assets/sample "$staging/sample"
+          cp -R drivers "$staging/drivers"
           cp README.md packaging/linux/com.aihouse.rudbgen.desktop "$staging/"
           install -m755 packaging/linux/install.sh "$staging/install.sh"
           cp assets/icon-128.png "$staging/icons/rudbgen-128.png"
@@ -237,6 +282,7 @@ jobs:
           Copy-Item runtime $staging -Recurse
           Copy-Item templates $staging -Recurse
           Copy-Item assets/sample $staging -Recurse
+          Copy-Item drivers $staging -Recurse
           Copy-Item README.md $staging
           Compress-Archive -Path $staging -DestinationPath "$staging.zip"
           "ASSET=$staging.zip" | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8
@@ -269,6 +315,7 @@ jobs:
             runtime="$contents/runtime"
             templates="$contents/Resources/templates"
             sample="$contents/Resources/sample"
+            drivers="$contents/Resources/drivers"
           else
             exe="$STAGING/rudbgen"
             if [ "$RUNNER_OS" = "Windows" ]; then exe="$exe.exe"; fi
@@ -276,6 +323,7 @@ jobs:
             runtime="$STAGING/runtime"
             templates="$STAGING/templates"
             sample="$STAGING/sample"
+            drivers="$STAGING/drivers"
           fi
           test -f "$exe" || { echo "no executable at $exe"; exit 1; }
           # Windows has no execute bit; everywhere else a tarred-up binary that
@@ -288,6 +336,9 @@ jobs:
             test -f "$templates/$template" || { echo "no $template under $templates"; exit 1; }
           done
           test -f "$sample/sample_h2.db.mv.db" || { echo "no sample database under $sample"; exit 1; }
+          # Without the driver JAR the seeded sample connection is a NoDriverJar
+          # error on a first run with no network.
+          test -f "$drivers/h2-2.4.240.jar" || { echo "no H2 driver JAR under $drivers"; exit 1; }
           modules=$("$runtime/bin/java" --list-modules)
           for module in jdk.charsets jdk.unsupported; do
             if ! printf '%s\n' "$modules" | grep -q "^${module}@"; then

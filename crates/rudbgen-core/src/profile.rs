@@ -937,9 +937,12 @@ pub struct DriverDef {
     pub class: String,
     /// JARs to put on the driver's isolated class loader.
     ///
-    /// Empty for every built-in definition: the JARs are not redistributable,
-    /// so the user either downloads them from [`DriverDef::maven`] or points at
-    /// copies they already have.
+    /// Empty for every built-in definition as it stands here: almost none of
+    /// these JARs are redistributable, so the user either downloads them from
+    /// [`DriverDef::maven`] or points at copies they already have. H2 is the
+    /// exception — its licence allows it, the release bundles the JAR, and a
+    /// first run fills this field in for `h2-embedded` so the sample connection
+    /// opens offline.
     pub jars: Vec<PathBuf>,
     /// Maven coordinate to download the driver from, `group:artifact:version`.
     pub maven: Option<String>,

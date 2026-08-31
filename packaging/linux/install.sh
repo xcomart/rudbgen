@@ -25,9 +25,13 @@ chmod 755 "$appdir/rudbgen"
 # no connections.json copies sample/sample_h2.db.mv.db next to the
 # configuration, where H2 may open it read-write, and seeds the connection that
 # opens the copy; without this directory beside the binary that first run has
-# nothing to seed. Both are installed because a tarball the user deletes after
-# running this script should not take them with it.
-for extra in templates sample; do
+# nothing to seed. drivers/ is read by the same first run: it holds the bundled
+# H2 driver JAR, which is copied into the configuration and put on the
+# h2-embedded class path, and without it the seeded connection cannot open until
+# the driver manager has fetched the JAR from Maven Central. All three are
+# installed because a tarball the user deletes after running this script should
+# not take them with it.
+for extra in templates sample drivers; do
     [ -d "$here/$extra" ] && cp -R "$here/$extra" "$appdir/" || true
 done
 

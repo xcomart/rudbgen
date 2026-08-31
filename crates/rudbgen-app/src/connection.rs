@@ -430,8 +430,11 @@ pub fn build_spec(
     // `encrypt` pair — and a profile is always allowed to overrule its driver.
     spec.props = driver.props.clone();
     spec.props.extend(profile.props.clone());
-    spec.read_only = profile.read_only;
-    spec.auto_commit = profile.auto_commit;
+    // Not a profile switch: rudbgen reads metadata to generate code and never
+    // writes, so every session it opens is read-only, and the bridge refuses
+    // DDL/DML on it. `auto_commit` is off to match — there is nothing to commit.
+    spec.read_only = true;
+    spec.auto_commit = false;
     spec.keep_alive = profile.keep_alive.as_ref().map(|keep| KeepAliveSpec {
         enabled: true,
         interval_s: keep.interval_s,
@@ -1111,8 +1114,6 @@ mod tests {
     #[test]
     fn the_spec_carries_the_profile_and_nothing_it_was_not_given() {
         let mut profile = ConnectionProfile::new("staging", "postgresql", "jdbc:x", "alice");
-        profile.read_only = true;
-        profile.auto_commit = false;
         profile.props.insert("ssl".into(), "true".into());
         profile.keep_alive = Some(rudbgen_core::KeepAlive {
             interval_s: 60,
@@ -1132,6 +1133,7 @@ mod tests {
         assert_eq!(spec.driver_class, "org.postgresql.Driver");
         assert_eq!(spec.jars, vec![std::path::PathBuf::from("/tmp/pg.jar")]);
         assert_eq!(spec.username.as_deref(), Some("alice"));
+        // Fixed, not read off the profile: rudbgen only ever reads.
         assert!(spec.read_only);
         assert!(!spec.auto_commit);
         assert_eq!(spec.props.get("ssl").map(String::as_str), Some("true"));

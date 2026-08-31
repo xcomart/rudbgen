@@ -91,9 +91,6 @@ connect:
     behaviour: Comportement
     tunnel: Tunnel SSH
 
-  read_only: Ouvrir la connexion en lecture seule
-  auto_commit: Valider chaque instruction à son exécution
-  confirm_writes: Demander avant d'exécuter une instruction d'écriture
   keep_alive: Maintenir la connexion par une requête périodique
 
   tunnel_enabled: Se connecter via un rebond SSH

@@ -147,12 +147,6 @@ mod tab {
     pub const PASSWORD: isize = 155;
     /// Driver property key/value rows.
     pub const PROPS: isize = 160;
-    /// Read-only.
-    pub const READ_ONLY: isize = 180;
-    /// Auto-commit.
-    pub const AUTO_COMMIT: isize = 181;
-    /// Confirm writes.
-    pub const CONFIRM_WRITES: isize = 182;
     /// Keep-alive toggle.
     pub const KEEP_ALIVE: isize = 190;
     /// Keep-alive interval.
@@ -268,12 +262,6 @@ pub struct ConnectionDialog {
     tunnel_auth: TunnelAuth,
     /// Whether the profile has a keep-alive probe.
     keep_alive_enabled: bool,
-    /// Whether the session is opened read-only.
-    read_only: bool,
-    /// Whether statements commit as they run.
-    auto_commit: bool,
-    /// Whether a write statement is confirmed first.
-    confirm_writes: bool,
     /// The colour tag, or `None`.
     color: Option<SharedString>,
     /// Whether the URL field has been edited away from the assembled one.
@@ -375,9 +363,6 @@ impl ConnectionDialog {
             tunnel_enabled: false,
             tunnel_auth: TunnelAuth::Agent,
             keep_alive_enabled: false,
-            read_only: false,
-            auto_commit: true,
-            confirm_writes: true,
             color: None,
             url_overridden: false,
             props: Vec::new(),
@@ -522,9 +507,6 @@ impl ConnectionDialog {
             cx,
         );
         self.color = profile.color.clone().map(SharedString::from);
-        self.read_only = profile.read_only;
-        self.auto_commit = profile.auto_commit;
-        self.confirm_writes = profile.confirm_writes;
         set_text(&self.url_input, profile.url.clone(), cx);
         set_text(&self.username_input, profile.username.clone(), cx);
 
@@ -708,9 +690,6 @@ impl ConnectionDialog {
         profile.color = self.color.as_ref().map(ToString::to_string);
         profile.url = text(&self.url_input, cx);
         profile.username = text(&self.username_input, cx);
-        profile.read_only = self.read_only;
-        profile.auto_commit = self.auto_commit;
-        profile.confirm_writes = self.confirm_writes;
 
         profile.props = self
             .props
@@ -1633,25 +1612,22 @@ impl ConnectionDialog {
             .children(body)
     }
 
-    /// The behaviour switches and the keep-alive settings.
+    /// The keep-alive settings.
+    ///
+    /// The only behaviour left to choose: rudbgen opens every session read-only
+    /// and never writes, so the write-behaviour switches its sibling app offers
+    /// would have nothing to change here.
     fn render_behaviour(&self, cx: &mut Context<Self>) -> impl IntoElement + use<> {
         let this = cx.entity();
-        let toggle = |id: &'static str,
-                      label: SharedString,
-                      checked: bool,
-                      index: isize,
-                      set: fn(&mut Self, bool)| {
-            let this = this.clone();
-            Checkbox::new(id, label)
-                .checked(checked)
-                .tab_index(index)
-                .on_toggle(move |checked, _window, cx| {
-                    this.update(cx, |dialog, cx| {
-                        set(dialog, checked);
-                        cx.notify();
-                    });
-                })
-        };
+        let keep_alive_toggle = Checkbox::new("connect-keep-alive", ts!("connect.keep_alive"))
+            .checked(self.keep_alive_enabled)
+            .tab_index(tab::KEEP_ALIVE)
+            .on_toggle(move |checked, _window, cx| {
+                this.update(cx, |dialog, cx| {
+                    dialog.keep_alive_enabled = checked;
+                    cx.notify();
+                });
+            });
 
         let keep_alive_body = self.keep_alive_enabled.then(|| {
             div()
@@ -1677,34 +1653,7 @@ impl ConnectionDialog {
             .flex()
             .flex_col()
             .gap(px(8.))
-            .child(toggle(
-                "connect-read-only",
-                ts!("connect.read_only"),
-                self.read_only,
-                tab::READ_ONLY,
-                |dialog, value| dialog.read_only = value,
-            ))
-            .child(toggle(
-                "connect-auto-commit",
-                ts!("connect.auto_commit"),
-                self.auto_commit,
-                tab::AUTO_COMMIT,
-                |dialog, value| dialog.auto_commit = value,
-            ))
-            .child(toggle(
-                "connect-confirm-writes",
-                ts!("connect.confirm_writes"),
-                self.confirm_writes,
-                tab::CONFIRM_WRITES,
-                |dialog, value| dialog.confirm_writes = value,
-            ))
-            .child(toggle(
-                "connect-keep-alive",
-                ts!("connect.keep_alive"),
-                self.keep_alive_enabled,
-                tab::KEEP_ALIVE,
-                |dialog, value| dialog.keep_alive_enabled = value,
-            ))
+            .child(keep_alive_toggle)
             .children(keep_alive_body)
     }
 
@@ -2565,9 +2514,6 @@ mod tests {
             ts!("connect.add_prop"),
             ts!("connect.section.behaviour"),
             ts!("connect.section.tunnel"),
-            ts!("connect.read_only"),
-            ts!("connect.auto_commit"),
-            ts!("connect.confirm_writes"),
             ts!("connect.keep_alive"),
             ts!("connect.tunnel_enabled"),
             ts!("connect.tunnel_host"),

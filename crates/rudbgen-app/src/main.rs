@@ -74,6 +74,7 @@ mod maven;
 mod palette;
 mod pane_item;
 mod preview_pane;
+mod sample_db;
 mod settings_dialog;
 mod template_pane;
 mod template_syntax;
@@ -4411,8 +4412,8 @@ fn bind_shortcuts(cx: &mut App) {
     ]);
 }
 
-/// Copies the shipped templates into the configuration directory and offers
-/// the two built-in sets, once.
+/// Copies the shipped templates into the configuration directory, offers the
+/// two built-in sets and seeds the sample connection, once.
 ///
 /// Every failure here is logged rather than fatal: an application whose
 /// template directory could not be written is still an application, with a
@@ -4426,6 +4427,14 @@ fn install_builtins() {
         },
         Err(error) => log::error!("no configuration directory for the templates: {error:#}"),
     }
+
+    // The same idea one file over, and ahead of the template sets because a
+    // template-sets.json that cannot be read must not cost the user their
+    // sample connection: a first run gets the sample H2 database copied
+    // somewhere writable and a connection that opens it, so that the connection
+    // list is not empty before there is a server to point at. Only when
+    // `connections.json` is missing entirely; see `sample_db`.
+    sample_db::install();
 
     let mut sets = match TemplateSetStore::load() {
         Ok(sets) => sets,

@@ -22,10 +22,10 @@
 ;
 ; Compiled from CI with:
 ;
-;   ISCC.exe /DVersion=0.1.3 ^
+;   ISCC.exe /DVersion=0.1.4 ^
 ;            /DSourceDir=<staging tree> ^
 ;            /DOutputDir=<where the .exe lands> ^
-;            /DOutputBaseFilename=rudbgen-v0.1.3-x86_64-pc-windows-msvc-setup
+;            /DOutputBaseFilename=rudbgen-v0.1.4-x86_64-pc-windows-msvc-setup
 ;
 ; Version carries no "v" prefix — VersionInfoVersion is a numeric quad and
 ; rejects one.
@@ -119,7 +119,10 @@ Name: "desktopicon"; Description: "{cm:CreateDesktopIcon}"; GroupDescription: "{
 ; standing invitation to miss one when the module list in release.yml changes.
 ; What ships is whatever the "Package (windows)" step staged, which is the
 ; same tree the zip contains and the same tree the smoke test checked —
-; including the reference copies under templates\ and sample\.
+; including templates\, a reference copy, and sample\, which the program reads:
+; a first run with no connections.json copies sample\sample_h2.db.mv.db into
+; the configuration directory, where H2 may open it read-write, and seeds the
+; connection that opens the copy.
 Source: "{#SourceDir}\*"; DestDir: "{app}"; Flags: ignoreversion recursesubdirs createallsubdirs
 
 [Icons]

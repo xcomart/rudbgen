@@ -91,9 +91,6 @@ connect:
     behaviour: Comportamiento
     tunnel: Túnel SSH
 
-  read_only: Abrir la conexión en solo lectura
-  auto_commit: Confirmar cada sentencia al ejecutarla
-  confirm_writes: Preguntar antes de ejecutar una sentencia de escritura
   keep_alive: Mantener la conexión viva con una consulta periódica
 
   tunnel_enabled: Conectar a través de un bastión SSH

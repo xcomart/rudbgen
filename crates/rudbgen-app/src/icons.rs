@@ -47,8 +47,8 @@ pub const NEW_TAB: &str = "icons/new-tab.svg";
 /// so the title bar can draw it with [`img`](gpui::img) — which, unlike the
 /// [`svg`](gpui::svg) element, keeps an SVG's own colours instead of reducing
 /// it to a tintable alpha mask. The bar shows the very mark the taskbar and
-/// Alt-Tab show — gold cap, blue barrel, embossed plate — and there is no
-/// second drawing to keep in step with the master.
+/// Alt-Tab show — blue barrel behind a pale folded sheet, embossed plate —
+/// and there is no second drawing to keep in step with the master.
 ///
 /// It was not always so: an earlier bar drew a monochrome outline stand-in
 /// (`icons/logo.svg`), because the shipped icon's tile was then a near-flat

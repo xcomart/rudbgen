@@ -2,33 +2,71 @@
   <!--
     rudbgen app icon.
 
-    A sheet of generated source, corner folded, with `</>` on it, on a One Dark
-    tile.
+    A blue database cylinder standing behind a sheet of pale stock, corner
+    folded, with `</>` printed on it, on a One Dark tile.
 
-    One subject, filling the tile. 16 px is where this is judged — a taskbar
-    and a window list are what an app icon is mostly seen in — and at that
-    size an icon has room for exactly one shape. A page is the thing this
-    program makes: point it at a schema and it writes files, one per table per
-    template, and the mark is one of them.
+    What the mark has to say. This program reads a schema and writes files:
+    point it at a database, pick a template, and it emits source, one file per
+    table. The icon that shipped before this one drew only the second half of
+    that — a gold page with `</>` on it — and the objection to it was exactly
+    the missing half: a page of code is *a page of code*, and nothing in the
+    mark said where the code had come from. Every generator on a taskbar looks
+    like that. So the store is put back in, behind the page, and the two are
+    overlapped rather than set side by side: the reading wanted is source
+    coming *out of* a database, and that is a sentence about one thing in
+    front of another, not two things sharing a tile.
 
-    The colours are the application's own, from `crates/rudbgen-ui/src/
-    theme.rs`, and they are rudbman's two colours swapped. rudbman is a blue
-    cylinder wearing a `grid_pk` gold cap — a keyed store. Here the gold
-    (#e5c07b) is the whole subject, because the file coming out is the whole
-    point, and the `accent` blue (#61afef) is the code written on it. Two
-    programs from one lineage, told apart at 16 px by which colour holds the
-    silhouette: blue there, gold here.
+    16 px is where this is judged — a taskbar and a window list are what an app
+    icon is mostly seen in — and at that size a second object is normally a
+    mistake, because two masses of comparable weight drift apart into two
+    blobs and the mark stops being a mark. Two things keep it from happening
+    here. The first is nesting: the exposed part of the cylinder is an L, a
+    band across the page's top and a flank down its left, so the blue wraps
+    the page instead of standing next to it, and the eye takes a wrapped shape
+    as background rather than as a second subject. The second is that the L is
+    deliberately wide — 48 px of band, 58 px of flank. An earlier draft
+    revealed a 46 px strip; at 16 px that is two and a half pixels of dim blue
+    and it read as dirt on the tile rather than as a shape. Given a second
+    object at all, it must be large enough to be read or small enough to be
+    absent, and there is nothing usable in between.
 
-    Not green, though green is in the palette: `theme.rs` binds green to
-    `success`. It already means "that worked" everywhere in the UI, and a
-    colour cannot be both a transient state and the application's name.
+    Why the page is paper. This is the one decision the whole mark rests on.
+    The page and the store are adjacent shapes that must never fuse, and what
+    separates adjacent shapes at 16 px is a step in *brightness* — a hue
+    change alone survives no antialiasing worth the name. Pale stock against
+    the accent blue is the widest step available in this palette, wider than
+    the gold it replaces, and it holds when the icon is four pixels of page
+    and three of cylinder. It is also, plainly, what a document looks like:
+    the gold was a family argument (rudbman's two colours swapped) rather than
+    a drawing of anything, and once a real database sits behind the sheet the
+    sheet no longer has to carry the identity by being coloured — it carries
+    it by being a sheet. The greys are the interface's own foreground ramp,
+    `text` in rugpui's `crates/rugpui/src/theme.rs`, so the stock is a colour
+    the application already owns.
 
-    The second colour is inside the silhouette rather than beside it, the way
-    it is in the sibling mark. A second *shape* would have to be given its own
-    room and would break the mark into two masses at 16 px; here the glyph is
-    printed on the page, so there is one object and the blue is a marking on
-    it. Gold under blue also keeps a brightness step between the two, which is
-    what a hue change alone cannot do.
+    That leaves one saturated hue on the tile, and it is the store's. rudbman
+    is a blue cylinder in a gold `grid_pk` cap — a keyed store — and this
+    cylinder is blue throughout with no cap at all: a lid would put a second
+    accent right at the seam where the two forms have to come apart, and the
+    silhouettes must stay distinct anyway, since rudbman's mark is a cylinder
+    standing alone and rulogman's is a `>_`. Here the cylinder is never the
+    whole subject; it is the thing the page came from.
+
+    Not red and not green, though both are in the palette: `theme.rs` binds
+    green to `success` and red to `danger`. They already mean "that worked"
+    and "that failed" everywhere in the UI, and a colour cannot be both a
+    transient state and the application's name.
+
+    The ink. `</>` is the only glyph that means "source code" without a
+    legend, and it is three strokes, which is what a 16 px page has room for.
+    It stays the interface's `accent` hue, but driven down to #2f74b5: the
+    stock accent sits at nearly the same lightness as pale paper and would
+    dissolve into it, and the ink has to be the darkest thing on the sheet or
+    it is not ink. Its offset copy is white rather than dark, which is the one
+    inversion in the mark — under dark strokes on pale stock a dark halo is
+    invisible, while a lit lower lip reads as ink pressed into the sheet.
+    Below about 20 px the three strokes merge into one dark band across the
+    page, which still reads as "written on", never as noise.
 
     Why a folded corner. A plain rectangle at 16 px is a rectangle; the fold
     is the one detail that says "sheet of paper" at every size, and it is
@@ -37,27 +75,35 @@
     darker plane turned away from the light — so the outline itself carries
     the reading even in a pure alpha mask.
 
-    Why `</>`. It is the only glyph that means "source code" without a
-    legend, and it is three strokes, which is what a 16 px page has room for.
-    It is drawn with round caps and joins at a weight that survives the
-    smallest render: below about 20 px the three strokes merge into one dark
-    band across the page, which still reads as "written on", never as noise.
-
     The modelling. One light, above and a little to the left, as in the
-    sibling mark. The page is shaded across its width — dark left edge,
-    highlight about a fifth of the way across, falling away on the right —
-    which is what makes a flat panel read as a lit surface rather than a
-    swatch; a top-to-bottom fade only ever reads as a gradient. Over that sit
-    a soft specular streak where the highlight peaks, a darkening toward the
-    base where the sheet turns from the light, and a shadow under the fold
-    that seats the flap on the page instead of leaving it pasted on. The sheet
-    drops a blurred pool of shadow on the tile, which is what lifts it off the
-    plate. Every one of these is a translucent overlay on the base fill, not a
-    new shape: below about 24 px they dissolve back into the page and the
-    silhouette is all that is left, so the depth costs the small sizes
-    nothing.
+    sibling marks. Page and barrel are both shaded across their width — dark
+    near edge, highlight about a fifth of the way across, falling away on the
+    far side — which is what makes a flat panel read as a lit surface and a
+    rectangle read as a turned solid; a top-to-bottom fade only ever reads as
+    a gradient. Two of the values are tuned to the stock rather than inherited.
+    The sheet's highlight stop is pulled in to #f2f5f9, because a near-white
+    page has almost no headroom above its local colour and the modelling has
+    to be carried by the two darker stops instead; and the specular streak
+    drops to 0.12, because at the weight the gold sheet took it flared and ate
+    the across-the-sheet shading it was meant to sit on top of. The barrel's
+    near stop is lifted for the opposite reason — only its left flank is ever
+    seen, so that flank cannot be the darkest edge of the form.
 
-    The plate. Byte for byte the sibling's, and deliberately: the tile is the
+    The barrel carries no grooves. They are what makes rudbman's cylinder read
+    at 64 px and up, but only the left third of this one is visible and
+    grooves there break the exposed flank into three dashes at 16-32 px. The
+    lip crescent stays, because it falls inside the visible band and is what
+    keeps the top face from reading as a flat blue ellipse.
+
+    The separation is drawn, not left to the colours. The sheet casts a
+    blurred pool across the barrel and onto the plate, and it is the only
+    thing keeping the overlap from reading as a single flat cut-out once the
+    render is small enough to lose the edges. Every overlay here is a
+    translucent pass over a base fill rather than a new shape: below about
+    24 px they dissolve back into the forms and the silhouettes are all that
+    is left, so the depth costs the small sizes nothing.
+
+    The plate. Byte for byte the siblings', and deliberately: the tile is the
     family, the subject is the program. The tile's gradient is steep enough to
     be seen as one — One Dark greys, a clear step from lit top to dark base.
     Its border is drawn twice: a dark crease at the very edge that cuts the
@@ -66,7 +112,9 @@
     itself: its gradient runs from lit grey at the top to shadowed grey at the
     base — the same overhead light that models the sheet catching the plate's
     frame — so the tile reads as a raised plate while the ring keeps one
-    geometric width all the way round.
+    geometric width all the way round. It matters more with a pale subject
+    than it did with a gold one: on a light desktop the plate is what the icon
+    has instead of an outline.
 
     Master file. `assets/icon-128.png`, `icon-256.png`, `icon.ico` and
     `icon.icns` are all rasterised from this one by `assets/render.py`, each
@@ -85,34 +133,55 @@
       <stop offset="0.5" stop-color="#5b6474"/>
       <stop offset="1" stop-color="#343a44"/>
     </linearGradient>
-    <!-- across the sheet: edge, highlight, local colour, far edge -->
+    <!-- across the sheet: edge, highlight, local colour, far edge. The
+         highlight is held back from white — pale stock has no headroom, and
+         the two dark stops do the modelling. -->
     <linearGradient id="page" x1="0" y1="0" x2="1" y2="0">
-      <stop offset="0" stop-color="#c2974f"/>
-      <stop offset="0.20" stop-color="#f7e5b1"/>
-      <stop offset="0.55" stop-color="#e5c07b"/>
-      <stop offset="1" stop-color="#b98d46"/>
+      <stop offset="0" stop-color="#9aa2b1"/>
+      <stop offset="0.20" stop-color="#f2f5f9"/>
+      <stop offset="0.55" stop-color="#cdd3dc"/>
+      <stop offset="1" stop-color="#8e96a5"/>
     </linearGradient>
-    <!-- the sheet turning away from the light toward its base -->
+    <!-- round-shading across the girth. Lifted at the near stop relative to
+         the sibling's: the left flank is the only part of this barrel that is
+         ever seen, so it cannot be the darkest edge of the form. -->
+    <linearGradient id="barrel" x1="0" y1="0" x2="1" y2="0">
+      <stop offset="0" stop-color="#4a89c4"/>
+      <stop offset="0.28" stop-color="#7fc3f8"/>
+      <stop offset="0.62" stop-color="#61afef"/>
+      <stop offset="1" stop-color="#2e5e8f"/>
+    </linearGradient>
+    <!-- the barrel's top face, tilted toward the light -->
+    <radialGradient id="capblue" cx="0.34" cy="0.25" r="1">
+      <stop offset="0" stop-color="#b3dcff"/>
+      <stop offset="0.55" stop-color="#7fc3f8"/>
+      <stop offset="1" stop-color="#3a76ad"/>
+    </radialGradient>
+    <!-- the form turning away from the light toward its base -->
     <linearGradient id="depth" x1="0" y1="0" x2="0" y2="1">
       <stop offset="0.5" stop-color="#1b1f24" stop-opacity="0"/>
       <stop offset="1" stop-color="#1b1f24" stop-opacity="0.30"/>
     </linearGradient>
     <!-- the folded flap: a second plane, turned away from the same light -->
     <linearGradient id="flap" x1="0" y1="0" x2="1" y2="1">
-      <stop offset="0" stop-color="#8d6a2e"/>
-      <stop offset="1" stop-color="#c2974f"/>
+      <stop offset="0" stop-color="#6b7280"/>
+      <stop offset="1" stop-color="#9aa2b1"/>
     </linearGradient>
-    <filter id="blur5" x="-30%" y="-30%" width="160%" height="160%">
+    <filter id="blur5" x="-40%" y="-40%" width="180%" height="180%">
       <feGaussianBlur stdDeviation="5"/>
     </filter>
-    <filter id="blur3" x="-30%" y="-30%" width="160%" height="160%">
+    <filter id="blur3" x="-40%" y="-40%" width="180%" height="180%">
       <feGaussianBlur stdDeviation="3"/>
     </filter>
-    <!-- overlays laid on the sheet would poke past its edges, so everything
-         drawn on it is clipped to it -->
+    <!-- overlays stroked along the barrel's arcs would poke past its straight
+         sides at their endpoints, and overlays laid on the sheet would poke
+         past its edges, so each form clips what is drawn on it -->
+    <clipPath id="body">
+      <path d="M 42 54 L 42 158 A 50 18 0 0 0 142 158 L 142 54 Z"/>
+    </clipPath>
     <clipPath id="sheet">
-      <path d="M 74 36 L 150 36 L 196 82 L 196 210 A 12 12 0 0 1 184 222
-               L 74 222 A 12 12 0 0 1 62 210 L 62 48 A 12 12 0 0 1 74 36 Z"/>
+      <path d="M 112 84 L 178 84 L 220 126 L 220 216 A 12 12 0 0 1 208 228
+               L 112 228 A 12 12 0 0 1 100 216 L 100 96 A 12 12 0 0 1 112 84 Z"/>
     </clipPath>
   </defs>
 
@@ -122,50 +191,73 @@
   <rect x="12" y="12" width="232" height="232" rx="52" fill="none"
         stroke="url(#ring)" stroke-width="5"/>
 
-  <!-- the pool of shadow that lifts the sheet off the plate -->
-  <ellipse cx="129" cy="222" rx="62" ry="11" fill="#06090c" opacity="0.45"
+  <!-- the store, behind: shadow, barrel, top face -->
+  <ellipse cx="92" cy="174" rx="46" ry="9" fill="#06090c" opacity="0.40"
            filter="url(#blur5)"/>
+  <path d="M 42 54 L 42 158 A 50 18 0 0 0 142 158 L 142 54 Z"
+        fill="url(#barrel)"/>
+  <g clip-path="url(#body)">
+    <path d="M 42 54 L 42 158 A 50 18 0 0 0 142 158 L 142 54 Z"
+          fill="url(#depth)"/>
+    <!-- the lip's crescent: the one piece of modelling inside the visible
+         band, and what keeps the top face from reading as a flat ellipse -->
+    <path d="M 42 54 A 50 18 0 0 0 142 54 A 50 27 0 0 1 42 54 Z"
+          fill="#1b1f24" opacity="0.30"/>
+  </g>
+  <ellipse cx="92" cy="54" rx="50" ry="18" fill="url(#capblue)"/>
+  <path d="M 45 53 A 47 16 0 0 1 139 53" fill="none"
+        stroke="#dcefff" stroke-opacity="0.50" stroke-width="3"/>
+
+  <!-- the sheet's pool of shadow, falling across the barrel and the plate:
+       the one thing that keeps the overlap from reading as a flat cut-out -->
+  <path d="M 112 84 L 178 84 L 220 126 L 220 216 A 12 12 0 0 1 208 228
+           L 112 228 A 12 12 0 0 1 100 216 L 100 96 A 12 12 0 0 1 112 84 Z"
+        fill="#06090c" opacity="0.55" filter="url(#blur5)"
+        transform="translate(-6,8)"/>
 
   <!-- the sheet, its top-right corner cut away for the fold -->
-  <path d="M 74 36 L 150 36 L 196 82 L 196 210 A 12 12 0 0 1 184 222
-           L 74 222 A 12 12 0 0 1 62 210 L 62 48 A 12 12 0 0 1 74 36 Z"
+  <path d="M 112 84 L 178 84 L 220 126 L 220 216 A 12 12 0 0 1 208 228
+           L 112 228 A 12 12 0 0 1 100 216 L 100 96 A 12 12 0 0 1 112 84 Z"
         fill="url(#page)"/>
 
   <g clip-path="url(#sheet)">
     <!-- base turning from the light -->
-    <path d="M 74 36 L 150 36 L 196 82 L 196 210 A 12 12 0 0 1 184 222
-             L 74 222 A 12 12 0 0 1 62 210 L 62 48 A 12 12 0 0 1 74 36 Z"
+    <path d="M 112 84 L 178 84 L 220 126 L 220 216 A 12 12 0 0 1 208 228
+             L 112 228 A 12 12 0 0 1 100 216 L 100 96 A 12 12 0 0 1 112 84 Z"
           fill="url(#depth)"/>
 
-    <!-- specular streak where the across-the-sheet highlight peaks -->
-    <rect x="78" y="52" width="16" height="152" rx="8" fill="#ffffff"
-          opacity="0.20" filter="url(#blur3)"/>
+    <!-- specular streak where the across-the-sheet highlight peaks, at a
+         weight pale stock can take without flaring -->
+    <rect x="116" y="100" width="14" height="112" rx="7" fill="#ffffff"
+          opacity="0.12" filter="url(#blur3)"/>
 
     <!-- the flap seated on the sheet: its cast shadow -->
-    <path d="M 150 36 L 196 82 L 150 82 Z" fill="#1b1f24" opacity="0.32"
+    <path d="M 178 84 L 220 126 L 178 126 Z" fill="#1b1f24" opacity="0.32"
           filter="url(#blur3)"/>
   </g>
 
   <!-- the fold itself: the corner turned back, lit from the other side -->
-  <path d="M 150 36 L 196 82 L 162 82 A 12 12 0 0 1 150 70 Z"
+  <path d="M 178 84 L 220 126 L 190 126 A 12 12 0 0 1 178 114 Z"
         fill="url(#flap)"/>
-  <path d="M 150 37 L 195 82" fill="none" stroke="#fff6da"
-        stroke-opacity="0.45" stroke-width="2.5"/>
+  <path d="M 178 85 L 219 126" fill="none" stroke="#ffffff"
+        stroke-opacity="0.65" stroke-width="2.5"/>
 
   <!--
-    `</>`, printed on the page in the interface's accent blue. Round caps and
-    joins, and a weight that still holds a row of pixels at 16 px.
+    `</>`, printed on the page in the interface's accent hue driven dark
+    enough to hold against pale stock. Round caps and joins, and a weight that
+    still holds a row of pixels at 16 px. The offset copy under it is light,
+    not dark: on this stock that is what reads as ink pressed into the sheet.
   -->
-  <g fill="none" stroke="#3f8ecb" stroke-width="12" stroke-linecap="round"
-     stroke-linejoin="round" opacity="0.35" transform="translate(0,3)">
-    <path d="M 110 128 L 90 150 L 110 172"/>
-    <path d="M 138 120 L 120 180"/>
-    <path d="M 148 128 L 168 150 L 148 172"/>
+  <g fill="none" stroke="#ffffff" stroke-width="11" stroke-linecap="round"
+     stroke-linejoin="round" opacity="0.55" transform="translate(0,3)">
+    <path d="M 145 156 L 126 176 L 145 196"/>
+    <path d="M 169 149 L 153 203"/>
+    <path d="M 178 156 L 196 176 L 178 196"/>
   </g>
-  <g fill="none" stroke="#61afef" stroke-width="12" stroke-linecap="round"
+  <g fill="none" stroke="#2f74b5" stroke-width="11" stroke-linecap="round"
      stroke-linejoin="round">
-    <path d="M 110 128 L 90 150 L 110 172"/>
-    <path d="M 138 120 L 120 180"/>
-    <path d="M 148 128 L 168 150 L 148 172"/>
+    <path d="M 145 156 L 126 176 L 145 196"/>
+    <path d="M 169 149 L 153 203"/>
+    <path d="M 178 156 L 196 176 L 178 196"/>
   </g>
 </svg>

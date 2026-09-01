@@ -3,14 +3,23 @@
 `icon.svg` is the master. Everything else in this directory is generated from
 it and should never be edited by hand.
 
-The mark is a sheet of generated source — corner folded, `</>` printed on it —
-on a dark One Dark tile. One subject, filling the tile, because 16 px — a
-taskbar, a window list — is the size an app icon is mostly seen at and there is
-room for one shape there. The page is the app's `grid_pk` gold and the glyph is
-its `accent` blue, both from rugpui's `crates/rugpui/src/theme.rs`; they are
-rudbman's two colours swapped, so the two marks are told apart at 16 px by
-which colour holds the silhouette. The reasoning, and why not the palette's
-green, is in the comment at the top of `icon.svg`.
+The mark is a blue database cylinder standing behind a sheet of generated
+source — corner folded, `</>` printed on it — on a dark One Dark tile. The two
+overlap rather than sitting side by side, because the sentence to be read is
+source coming *out of* a database: the cylinder shows as an L wrapping the
+page's top and left, so the eye takes it as background and the page stays the
+subject. An earlier mark drew the page alone, and a page of code on its own
+never said where the code came from.
+
+16 px — a taskbar, a window list — is the size an app icon is mostly seen at,
+and it is what the proportions are set by: the exposed L is wide enough to
+survive that render, and the page is pale stock (the `text` greys) precisely
+because the brightness step against the `accent` blue is the widest this
+palette offers, so the two masses cannot fuse at the size where hue stops
+helping. The glyph is that same accent driven dark enough to hold on light
+paper. Colours are from rugpui's `crates/rugpui/src/theme.rs`. The full
+reasoning — and why not the palette's green or red — is in the comment at the
+top of `icon.svg`.
 
 ## Regenerating
 

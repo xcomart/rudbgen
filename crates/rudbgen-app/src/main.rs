@@ -89,8 +89,8 @@ rust_i18n::i18n!("locales", fallback = "en");
 use std::path::{Path, PathBuf};
 
 use gpui::{
-    AnyElement, App, Context, Div, DragMoveEvent, Entity, FocusHandle, Hsla, KeyBinding, Menu,
-    MenuItem, MouseButton, MouseUpEvent, Pixels, Point, QuitMode, ScrollHandle, SharedString,
+    AnyElement, App, Axis, Context, Div, DragMoveEvent, Entity, FocusHandle, Hsla, KeyBinding,
+    Menu, MenuItem, MouseButton, MouseUpEvent, Pixels, Point, QuitMode, ScrollHandle, SharedString,
     Subscription, Task, TitlebarOptions, Window, WindowBackgroundAppearance, WindowBounds,
     WindowControlArea, WindowOptions, actions, div, img, prelude::*, px,
 };
@@ -102,8 +102,8 @@ use rudbgen_gen::{Plan, TemplateSpec};
 use rudbgen_meta::{MetaReader, Table};
 use rugpui::{
     Button, ButtonVariant, DraggedThumb, EditorThemeEntry, EditorThemeRegistry, MenuButton,
-    MenuEntry, Scrollbar, ScrollbarAxis, ScrollbarState, Select, TabBar, TabItem, Theme,
-    ThemeRegistry, hide_later, hide_now, scroll_to, scrolled, set_editor_theme, set_theme,
+    MenuEntry, ResizeHandle, Scrollbar, ScrollbarAxis, ScrollbarState, Select, TabBar, TabItem,
+    Theme, ThemeRegistry, hide_later, hide_now, scroll_to, scrolled, set_editor_theme, set_theme,
     set_window_tint, theme, tooltip_label,
 };
 use rugpui_shell::{
@@ -341,8 +341,9 @@ impl rugpui_shell::UpdatePolicy for IgnoredUpdate {
 
 /// Width of the grab area between two panels of the body, in logical pixels.
 ///
-/// Pulled back over the panel's own border so the band straddles the seam
-/// rather than pushing the work area across; see [`Workspace::render_work_area`].
+/// Laid over the panel's own edge rather than wedged beside it, so the band
+/// takes none of the row's width and the work area does not shift by six pixels
+/// every time a panel appears; see [`Workspace::render_work_area`].
 const SPLIT_HANDLE: f32 = 6.;
 
 /// Narrowest the explorer may be dragged. Mirrors `rudbgen-core`'s clamp, which
@@ -3269,7 +3270,9 @@ impl Workspace {
     ///
     /// Both panels are left out of the tree entirely when they are hidden
     /// rather than given zero width — a zero-width flex child would still take
-    /// its divider's hit area with it — and so is the divider beside each.
+    /// its divider's hit area with it — and the divider goes with the panel,
+    /// because each one is a child of the panel it resizes rather than a band
+    /// of its own between them.
     ///
     /// The row paints no fill of its own. Its children tile it and each tints
     /// its own share: the panels' surface at the two edges, the background
@@ -3277,37 +3280,27 @@ impl Workspace {
     /// [`app_settings::window_tint`] requires, and it is what lets the blur
     /// behind the window carry on under the panels too.
     fn render_work_area(&self, theme: &Theme, cx: &mut Context<Self>) -> AnyElement {
+        // `relative`, because the divider is the last child rather than the
+        // next sibling: a `ResizeHandle` places itself absolutely against its
+        // container, so it lands on the sidebar's own trailing border without
+        // being a flex child that the row would have to make room for. The
+        // widget brings the press, the resize cursor and the accent bar that
+        // fades in under the pointer — the same bar a `Splitter`'s seam shows,
+        // which is the point of borrowing it rather than drawing a band here.
         let sidebar = self.explorer_showing().then(|| {
             div()
                 .flex()
+                .relative()
                 .flex_none()
                 .w(px(self.explorer_width))
                 .min_h_0()
                 .child(self.explorer.clone())
+                .child(
+                    ResizeHandle::new("explorer-divider", Axis::Horizontal, DraggedExplorer)
+                        .at_end()
+                        .thickness(px(SPLIT_HANDLE)),
+                )
         });
-        let left_handle = self.explorer_showing().then(|| {
-            div()
-                .id("explorer-divider")
-                .occlude()
-                .flex_none()
-                .w(px(SPLIT_HANDLE))
-                // Pulled back over the sidebar's own border so the grab area
-                // straddles the seam rather than pushing the work area across.
-                .ml(px(-SPLIT_HANDLE))
-                .cursor_ew_resize()
-                .on_drag(DraggedExplorer, |_, _, _, cx| cx.new(|_| gpui::Empty))
-        });
-        let right_handle =
-            (self.active_template(cx).is_some() || self.inspector_showing()).then(|| {
-                div()
-                    .id("inspector-divider")
-                    .occlude()
-                    .flex_none()
-                    .w(px(SPLIT_HANDLE))
-                    .mr(px(-SPLIT_HANDLE))
-                    .cursor_ew_resize()
-                    .on_drag(DraggedInspector, |_, _, _, cx| cx.new(|_| gpui::Empty))
-            });
         // The same column, and one of two things in it: the variable palette
         // while a template is being edited, the table inspector otherwise
         // (§4.5). The palette needs no connection — a template opened from the
@@ -3317,6 +3310,7 @@ impl Workspace {
         let panel = (palette || self.inspector_showing()).then(|| {
             div()
                 .flex()
+                .relative()
                 .flex_none()
                 .w(px(self.inspector_width))
                 .min_h_0()
@@ -3325,6 +3319,14 @@ impl Workspace {
                 } else {
                     self.inspector.clone().into_any_element()
                 })
+                // The mirror of the sidebar's, on the edge this panel is
+                // dragged from: its leading one, because the panel sits at the
+                // right of the row.
+                .child(
+                    ResizeHandle::new("inspector-divider", Axis::Horizontal, DraggedInspector)
+                        .at_start()
+                        .thickness(px(SPLIT_HANDLE)),
+                )
         });
 
         div()
@@ -3344,7 +3346,6 @@ impl Workspace {
                 },
             ))
             .children(sidebar)
-            .children(left_handle)
             .child(
                 // A column, and pointedly not the row its parent is: the tab
                 // strip is `w_full`, and in a row it would take the whole of
@@ -3362,7 +3363,6 @@ impl Workspace {
                     .child(self.render_tabs(theme, cx))
                     .child(self.render_active_tab(theme, cx)),
             )
-            .children(right_handle)
             .children(panel)
             .into_any_element()
     }

@@ -122,7 +122,9 @@ Once connected the window is three columns over a status bar:
 └──────────────────────────────────────────────────────────────────┘
 ```
 
-Both side panels have a draggable divider and remember their width; both toggle
+Both side panels are resized by dragging their own inner edge — a six-pixel
+grab band that lights an accent bar while the pointer is on it, the same one a
+splitter's seam shows — and both remember their width; both toggle
 with a shortcut (<kbd>Ctrl</kbd>+<kbd>B</kbd>, <kbd>Ctrl</kbd>+<kbd>I</kbd>) and
 both disappear when nothing is connected.
 

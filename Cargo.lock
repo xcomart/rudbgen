@@ -735,7 +735,7 @@ dependencies = [
  "bitflags 2.13.1",
  "cexpr",
  "clang-sys",
- "itertools 0.13.0",
+ "itertools 0.11.0",
  "log",
  "prettyplease",
  "proc-macro2",
@@ -2704,7 +2704,7 @@ dependencies = [
 [[package]]
 name = "gpui"
 version = "0.2.2"
-source = "git+https://github.com/xcomart/rugpui?rev=a028602ed4e609e803691ac99afebd6f216f27b8#a028602ed4e609e803691ac99afebd6f216f27b8"
+source = "git+https://github.com/xcomart/rugpui?rev=60fc28368b5ea9feab745f3ba628f0e2ee06b1a0#60fc28368b5ea9feab745f3ba628f0e2ee06b1a0"
 dependencies = [
  "accesskit",
  "anyhow",
@@ -2799,7 +2799,7 @@ dependencies = [
 [[package]]
 name = "gpui_linux"
 version = "0.1.0"
-source = "git+https://github.com/xcomart/rugpui?rev=a028602ed4e609e803691ac99afebd6f216f27b8#a028602ed4e609e803691ac99afebd6f216f27b8"
+source = "git+https://github.com/xcomart/rugpui?rev=60fc28368b5ea9feab745f3ba628f0e2ee06b1a0#60fc28368b5ea9feab745f3ba628f0e2ee06b1a0"
 dependencies = [
  "accesskit",
  "accesskit_unix",
@@ -2845,7 +2845,7 @@ dependencies = [
 [[package]]
 name = "gpui_macos"
 version = "0.1.0"
-source = "git+https://github.com/xcomart/rugpui?rev=a028602ed4e609e803691ac99afebd6f216f27b8#a028602ed4e609e803691ac99afebd6f216f27b8"
+source = "git+https://github.com/xcomart/rugpui?rev=60fc28368b5ea9feab745f3ba628f0e2ee06b1a0#60fc28368b5ea9feab745f3ba628f0e2ee06b1a0"
 dependencies = [
  "accesskit",
  "accesskit_macos",
@@ -2985,7 +2985,7 @@ dependencies = [
 [[package]]
 name = "gpui_windows"
 version = "0.1.0"
-source = "git+https://github.com/xcomart/rugpui?rev=a028602ed4e609e803691ac99afebd6f216f27b8#a028602ed4e609e803691ac99afebd6f216f27b8"
+source = "git+https://github.com/xcomart/rugpui?rev=60fc28368b5ea9feab745f3ba628f0e2ee06b1a0#60fc28368b5ea9feab745f3ba628f0e2ee06b1a0"
 dependencies = [
  "accesskit",
  "accesskit_windows",
@@ -3541,15 +3541,6 @@ name = "itertools"
 version = "0.11.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "b1c173a5686ce8bfa551b3563d0c2170bf24ca44da99c7ca4bfdab5418c3fe57"
-dependencies = [
- "either",
-]
-
-[[package]]
-name = "itertools"
-version = "0.13.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "413ee7dfc52ee1a4949ceeb7dbc8a33f2d6c088194d9f922fb8318faf1f01186"
 dependencies = [
  "either",
 ]
@@ -5774,7 +5765,7 @@ dependencies = [
 
 [[package]]
 name = "rudbgen-app"
-version = "0.1.6"
+version = "0.1.7"
 dependencies = [
  "anyhow",
  "async-trait",
@@ -5808,7 +5799,7 @@ dependencies = [
 
 [[package]]
 name = "rudbgen-core"
-version = "0.1.6"
+version = "0.1.7"
 dependencies = [
  "anyhow",
  "directories",
@@ -5822,7 +5813,7 @@ dependencies = [
 
 [[package]]
 name = "rudbgen-gen"
-version = "0.1.6"
+version = "0.1.7"
 dependencies = [
  "log",
  "rudbgen-core",
@@ -5834,7 +5825,7 @@ dependencies = [
 
 [[package]]
 name = "rudbgen-import"
-version = "0.1.6"
+version = "0.1.7"
 dependencies = [
  "aes 0.9.2",
  "aes-gcm",
@@ -5855,7 +5846,7 @@ dependencies = [
 
 [[package]]
 name = "rudbgen-jdbc"
-version = "0.1.6"
+version = "0.1.7"
 dependencies = [
  "anyhow",
  "jni",
@@ -5869,7 +5860,7 @@ dependencies = [
 
 [[package]]
 name = "rudbgen-meta"
-version = "0.1.6"
+version = "0.1.7"
 dependencies = [
  "log",
  "rudbgen-core",
@@ -5881,7 +5872,7 @@ dependencies = [
 
 [[package]]
 name = "rudbgen-ssh"
-version = "0.1.6"
+version = "0.1.7"
 dependencies = [
  "async-trait",
  "futures",
@@ -5902,8 +5893,8 @@ dependencies = [
 
 [[package]]
 name = "rugpui"
-version = "0.1.0"
-source = "git+https://github.com/xcomart/rugpui?rev=a028602ed4e609e803691ac99afebd6f216f27b8#a028602ed4e609e803691ac99afebd6f216f27b8"
+version = "0.1.1"
+source = "git+https://github.com/xcomart/rugpui?rev=60fc28368b5ea9feab745f3ba628f0e2ee06b1a0#60fc28368b5ea9feab745f3ba628f0e2ee06b1a0"
 dependencies = [
  "anyhow",
  "gpui",
@@ -5915,8 +5906,8 @@ dependencies = [
 
 [[package]]
 name = "rugpui-editor"
-version = "0.1.0"
-source = "git+https://github.com/xcomart/rugpui?rev=a028602ed4e609e803691ac99afebd6f216f27b8#a028602ed4e609e803691ac99afebd6f216f27b8"
+version = "0.1.1"
+source = "git+https://github.com/xcomart/rugpui?rev=60fc28368b5ea9feab745f3ba628f0e2ee06b1a0#60fc28368b5ea9feab745f3ba628f0e2ee06b1a0"
 dependencies = [
  "gpui",
  "log",
@@ -5927,8 +5918,8 @@ dependencies = [
 
 [[package]]
 name = "rugpui-grid"
-version = "0.1.0"
-source = "git+https://github.com/xcomart/rugpui?rev=a028602ed4e609e803691ac99afebd6f216f27b8#a028602ed4e609e803691ac99afebd6f216f27b8"
+version = "0.1.1"
+source = "git+https://github.com/xcomart/rugpui?rev=60fc28368b5ea9feab745f3ba628f0e2ee06b1a0#60fc28368b5ea9feab745f3ba628f0e2ee06b1a0"
 dependencies = [
  "gpui",
  "rugpui",
@@ -5937,8 +5928,8 @@ dependencies = [
 
 [[package]]
 name = "rugpui-shell"
-version = "0.1.0"
-source = "git+https://github.com/xcomart/rugpui?rev=a028602ed4e609e803691ac99afebd6f216f27b8#a028602ed4e609e803691ac99afebd6f216f27b8"
+version = "0.1.1"
+source = "git+https://github.com/xcomart/rugpui?rev=60fc28368b5ea9feab745f3ba628f0e2ee06b1a0#60fc28368b5ea9feab745f3ba628f0e2ee06b1a0"
 dependencies = [
  "anyhow",
  "futures",

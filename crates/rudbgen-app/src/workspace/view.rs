@@ -252,14 +252,8 @@ impl Render for Workspace {
             // and the content is the whole surface.
             return content.into_any_element();
         };
-        chrome::render_client_frame(
-            content,
-            tiling,
-            theme.surface,
-            theme.border,
-            window.is_window_active(),
-        )
-        .into_any_element()
+        chrome::render_client_frame(content, tiling, theme.border, window.is_window_active())
+            .into_any_element()
     }
 }
 

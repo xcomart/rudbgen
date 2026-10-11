@@ -47,7 +47,7 @@ use rugpui::{
     Button, ButtonVariant, ContextMenu, Select, Splitter, editor_theme, theme, tooltip_label,
 };
 use rugpui_editor::editor::{CloseFind, Copy, Cut, Find, Paste, Redo, Replace, SelectAll, Undo};
-use rugpui_editor::{EditorEvent, EditorView, MarkKind, NavKey};
+use rugpui_editor::{EditorEvent, EditorScrollEvent, EditorView, MarkKind, NavKey};
 use rugpui_shell::menu_rows::{self, MenuRow, SHORTCUT_MODIFIER};
 
 use crate::app_settings;
@@ -337,6 +337,8 @@ pub struct TemplatePane {
     _debounce: Option<Task<()>>,
     /// Keeps the editor's subscription alive.
     _editor_events: Subscription,
+    /// The source and preview follow each other's wheel and scrollbar moves.
+    _scroll_events: [Subscription; 2],
 }
 
 impl TemplatePane {
@@ -362,6 +364,22 @@ impl TemplatePane {
             }
             _ => {}
         });
+        let scroll_events = [
+            cx.subscribe(&editor, |pane, _, event: &EditorScrollEvent, cx| {
+                if pane.preview_open && pane.preview_note.is_none() {
+                    pane.preview.update(cx, |preview, cx| {
+                        preview.set_scroll_progress(event.axis, event.progress, cx);
+                    });
+                }
+            }),
+            cx.subscribe(&preview, |pane, _, event: &EditorScrollEvent, cx| {
+                if pane.preview_open && pane.preview_note.is_none() {
+                    pane.editor.update(cx, |editor, cx| {
+                        editor.set_scroll_progress(event.axis, event.progress, cx);
+                    });
+                }
+            }),
+        ];
 
         let title = path
             .file_name()
@@ -391,6 +409,7 @@ impl TemplatePane {
             pending_focus: true,
             _debounce: None,
             _editor_events: editor_events,
+            _scroll_events: scroll_events,
         };
         pane.load(cx);
         pane
@@ -1117,6 +1136,8 @@ impl TemplatePane {
                     .child(note.clone())
                     .into_any_element(),
                 None => div()
+                    .id("template-preview-source")
+                    .debug_selector(|| "template-preview-source".to_string())
                     .flex()
                     .flex_grow_1()
                     .min_h_0()
@@ -1446,6 +1467,7 @@ mod tests {
     ) -> (tempfile::TempDir, Entity<TemplatePane>, VisualTestContext) {
         cx.update(|cx| {
             app_settings::init(cx);
+            app_settings::replace(Default::default(), cx);
             rugpui::init(cx);
             rugpui_editor::init(cx);
         });
@@ -1492,6 +1514,76 @@ mod tests {
             assert!(pane.editor.read(cx).focus_handle(cx).is_focused(window));
             assert!(!pane.preview.read(cx).has_selection());
         });
+    }
+
+    #[gpui::test]
+    fn wheel_scrolling_either_side_keeps_the_preview_and_source_together(cx: &mut TestAppContext) {
+        use gpui::{Modifiers, ScrollDelta, ScrollWheelEvent, TouchPhase};
+        use rugpui::scrollbar::ScrollbarAxis;
+
+        let source = format!("{}\n", "source ".repeat(60)).repeat(200);
+        let content = format!("{}\n", "output ".repeat(100)).repeat(400);
+        let (_dir, pane, mut cx) = open_pane(&source, cx);
+        cx.update(|_, cx| {
+            pane.update(cx, |pane, cx| {
+                pane.deliver_preview(
+                    PreviewOutcome::Rendered {
+                        path: PathBuf::from("output.java"),
+                        content,
+                        warnings: Vec::new(),
+                    },
+                    &source,
+                    cx,
+                )
+            });
+        });
+        cx.run_until_parked();
+        for (wrap, axis, delta) in [
+            (false, ScrollbarAxis::Vertical, point(0., -3.)),
+            (false, ScrollbarAxis::Horizontal, point(-3., 0.)),
+            (true, ScrollbarAxis::Vertical, point(0., -3.)),
+        ] {
+            cx.update(|_, cx| {
+                let mut settings = app_settings::current(cx);
+                settings.editor_word_wrap = wrap;
+                app_settings::replace(settings, cx);
+                pane.update(cx, |pane, cx| {
+                    for editor in [&pane.editor, &pane.preview] {
+                        editor.update(cx, |editor, cx| editor.set_scroll_progress(axis, 0., cx));
+                    }
+                    cx.notify();
+                });
+            });
+            cx.run_until_parked();
+            let mut previous = 0.;
+            for selector in ["template-source", "template-preview-source"] {
+                let position = cx.debug_bounds(selector).unwrap().center();
+                cx.simulate_mouse_move(position, None, Modifiers::none());
+                cx.simulate_event(ScrollWheelEvent {
+                    position,
+                    delta: ScrollDelta::Lines(delta),
+                    modifiers: Modifiers::none(),
+                    touch_phase: TouchPhase::Moved,
+                });
+                cx.run_until_parked();
+                previous = cx.update(|_, cx| {
+                    let pane = pane.read(cx);
+                    let source_progress = pane.editor.read(cx).scroll_progress(axis);
+                    let preview_progress = pane.preview.read(cx).scroll_progress(axis);
+                    assert!(source_progress > previous,
+                        "{selector} {axis:?} did not scroll: {source_progress}, previous {previous}, preview {preview_progress}, wrap {}",
+                        pane.editor.read(cx).is_word_wrap());
+                    assert!(
+                        (source_progress - preview_progress).abs() < 0.00001,
+                        "{selector}: source {source_progress}, preview {preview_progress}"
+                    );
+                    assert_eq!(pane.editor.read(cx).selection(), 0..0);
+                    assert_eq!(pane.preview.read(cx).selection(), 0..0);
+                    assert!(!pane.is_dirty(cx));
+                    source_progress
+                });
+            }
+        }
     }
 
     #[gpui::test]

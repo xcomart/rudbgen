@@ -202,10 +202,36 @@ impl Workspace {
         };
         let menu = (!cfg!(target_os = "macos")).then(|| self.render_app_menu(cx));
 
+        // Keep application controls in their own painted cell, as in the
+        // other shells, so its padding never insets the window buttons.
+        let leading = div()
+            .flex()
+            .flex_row()
+            .flex_none()
+            .items_center()
+            .gap(px(6.))
+            .h(px(TOOLBAR_HEIGHT))
+            .px(px(4.))
+            .bg(theme.surface)
+            .border_b_1()
+            .border_color(theme.border)
+            .children(menu)
+            .child(self.render_connection_select(cx));
+
         // Room for the traffic lights AppKit still draws over the transparent
-        // title bar. Fullscreen hides the buttons, and the gap goes with them.
-        let traffic_lights = (custom && cfg!(target_os = "macos") && !window.is_fullscreen())
-            .then(|| div().flex_none().w(px(TRAFFIC_LIGHT_GAP)));
+        // title bar. Painted like the leading cell rather than left empty, so
+        // the band reads as one strip. Fullscreen hides the buttons, and the
+        // gap goes with them.
+        let traffic_lights =
+            (custom && cfg!(target_os = "macos") && !window.is_fullscreen()).then(|| {
+                div()
+                    .flex_none()
+                    .w(px(TRAFFIC_LIGHT_GAP))
+                    .h(px(TOOLBAR_HEIGHT))
+                    .bg(theme.surface)
+                    .border_b_1()
+                    .border_color(theme.border)
+            });
 
         // The application's own name, which only the custom style has to write:
         // a system title bar already carries it, and drawing it twice would put
@@ -240,7 +266,11 @@ impl Workspace {
                 .flex_none()
                 .items_center()
                 .gap(px(6.))
-                .px(px(4.))
+                .h(px(TOOLBAR_HEIGHT))
+                .px(px(10.))
+                .bg(theme.surface)
+                .border_b_1()
+                .border_color(theme.border)
                 // A shade quieter than the connection selector, which is the
                 // one control in this row that has to be read.
                 .text_size(px(12.))
@@ -264,13 +294,8 @@ impl Workspace {
             .flex_row()
             .flex_none()
             .items_center()
-            .gap(px(6.))
             .w_full()
             .h(px(TOOLBAR_HEIGHT))
-            .px(px(6.))
-            .bg(theme.surface)
-            .border_b_1()
-            .border_color(theme.border)
             .when(custom, |this| {
                 // Occluding is load-bearing, not just hygiene: the workspace
                 // root tracks focus, and gpui's focus transfer marks every
@@ -289,11 +314,18 @@ impl Workspace {
             .children(leading_controls)
             .children(traffic_lights)
             .children(title)
-            .children(menu)
-            .child(self.render_connection_select(cx))
+            .child(leading)
             // The gap the window is dragged by: everything to its left and
             // right is a control, and this is what is left of the caption.
-            .child(div().flex_1().min_w_0())
+            .child(
+                div()
+                    .flex_1()
+                    .min_w_0()
+                    .h(px(TOOLBAR_HEIGHT))
+                    .bg(theme.surface)
+                    .border_b_1()
+                    .border_color(theme.border),
+            )
             .children(trailing_controls)
             .into_any_element()
     }

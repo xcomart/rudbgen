@@ -612,6 +612,10 @@ impl TemplatePane {
     pub fn set_choices(&mut self, choices: Vec<SharedString>, cx: &mut Context<Self>) {
         self.choice = self.choice.min(choices.len().saturating_sub(1));
         self.choices = choices;
+        // Explorer changes do not run the dropdown's selection callback.
+        // Even an unchanged index can now name a different table, or the
+        // first table available since this template was opened.
+        self.request_render(cx);
         cx.notify();
     }
 

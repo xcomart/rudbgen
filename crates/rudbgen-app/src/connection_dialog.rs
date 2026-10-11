@@ -566,6 +566,10 @@ impl ConnectionDialog {
         );
 
         self.rebuild_props(&profile.props, cx);
+        // A different profile starts with its own URL values and driver defaults.
+        // Reusing the previous inputs would retain its host, port and database
+        // whenever the new profile has no URL to decompose.
+        self.url_parts.clear();
         self.rebuild_url_parts(cx);
         // A stored URL that the template cannot reproduce is an override, and
         // saying so up front is what stops the first keystroke in a port field
@@ -2648,6 +2652,66 @@ mod tests {
         cx.update(|window, _| window.refresh());
         cx.run_until_parked();
         (dialog, cx)
+    }
+
+    #[gpui::test]
+    fn a_new_profile_clears_the_previous_connections_inputs(cx: &mut gpui::TestAppContext) {
+        let (dialog, mut cx) = open_over_a_profile(cx);
+        cx.update(|_, cx| {
+            dialog.update(cx, |dialog, cx| {
+                // Use the same driver as a fresh connection so every URL field
+                // could otherwise be reused, including a non-default port.
+                let driver = dialog.drivers.drivers()[0].id.clone();
+                dialog.set_driver(driver, cx);
+                for (name, input) in &dialog.url_parts {
+                    set_text(input, format!("previous-{name}"), cx);
+                }
+                set_text(&dialog.name_input, "previous connection", cx);
+                set_text(&dialog.folder_input, "previous folder", cx);
+                set_text(&dialog.username_input, "previous user", cx);
+                set_text(&dialog.password_input, "previous password", cx);
+                set_text(&dialog.url_input, "jdbc:previous:custom", cx);
+                set_text(&dialog.tunnel_host_input, "previous tunnel", cx);
+                set_text(&dialog.tunnel_secret_input, "previous secret", cx);
+                dialog.url_overridden = true;
+                dialog.keep_alive_enabled = true;
+                dialog.tunnel_enabled = true;
+                let previous = dialog.selected;
+
+                dialog.add_profile(cx);
+
+                assert_ne!(dialog.selected, previous);
+                assert_eq!(text(&dialog.name_input, cx), ts!("connect.new_name"));
+                for input in [
+                    &dialog.folder_input,
+                    &dialog.username_input,
+                    &dialog.password_input,
+                    &dialog.tunnel_host_input,
+                    &dialog.tunnel_secret_input,
+                ] {
+                    assert!(text(input, cx).is_empty());
+                }
+                assert!(!dialog.url_overridden);
+                assert!(!dialog.keep_alive_enabled);
+                assert!(!dialog.tunnel_enabled);
+            });
+        });
+        cx.update(|window, _| window.refresh());
+        cx.run_until_parked();
+        cx.update(|_, cx| {
+            let dialog = dialog.read(cx);
+            let port = dialog.current_driver().unwrap().default_port;
+            for (name, input) in &dialog.url_parts {
+                let expected = if name == "port" {
+                    port.map(|port| port.to_string()).unwrap_or_default()
+                } else {
+                    String::new()
+                };
+                assert_eq!(text(input, cx), expected, "stale URL field: {name}");
+            }
+            assert_eq!(text(&dialog.url_input, cx), dialog.assembled_url(cx));
+            assert!(!text(&dialog.url_input, cx).contains("previous"));
+        });
     }
 
     /// The hint under the field says the URL can be typed over, so it has to

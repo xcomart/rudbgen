@@ -301,7 +301,6 @@ impl Workspace {
             .flex_none()
             .items_center()
             .gap(px(6.))
-            .w(px(CONNECTION_SELECT_WIDTH))
             .child(
                 div()
                     .flex_none()
@@ -310,39 +309,38 @@ impl Workspace {
                     .bg(self.connection.dot(&theme)),
             )
             .child(
-                div().flex_1().min_w_0().child(
-                    Select::new("connection-select")
-                        .chevron_icon(icons::CHEVRON_DOWN)
-                        .placeholder(ts!("titlebar.no_connection"))
-                        .options(options)
-                        .selected(selected)
-                        .open(self.connection_list_open)
-                        .width(px(CONNECTION_SELECT_WIDTH))
-                        .on_select(move |index, _text, _window, cx| {
-                            this.update(cx, |workspace, cx| {
-                                workspace.connection_list_open = false;
-                                match workspace.profiles.connections().get(index).cloned() {
-                                    Some(profile) => workspace.connect_to(profile, cx),
-                                    // Past the end of the list is the
-                                    // "Disconnect" row.
-                                    None if index == count => workspace.disconnect(cx),
-                                    None => {}
-                                }
-                            });
-                        })
-                        .on_open_change(move |open, _window, cx| {
-                            toggle.update(cx, |workspace, cx| {
-                                // Re-read on the way open: the dialog may have
-                                // added or renamed a profile since the last
-                                // frame that drew this list.
-                                if open {
-                                    workspace.profiles = load_profiles();
-                                }
-                                workspace.connection_list_open = open;
-                                cx.notify();
-                            });
-                        }),
-                ),
+                // The dot and gap sit beside the selector's full width.
+                Select::new("connection-select")
+                    .chevron_icon(icons::CHEVRON_DOWN)
+                    .placeholder(ts!("titlebar.no_connection"))
+                    .options(options)
+                    .selected(selected)
+                    .open(self.connection_list_open)
+                    .width(px(CONNECTION_SELECT_WIDTH))
+                    .on_select(move |index, _text, _window, cx| {
+                        this.update(cx, |workspace, cx| {
+                            workspace.connection_list_open = false;
+                            match workspace.profiles.connections().get(index).cloned() {
+                                Some(profile) => workspace.connect_to(profile, cx),
+                                // Past the end of the list is the
+                                // "Disconnect" row.
+                                None if index == count => workspace.disconnect(cx),
+                                None => {}
+                            }
+                        });
+                    })
+                    .on_open_change(move |open, _window, cx| {
+                        toggle.update(cx, |workspace, cx| {
+                            // Re-read on the way open: the dialog may have
+                            // added or renamed a profile since the last
+                            // frame that drew this list.
+                            if open {
+                                workspace.profiles = load_profiles();
+                            }
+                            workspace.connection_list_open = open;
+                            cx.notify();
+                        });
+                    }),
             )
     }
 
@@ -390,7 +388,7 @@ impl Workspace {
                 .disabled(self.active_template(cx).is_none())
                 .on_activate(|window, cx| window.dispatch_action(Box::new(ToggleLivePreview), cx)),
             MenuEntry::separator(),
-            // The three run commands, in the order the status bar draws them.
+            // The three run commands, in the order the Generate tab draws them.
             // Each is greyed exactly when the button is, and for the reason the
             // button's tooltip gives.
             MenuEntry::new(ts!("menu.preview"))
@@ -593,7 +591,8 @@ impl Workspace {
                     PaneItem::Template { title, .. } => title.clone(),
                     PaneItem::Preview { title } => title.clone(),
                 };
-                let tab = TabItem::new(("work-tab", index), title);
+                let tab = TabItem::new(("work-tab", index), title)
+                    .closable(!matches!(item, PaneItem::Generate));
                 // The dirty marker is the strip's own dot rather than a
                 // character glued to the title: a title that changes width
                 // when a key is pressed makes the whole strip twitch.
@@ -664,7 +663,28 @@ impl Workspace {
             // is what a window holding nothing but a template tab looks like.
             Some(PaneItem::Generate) | None => {
                 if matches!(self.connection, ConnectionState::Open { .. }) {
-                    self.generate.clone().into_any_element()
+                    div()
+                        .flex()
+                        .flex_col()
+                        .flex_1()
+                        .min_h_0()
+                        .child(self.generate.clone())
+                        .child(
+                            div()
+                                .id("generate-actions")
+                                .flex()
+                                .flex_none()
+                                .flex_wrap()
+                                .items_center()
+                                .justify_end()
+                                .gap(px(8.))
+                                .px(px(16.))
+                                .py(px(12.))
+                                .border_t_1()
+                                .border_color(theme.border)
+                                .children(self.render_run_buttons(cx)),
+                        )
+                        .into_any_element()
                 } else {
                     return self.render_welcome(theme, cx);
                 }
@@ -997,7 +1017,6 @@ impl Workspace {
                         _ => self.render_run_summary(cx),
                     }),
             )
-            .children(self.render_run_buttons(cx))
             .into_any_element()
     }
 
@@ -1027,7 +1046,7 @@ impl Workspace {
         }
     }
 
-    /// The three buttons at the right end of the status bar.
+    /// The three actions fixed below the Generate tab's scrolling form.
     ///
     /// Disabled with the reason in a tooltip rather than an error box after the
     /// click (§4.2): the tooltip has to go on a box *around* the button,
@@ -1068,7 +1087,6 @@ impl Workspace {
                             ButtonVariant::Secondary
                         })
                         .disabled(blocker.is_some())
-                        .compact()
                         .on_click(move |_, window, cx| window.dispatch_action(action(), cx)),
                 )
                 .into_any_element()
@@ -1076,26 +1094,22 @@ impl Workspace {
 
         vec![
             button(
-                "statusbar-preview",
+                "generate-preview",
                 ts!("generate.preview"),
                 renders,
                 false,
                 || Box::new(Preview),
             ),
             button(
-                "statusbar-dry-run",
+                "generate-dry-run",
                 ts!("generate.dry_run"),
                 renders,
                 false,
                 || Box::new(DryRun),
             ),
-            button(
-                "statusbar-generate",
-                ts!("generate.run"),
-                writes,
-                true,
-                || Box::new(Generate),
-            ),
+            button("generate-run", ts!("generate.run"), writes, true, || {
+                Box::new(Generate)
+            }),
         ]
     }
 }

@@ -117,8 +117,9 @@ Once connected the window is three columns over a status bar:
 │ ▸ INFO_SCHEMA│ │  Output   ~/out/src      [...]  │                 │
 │              │ │  Author   comart                │                 │
 │              │ │  Variables  package=com.abc.x   │                 │
+│              │ │ [Preview] [Dry run] [Generate] │                 │
 ├──────────────┴─────────────────────────────────┴─────────────────┤
-│ 2 tables · 2 templates → 4 files into ~/out/src  [Preview][Dry run][Generate ▶]│
+│ 2 tables · 2 templates → 4 files into ~/out/src                    │
 └──────────────────────────────────────────────────────────────────┘
 ```
 
@@ -278,8 +279,11 @@ one-line description the palette shows.
 
 ## Preview and dry run
 
-Both live on the status bar, beside the arithmetic of the run: *n* tables · *m*
-templates → *n*×*m* files into the output directory.
+Both sit beside **Generate** at the bottom of the connected **Generate** tab,
+in a fixed row of standard-sized buttons below the scrolling options. The
+status bar shows the arithmetic of the run: *n* tables · *m* templates → *n*×*m*
+files into the output directory. The Generate tab is permanent and has no
+close button.
 
 - **Preview** opens a Preview tab and renders **one** pair — pick the table and
   the template from the two dropdowns in its header.

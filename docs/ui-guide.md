@@ -261,6 +261,8 @@ the right, and the [variable palette](#the-inspector) in place of the inspector.
 - **The preview follows the buffer, not the file.** It renders the text as it
   now stands against the table named in its header — pick another from the
   dropdown — so a change shows before it is saved.
+- **Right-click the editor** for Cut, Copy, Paste, Select all, Undo, Redo,
+  Find, Replace, and Save. The menu keeps the current text selection.
 - **Diagnostics** are gutter marks with a message: a parse error stops the
   render and names the line; an **unknown field** — `${nmae}` — is a warning,
   because the engine renders it to nothing and jdbgen's way of finding it was to

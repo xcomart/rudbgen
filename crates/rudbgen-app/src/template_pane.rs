@@ -38,13 +38,17 @@ use std::path::{Path, PathBuf};
 use std::time::Duration;
 
 use gpui::{
-    Anchor, AnchoredPositionMode, App, Axis, Bounds, Context, Entity, EventEmitter, FocusHandle,
-    Focusable, MouseButton, Pixels, SharedString, Subscription, Task, Window, anchored, deferred,
-    div, point, prelude::*, px,
+    Action, Anchor, AnchoredPositionMode, App, Axis, Bounds, Context, Entity, EventEmitter,
+    FocusHandle, Focusable, MouseButton, Pixels, Point, SharedString, Subscription, Task, Window,
+    anchored, deferred, div, point, prelude::*, px,
 };
 use rudbgen_template::{ParseError, Template, Warning};
-use rugpui::{Button, ButtonVariant, Select, Splitter, editor_theme, theme, tooltip_label};
+use rugpui::{
+    Button, ButtonVariant, ContextMenu, Select, Splitter, editor_theme, theme, tooltip_label,
+};
+use rugpui_editor::editor::{CloseFind, Copy, Cut, Find, Paste, Redo, Replace, SelectAll, Undo};
 use rugpui_editor::{EditorEvent, EditorView, MarkKind, NavKey};
+use rugpui_shell::menu_rows::{self, MenuRow, SHORTCUT_MODIFIER};
 
 use crate::app_settings;
 use crate::i18n::ts;
@@ -320,6 +324,8 @@ pub struct TemplatePane {
     items: Vec<PaletteItem>,
     /// The popup, while it is up.
     completion: Option<Completion>,
+    /// Pointer position of the source editor's context menu.
+    context_menu: Option<Point<Pixels>>,
     /// Whether the buffer should take the keyboard on the next frame.
     ///
     /// A tab that has just been opened or brought to the front is a document
@@ -348,6 +354,12 @@ impl TemplatePane {
             EditorEvent::Changed => pane.changed(cx),
             EditorEvent::SelectionChanged => pane.moved(cx),
             EditorEvent::Intercepted(key) => pane.intercepted(*key, cx),
+            EditorEvent::ContextMenu { position } => {
+                pane.close_completion(cx);
+                pane.choice_open = false;
+                pane.context_menu = Some(*position);
+                cx.notify();
+            }
             _ => {}
         });
 
@@ -375,6 +387,7 @@ impl TemplatePane {
             diagnostics: Vec::new(),
             items: Vec::new(),
             completion: None,
+            context_menu: None,
             pending_focus: true,
             _debounce: None,
             _editor_events: editor_events,
@@ -492,6 +505,107 @@ impl TemplatePane {
     pub fn focus_editor(&self, window: &mut Window, cx: &mut App) {
         let handle = self.editor.read(cx).focus_handle(cx);
         window.focus(&handle, cx);
+    }
+
+    /// Dismisses the menu when a shell command changes the active surface.
+    pub fn close_context_menu(&mut self, cx: &mut Context<Self>) -> bool {
+        let closed = self.context_menu.take().is_some();
+        if closed {
+            cx.notify();
+        }
+        closed
+    }
+
+    fn editor_rows(&self, cx: &Context<Self>) -> Vec<MenuRow> {
+        let editor = self.editor.read(cx);
+        let handle = editor.focus_handle(cx);
+        let selected = editor.has_selection();
+        let modifier = SHORTCUT_MODIFIER;
+        let row =
+            |label: SharedString, shortcut: String, enabled: bool, action: Box<dyn Action>| {
+                let handle = handle.clone();
+                MenuRow::new(label)
+                    .shortcut(shortcut)
+                    .enabled(enabled)
+                    .on_activate(move |window, cx| handle.dispatch_action(&*action, window, cx))
+            };
+        let this = cx.entity();
+        vec![
+            row(
+                ts!("input.menu_cut"),
+                format!("{modifier}+X"),
+                selected,
+                Box::new(Cut),
+            ),
+            row(
+                ts!("input.menu_copy"),
+                format!("{modifier}+C"),
+                selected,
+                Box::new(Copy),
+            ),
+            row(
+                ts!("input.menu_paste"),
+                format!("{modifier}+V"),
+                true,
+                Box::new(Paste),
+            ),
+            MenuRow::separator(),
+            row(
+                ts!("input.menu_select_all"),
+                format!("{modifier}+A"),
+                true,
+                Box::new(SelectAll),
+            ),
+            MenuRow::separator(),
+            row(
+                ts!("template.menu_undo"),
+                format!("{modifier}+Z"),
+                editor.can_undo(),
+                Box::new(Undo),
+            ),
+            row(
+                ts!("template.menu_redo"),
+                format!("{modifier}+Shift+Z"),
+                editor.can_redo(),
+                Box::new(Redo),
+            ),
+            MenuRow::separator(),
+            row(
+                ts!("template.menu_find"),
+                format!("{modifier}+F"),
+                true,
+                Box::new(Find),
+            ),
+            row(
+                ts!("template.menu_replace"),
+                format!("{modifier}+H"),
+                true,
+                Box::new(Replace),
+            ),
+            MenuRow::separator(),
+            MenuRow::new(ts!("common.save"))
+                .shortcut(format!("{modifier}+S"))
+                .on_activate(move |_window, cx| {
+                    this.update(cx, |pane, cx| {
+                        pane.save(cx);
+                    });
+                }),
+        ]
+    }
+
+    fn render_context_menu(&self, cx: &mut Context<Self>) -> Option<ContextMenu> {
+        let position = self.context_menu?;
+        let this = cx.entity();
+        Some(
+            ContextMenu::new("template-context")
+                .position(position)
+                .entries(menu_rows::entries(self.editor_rows(cx)))
+                .on_dismiss(move |_window, cx| {
+                    this.update(cx, |pane, cx| {
+                        pane.close_context_menu(cx);
+                    });
+                }),
+        )
     }
 
     /// Replaces the tables the preview may be rendered against.
@@ -1232,6 +1346,8 @@ impl Render for TemplatePane {
         }
 
         let editor = div()
+            .id("template-source")
+            .debug_selector(|| "template-source".to_string())
             .flex()
             .flex_col()
             .flex_1()
@@ -1267,6 +1383,13 @@ impl Render for TemplatePane {
         div()
             .key_context("TemplatePane")
             .track_focus(&self.focus_handle)
+            .capture_action(cx.listener(|pane, _: &CloseFind, _window, cx| {
+                if pane.close_context_menu(cx) {
+                    cx.stop_propagation();
+                } else {
+                    cx.propagate();
+                }
+            }))
             .relative()
             .flex()
             .flex_col()
@@ -1293,6 +1416,7 @@ impl Render for TemplatePane {
             )
             .children((!self.diagnostics.is_empty()).then(|| self.render_diagnostics(cx)))
             .children(self.render_completion(cx))
+            .children(self.render_context_menu(cx))
             .into_any_element()
     }
 }
@@ -1300,6 +1424,149 @@ impl Render for TemplatePane {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use gpui::{TestAppContext, VisualTestContext};
+
+    struct Harness {
+        pane: Entity<TemplatePane>,
+    }
+
+    impl Render for Harness {
+        fn render(&mut self, _window: &mut Window, _cx: &mut Context<Self>) -> impl IntoElement {
+            div().size_full().flex().flex_col().child(self.pane.clone())
+        }
+    }
+
+    fn open_pane(
+        source: &str,
+        cx: &mut TestAppContext,
+    ) -> (tempfile::TempDir, Entity<TemplatePane>, VisualTestContext) {
+        cx.update(|cx| {
+            app_settings::init(cx);
+            rugpui::init(cx);
+            rugpui_editor::init(cx);
+        });
+        let dir = tempfile::tempdir().expect("a temporary directory");
+        let file = dir.path().join("model.java");
+        std::fs::write(&file, source).expect("the template is written");
+        let window = cx.add_window(|_, cx| Harness {
+            pane: cx.new(|cx| TemplatePane::open(file, cx)),
+        });
+        let pane = window
+            .update(cx, |harness, _, _| harness.pane.clone())
+            .unwrap();
+        let cx = VisualTestContext::from_window(window.into(), cx);
+        cx.run_until_parked();
+        (dir, pane, cx)
+    }
+
+    #[gpui::test]
+    fn keyboard_selection_survives_a_rendered_live_preview(cx: &mut TestAppContext) {
+        let source = "class Album {\n    String title;\n}\n";
+        let (_dir, pane, mut cx) = open_pane(source, cx);
+        cx.update(|window, cx| {
+            pane.update(cx, |pane, cx| {
+                pane.set_choices(vec!["ALBUM".into()], cx);
+                pane.deliver_preview(
+                    PreviewOutcome::Rendered {
+                        path: PathBuf::from("Album.java"),
+                        content: source.to_owned(),
+                        warnings: Vec::new(),
+                    },
+                    source,
+                    cx,
+                );
+                pane.editor
+                    .update(cx, |editor, cx| editor.select_range(0..0, cx));
+                pane.focus_editor(window, cx);
+            });
+        });
+        cx.run_until_parked();
+        cx.simulate_keystrokes("shift-right shift-right shift-right");
+        cx.update(|window, cx| {
+            let pane = pane.read(cx);
+            assert_eq!(pane.editor.read(cx).selection(), 0..3);
+            assert!(pane.editor.read(cx).focus_handle(cx).is_focused(window));
+            assert!(!pane.preview.read(cx).has_selection());
+        });
+    }
+
+    #[gpui::test]
+    fn the_context_menu_preserves_selection_and_edits_the_source(cx: &mut TestAppContext) {
+        use gpui::{Modifiers, MouseDownEvent, MouseUpEvent};
+        use menu_rows::row;
+
+        let (dir, pane, mut cx) = open_pane("class Album {}\n", cx);
+        cx.update(|_window, cx| {
+            pane.update(cx, |pane, cx| {
+                let rows = pane.editor_rows(cx);
+                assert!(!row(&rows, &ts!("input.menu_cut")).is_enabled());
+                assert!(!row(&rows, &ts!("input.menu_copy")).is_enabled());
+                assert!(!row(&rows, &ts!("template.menu_undo")).is_enabled());
+                pane.editor
+                    .update(cx, |editor, cx| editor.select_range(6..11, cx));
+            });
+        });
+        cx.run_until_parked();
+        let bounds = cx
+            .debug_bounds("template-source")
+            .expect("the source is rendered");
+        let position = bounds.origin + point(px(70.), px(10.));
+        cx.simulate_event(MouseDownEvent {
+            position,
+            modifiers: Modifiers::none(),
+            button: MouseButton::Right,
+            click_count: 1,
+            first_mouse: false,
+        });
+        cx.simulate_event(MouseUpEvent {
+            position,
+            modifiers: Modifiers::none(),
+            button: MouseButton::Right,
+            click_count: 1,
+        });
+        cx.run_until_parked();
+        let rows = cx.update(|_window, cx| {
+            pane.update(cx, |pane, cx| {
+                assert_eq!(pane.context_menu, Some(position));
+                assert_eq!(pane.editor.read(cx).selection(), 6..11);
+                pane.editor_rows(cx)
+            })
+        });
+        // Escape puts the menu away without clearing the selection.
+        cx.simulate_keystrokes("escape");
+        cx.update(|_window, cx| {
+            assert!(pane.read(cx).context_menu.is_none());
+            assert_eq!(pane.read(cx).editor.read(cx).selection(), 6..11);
+        });
+        cx.update(|window, cx| row(&rows, &ts!("input.menu_cut")).activate(window, cx));
+        cx.run_until_parked();
+        cx.update(|window, cx| {
+            assert_eq!(pane.read(cx).source(cx), "class  {}\n");
+            assert_eq!(
+                cx.read_from_clipboard().and_then(|item| item.text()),
+                Some("Album".into())
+            );
+            let rows = pane.update(cx, |pane, cx| pane.editor_rows(cx));
+            row(&rows, &ts!("template.menu_undo")).activate(window, cx);
+        });
+        cx.run_until_parked();
+        cx.update(|window, cx| {
+            assert_eq!(pane.read(cx).source(cx), "class Album {}\n");
+            let rows = pane.update(cx, |pane, cx| pane.editor_rows(cx));
+            row(&rows, &ts!("template.menu_redo")).activate(window, cx);
+        });
+        cx.run_until_parked();
+        cx.update(|window, cx| {
+            let rows = pane.update(cx, |pane, cx| pane.editor_rows(cx));
+            row(&rows, &ts!("common.save")).activate(window, cx);
+            assert!(!pane.read(cx).is_dirty(cx));
+            assert_eq!(pane.read(cx).preview.read(cx).text(), "");
+        });
+        assert_eq!(
+            std::fs::read_to_string(dir.path().join("model.java")).unwrap(),
+            "class  {}\n"
+        );
+    }
 
     #[test]
     fn a_files_line_ending_is_read_off_its_first_break() {

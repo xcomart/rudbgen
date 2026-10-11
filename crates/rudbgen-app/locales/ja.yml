@@ -470,6 +470,10 @@ update:
   open_release: リリースページを開く
 
 template:
+  menu_undo: 元に戻す
+  menu_redo: やり直し
+  menu_find: 検索…
+  menu_replace: 置換…
   unsaved: 未保存
   tip_preview: ライブプレビューの表示を切り替えます
   show_preview: プレビューを表示

@@ -7,6 +7,7 @@ impl Workspace {
 
     /// Puts the keyboard back on the shell after a dialog closes.
     pub(super) fn focus_shell(&mut self, window: &mut Window, cx: &mut Context<Self>) {
+        self.close_template_menus(cx);
         window.focus(&self.focus_handle, cx);
         cx.notify();
     }
@@ -49,6 +50,7 @@ impl Workspace {
     /// when its own `close` refuses and the swap is allowed to finish; see
     /// [`UpdateDialog::close`].
     pub(super) fn close_overlays(&mut self, window: &mut Window, cx: &mut Context<Self>) {
+        self.close_template_menus(cx);
         self.menu_open = false;
         // A question nobody answered is a question withdrawn: the tab stays
         // open with its edits, which is the safe half of both answers.
@@ -247,10 +249,21 @@ impl Workspace {
 
     /// Shows or hides the help menu.
     pub(super) fn set_menu_open(&mut self, open: bool, cx: &mut Context<Self>) {
+        if open {
+            self.close_template_menus(cx);
+        }
         if self.menu_open != open {
             self.menu_open = open;
             cx.notify();
         }
+    }
+
+    pub(super) fn close_template_menus(&mut self, cx: &mut Context<Self>) -> bool {
+        let mut closed = false;
+        for pane in &self.templates {
+            closed |= pane.update(cx, |pane, cx| pane.close_context_menu(cx));
+        }
+        closed
     }
 
     /// Re-applies everything a saved settings file changes about the live

@@ -469,6 +469,10 @@ update:
   open_release: 打开发布页面
 
 template:
+  menu_undo: 撤销
+  menu_redo: 重做
+  menu_find: 查找…
+  menu_replace: 替换…
   unsaved: 未保存
   tip_preview: 显示或隐藏实时预览
   show_preview: 显示预览

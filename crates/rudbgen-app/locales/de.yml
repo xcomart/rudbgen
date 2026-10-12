@@ -472,6 +472,10 @@ update:
   open_release: Release-Seite öffnen
 
 template:
+  menu_undo: Rückgängig
+  menu_redo: Wiederholen
+  menu_find: Suchen…
+  menu_replace: Ersetzen…
   unsaved: ungespeichert
   tip_preview: Live-Vorschau ein- und ausblenden
   show_preview: Vorschau zeigen

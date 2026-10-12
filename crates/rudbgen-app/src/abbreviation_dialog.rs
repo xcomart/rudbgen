@@ -67,12 +67,6 @@ const ABBR_WIDTH: f32 = 170.;
 /// Width of the table-name picker beside a whole-name row's abbreviation.
 const PICKER_WIDTH: f32 = 92.;
 
-/// Tab-ring position of the first control in the dialog.
-const FIRST_TAB: isize = 100;
-
-/// Tab stops one rule row takes: the two boxes and the two fields.
-const ROW_STRIDE: isize = 4;
-
 /// What the dialog tells the shell about.
 pub enum AbbreviationDialogEvent {
     /// The rules were written; the store as it now stands.
@@ -162,8 +156,7 @@ impl AbbreviationDialog {
         let rows: Vec<RuleRow> = store
             .rules
             .iter()
-            .enumerate()
-            .map(|(index, rule)| self.new_row(index, rule, cx))
+            .map(|rule| self.new_row(rule, cx))
             .collect();
         self.rows = rows;
         self.ensure_blank(cx);
@@ -283,19 +276,14 @@ impl AbbreviationDialog {
     }
 
     /// Builds one editable row over `rule`.
-    fn new_row(&self, index: usize, rule: &AbbreviationRule, cx: &mut Context<Self>) -> RuleRow {
-        let base = FIRST_TAB + ROW_STRIDE * (index as isize + 1);
+    fn new_row(&self, rule: &AbbreviationRule, cx: &mut Context<Self>) -> RuleRow {
         let abbreviation = cx.new(|cx| {
-            let mut input = TextInput::new(cx)
-                .placeholder(ts!("abbr.abbreviation_placeholder"))
-                .tab_index(base + 2);
+            let mut input = TextInput::new(cx).placeholder(ts!("abbr.abbreviation_placeholder"));
             input.set_content(rule.abbreviation.clone(), cx);
             input
         });
         let replacement = cx.new(|cx| {
-            let mut input = TextInput::new(cx)
-                .placeholder(ts!("abbr.replacement_placeholder"))
-                .tab_index(base + 3);
+            let mut input = TextInput::new(cx).placeholder(ts!("abbr.replacement_placeholder"));
             input.set_content(rule.replacement.clone(), cx);
             input
         });
@@ -321,7 +309,7 @@ impl AbbreviationDialog {
     /// Keeps exactly one blank row at the foot of the table.
     fn ensure_blank(&mut self, cx: &mut Context<Self>) {
         if needs_trailing_blank(&self.draft(cx)) {
-            let row = self.new_row(self.rows.len(), &AbbreviationRule::default(), cx);
+            let row = self.new_row(&AbbreviationRule::default(), cx);
             self.rows.push(row);
         }
     }
@@ -494,7 +482,6 @@ impl AbbreviationDialog {
         chrome: &Theme,
         cx: &mut Context<Self>,
     ) -> impl IntoElement + use<> {
-        let base = FIRST_TAB + ROW_STRIDE * (index as isize + 1);
         let this = cx.entity();
         let picker = (row.whole_name && !self.tables.is_empty()).then(|| {
             let open = self.picker == Some(index);
@@ -529,7 +516,6 @@ impl AbbreviationDialog {
                 div().w(px(APPLY_WIDTH)).flex_none().child(
                     Checkbox::new(("abbr-enabled", index), SharedString::default())
                         .checked(row.enabled)
-                        .tab_index(base)
                         .on_toggle({
                             let this = this.clone();
                             move |on, _window, cx| {
@@ -542,7 +528,6 @@ impl AbbreviationDialog {
                 div().w(px(WHOLE_WIDTH)).flex_none().child(
                     Checkbox::new(("abbr-whole", index), SharedString::default())
                         .checked(row.whole_name)
-                        .tab_index(base + 1)
                         .on_toggle({
                             let this = this.clone();
                             move |on, _window, cx| {
@@ -579,6 +564,8 @@ impl AbbreviationDialog {
             .child(
                 div()
                     .id(("abbr-remove", index))
+                    .tab_index(0)
+                    .focus(|style| style.bg(chrome.surface_active).text_color(chrome.accent))
                     .flex()
                     .flex_none()
                     .items_center()
@@ -623,7 +610,6 @@ impl Render for AbbreviationDialog {
 
         let apply = Checkbox::new("abbr-apply", ts!("generate.apply_abbreviations"))
             .checked(self.apply_to_names)
-            .tab_index(FIRST_TAB)
             .on_toggle({
                 let this = this.clone();
                 move |on, _window, cx| {
@@ -848,6 +834,93 @@ mod tests {
             abbreviation: abbr.to_string(),
             replacement: replace.to_string(),
         }
+    }
+
+    #[gpui::test]
+    fn tab_keeps_dynamic_rule_controls_in_row_order(cx: &mut gpui::TestAppContext) {
+        cx.update(rugpui::init);
+        let window = cx.add_window(|_, cx| {
+            let mut dialog = AbbreviationDialog::new(cx);
+            dialog.open(
+                &AbbreviationStore {
+                    rules: vec![
+                        rule(true, true, "EMP", "employee"),
+                        rule(true, false, "DEPT", "department"),
+                    ],
+                    ..Default::default()
+                },
+                vec!["EMP".into()],
+                cx,
+            );
+            dialog
+        });
+        let mut cx = gpui::VisualTestContext::from_window(window.into(), cx);
+        cx.run_until_parked();
+        window
+            .update(&mut cx, |dialog, window, cx| {
+                dialog.rows[0]
+                    .abbreviation
+                    .read(cx)
+                    .focus_handle(cx)
+                    .focus(window, cx);
+            })
+            .unwrap();
+        // The optional table picker sits between abbreviation and replacement.
+        cx.simulate_keystrokes("tab tab");
+        window
+            .update(&mut cx, |dialog, window, cx| {
+                assert!(
+                    dialog.rows[0]
+                        .replacement
+                        .read(cx)
+                        .focus_handle(cx)
+                        .is_focused(window)
+                );
+            })
+            .unwrap();
+        cx.simulate_keystrokes("tab");
+        let stroke = gpui::Keystroke::parse("enter").unwrap();
+        cx.simulate_event(gpui::KeyDownEvent {
+            keystroke: stroke.clone(),
+            is_held: false,
+            prefer_character_input: false,
+        });
+        cx.simulate_event(gpui::KeyUpEvent { keystroke: stroke });
+        window
+            .update(&mut cx, |dialog, window, cx| {
+                assert_eq!(dialog.rows.len(), 2);
+                assert_eq!(dialog.rows[0].abbreviation.read(cx).content(), "DEPT");
+                dialog.rows[0]
+                    .abbreviation
+                    .read(cx)
+                    .focus_handle(cx)
+                    .focus(window, cx);
+            })
+            .unwrap();
+        cx.simulate_keystrokes("tab");
+        window
+            .update(&mut cx, |dialog, window, cx| {
+                assert!(
+                    dialog.rows[0]
+                        .replacement
+                        .read(cx)
+                        .focus_handle(cx)
+                        .is_focused(window)
+                );
+            })
+            .unwrap();
+        cx.simulate_keystrokes("shift-tab");
+        window
+            .update(&mut cx, |dialog, window, cx| {
+                assert!(
+                    dialog.rows[0]
+                        .abbreviation
+                        .read(cx)
+                        .focus_handle(cx)
+                        .is_focused(window)
+                );
+            })
+            .unwrap();
     }
 
     #[test]

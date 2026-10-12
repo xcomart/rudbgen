@@ -49,6 +49,12 @@ it is, so a configuration copied from another machine still has a door.
 connection dialog: a name, a driver, the URL, credentials, extra properties, a
 keep-alive probe and an SSH tunnel.
 
+Set **Folder** to group saved connections in the list. Click a folder heading
+to collapse or expand it, or focus it with <kbd>Tab</kbd> and press <kbd>Space</kbd>
+or <kbd>Enter</kbd>. Collapsed folders keep their state when you reopen the
+dialog during the same app session, and folding one keeps the current form's
+unsaved edits.
+
 - **The driver** picks the URL shape. Choosing one fills the URL with its
   template — `jdbc:postgresql://{host}:{port}/{database}` — and the fields under
   it fill the holes; the URL stays editable, so an option the form has no field
@@ -117,8 +123,9 @@ Once connected the window is three columns over a status bar:
 │ ▸ INFO_SCHEMA│ │  Output   ~/out/src      [...]  │                 │
 │              │ │  Author   comart                │                 │
 │              │ │  Variables  package=com.abc.x   │                 │
+│              │ │ [Preview] [Dry run] [Generate] │                 │
 ├──────────────┴─────────────────────────────────┴─────────────────┤
-│ 2 tables · 2 templates → 4 files into ~/out/src  [Preview][Dry run][Generate ▶]│
+│ 2 tables · 2 templates → 4 files into ~/out/src                    │
 └──────────────────────────────────────────────────────────────────┘
 ```
 
@@ -260,6 +267,10 @@ the right, and the [variable palette](#the-inspector) in place of the inspector.
 - **The preview follows the buffer, not the file.** It renders the text as it
   now stands against the table named in its header — pick another from the
   dropdown — so a change shows before it is saved.
+- **Right-click the editor** for Cut, Copy, Paste, Select all, Undo, Redo,
+  Find, Replace, and Save. The menu keeps the current text selection.
+- **Scroll either side** with the mouse wheel or scrollbar to move both views
+  to the same relative position, even when the generated output is longer.
 - **Diagnostics** are gutter marks with a message: a parse error stops the
   render and names the line; an **unknown field** — `${nmae}` — is a warning,
   because the engine renders it to nothing and jdbgen's way of finding it was to
@@ -278,8 +289,11 @@ one-line description the palette shows.
 
 ## Preview and dry run
 
-Both live on the status bar, beside the arithmetic of the run: *n* tables · *m*
-templates → *n*×*m* files into the output directory.
+Both sit beside **Generate** at the bottom of the connected **Generate** tab,
+in a fixed row of standard-sized buttons below the scrolling options. The
+status bar shows the arithmetic of the run: *n* tables · *m* templates → *n*×*m*
+files into the output directory. The Generate tab is permanent and has no
+close button.
 
 - **Preview** opens a Preview tab and renders **one** pair — pick the table and
   the template from the two dropdowns in its header.

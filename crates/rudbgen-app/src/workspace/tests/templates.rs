@@ -1,13 +1,15 @@
 use super::*;
 
-/// M4's other half, against a real database: the live preview renders the
-/// buffer — not the file — and an unknown field comes back as a warning on
-/// the line that names it.
+/// A template opened before any table is selected starts rendering when the
+/// explorer selection arrives. Later edits render the buffer and report an
+/// unknown field on the line that names it.
 ///
 /// The typo is the case D12 exists for: `${nmae}` parses, renders to
 /// nothing, and in jdbgen is found by reading the generated file.
 #[gpui::test]
-fn a_real_database_marks_an_unknown_field_in_the_live_preview(cx: &mut gpui::TestAppContext) {
+fn a_template_opened_before_table_selection_renders_and_reports_diagnostics(
+    cx: &mut gpui::TestAppContext,
+) {
     use rudbgen_jdbc::StatementSpec;
 
     let dir = tempfile::tempdir().expect("tempdir");
@@ -51,6 +53,19 @@ fn a_real_database_marks_an_unknown_field_in_the_live_preview(cx: &mut gpui::Tes
         .expect("the window is open");
     cx.run_until_parked();
 
+    window
+        .update(cx, |workspace, _window, cx| {
+            assert!(workspace.preview_tables(cx).is_empty());
+            workspace.open_template(file.clone(), cx);
+        })
+        .expect("the window is open");
+    cx.run_until_parked();
+    window
+        .update(cx, |workspace, _window, cx| {
+            assert!(workspace.templates[0].read(cx).preview_text(cx).is_empty());
+        })
+        .expect("the window is open");
+
     // Tick the schema, so the preview has a table to render against.
     let public = window
         .update(cx, |workspace, _window, cx| {
@@ -80,13 +95,6 @@ fn a_real_database_marks_an_unknown_field_in_the_live_preview(cx: &mut gpui::Tes
             workspace.explorer.update(cx, |explorer, cx| {
                 explorer.toggle_tick(&explorer::NodeId::Schema(public.clone()), cx);
             });
-        })
-        .expect("the window is open");
-    cx.run_until_parked();
-
-    window
-        .update(cx, |workspace, _window, cx| {
-            workspace.open_template(file.clone(), cx);
         })
         .expect("the window is open");
     cx.run_until_parked();

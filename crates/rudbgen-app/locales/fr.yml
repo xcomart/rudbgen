@@ -472,6 +472,10 @@ update:
   open_release: Ouvrir la page de la version
 
 template:
+  menu_undo: Annuler
+  menu_redo: Rétablir
+  menu_find: Rechercher…
+  menu_replace: Remplacer…
   unsaved: non enregistré
   tip_preview: Afficher ou masquer l'aperçu en direct
   show_preview: Afficher l'aperçu

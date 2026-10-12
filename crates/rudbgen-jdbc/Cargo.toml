@@ -8,6 +8,7 @@ repository.workspace = true
 description = "The JDBC bridge from the Rust side: JVM bootstrap, the session worker, DESCRIBE and EXECUTE"
 
 [dependencies]
+rudbkit-jdbc.workspace = true
 # The only rudbgen crate this one knows, and it is read-only: the JVM heap and
 # the extra JVM arguments come from `AppSettings`. In particular this crate does
 # *not* know `gpui` — it exposes a plain synchronous API and leaves the binding

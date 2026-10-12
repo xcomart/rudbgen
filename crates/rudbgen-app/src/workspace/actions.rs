@@ -184,6 +184,9 @@ impl Workspace {
             self.set_menu_open(false, cx);
             return;
         }
+        if self.close_template_menus(cx) {
+            return;
+        }
         // Then the "save before closing?" question, which is the innermost
         // thing on screen whenever it is up: it was opened by a press on a
         // tab's close button, over whatever else was already there.

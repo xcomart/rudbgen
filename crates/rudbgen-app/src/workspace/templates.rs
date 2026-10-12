@@ -24,6 +24,7 @@ impl Workspace {
     /// answers to what is in it, and the second save would silently undo the
     /// first.
     pub(super) fn open_template(&mut self, file: PathBuf, cx: &mut Context<Self>) {
+        self.close_template_menus(cx);
         if let Some(index) = self.pane.template_of(&file) {
             self.pane.activate(index);
             if let Some(at) = self.template_index(&file, cx) {

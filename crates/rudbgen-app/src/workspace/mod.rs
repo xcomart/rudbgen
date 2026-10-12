@@ -68,6 +68,8 @@ use crate::{
 
 mod actions;
 mod bootstrap;
+mod events;
+mod startup;
 use bootstrap::{app_menus, apply_themes, chrome_style, record_window_geometry, window_appearance};
 mod database;
 mod dialogs;
@@ -653,133 +655,21 @@ impl Workspace {
     /// field tracks whatever the applied settings switched the window to.
     fn new(titlebar: TitlebarStyle, window: &mut Window, cx: &mut Context<Self>) -> Self {
         let about = cx.new(AboutDialog::new);
-        let about_events =
-            cx.subscribe_in(
-                &about,
-                window,
-                |this, dialog, event, window, cx| match event {
-                    AboutDialogEvent::Dismissed => {
-                        dialog.update(cx, |dialog, cx| dialog.close(cx));
-                        this.focus_shell(window, cx);
-                    }
-                },
-            );
+        let about_events = cx.subscribe_in(&about, window, Self::on_about_event);
 
         let settings = cx.new(SettingsDialog::new);
-        let settings_events = cx.subscribe_in(
-            &settings,
-            window,
-            |this, dialog, event, window, cx| match event {
-                // The dialog has already replaced and persisted the settings
-                // global by the time it emits this; the shell re-applies the
-                // parts that touch the live window.
-                SettingsDialogEvent::Applied => {
-                    this.apply_settings(window, cx);
-                    // The dialog closes itself after applying; without a refocus
-                    // the window focus dangles on its unrendered controls and
-                    // macOS disables every menu item validated through it.
-                    this.focus_shell(window, cx);
-                }
-                // The user is still in the dialog and nothing has been saved, so
-                // only the palettes and the fonts follow — and the focus stays
-                // where it is, since taking it back now would pull it out from
-                // under whoever is typing.
-                SettingsDialogEvent::Previewed => this.apply_preview(window, cx),
-                // Closing dropped the preview, so re-applying now resolves back
-                // to the settings on disk. That is the whole of the undo.
-                SettingsDialogEvent::Dismissed => {
-                    dialog.update(cx, |dialog, cx| dialog.close(cx));
-                    this.apply_preview(window, cx);
-                    this.focus_shell(window, cx);
-                }
-            },
-        );
+        let settings_events = cx.subscribe_in(&settings, window, Self::on_settings_event);
 
         let connection_dialog = cx.new(ConnectionDialog::new);
-        let connection_events = cx.subscribe_in(
-            &connection_dialog,
-            window,
-            |this, dialog, event, window, cx| match event {
-                // The dialog has already written `connections.json`; the shell
-                // re-reads it and opens the session, because the session is the
-                // shell's to own — a dialog that held one could not be closed
-                // without closing the database with it.
-                ConnectionDialogEvent::Connect(profile) => {
-                    this.profiles = load_profiles();
-                    let profile = (**profile).clone();
-                    this.focus_shell(window, cx);
-                    this.connect_to(profile, cx);
-                }
-                ConnectionDialogEvent::Dismissed => {
-                    dialog.update(cx, |dialog, cx| dialog.close(cx));
-                    // Saved, renamed or deleted while it was up, so the welcome
-                    // list and the selector both have to be re-read.
-                    this.profiles = load_profiles();
-                    this.focus_shell(window, cx);
-                }
-            },
-        );
+        let connection_events =
+            cx.subscribe_in(&connection_dialog, window, Self::on_connection_dialog_event);
 
         let abbreviations = cx.new(AbbreviationDialog::new);
-        let abbreviation_events = cx.subscribe_in(
-            &abbreviations,
-            window,
-            |this, dialog, event, window, cx| match event {
-                // The dialog has already written `abbreviations.json`. What is
-                // left is the copy the Generate tab holds — the panel is what a
-                // run reads the rules from, and re-reading the file here would
-                // be a second answer to a question already answered.
-                AbbreviationDialogEvent::Saved(store) => {
-                    let store = (**store).clone();
-                    this.generate.update(cx, |pane, cx| {
-                        pane.adopt_abbreviations(store, cx);
-                    });
-                    dialog.update(cx, |dialog, cx| dialog.close(cx));
-                    this.focus_shell(window, cx);
-                }
-                AbbreviationDialogEvent::Dismissed => {
-                    dialog.update(cx, |dialog, cx| dialog.close(cx));
-                    this.focus_shell(window, cx);
-                }
-            },
-        );
+        let abbreviation_events =
+            cx.subscribe_in(&abbreviations, window, Self::on_abbreviations_event);
 
         let import = cx.new(ImportDialog::new);
-        let import_events =
-            cx.subscribe_in(
-                &import,
-                window,
-                |this, dialog, event, window, cx| match event {
-                    // The wizard has already written the four stores and the
-                    // keychain; the shell re-reads the connection list the welcome
-                    // screen draws, and applies jdbgen's language and theme when
-                    // the user ticked that box — settings are the shell's, never a
-                    // dialog's.
-                    ImportDialogEvent::Imported(hint) => {
-                        this.profiles = load_profiles();
-                        // The wizard wrote `abbreviations.json`; the Generate
-                        // tab holds the copy a run reads the rules from, and it
-                        // only re-reads the file when a connection opens.
-                        match rudbgen_core::AbbreviationStore::load() {
-                            Ok(store) => this.generate.update(cx, |pane, cx| {
-                                pane.adopt_abbreviations(store, cx);
-                            }),
-                            Err(error) => {
-                                log::error!("could not re-read abbreviations.json: {error:#}");
-                            }
-                        }
-                        if let Some(hint) = hint {
-                            this.adopt_jdbgen_settings(hint, window, cx);
-                        }
-                        cx.notify();
-                    }
-                    ImportDialogEvent::Dismissed => {
-                        dialog.update(cx, |dialog, cx| dialog.close(cx));
-                        this.profiles = load_profiles();
-                        this.focus_shell(window, cx);
-                    }
-                },
-            );
+        let import_events = cx.subscribe_in(&import, window, Self::on_import_event);
 
         // The one thing that must happen before the process winds down: the
         // session is closed, and the tunnel under it after that. A session left
@@ -791,132 +681,17 @@ impl Workspace {
         });
 
         let update = cx.new(UpdateDialog::new);
-        let update_events = cx.subscribe_in(&update, window, |this, dialog, event, window, cx| {
-            match event {
-                UpdateDialogEvent::Ignored { tag } => {
-                    // The dialog has already closed itself; writing the file is
-                    // the shell's job because the shell is what owns settings.
-                    update::remember_ignored(tag, cx);
-                    this.focus_shell(window, cx);
-                }
-                UpdateDialogEvent::Installed(_) => {
-                    // The new build is on disk and the restart is the
-                    // application's to perform: `cx.restart()` spawns a watcher
-                    // that waits for this pid to exit and starts rudbgen again
-                    // from the same path, which by then holds what was
-                    // installed. The dialog stays on screen — the process is
-                    // about to go, and closing it first would flash the window
-                    // back into view for a fraction of a second.
-                    //
-                    // The path has to be pointed at explicitly: `install`
-                    // renames the running image aside and writes the new build
-                    // under the old name, and on Linux `current_exe()` follows
-                    // the *inode* into the renamed-away copy, so a bare
-                    // `cx.restart()` would come back up on the build that was
-                    // just replaced. `restart_path()` is the path as it stood
-                    // before anything moved, taken by `init_process_identity`
-                    // at the top of `main`; where the platform never answered
-                    // one, leaving `set_restart_path` uncalled is gpui's own
-                    // default and behaves the same as before this build.
-                    if let Some(path) = rugpui_shell::restart_path() {
-                        cx.set_restart_path(path);
-                    }
-                    cx.restart();
-                }
-                UpdateDialogEvent::Dismissed => {
-                    dialog.update(cx, |dialog, cx| dialog.close(cx));
-                    this.focus_shell(window, cx);
-                }
-            }
-        });
+        let update_events = cx.subscribe_in(&update, window, Self::on_update_event);
 
-        // The start-up update check, off the UI thread: it is an HTTPS request
-        // to GitHub, and nothing on screen waits for it (architecture document,
-        // §4.1). The tag the user may have ignored is read here, on the UI
-        // thread, because the settings global is only reachable from it.
-        //
-        // The answer opens a dialog, so it deliberately does *not* go through
-        // `open_about`'s `close_overlays` route: this is the one dialog nobody
-        // asked for, arriving at a moment nobody chose, and it must never take
-        // the screen from something the user opened themselves. If anything is
-        // already up, the check simply says nothing and tries again next
-        // launch.
-        //
-        // The guard is here, in this crate, rather than inside the check:
-        // `cfg!(test)` compiled into a dependency is that dependency's build,
-        // so `rugpui_shell::update::check` cannot tell a test build of *this*
-        // crate from a release one, and every render test that opens a window
-        // would make a real request to GitHub.
-        //
-        // `rugpui_shell::update::set_startup_check_enabled(false)` says the same
-        // thing to the shell and is the other half of the guard; the tests
-        // install it once, so that a path reaching the check some other way is
-        // still silent. See [`tests::silence_the_update_check`].
-        if !cfg!(test) {
-            let ignored = update::ignored_release(cx);
-            cx.spawn(async move |this, cx| {
-                let found = cx
-                    .background_executor()
-                    .spawn(async move { update::check(ignored.as_deref()) })
-                    .await;
-                let Some(release) = found else {
-                    return;
-                };
-                this.update(cx, |workspace, cx| {
-                    if workspace.dialog_open(cx) {
-                        log::debug!("update {} announced while a dialog is open", release.tag);
-                        return;
-                    }
-                    workspace.update.update(cx, |dialog, cx| {
-                        dialog.open(release, cx);
-                    });
-                    cx.notify();
-                })
-                .ok();
-            })
-            .detach();
-        }
+        Self::start_background_work(cx);
 
         // The two panels of the body. Both are built empty and stay out of the
         // frame until a session opens; see [`Workspace::render_body`].
         let explorer = cx.new(Explorer::new);
-        let explorer_events = cx.subscribe(&explorer, |workspace, _explorer, event, cx| {
-            match event {
-                // Both of these need the session, which is the workspace's.
-                ExplorerEvent::LoadSchemas => workspace.load_schemas(cx),
-                ExplorerEvent::LoadTables(schema) => workspace.load_tables(schema.clone(), cx),
-                // The status bar counts the ticks, and so does the list of
-                // tables a live preview may be rendered against.
-                ExplorerEvent::SelectionChanged => {
-                    workspace.refresh_templates(cx);
-                    cx.notify();
-                }
-                ExplorerEvent::Inspect { table, reveal } => {
-                    // Only the menu row asks for the panel to be shown. Moving
-                    // the tree's cursor must not: an arrow key that reopened a
-                    // panel the user had put away would be the shell arguing.
-                    if *reveal {
-                        workspace.inspector_visible = true;
-                        workspace.remember_layout(cx);
-                    }
-                    let table = table.clone();
-                    workspace
-                        .inspector
-                        .update(cx, |panel, cx| panel.show(table, cx));
-                    // A cache hit draws without asking anybody, so no Load
-                    // event follows to refresh the palette on the way back —
-                    // refresh it here, for the table now in hand.
-                    workspace.refresh_palette(cx);
-                    cx.notify();
-                }
-            }
-        });
+        let explorer_events = cx.subscribe(&explorer, Self::on_explorer_event);
 
         let inspector = cx.new(Inspector::new);
-        let inspector_events =
-            cx.subscribe(&inspector, |workspace, _panel, event, cx| match event {
-                InspectorEvent::Load(table) => workspace.load_table(table.clone(), cx),
-            });
+        let inspector_events = cx.subscribe(&inspector, Self::on_inspector_event);
 
         // The three views of the work area. The Generate tab is permanent and
         // is pushed here rather than on the first connection: it is what the
@@ -926,47 +701,16 @@ impl Workspace {
         // `subscribe_in` rather than `subscribe`: *Rules…* opens a modal, and
         // opening one closes whatever else is on screen and moves the keyboard,
         // both of which need the window.
-        let generate_events = cx.subscribe_in(
-            &generate,
-            window,
-            |workspace, _pane, event, window, cx| match event {
-                GeneratePaneEvent::Changed => {
-                    // The palette lists the custom variables, so a variable
-                    // typed into the Generate tab has to reach it.
-                    workspace.refresh_palette(cx);
-                    cx.notify();
-                }
-                GeneratePaneEvent::EditTemplate(file) => {
-                    let file = generate_pane::resolve_template(file);
-                    workspace.open_template(file, cx);
-                }
-                GeneratePaneEvent::EditAbbreviations => {
-                    workspace.open_abbreviations(window, cx);
-                }
-            },
-        );
+        let generate_events = cx.subscribe_in(&generate, window, Self::on_generate_event);
 
         let preview = cx.new(PreviewPane::new);
-        let preview_events = cx.subscribe(&preview, |workspace, _pane, event, cx| match event {
-            PreviewEvent::Reselect { table, template } => {
-                workspace.render_preview(*table, *template, cx);
-            }
-        });
+        let preview_events = cx.subscribe(&preview, Self::on_preview_event);
 
         let palette = cx.new(VariablePalette::new);
-        let palette_events = cx.subscribe_in(
-            &palette,
-            window,
-            |workspace, _panel, event, window, cx| match event {
-                PaletteEvent::Insert(text) => workspace.insert_into_template(text, window, cx),
-            },
-        );
+        let palette_events = cx.subscribe_in(&palette, window, Self::on_palette_event);
 
         let job = cx.new(GenerationJob::new);
-        let job_events =
-            cx.subscribe_in(&job, window, |this, _job, event, window, cx| match event {
-                JobEvent::Closed => this.focus_shell(window, cx),
-            });
+        let job_events = cx.subscribe_in(&job, window, Self::on_job_event);
 
         let mut pane = Pane::new();
         pane.push(PaneItem::Generate);

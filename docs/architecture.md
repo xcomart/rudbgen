@@ -145,17 +145,18 @@ rudbgen-app
 │              │ │  Author   comart                │                 │
 │              │ │  Variables  package=com.abc.x   │                 │
 │              │ │  ☑ apply abbreviations  [rules…]│                 │
+│              │ │ [Preview] [Dry run] [Generate] │                 │
 │              │ └────────────────────────────────┘                 │
 ├──────────────┴─────────────────────────────────┴─────────────────┤
-│ 2 tables · 2 templates → 4 files into ~/out/src   [Preview] [Dry run] [Generate ▶] │
+│ 2 tables · 2 templates → 4 files into ~/out/src                    │
 └──────────────────────────────────────────────────────────────────┘
 ```
 
 - **Title bar**: the connection selector (a `TabBar`-less `Select` with the status dot: connecting / connected / error), settings and help. Switching the connection swaps the explorer and the Generate tab's options (they are per connection), never the open template tabs.
 - **Explorer** (left, collapsible): catalog → schema → table tree with a filter box (contains, case-insensitive — jdbgen's `filterTables` rule), a *views* toggle, and a **checkbox per table row**. Selection is the set of ticked rows, which survives filtering and schema switching. Context menu: select all visible, clear, invert, open in inspector.
-- **Work area** (center): a tab strip. The **Generate** tab is permanent. Template tabs open from the template list (§4.4). A **Preview** tab opens from the status bar.
+- **Work area** (center): a tab strip. The **Generate** tab is permanent and has no close button. Template tabs open from the template list (§4.4). A **Preview** tab opens from the Generate tab's action row.
 - **Inspector** (right, collapsible): the table under the cursor or the last ticked one — columns (ordinal, name, type, nullable, default, comment, PK marker), keys, foreign keys in and out, indexes. This replaces jdbgen's Table View modal. When a template tab is active it shows the **variable palette** instead (§4.5).
-- **Status bar**: the arithmetic of the run and the three actions. `Generate` is disabled with a reason (`no connection`, `no tables ticked`, `no templates ticked`) in a tooltip rather than an error box after the click.
+- **Status bar**: the connection state and the arithmetic of the run.
 
 ### 4.3 Welcome screen
 
@@ -166,6 +167,7 @@ Shown in the work area when no connection is open: saved connections as a list (
 - **Template set** selector (jdbgen's presets, renamed): `Built-in: Java + MyBatis`, user sets, and `Custom` once the list diverges. `Save as set…` stores the current list.
 - **Template list**: one row per template — tick, name, output name template, and an **Edit** glyph that opens the template tab. Inline add/remove; the file picker starts in `<config>/templates`. The ticks are stored per connection as in jdbgen.
 - **Options**: output directory (with the `...` chooser), author, custom variables (key/value table with the trailing empty row rule), the abbreviation toggle with a link to the rules editor.
+- **Actions**: standard-sized **Preview**, **Dry run**, and **Generate** buttons in a fixed row at the bottom, outside the scrolling form. The row appears only while the connected Generate tab is active. Each action is disabled with a reason in a tooltip when its requirements are missing or a generation job is running.
 - All of it is the connection's generation profile, saved when it changes (debounced) — there is no second place to edit it.
 
 ### 4.5 Template tab

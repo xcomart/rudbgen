@@ -661,6 +661,10 @@ update:
 # The template tab: the editor, the live preview beside it, and the question
 # asked when one is closed with edits in it (§4.5).
 template:
+  menu_undo: Undo
+  menu_redo: Redo
+  menu_find: Find…
+  menu_replace: Replace…
   # The marker in the tab's header strip while the buffer differs from the file.
   unsaved: unsaved
   tip_preview: Show or hide the live preview

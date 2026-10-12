@@ -199,6 +199,8 @@ impl Render for VariablePalette {
                     let this = cx.entity();
                     div()
                         .id((section.id(), index))
+                        .tab_index(0)
+                        .focus(|style| style.bg(theme.surface_active))
                         .flex()
                         .flex_row()
                         .items_center()

@@ -470,6 +470,10 @@ update:
   open_release: 릴리스 페이지 열기
 
 template:
+  menu_undo: 실행 취소
+  menu_redo: 다시 실행
+  menu_find: 찾기…
+  menu_replace: 바꾸기…
   unsaved: 저장 안 됨
   tip_preview: 실시간 미리보기를 켜거나 끕니다
   show_preview: 미리보기 표시

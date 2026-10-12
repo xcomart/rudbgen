@@ -44,8 +44,8 @@ use gpui::{
 };
 use rudbgen_meta::Table;
 use rugpui::{
-    Button, ButtonVariant, DraggedThumb, Scrollbar, ScrollbarAxis, ScrollbarState, Segmented,
-    Theme, hide_later, hide_now, scroll_to, scrolled, theme,
+    DraggedThumb, Scrollbar, ScrollbarAxis, ScrollbarState, Segmented, Theme, hide_later, hide_now,
+    scroll_to, scrolled, theme,
 };
 use rugpui_grid::{
     GridCell, GridColumn, GridColumnKind, GridSource, GridView, source::GridColumnAlign,
@@ -486,7 +486,7 @@ impl Inspector {
     /// The header: what is being described, and the button that reads it again.
     fn render_header(&self, chrome: &Theme, cx: &mut Context<Self>) -> AnyElement {
         let this = cx.entity();
-        let loading = self.is_loading();
+        let can_refresh = !self.is_loading() && self.target.is_some();
         let (mark, name, kind, remarks) = match (&self.target, &self.load) {
             (Some(key), Load::Ready(table)) => (
                 if table.is_view() {
@@ -554,12 +554,33 @@ impl Inspector {
             }))
             .child(div().flex_1().min_w_0())
             .child(
-                Button::new("inspector-refresh", ts!("inspector.refresh"))
-                    .variant(ButtonVariant::Secondary)
-                    .disabled(loading || self.target.is_none())
-                    .on_click(move |_, _window, cx| {
-                        this.update(cx, |panel, cx| panel.refresh(cx));
-                    }),
+                div()
+                    .id("inspector-refresh")
+                    .flex()
+                    .flex_none()
+                    .items_center()
+                    .justify_center()
+                    .size(px(24.))
+                    .rounded_md()
+                    .tooltip(rugpui::tooltip_label(ts!("inspector.refresh")))
+                    .when(can_refresh, |button| {
+                        button
+                            .cursor_pointer()
+                            .hover(|style| style.bg(chrome.surface_hover))
+                            .active(|style| style.bg(chrome.surface_active))
+                            .on_click(move |_, _window, cx| {
+                                this.update(cx, |panel, cx| panel.refresh(cx));
+                            })
+                    })
+                    .child(rugpui_shell::icon(
+                        icons::REFRESH,
+                        px(16.),
+                        if can_refresh {
+                            chrome.icon
+                        } else {
+                            chrome.icon.opacity(0.5)
+                        },
+                    )),
             )
             .into_any_element()
     }

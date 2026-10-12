@@ -64,9 +64,6 @@ const PANE_SCROLL: &str = "generate-scroll";
 /// Element id the panel's overlay scroll indicator is drawn under.
 const PANE_SCROLLBAR: &str = "generate-scrollbar";
 
-/// Tab-ring position of the first control in the panel.
-const FIRST_TAB: isize = 100;
-
 /// What the panel tells the shell about.
 pub enum GeneratePaneEvent {
     /// The profile changed: the status bar has to recount.
@@ -291,16 +288,10 @@ pub struct GeneratePane {
 impl GeneratePane {
     /// An empty panel, pointed at no connection.
     pub fn new(cx: &mut Context<Self>) -> Self {
-        let output = cx.new(|cx| {
-            TextInput::new(cx)
-                .placeholder(ts!("generate.output_placeholder"))
-                .tab_index(FIRST_TAB)
-        });
-        let author = cx.new(|cx| {
-            TextInput::new(cx)
-                .placeholder(ts!("generate.author_placeholder"))
-                .tab_index(FIRST_TAB + 1)
-        });
+        let output =
+            cx.new(|cx| TextInput::new(cx).placeholder(ts!("generate.output_placeholder")));
+        let author =
+            cx.new(|cx| TextInput::new(cx).placeholder(ts!("generate.author_placeholder")));
         let set_name = cx.new(|cx| TextInput::new(cx).placeholder(ts!("generate.set_name")));
         let subs = vec![
             cx.observe(&output, |pane, _, cx| pane.touch(cx)),
@@ -512,14 +503,14 @@ impl GeneratePane {
     /// Rebuilds every row from `profile`.
     fn rebuild(&mut self, profile: &GenerationProfile, cx: &mut Context<Self>) {
         self.templates.clear();
-        for (index, template) in profile.templates.iter().enumerate() {
-            let row = self.new_template_row(index, template, cx);
+        for template in &profile.templates {
+            let row = self.new_template_row(template, cx);
             self.templates.push(row);
         }
 
         self.vars.clear();
-        for (index, (key, value)) in profile.custom_vars.iter().enumerate() {
-            let row = self.new_var_row(index, cx);
+        for (key, value) in &profile.custom_vars {
+            let row = self.new_var_row(cx);
             set_text(&row.key, key.clone(), cx);
             set_text(&row.value, value.clone(), cx);
             self.vars.push(row);
@@ -541,23 +532,9 @@ impl GeneratePane {
     }
 
     /// One template row, with its two fields already observed.
-    fn new_template_row(
-        &self,
-        index: usize,
-        template: &TemplateRef,
-        cx: &mut Context<Self>,
-    ) -> TemplateRow {
-        let base = FIRST_TAB + 10 + (index as isize) * 2;
-        let name = cx.new(|cx| {
-            TextInput::new(cx)
-                .placeholder(ts!("generate.template_name"))
-                .tab_index(base)
-        });
-        let out = cx.new(|cx| {
-            TextInput::new(cx)
-                .placeholder(ts!("generate.out_template"))
-                .tab_index(base + 1)
-        });
+    fn new_template_row(&self, template: &TemplateRef, cx: &mut Context<Self>) -> TemplateRow {
+        let name = cx.new(|cx| TextInput::new(cx).placeholder(ts!("generate.template_name")));
+        let out = cx.new(|cx| TextInput::new(cx).placeholder(ts!("generate.out_template")));
         set_text(&name, template.name.clone(), cx);
         set_text(&out, template.out_template.clone(), cx);
         let subs = [
@@ -574,18 +551,9 @@ impl GeneratePane {
     }
 
     /// One variable row, with its two fields already observed.
-    fn new_var_row(&self, index: usize, cx: &mut Context<Self>) -> VarRow {
-        let base = FIRST_TAB + 200 + (index as isize) * 2;
-        let key = cx.new(|cx| {
-            TextInput::new(cx)
-                .placeholder(ts!("generate.var_key"))
-                .tab_index(base)
-        });
-        let value = cx.new(|cx| {
-            TextInput::new(cx)
-                .placeholder(ts!("generate.var_value"))
-                .tab_index(base + 1)
-        });
+    fn new_var_row(&self, cx: &mut Context<Self>) -> VarRow {
+        let key = cx.new(|cx| TextInput::new(cx).placeholder(ts!("generate.var_key")));
+        let value = cx.new(|cx| TextInput::new(cx).placeholder(ts!("generate.var_value")));
         let subs = [
             cx.observe(&key, |pane, _, cx| pane.var_edited(cx)),
             cx.observe(&value, |pane, _, cx| pane.var_edited(cx)),
@@ -612,7 +580,7 @@ impl GeneratePane {
             .map(|row| (text(&row.key, cx), text(&row.value, cx)))
             .collect();
         if needs_trailing_blank(&rows) {
-            let row = self.new_var_row(self.vars.len(), cx);
+            let row = self.new_var_row(cx);
             self.vars.push(row);
         }
     }
@@ -644,8 +612,8 @@ impl GeneratePane {
             return;
         };
         self.templates.clear();
-        for (index, template) in set.templates.iter().enumerate() {
-            let row = self.new_template_row(index, template, cx);
+        for template in &set.templates {
+            let row = self.new_template_row(template, cx);
             self.templates.push(row);
         }
         self.touch(cx);
@@ -740,7 +708,7 @@ impl GeneratePane {
                 out_template: format!("${{name.suffix.pascal}}{extension}"),
                 selected: true,
             };
-            let row = self.new_template_row(self.templates.len(), &template, cx);
+            let row = self.new_template_row(&template, cx);
             self.templates.push(row);
         }
         self.touch(cx);
@@ -883,7 +851,6 @@ impl GeneratePane {
                     .selected(Some(selected))
                     .open(self.set_open)
                     .width(px(SET_WIDTH))
-                    .tab_index(FIRST_TAB - 3)
                     .on_select(move |index, _text, _window, cx| {
                         this.update(cx, |pane, cx| {
                             pane.set_open = false;
@@ -904,7 +871,6 @@ impl GeneratePane {
                 Button::new("generate-save-set", ts!("generate.save_as_set"))
                     .variant(ButtonVariant::Secondary)
                     .disabled(self.templates.is_empty())
-                    .tab_index(FIRST_TAB - 2)
                     .on_click(move |_, window, cx| {
                         naming.update(cx, |pane, cx| {
                             pane.naming_set = true;
@@ -919,7 +885,6 @@ impl GeneratePane {
                 Button::new("generate-delete-set", ts!("generate.delete_set"))
                     .variant(ButtonVariant::Secondary)
                     .disabled(matched.is_none())
-                    .tab_index(FIRST_TAB - 1)
                     .on_click(move |_, _window, cx| {
                         deleting.update(cx, |pane, cx| {
                             pane.deleting_set = matched;
@@ -1030,6 +995,8 @@ impl GeneratePane {
                 // the configuration directory before opening it.
                 div()
                     .id(("generate-edit", index))
+                    .tab_index(0)
+                    .focus(|style| style.bg(theme.surface_active).text_color(theme.accent))
                     .flex()
                     .flex_none()
                     .items_center()
@@ -1052,6 +1019,8 @@ impl GeneratePane {
             .child(
                 div()
                     .id(("generate-remove", index))
+                    .tab_index(0)
+                    .focus(|style| style.bg(theme.surface_active).text_color(theme.accent))
                     .flex()
                     .flex_none()
                     .items_center()
@@ -1373,6 +1342,80 @@ mod tests {
             out_template: "${name.suffix.pascal}.java".to_string(),
             selected,
         }
+    }
+
+    #[gpui::test]
+    fn tab_follows_template_rows_and_reaches_remove(cx: &mut gpui::TestAppContext) {
+        cx.update(|cx| {
+            crate::app_settings::init(cx);
+            rugpui::init(cx);
+        });
+        let window = cx.add_window(|_, cx| {
+            let mut pane = GeneratePane::new(cx);
+            pane.rebuild(
+                &GenerationProfile {
+                    templates: vec![reference("first", true), reference("second", true)],
+                    ..Default::default()
+                },
+                cx,
+            );
+            pane
+        });
+        let mut cx = gpui::VisualTestContext::from_window(window.into(), cx);
+        cx.run_until_parked();
+        window
+            .update(&mut cx, |pane, window, cx| {
+                pane.templates[0]
+                    .name
+                    .read(cx)
+                    .focus_handle(cx)
+                    .focus(window, cx);
+            })
+            .unwrap();
+        cx.simulate_keystrokes("tab");
+        window
+            .update(&mut cx, |pane, window, cx| {
+                assert!(
+                    pane.templates[0]
+                        .out
+                        .read(cx)
+                        .focus_handle(cx)
+                        .is_focused(window)
+                );
+            })
+            .unwrap();
+        // Edit, remove: these used to be mouse-only controls.
+        cx.simulate_keystrokes("tab tab");
+        let stroke = gpui::Keystroke::parse("enter").unwrap();
+        cx.simulate_event(gpui::KeyDownEvent {
+            keystroke: stroke.clone(),
+            is_held: false,
+            prefer_character_input: false,
+        });
+        cx.simulate_event(gpui::KeyUpEvent { keystroke: stroke });
+        window
+            .update(&mut cx, |pane, window, cx| {
+                assert_eq!(pane.templates.len(), 1);
+                assert_eq!(text(&pane.templates[0].name, cx), "second");
+                pane.templates[0]
+                    .name
+                    .read(cx)
+                    .focus_handle(cx)
+                    .focus(window, cx);
+            })
+            .unwrap();
+        // Removing a row must keep its checkbox before its text fields.
+        cx.simulate_keystrokes("shift-tab");
+        let stroke = gpui::Keystroke::parse("space").unwrap();
+        cx.simulate_event(gpui::KeyDownEvent {
+            keystroke: stroke.clone(),
+            is_held: false,
+            prefer_character_input: false,
+        });
+        cx.simulate_event(gpui::KeyUpEvent { keystroke: stroke });
+        window
+            .update(&mut cx, |pane, _, _| assert!(!pane.templates[0].selected))
+            .unwrap();
     }
 
     #[test]

@@ -472,6 +472,10 @@ update:
   open_release: Открыть страницу выпуска
 
 template:
+  menu_undo: Отменить
+  menu_redo: Вернуть
+  menu_find: Найти…
+  menu_replace: Заменить…
   unsaved: не сохранено
   tip_preview: Показать или скрыть живой просмотр
   show_preview: Показать просмотр

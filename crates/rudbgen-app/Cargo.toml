@@ -20,6 +20,7 @@ path = "src/main.rs"
 winresource.workspace = true
 
 [dependencies]
+rudbkit-core.workspace = true
 rudbgen-core.workspace = true
 # The session behind a connection: `Jvm::start`, `Session::open` and the
 # `EXECUTE` the custom-query test runs. `src/connection.rs` is the only module

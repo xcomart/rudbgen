@@ -35,6 +35,10 @@ Written against jdbgen, because that is what most of this is for:
   and the explorer, the work area and the inspector are the same frame from then
   on. Nothing modal stands between you and the first click.
   ![The welcome screen](docs/screenshots/welcome.png)
+- **Connection folders.** Group saved connections by folder in the connection
+  dialog. Click a folder heading to collapse or expand it, or focus it with
+  <kbd>Tab</kbd> and press <kbd>Space</kbd> or <kbd>Enter</kbd>. Folded folders
+  stay folded when you reopen the dialog during the same app session.
 - **No master password.** jdbgen encrypted the URL, the user name and the
   password with a master password you had to type at every start. rudbgen puts
   the password — and an SSH key passphrase — in the operating system's own

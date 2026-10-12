@@ -49,6 +49,12 @@ it is, so a configuration copied from another machine still has a door.
 connection dialog: a name, a driver, the URL, credentials, extra properties, a
 keep-alive probe and an SSH tunnel.
 
+Set **Folder** to group saved connections in the list. Click a folder heading
+to collapse or expand it, or focus it with <kbd>Tab</kbd> and press <kbd>Space</kbd>
+or <kbd>Enter</kbd>. Collapsed folders keep their state when you reopen the
+dialog during the same app session, and folding one keeps the current form's
+unsaved edits.
+
 - **The driver** picks the URL shape. Choosing one fills the URL with its
   template — `jdbc:postgresql://{host}:{port}/{database}` — and the fields under
   it fill the holes; the URL stays editable, so an option the form has no field

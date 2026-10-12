@@ -178,6 +178,13 @@ tag: Gradle, then `jlink`, then `cargo`, then packaging.
 
 ## Architecture
 
+SSH transport, tunnel ownership, connection validation and saving, and JVM
+startup come from [rudbkit](https://github.com/xcomart/rudbkit), pinned to one
+Git revision in the root Cargo manifest. Cargo fetches it automatically. The
+application keeps its own settings, keychain, Java bridge protocol and dialog
+layout; its SSH crate is a compatibility facade over the shared transport.
+
+
 The design document — the decisions, the crate layout, the JNI bridge, the
 template engine and its compatibility canary, the metadata model, the generation
 job and the milestone plan — lives in

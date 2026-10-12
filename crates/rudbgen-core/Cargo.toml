@@ -8,6 +8,7 @@ repository.workspace = true
 description = "Everything rudbgen persists: paths, settings, connection and driver stores, template sets, abbreviation rules, keychain access"
 
 [dependencies]
+rudbkit-core.workspace = true
 anyhow.workspace = true
 log.workspace = true
 serde.workspace = true

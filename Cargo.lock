@@ -5877,6 +5877,7 @@ dependencies = [
  "async-trait",
  "futures",
  "log",
+ "parking_lot",
  "rudbgen-core",
  "russh",
  "tokio",

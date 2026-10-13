@@ -215,6 +215,11 @@ upstream has no answer for.
 The root [`Cargo.toml`](Cargo.toml) explains why the patch table here has to
 point at rugpui's copies rather than carry its own.
 
+## Contributing
+
+See the [contribution guide](CONTRIBUTING.md) for development setup, bridge and
+database tests, template compatibility and the workflow for submitting changes.
+
 ## License
 
 [MIT](LICENSE). The gpui crates rugpui vendors keep their upstream licenses.

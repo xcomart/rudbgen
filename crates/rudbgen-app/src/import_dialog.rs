@@ -38,6 +38,7 @@
 //! [`Error::WrongPassword`]: rudbgen_import::Error::WrongPassword
 //! [`Zeroizing<String>`]: zeroize::Zeroizing
 
+use rugpui::SmoothScrollExt;
 use std::collections::HashMap;
 use std::path::{Path, PathBuf};
 
@@ -1271,6 +1272,7 @@ impl Render for ImportDialog {
                             .min_h_0()
                             .max_h(px(BODY_MAX_HEIGHT))
                             .overflow_y_scroll()
+                            .smooth_scroll(&self.scroll)
                             .restrict_scroll_to_axis()
                             .child(step),
                     )

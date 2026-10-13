@@ -38,6 +38,7 @@ use gpui::{
     Window, div, prelude::*, px,
 };
 use rudbgen_core::{AbbreviationRule, AbbreviationStore};
+use rugpui::SmoothScrollExt;
 use rugpui::{
     Button, ButtonVariant, Checkbox, DraggedThumb, Scrollbar, ScrollbarAxis, ScrollbarState,
     Select, TextInput, Theme, hide_later, modal, scroll_to, scrolled, theme, tooltip_label,
@@ -642,6 +643,7 @@ impl Render for AbbreviationDialog {
                     .min_h_0()
                     .max_h(px(TABLE_MAX_HEIGHT))
                     .overflow_y_scroll()
+                    .smooth_scroll(&self.scroll)
                     .restrict_scroll_to_axis()
                     .children(rows),
             )

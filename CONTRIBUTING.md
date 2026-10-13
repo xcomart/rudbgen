@@ -165,8 +165,15 @@ with `--ignored`; ordinary SSH tests use loopback servers.
 `dev` is the integration branch. Fork if necessary, branch from the latest
 upstream `dev`, and open a focused pull request targeting `dev`. Maintainers
 working directly in this workspace validate and commit on `dev`, then push to
-`origin/dev`. Use the existing imperative commit style, for example
-`Fix template preview for empty tables` or `Add contribution guide`.
+`origin/dev`.
+
+Use `type: summary` for new commit subjects, with a concise imperative summary.
+Choose `feat`, `fix`, `docs`, `refactor`, `test`, `perf`, `build`, `ci` or `chore`
+to describe the change, for example `fix: handle empty tables in template previews`
+or `docs: add contribution guide`. Release and merge commits also use a prefix,
+such as `chore: release <version>` or `chore: merge dev into main`. This convention
+applies across all five repositories; do not rewrite existing history to rename
+older commits.
 
 Explain the problem, resulting behavior and validation in the pull request.
 Include a minimal reproduction, screenshots for UI changes, database/driver

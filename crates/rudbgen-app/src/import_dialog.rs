@@ -1026,6 +1026,7 @@ impl ImportDialog {
         div()
             .flex()
             .flex_col()
+            .w_full()
             .gap(px(14.))
             .child(connections)
             .child(drivers)
@@ -1551,6 +1552,27 @@ mod tests {
         let opened = decrypt(&config, MASTER).expect("the master password opens it");
         let mapped = map(&opened, &MapOptions::new(dir.path()));
         (dir, mapped)
+    }
+
+    #[gpui::test]
+    #[ignore = "manual dialog frame benchmark"]
+    fn profile_import_review_frames(cx: &mut gpui::TestAppContext) {
+        let (dir, mapped) = fixture();
+        let config = read(&dir.path().join("config.json")).unwrap();
+        let decrypted = decrypt(&config, MASTER).unwrap();
+        let preview = rudbgen_import::from_mapped(&decrypted, &mapped);
+        cx.update(rugpui::init);
+        let window = cx.add_window(|_, cx| {
+            let mut dialog = ImportDialog::new(cx);
+            dialog.open = true;
+            dialog.stage = Stage::Review;
+            dialog.preview = Some(preview);
+            dialog.hint = mapped.settings_hint.clone();
+            dialog.selection = Selection::everything(&mapped);
+            dialog.mapped = Some(mapped);
+            dialog
+        });
+        crate::frame_profile::measure("Import review", window, cx);
     }
 
     fn driver(id: &str, name: &str) -> DriverDef {

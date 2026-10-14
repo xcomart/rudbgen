@@ -8,6 +8,8 @@ mod connection;
 mod connection_dialog;
 mod driver_manager;
 mod explorer;
+#[cfg(test)]
+mod frame_profile;
 mod generate_job;
 mod generate_pane;
 mod i18n;

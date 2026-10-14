@@ -501,7 +501,7 @@ impl Workspace {
                 .flex_none()
                 .w(px(self.explorer_width))
                 .min_h_0()
-                .child(self.explorer.clone())
+                .child(rugpui::cached_view(self.explorer.clone()))
                 .child(
                     ResizeHandle::new("explorer-divider", Axis::Horizontal, DraggedExplorer)
                         .at_end()
@@ -522,9 +522,9 @@ impl Workspace {
                 .w(px(self.inspector_width))
                 .min_h_0()
                 .child(if palette {
-                    self.palette.clone().into_any_element()
+                    rugpui::cached_view(self.palette.clone()).into_any_element()
                 } else {
-                    self.inspector.clone().into_any_element()
+                    rugpui::cached_view(self.inspector.clone()).into_any_element()
                 })
                 // The mirror of the sidebar's, on the edge this panel is
                 // dragged from: its leading one, because the panel sits at the
@@ -668,7 +668,13 @@ impl Workspace {
                         .flex_col()
                         .flex_1()
                         .min_h_0()
-                        .child(self.generate.clone())
+                        .child(
+                            div()
+                                .flex()
+                                .flex_1()
+                                .min_h_0()
+                                .child(rugpui::cached_view(self.generate.clone())),
+                        )
                         .child(
                             div()
                                 .id("generate-actions")
@@ -689,9 +695,13 @@ impl Workspace {
                     return self.render_welcome(theme, cx);
                 }
             }
-            Some(PaneItem::Preview { .. }) => self.preview.clone().into_any_element(),
+            Some(PaneItem::Preview { .. }) => {
+                rugpui::cached_view(self.preview.clone()).into_any_element()
+            }
             Some(PaneItem::Template { file, .. }) => match self.template_index(file, cx) {
-                Some(index) => self.templates[index].clone().into_any_element(),
+                Some(index) => {
+                    rugpui::cached_view(self.templates[index].clone()).into_any_element()
+                }
                 // A tab with no buffer behind it cannot happen — the two are
                 // pushed together — but drawing nothing is better than a panic
                 // if it ever did.

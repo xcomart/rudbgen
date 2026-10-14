@@ -38,6 +38,7 @@ use gpui::{
     Window, div, prelude::*, px,
 };
 use rudbgen_core::{AbbreviationRule, AbbreviationStore};
+use rugpui::SmoothScrollExt;
 use rugpui::{
     Button, ButtonVariant, Checkbox, DraggedThumb, Scrollbar, ScrollbarAxis, ScrollbarState,
     Select, TextInput, Theme, hide_later, modal, scroll_to, scrolled, theme, tooltip_label,
@@ -510,6 +511,7 @@ impl AbbreviationDialog {
             .id(("abbr-row", index))
             .flex()
             .flex_row()
+            .w_full()
             .items_center()
             .gap(px(6.))
             .child(
@@ -631,6 +633,8 @@ impl Render for AbbreviationDialog {
             .relative()
             .flex()
             .flex_col()
+            // Give every editable row a definite width before laying it out.
+            .w_full()
             .min_h_0()
             .child(
                 div()
@@ -642,6 +646,7 @@ impl Render for AbbreviationDialog {
                     .min_h_0()
                     .max_h(px(TABLE_MAX_HEIGHT))
                     .overflow_y_scroll()
+                    .smooth_scroll(&self.scroll)
                     .restrict_scroll_to_axis()
                     .children(rows),
             )
@@ -834,6 +839,67 @@ mod tests {
             abbreviation: abbr.to_string(),
             replacement: replace.to_string(),
         }
+    }
+
+    fn populated_window(cx: &mut gpui::TestAppContext) -> gpui::WindowHandle<AbbreviationDialog> {
+        cx.update(rugpui::init);
+        cx.add_window(|_, cx| {
+            let mut dialog = AbbreviationDialog::new(cx);
+            dialog.open(
+                &AbbreviationStore {
+                    rules: (0..50)
+                        .map(|i| rule(true, true, &format!("T{i}"), &format!("Table{i}")))
+                        .collect(),
+                    ..Default::default()
+                },
+                vec!["EMP".into()],
+                cx,
+            );
+            dialog
+        })
+    }
+
+    #[gpui::test]
+    fn long_rule_lists_keep_their_width_and_scroll_to_the_last_row(cx: &mut gpui::TestAppContext) {
+        let window = populated_window(cx);
+        let mut cx = gpui::VisualTestContext::from_window(window.into(), cx);
+        for (width, height) in [(1200., 900.), (900., 600.), (900., 400.)] {
+            cx.simulate_resize(gpui::size(px(width), px(height)));
+            cx.run_until_parked();
+            window
+                .update(&mut cx, |dialog, _, cx| {
+                    let viewport = dialog.scroll.bounds();
+                    let first = dialog.scroll.bounds_for_item(0).unwrap();
+                    let last = dialog
+                        .scroll
+                        .bounds_for_item(dialog.rows.len() - 1)
+                        .unwrap();
+                    assert_eq!(first.size.width, viewport.size.width);
+                    assert_eq!(last.size.width, viewport.size.width);
+                    assert!(first.size.height >= px(20.));
+                    assert!(last.size.height >= px(20.));
+                    assert!(viewport.size.height > px(0.));
+                    assert!(viewport.bottom() < px(height - 48.));
+                    assert!(dialog.scroll.max_offset().y > px(0.));
+                    dialog.scroll.scroll_to_item(dialog.rows.len() - 1);
+                    cx.notify();
+                })
+                .unwrap();
+            cx.run_until_parked();
+            window
+                .update(&mut cx, |dialog, _, _| {
+                    assert!(dialog.scroll.offset().y < px(0.));
+                    assert_eq!(dialog.scroll.bottom_item(), dialog.rows.len() - 1);
+                })
+                .unwrap();
+        }
+    }
+
+    #[gpui::test]
+    #[ignore = "manual dialog frame benchmark"]
+    fn profile_abbreviation_frames(cx: &mut gpui::TestAppContext) {
+        let window = populated_window(cx);
+        crate::frame_profile::measure("Abbreviations (50 rules)", window, cx);
     }
 
     #[gpui::test]

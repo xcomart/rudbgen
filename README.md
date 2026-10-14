@@ -112,17 +112,53 @@ Download the build for your platform from
 every download carries a Java runtime built with `jlink`, and rudbgen uses the
 one next to its executable.
 
-- **Windows** — `…-setup.exe` installs into your user profile (no administrator
-  rights, no UAC prompt) and is what `winget` uses; `….zip` is the same tree,
-  portable. Either way SmartScreen may warn, because the signature is
-  self-signed at best: **More info → Run anyway**.
+- **Windows** — two downloads, the same program inside.
+  - `…-setup.exe` is an installer. It installs into your user profile, so it
+    needs no administrator rights and raises no UAC prompt, and it adds a
+    Start-menu entry plus an **Apps & features** entry you can uninstall from
+    later. Uninstalling removes only the program: settings, themes and saved
+    connections stay. This is also what `winget` installs.
+  - `….zip` is the same tree, portable. Unzip it wherever you like and run
+    `rudbgen.exe` from inside the folder — keep the folder together, because
+    the executable finds its Java runtime and bridge JAR beside itself.
+
+  Either way the executable is self-signed at best, so SmartScreen may say
+  "Windows protected your PC"; choose **More info → Run anyway**.
 - **macOS** — unpack the `.tar.gz` and drag `rudbgen.app` to Applications. The
-  bundle is ad-hoc signed rather than notarized, so the first launch needs
-  **right-click → Open**.
-- **Linux** — unpack the `.tar.gz` and run `./install.sh`. It copies the tree to
-  `~/.local/share/rudbgen`, links it from `~/.local/bin/rudbgen`, and installs
-  the desktop entry and icons. No root; make sure `~/.local/bin` is on your
-  `PATH`.
+  bundle is ad-hoc signed rather than notarized, so Gatekeeper quarantines
+  it on arrival: the first launch needs **right-click → Open** instead of a
+  double-click, and if macOS still refuses (newer versions offer no way
+  through), drop the quarantine flag and launch normally:
+
+  ```sh
+  xattr -r -d com.apple.quarantine /Applications/rudbgen.app
+  ```
+
+  On macOS 15 and later there is a second hurdle. The system asks each app
+  separately for permission to reach the local network, and because the
+  bundle is only ad-hoc signed it usually never gets the prompt and never
+  appears under **System Settings → Privacy & Security → Local Network**,
+  which offers no way to add an app by hand. The permission is then denied
+  silently: connections to a database on your LAN — a `192.168.x.x` or
+  `10.x.x.x` address, or a `.local` name — fail with "No route to host",
+  while `localhost` connections work as usual. The dependable way through is
+  to launch the binary from Terminal, whose execution context is always
+  allowed on the local network:
+
+  ```sh
+  /Applications/rudbgen.app/Contents/MacOS/rudbgen
+  ```
+
+  It has to be the executable itself; `open rudbgen.app` hands the launch to
+  launchd and does not count. If you would rather try to get the prompt
+  back, run `tccutil reset All com.aihouse.rudbgen`, delete every copy of
+  `rudbgen.app` (empty the Trash too), reboot, then reinstall and launch —
+  with an ad-hoc signature it may or may not ask. Updating to macOS 15.2 or
+  newer, which fixed several of these cases, also helps.
+- **Linux** — unpack the `.tar.gz` and run `./install.sh`. It copies the tree
+  to `~/.local/share/rudbgen`, links it from `~/.local/bin/rudbgen`, and
+  installs the desktop entry and icons. Needs no root; make sure
+  `~/.local/bin` is on your `PATH`.
 
 Each archive also carries a sample H2 database under `sample/`, so there is
 something to connect to before there is anything to connect to.

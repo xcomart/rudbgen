@@ -596,6 +596,8 @@ impl Render for PreviewPane {
             .flex_grow_1()
             .min_w_0()
             .w_full()
+            // As the template pane: `cached_view`'s box is no flex container.
+            .h_full()
             .min_h_0()
             .gap(px(8.))
             .p(px(12.))

@@ -1312,10 +1312,15 @@ impl Render for GeneratePane {
             .flex_grow_1()
             .min_w_0()
             .w_full()
+            // Bounded by `cached_view`'s box, which a grow alone would not do:
+            // without it the root is as tall as the form, the scroll box never
+            // overflows and the form runs under the run buttons.
+            .h_full()
             .min_h_0()
             .child(
                 div()
                     .id(PANE_SCROLL)
+                    .debug_selector(|| PANE_SCROLL.to_string())
                     .track_scroll(&self.scroll)
                     .flex()
                     .flex_col()
@@ -1591,6 +1596,65 @@ mod tests {
         let stored = store_template_path(&below);
         assert_eq!(stored, PathBuf::from("templates/java_model.java"));
         assert_eq!(resolve_template(&stored), below);
+    }
+
+    /// The pane as the workspace draws it: through `cached_view`, above the
+    /// band the run buttons sit in.
+    struct CachedHarness {
+        pane: Entity<GeneratePane>,
+    }
+
+    impl Render for CachedHarness {
+        fn render(&mut self, _window: &mut Window, _cx: &mut Context<Self>) -> impl IntoElement {
+            div()
+                .size_full()
+                .flex()
+                .flex_col()
+                .child(
+                    div()
+                        .flex()
+                        .flex_1()
+                        .min_h_0()
+                        .child(rugpui::cached_view(self.pane.clone())),
+                )
+                .child(div().flex_none().h(px(60.)))
+        }
+    }
+
+    #[gpui::test]
+    fn a_short_window_scrolls_the_form_above_the_run_buttons(cx: &mut gpui::TestAppContext) {
+        cx.update(|cx| {
+            crate::app_settings::init(cx);
+            rugpui::init(cx);
+        });
+        let window = cx.add_window(|_, cx| {
+            let pane = cx.new(|cx| {
+                let mut pane = GeneratePane::new(cx);
+                pane.rebuild(
+                    &GenerationProfile {
+                        templates: vec![reference("first", true), reference("second", true)],
+                        custom_vars: vec![("package".to_string(), "com.example".to_string())],
+                        output_dir: Some(PathBuf::from("/tmp/out")),
+                        author: "author".to_string(),
+                    },
+                    cx,
+                );
+                pane
+            });
+            CachedHarness { pane }
+        });
+        let mut cx = gpui::VisualTestContext::from_window(window.into(), cx);
+        cx.simulate_resize(gpui::size(px(800.), px(200.)));
+        cx.run_until_parked();
+        let scroll = cx
+            .debug_bounds(PANE_SCROLL)
+            .expect("the scroll box is drawn");
+        // The scroll box has to stop where the button band starts; a root that
+        // only grows lets it run as tall as the form, under the buttons.
+        assert!(
+            (scroll.size.height - px(140.)).abs() < px(2.),
+            "the form was not bounded above the buttons: {scroll:?}"
+        );
     }
 
     #[gpui::test]

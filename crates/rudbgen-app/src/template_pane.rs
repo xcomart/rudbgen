@@ -1376,6 +1376,7 @@ impl Render for TemplatePane {
                 .flex_grow_1()
                 .min_w_0()
                 .w_full()
+                .h_full()
                 .min_h_0()
                 .p(px(16.))
                 .text_size(px(12.))
@@ -1436,6 +1437,11 @@ impl Render for TemplatePane {
             .flex_grow_1()
             .min_w_0()
             .w_full()
+            // `h_full`, not just the grow: the pane is drawn inside
+            // `cached_view`'s box, which is no flex container, so a grow alone
+            // leaves the root as tall as its content and the editor never
+            // follows the window.
+            .h_full()
             .min_h_0()
             .child(self.render_header(cx))
             .children(self.save_failure.clone().map(|message| {
@@ -1559,6 +1565,58 @@ mod tests {
         assert!(
             (wide_ratio - narrow_ratio).abs() < 0.05,
             "the split moved: wide {wide_ratio}, narrow {narrow_ratio}"
+        );
+    }
+
+    /// The pane as the workspace draws it: through `cached_view`, in the slot
+    /// above a fixed band.
+    struct CachedHarness {
+        pane: Entity<TemplatePane>,
+    }
+
+    impl Render for CachedHarness {
+        fn render(&mut self, _window: &mut Window, _cx: &mut Context<Self>) -> impl IntoElement {
+            div()
+                .size_full()
+                .flex()
+                .flex_col()
+                .child(
+                    div()
+                        .flex()
+                        .flex_col()
+                        .flex_1()
+                        .min_h_0()
+                        .child(rugpui::cached_view(self.pane.clone())),
+                )
+                .child(div().flex_none().h(px(40.)))
+        }
+    }
+
+    #[gpui::test]
+    fn shortening_the_window_shortens_the_editor(cx: &mut TestAppContext) {
+        let (_dir, pane, _) = open_pane("class Album {}\n", cx);
+        let window = cx.add_window(|_, _| CachedHarness { pane });
+        let mut cx = VisualTestContext::from_window(window.into(), cx);
+        cx.simulate_resize(gpui::size(px(900.), px(700.)));
+        cx.run_until_parked();
+        let tall = cx
+            .debug_bounds("template-source")
+            .expect("the source is drawn")
+            .size
+            .height;
+        cx.simulate_resize(gpui::size(px(900.), px(400.)));
+        cx.run_until_parked();
+        let short = cx
+            .debug_bounds("template-source")
+            .expect("the source is drawn")
+            .size
+            .height;
+        // A root that only grows is as tall as its content inside the cached
+        // box, so the editor kept one height whatever the window did.
+        let delta = tall - short;
+        assert!(
+            (delta - px(300.)).abs() < px(2.),
+            "the editor did not track the window: tall {tall:?}, short {short:?}"
         );
     }
 

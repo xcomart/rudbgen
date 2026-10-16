@@ -1003,6 +1003,8 @@ impl TemplatePane {
             .items_center()
             .gap(px(8.))
             .flex_none()
+            .w_full()
+            .min_w_0()
             .px(px(10.))
             .py(px(5.))
             .border_b_1()
@@ -1076,6 +1078,7 @@ impl TemplatePane {
             .flex_col()
             .flex_1()
             .min_w_0()
+            .w_full()
             .min_h_0()
             .child(
                 div()
@@ -1084,6 +1087,8 @@ impl TemplatePane {
                     .items_center()
                     .gap(px(8.))
                     .flex_none()
+                    .w_full()
+                    .min_w_0()
                     .px(px(8.))
                     .py(px(4.))
                     .border_b_1()
@@ -1130,6 +1135,7 @@ impl TemplatePane {
                     // can be a whole sentence — runs off the half instead of
                     // wrapping inside it.
                     .min_w_0()
+                    .w_full()
                     .p(px(12.))
                     .text_size(px(12.))
                     .text_color(theme.text_muted)
@@ -1140,6 +1146,8 @@ impl TemplatePane {
                     .debug_selector(|| "template-preview-source".to_string())
                     .flex()
                     .flex_grow_1()
+                    .min_w_0()
+                    .w_full()
                     .min_h_0()
                     // The same face and size the editor half draws with: the
                     // two sit side by side showing source and result, and a
@@ -1175,6 +1183,8 @@ impl TemplatePane {
                     .flex_row()
                     .items_center()
                     .gap(px(8.))
+                    .w_full()
+                    .min_w_0()
                     .px(px(8.))
                     .py(px(2.))
                     .rounded_md()
@@ -1212,6 +1222,8 @@ impl TemplatePane {
             .flex()
             .flex_col()
             .flex_none()
+            .w_full()
+            .min_w_0()
             .h(px(DIAGNOSTICS_HEIGHT))
             .gap(px(1.))
             .py(px(4.))
@@ -1362,6 +1374,8 @@ impl Render for TemplatePane {
                 .flex()
                 .flex_col()
                 .flex_grow_1()
+                .min_w_0()
+                .w_full()
                 .min_h_0()
                 .p(px(16.))
                 .text_size(px(12.))
@@ -1377,6 +1391,7 @@ impl Render for TemplatePane {
             .flex_col()
             .flex_1()
             .min_w_0()
+            .w_full()
             .min_h_0()
             .font_family(mono)
             .text_size(px(font_size))
@@ -1419,6 +1434,8 @@ impl Render for TemplatePane {
             .flex()
             .flex_col()
             .flex_grow_1()
+            .min_w_0()
+            .w_full()
             .min_h_0()
             .child(self.render_header(cx))
             .children(self.save_failure.clone().map(|message| {
@@ -1437,6 +1454,7 @@ impl Render for TemplatePane {
                     .flex_grow_1()
                     .min_h_0()
                     .min_w_0()
+                    .w_full()
                     .child(body),
             )
             .children((!self.diagnostics.is_empty()).then(|| self.render_diagnostics(cx)))
@@ -1457,7 +1475,13 @@ mod tests {
 
     impl Render for Harness {
         fn render(&mut self, _window: &mut Window, _cx: &mut Context<Self>) -> impl IntoElement {
-            div().size_full().flex().flex_col().child(self.pane.clone())
+            div()
+                .size_full()
+                .flex()
+                .flex_col()
+                .min_w_0()
+                .w_full()
+                .child(self.pane.clone())
         }
     }
 
@@ -1483,6 +1507,59 @@ mod tests {
         let cx = VisualTestContext::from_window(window.into(), cx);
         cx.run_until_parked();
         (dir, pane, cx)
+    }
+
+    #[gpui::test]
+    fn narrowing_the_window_narrows_both_split_halves(cx: &mut TestAppContext) {
+        let source = "class Album {\n    String title;\n}\n";
+        let (_dir, _pane, mut cx) = open_pane(source, cx);
+        cx.simulate_resize(gpui::size(px(1100.), px(700.)));
+        cx.run_until_parked();
+        let wide_source = cx
+            .debug_bounds("template-source")
+            .expect("the source half is drawn")
+            .size
+            .width;
+        let wide_preview = cx
+            .debug_bounds("template-preview-source")
+            .expect("the preview half is drawn")
+            .size
+            .width;
+        cx.simulate_resize(gpui::size(px(800.), px(700.)));
+        cx.run_until_parked();
+        let narrow_source = cx
+            .debug_bounds("template-source")
+            .expect("the source half is drawn")
+            .size
+            .width;
+        let narrow_preview = cx
+            .debug_bounds("template-preview-source")
+            .expect("the preview half is drawn")
+            .size
+            .width;
+        // The window lost 300px; the split keeps its ratio, so both halves
+        // have to lose their share of it. A chain that refuses to shrink keeps
+        // the wide widths here, which is the regression this guards against.
+        assert!(
+            narrow_source < wide_source,
+            "the source half did not shrink: wide {wide_source:?}, narrow {narrow_source:?}"
+        );
+        assert!(
+            narrow_preview < wide_preview,
+            "the preview half did not shrink: wide {wide_preview:?}, narrow {narrow_preview:?}"
+        );
+        let total = (wide_source + wide_preview) - (narrow_source + narrow_preview);
+        assert!(
+            (total - px(300.)).abs() < px(4.),
+            "the halves did not track the window: wide {wide_source:?} + {wide_preview:?}, narrow {narrow_source:?} + {narrow_preview:?}"
+        );
+        // The ratio survives the resize: the default split starts at 0.55.
+        let wide_ratio = wide_source / (wide_source + wide_preview);
+        let narrow_ratio = narrow_source / (narrow_source + narrow_preview);
+        assert!(
+            (wide_ratio - narrow_ratio).abs() < 0.05,
+            "the split moved: wide {wide_ratio}, narrow {narrow_ratio}"
+        );
     }
 
     #[gpui::test]

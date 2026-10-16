@@ -844,6 +844,9 @@ impl GeneratePane {
             .flex_row()
             .items_center()
             .gap(px(8.))
+            .w_full()
+            .min_w_0()
+            .debug_selector(|| "generate-sets".to_string())
             .child(
                 Select::new("generate-set")
                     .chevron_icon(icons::CHEVRON_DOWN)
@@ -908,6 +911,9 @@ impl GeneratePane {
             .flex()
             .flex_col()
             .gap(px(4.))
+            .w_full()
+            .min_w_0()
+            .debug_selector(|| "generate-templates".to_string())
             .when(rows.is_empty(), |list| {
                 list.child(
                     div()
@@ -950,6 +956,8 @@ impl GeneratePane {
             .flex_row()
             .items_center()
             .gap(px(6.))
+            .w_full()
+            .min_w_0()
             .child(
                 Checkbox::new(("generate-tick", index), "")
                     .checked(row.selected)
@@ -1052,11 +1060,20 @@ impl GeneratePane {
                     .flex_row()
                     .items_center()
                     .gap(px(6.))
+                    .w_full()
+                    .min_w_0()
                     .child(div().w(px(150.)).flex_none().child(row.key.clone()))
                     .child(div().flex_1().min_w_0().child(row.value.clone()))
             })
             .collect();
-        div().flex().flex_col().gap(px(4.)).children(rows)
+        div()
+            .flex()
+            .flex_col()
+            .gap(px(4.))
+            .w_full()
+            .min_w_0()
+            .debug_selector(|| "generate-vars".to_string())
+            .children(rows)
     }
 
     /// The abbreviation switch, and the button that opens the rules editor.
@@ -1067,6 +1084,8 @@ impl GeneratePane {
             .flex_row()
             .items_center()
             .gap(px(8.))
+            .w_full()
+            .min_w_0()
             .child(
                 Checkbox::new("generate-abbr", ts!("generate.apply_abbreviations"))
                     .checked(self.abbr.apply_to_names)
@@ -1214,6 +1233,9 @@ impl Render for GeneratePane {
             .flex_row()
             .items_center()
             .gap(px(6.))
+            .w_full()
+            .min_w_0()
+            .debug_selector(|| "generate-output-row".to_string())
             .child(div().flex_1().min_w_0().child(self.output.clone()))
             .child(
                 Button::new("generate-output-pick", ts!("generate.browse"))
@@ -1235,11 +1257,15 @@ impl Render for GeneratePane {
             .flex_col()
             .gap(px(14.))
             .p(px(16.))
+            .w_full()
+            .min_w_0()
             .child(
                 div()
                     .flex()
                     .flex_col()
                     .gap(px(6.))
+                    .w_full()
+                    .min_w_0()
                     .child(heading(ts!("generate.template_set")))
                     .child(self.render_sets(cx)),
             )
@@ -1248,6 +1274,8 @@ impl Render for GeneratePane {
                     .flex()
                     .flex_col()
                     .gap(px(6.))
+                    .w_full()
+                    .min_w_0()
                     .child(heading(ts!("generate.templates")))
                     .child(self.render_templates(&theme, cx)),
             )
@@ -1256,6 +1284,8 @@ impl Render for GeneratePane {
                     .flex()
                     .flex_col()
                     .gap(px(8.))
+                    .w_full()
+                    .min_w_0()
                     .child(heading(ts!("generate.options")))
                     .child(labelled(ts!("generate.output_dir"), output))
                     .child(labelled(ts!("generate.author"), self.author.clone()))
@@ -1280,6 +1310,8 @@ impl Render for GeneratePane {
             .flex()
             .flex_col()
             .flex_grow_1()
+            .min_w_0()
+            .w_full()
             .min_h_0()
             .child(
                 div()
@@ -1288,6 +1320,8 @@ impl Render for GeneratePane {
                     .flex()
                     .flex_col()
                     .flex_grow_1()
+                    .min_w_0()
+                    .w_full()
                     .min_h_0()
                     .overflow_y_scroll()
                     .restrict_scroll_to_axis()
@@ -1310,6 +1344,8 @@ fn labelled(label: SharedString, control: impl IntoElement) -> impl IntoElement 
         .flex_row()
         .items_start()
         .gap(px(10.))
+        .w_full()
+        .min_w_0()
         .child(
             div()
                 .flex_none()
@@ -1555,5 +1591,79 @@ mod tests {
         let stored = store_template_path(&below);
         assert_eq!(stored, PathBuf::from("templates/java_model.java"));
         assert_eq!(resolve_template(&stored), below);
+    }
+
+    #[gpui::test]
+    fn narrowing_the_window_narrows_the_generate_controls(cx: &mut gpui::TestAppContext) {
+        cx.update(|cx| {
+            crate::app_settings::init(cx);
+            rugpui::init(cx);
+        });
+        let window = cx.add_window(|_, cx| {
+            let mut pane = GeneratePane::new(cx);
+            pane.rebuild(
+                &GenerationProfile {
+                    templates: vec![reference("first", true), reference("second", true)],
+                    custom_vars: vec![("package".to_string(), "com.example".to_string())],
+                    output_dir: Some(PathBuf::from("/tmp/out")),
+                    author: "author".to_string(),
+                },
+                cx,
+            );
+            pane
+        });
+        let mut cx = gpui::VisualTestContext::from_window(window.into(), cx);
+        cx.simulate_resize(gpui::size(px(1000.), px(700.)));
+        cx.run_until_parked();
+        let wide_output = cx
+            .debug_bounds("generate-output-row")
+            .expect("the output row is drawn")
+            .size
+            .width;
+        let wide_templates = cx
+            .debug_bounds("generate-templates")
+            .expect("the template list is drawn")
+            .size
+            .width;
+        let wide_vars = cx
+            .debug_bounds("generate-vars")
+            .expect("the variable table is drawn")
+            .size
+            .width;
+        cx.simulate_resize(gpui::size(px(700.), px(700.)));
+        cx.run_until_parked();
+        let narrow_output = cx
+            .debug_bounds("generate-output-row")
+            .expect("the output row is drawn")
+            .size
+            .width;
+        let narrow_templates = cx
+            .debug_bounds("generate-templates")
+            .expect("the template list is drawn")
+            .size
+            .width;
+        let narrow_vars = cx
+            .debug_bounds("generate-vars")
+            .expect("the variable table is drawn")
+            .size
+            .width;
+        // The window lost 300px; every stretchable row has to lose the same.
+        // A chain that refuses to shrink keeps the wide width here, which is
+        // the regression this guards against.
+        for (name, wide, narrow) in [
+            ("output", wide_output, narrow_output),
+            ("templates", wide_templates, narrow_templates),
+            ("vars", wide_vars, narrow_vars),
+        ] {
+            assert!(
+                narrow < wide,
+                "{name} did not shrink: wide {wide:?}, narrow {narrow:?}"
+            );
+            let delta = wide - narrow;
+            assert!(
+                (delta - px(300.)).abs() < px(2.),
+                "{name} did not track the window: wide {wide:?}, narrow {narrow:?}, delta {delta:?}"
+            );
+        }
     }
 }

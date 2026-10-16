@@ -83,10 +83,10 @@ use view::centered_scroll;
 use std::path::{Path, PathBuf};
 
 use gpui::{
-    AnyElement, App, Axis, Context, Div, DragMoveEvent, Entity, FocusHandle, Hsla, KeyBinding,
-    Menu, MenuItem, MouseButton, MouseUpEvent, Pixels, Point, QuitMode, ScrollHandle, SharedString,
-    Subscription, Task, TitlebarOptions, Window, WindowBackgroundAppearance, WindowBounds,
-    WindowControlArea, WindowOptions, div, img, prelude::*, px,
+    AnyElement, App, Axis, Context, Div, DragMoveEvent, ElementId, Entity, FocusHandle, Hsla,
+    KeyBinding, Menu, MenuItem, MouseButton, MouseUpEvent, Pixels, Point, QuitMode, ScrollHandle,
+    SharedString, Subscription, Task, TitlebarOptions, Window, WindowBackgroundAppearance,
+    WindowBounds, WindowControlArea, WindowOptions, div, img, prelude::*, px,
 };
 use rudbgen_core::{
     AppSettings, ConnectionProfile, ConnectionStore, DriverDef, DriverStore, TemplateSetStore,
@@ -95,10 +95,10 @@ use rudbgen_core::{
 use rudbgen_gen::{Plan, TemplateSpec};
 use rudbgen_meta::{MetaReader, Table};
 use rugpui::{
-    Button, ButtonVariant, DraggedThumb, EditorThemeEntry, EditorThemeRegistry, MenuButton,
-    MenuEntry, ResizeHandle, Scrollbar, ScrollbarAxis, ScrollbarState, Select, TabBar, TabItem,
-    Theme, ThemeRegistry, hide_later, hide_now, scroll_to, scrolled, set_editor_theme, set_theme,
-    set_window_tint, theme, tooltip_label,
+    Button, ButtonVariant, DraggedTab, DraggedThumb, EditorThemeEntry, EditorThemeRegistry,
+    MenuButton, MenuEntry, ResizeHandle, Scrollbar, ScrollbarAxis, ScrollbarState, Select, TabBar,
+    TabItem, Theme, ThemeRegistry, hide_later, hide_now, scroll_to, scrolled, set_editor_theme,
+    set_theme, set_window_tint, theme, tooltip_label,
 };
 use rugpui_shell::{
     AboutDialog, AboutDialogEvent, AppIdentity, Pane, UpdateDialog, UpdateDialogEvent,
@@ -482,6 +482,13 @@ fn label_of(profile: &ConnectionProfile) -> SharedString {
     }
 }
 
+/// Tag identifying the work area's tab strip as a tab-drag source.
+///
+/// The window holds a single strip, so one tag names it; the source guard on
+/// the reorder path compares against this, refusing whatever foreign drag a
+/// future second strip — or another window — might report here.
+pub(super) const WORK_STRIP_TAG: u64 = u64::MAX;
+
 /// The whole of the window.
 struct Workspace {
     /// Focus target for the window, so the shortcuts stay live.
@@ -578,6 +585,12 @@ struct Workspace {
     pane: Pane<PaneItem>,
     /// Whether the tab strip's dropdown is showing.
     pane_menu_open: bool,
+    /// Where a dragged tab would land, while it is over the strip.
+    ///
+    /// The strip reporting and the insertion gap the pointer last named — the
+    /// bar [`Workspace::render_tabs`] draws. `None` is no bar: no drag, a
+    /// foreign drag, or a drag that has left the strip or already dropped.
+    tab_drop: Option<(u64, usize)>,
     /// The ticked tables, as the last run read them.
     ///
     /// Kept so that moving the preview header's dropdowns re-renders without
@@ -762,6 +775,7 @@ impl Workspace {
             job,
             pane,
             pane_menu_open: false,
+            tab_drop: None,
             run_tables: Vec::new(),
             explorer_visible: layout.explorer_visible,
             inspector_visible: layout.inspector_visible,

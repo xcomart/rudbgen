@@ -821,10 +821,8 @@ impl Explorer {
 
     /// The ticked tables, in generation order.
     ///
-    /// What M3's run walks. Nothing reads it yet — the status bar counts the
-    /// set rather than listing it — but it is the panel's whole output, and a
-    /// selection that could only be counted would not be one.
-    #[allow(dead_code)]
+    /// The panel's whole output: what a run walks and what a template tab
+    /// renders against, while the status bar only counts it.
     pub fn selection(&self, cx: &App) -> BTreeSet<TableKey> {
         self.tree.read(cx).source().selection.clone()
     }

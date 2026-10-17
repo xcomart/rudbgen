@@ -251,16 +251,6 @@ impl Workspace {
         self.closing_sessions.push(session.close_in_background());
     }
 
-    /// A handle a background task can carry, while a session is open.
-    ///
-    /// Nothing calls it yet — the explorer and the metadata reader are what it
-    /// is for — and it is the one thing every one of those call sites needs, so
-    /// it arrives with the session rather than after it.
-    #[allow(dead_code)]
-    pub(super) fn session_handle(&self) -> Option<SessionHandle> {
-        self.connection.session().map(Connected::handle)
-    }
-
     /// Opens the settings dialog, closing whatever else was showing.
     pub(super) fn open_settings(&mut self, window: &mut Window, cx: &mut Context<Self>) {
         self.close_overlays(window, cx);

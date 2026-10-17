@@ -13,6 +13,18 @@ use crate::error::{ParseError, Span};
 use crate::keys::KeyChain;
 use crate::strutil;
 
+/// How deep `if`s and `for`s may be nested inside one another.
+///
+/// The parser, the renderer and the drop of the parsed tree all recurse once
+/// per level, so without a limit a template of nothing but tens of thousands
+/// of unclosed `${if:...}` overflows the stack and takes the application down,
+/// even from the editor's live preview while it is typed. The limit is set by the
+/// unoptimised build, whose frames are the largest: an `if` costs the parser
+/// and the renderer several kilobytes of stack per level there, and sixty-four
+/// levels of it still fit a thread's default two megabytes with room to
+/// spare. No real template comes near it; the shipped ones nest two deep.
+pub(crate) const MAX_DEPTH: usize = 64;
+
 /// The attribute list of a statement, in the order it was written.
 ///
 /// jdbgen keeps these in a `HashMap`, where a repeated name overwrites the
@@ -116,23 +128,27 @@ pub(crate) struct PlainNode {
 }
 
 /// `${if:...}` up to its `${endif}`.
+///
+/// The `elif`s are a list beside the `if` rather than an `if` nested in the
+/// false branch of the one before, which is how jdbgen holds them: a chain of
+/// a hundred thousand `elif`s is then a long list and not a deep tree, which
+/// neither the renderer nor the drop of the tree has to recurse through.
 #[derive(Debug)]
 pub(crate) struct IfNode {
+    /// The `if` first, then every `${elif:...}` in the order written; the
+    /// first one whose conditions all hold is rendered.
+    pub(crate) branches: Vec<Branch>,
+    /// The body of the `${else}`, rendered when no branch holds.
+    pub(crate) otherwise: Option<Vec<Node>>,
+}
+
+/// One `${if:...}` or `${elif:...}` with the body behind it.
+#[derive(Debug)]
+pub(crate) struct Branch {
     pub(crate) span: Span,
     pub(crate) chain: KeyChain,
     pub(crate) conds: Vec<Cond>,
-    pub(crate) then_body: Vec<Node>,
-    pub(crate) otherwise: Option<Box<Else>>,
-}
-
-/// What is rendered when an `if` does not hold: the body of an `${else}`, or
-/// the `${elif:...}` that follows.
-#[derive(Debug)]
-pub(crate) enum Else {
-    /// A following `${elif:...}`, which is an `if` of its own.
-    If(IfNode),
-    /// The body of an `${else}`.
-    Body(Vec<Node>),
+    pub(crate) body: Vec<Node>,
 }
 
 /// `${for:...}` up to its `${endfor}`.
@@ -162,6 +178,8 @@ pub(crate) struct Parser {
     curr: usize,
     len: usize,
     line: usize,
+    /// How many `if`s and `for`s the statement being read is inside of.
+    depth: usize,
 }
 
 impl Parser {
@@ -181,6 +199,7 @@ impl Parser {
             curr: 0,
             len,
             line: 0,
+            depth: 0,
         }
     }
 
@@ -276,6 +295,23 @@ impl Parser {
             line: span.line,
             span: Some(span),
         }
+    }
+
+    /// Step into the body of an `if` or a `for`, refusing to go deeper than
+    /// [`MAX_DEPTH`]; the statement that opened it steps out again when its
+    /// end has been read.
+    fn enter(&mut self, span: Span) -> Result<(), ParseError> {
+        self.depth += 1;
+        if self.depth > MAX_DEPTH {
+            return Err(self.invalid(
+                format!(
+                    "statements nested more than {MAX_DEPTH} deep, before: {}",
+                    self.near()
+                ),
+                span,
+            ));
+        }
+        Ok(())
     }
 
     /// The key chain of a statement, which every statement that reads one
@@ -526,7 +562,7 @@ impl Parser {
     }
 
     /// One branch of an if/elif chain while it is being read.
-    fn branch(&self, attrs: Attrs, span: Span) -> Result<IfNode, ParseError> {
+    fn branch(&self, attrs: Attrs, span: Span) -> Result<Branch, ParseError> {
         let chain = self.require_chain(&attrs, span)?;
         let conds = attrs
             .iter()
@@ -535,21 +571,21 @@ impl Parser {
             })
             .collect::<Result<_, _>>()
             .map_err(|message| self.invalid(message, span))?;
-        Ok(IfNode {
+        Ok(Branch {
             span,
             chain,
             conds,
-            then_body: Vec::new(),
-            otherwise: None,
+            body: Vec::new(),
         })
     }
 
     /// Read an `if` up to its `${endif}`.
     ///
-    /// An `elif` becomes an `if` in the false branch of the one before it,
-    /// and, as in jdbgen, it replaces an `${else}` that was already read, so
-    /// that an `else` before an `elif` loses its body.
+    /// An `elif` opens the next branch and, as in jdbgen, it replaces an
+    /// `${else}` that was already read, so that an `else` before an `elif`
+    /// loses its body.
     fn parse_if(&mut self, extra: &str, span: Span) -> Result<IfNode, ParseError> {
+        self.enter(span)?;
         let attrs = self.parse_nv_pairs(extra)?;
         self.check_if_conditions(&attrs, extra)?;
         let mut branches = vec![self.branch(attrs, span)?];
@@ -581,31 +617,28 @@ impl Parser {
             }
         }
 
-        let mut otherwise = tail.map(|body| Box::new(Else::Body(body)));
-        while branches.len() > 1 {
-            let mut inner = branches.pop().expect("more than one branch");
-            inner.otherwise = otherwise;
-            otherwise = Some(Box::new(Else::If(inner)));
-        }
-        let mut res = branches.pop().expect("the if itself is always a branch");
-        res.otherwise = otherwise;
-        Ok(res)
+        self.depth -= 1;
+        Ok(IfNode {
+            branches,
+            otherwise: tail,
+        })
     }
 
     /// Where the statements read right now belong: the body of the `${else}`
     /// when one was seen, the body of the last branch otherwise.
     fn target<'a>(
-        branches: &'a mut [IfNode],
+        branches: &'a mut [Branch],
         tail: &'a mut Option<Vec<Node>>,
     ) -> &'a mut Vec<Node> {
         match tail {
             Some(body) => body,
-            None => &mut branches.last_mut().expect("at least one branch").then_body,
+            None => &mut branches.last_mut().expect("at least one branch").body,
         }
     }
 
     /// Read a `for` up to its `${endfor}`.
     fn parse_for(&mut self, extra: &str, span: Span) -> Result<ForNode, ParseError> {
+        self.enter(span)?;
         let attrs = self.parse_nv_pairs(extra)?;
         let Some(key) = attrs.key().map(|k| strutil::trim(k).to_string()) else {
             return Err(self.invalid(missing_key(&attrs), span));
@@ -627,6 +660,7 @@ impl Parser {
             let node = self.parse_one(stmt)?;
             body.push(node);
         }
+        self.depth -= 1;
         Ok(ForNode {
             span,
             attrs,

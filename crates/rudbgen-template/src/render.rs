@@ -10,7 +10,7 @@ use crate::date;
 use crate::error::{Diagnostics, RenderError, Span};
 use crate::keys::{self, KeyChain};
 use crate::model::{Model, Value};
-use crate::parse::{Attrs, Else, ForNode, IfNode, ItemNode, Node, PlainNode};
+use crate::parse::{Attrs, ForNode, IfNode, ItemNode, Node, PlainNode};
 use crate::strutil;
 
 /// Everything a render pass needs besides the model.
@@ -289,29 +289,29 @@ impl<'a> Renderer<'a> {
         Ok(())
     }
 
-    /// `${if}`: every condition has to hold for the true branch to be
-    /// rendered.
+    /// `${if}`: the first branch whose conditions all hold is rendered, the
+    /// `${else}` when none does. A branch's key is only resolved once every
+    /// branch before it has failed, as it is in jdbgen's nested form.
     fn if_statement(&mut self, node: &IfNode, scope: Scope<'_>) -> Result<(), RenderError> {
-        let value = self.resolve(&node.chain, scope.mapper, scope.mapper_no, node.span)?;
-        let mut held = true;
-        for cond in &node.conds {
-            if !cond
-                .eval(&value)
-                .map_err(|e| RenderError::at(e.message, node.span))?
-            {
-                held = false;
-                break;
+        for branch in &node.branches {
+            let value = self.resolve(&branch.chain, scope.mapper, scope.mapper_no, branch.span)?;
+            let mut held = true;
+            for cond in &branch.conds {
+                if !cond
+                    .eval(&value)
+                    .map_err(|e| RenderError::at(e.message, branch.span))?
+                {
+                    held = false;
+                    break;
+                }
+            }
+            if held {
+                return self.nodes(&branch.body, scope);
             }
         }
-
-        if held {
-            self.nodes(&node.then_body, scope)
-        } else {
-            match node.otherwise.as_deref() {
-                Some(Else::If(nested)) => self.if_statement(nested, scope),
-                Some(Else::Body(body)) => self.nodes(body, scope),
-                None => Ok(()),
-            }
+        match &node.otherwise {
+            Some(body) => self.nodes(body, scope),
+            None => Ok(()),
         }
     }
 

@@ -966,6 +966,7 @@ which the editor refuses to save — the later one wins.
 | `contains`/`notContains` on a value that is neither a list nor a string | Render error |
 | Unterminated `}` | Parse error: `'}' not found, before: …` |
 | Missing `endif` / `endfor` | Parse error: `if statements not closed` / `for statements not closed` |
+| `if`s and `for`s nested more than 64 deep | Parse error: `statements nested more than 64 deep` |
 | Unknown statement type | Parse error: `Unknown template: …` |
 | Non-numeric `padSize` or `indent` | Parse error |
 | `matches`/`notMatches` pattern that is not a valid regular expression | Parse error |

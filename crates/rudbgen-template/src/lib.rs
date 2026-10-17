@@ -57,6 +57,10 @@
 //! AND and compare ignoring case, except `matches`, which is a regular
 //! expression the whole value has to match.
 //!
+//! `if`s and `for`s nest up to 64 deep; a template nested deeper is a
+//! [`ParseError`] rather than a stack overflow. An `elif` is no level of its
+//! own, so a chain of them may be as long as it likes.
+//!
 //! A key nothing answers - neither the model nor the custom variables -
 //! renders as an empty string and leaves a [`Warning`] in the
 //! [`Diagnostics`], which is what the editor marks unknown fields with.

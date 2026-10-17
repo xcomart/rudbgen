@@ -106,7 +106,9 @@ use rugpui_shell::{
 };
 
 use crate::abbreviation_dialog::{AbbreviationDialog, AbbreviationDialogEvent};
-use crate::connection::{ConnectError, Connected, Credentials, SessionHandle};
+use crate::connection::{
+    Closing, ConnectError, Connected, Credentials, SessionHandle, wait_for_closes,
+};
 use crate::connection_dialog::{ConnectionDialog, ConnectionDialogEvent};
 use crate::explorer::{Explorer, ExplorerEvent, SchemaKey, TableKey};
 use crate::generate_job::{GenerationJob, JobEvent};
@@ -543,6 +545,11 @@ struct Workspace {
     jdbgen_config: Option<PathBuf>,
     /// Whether a session is open, opening, or has just failed.
     connection: ConnectionState,
+    /// The sessions this window let go of that may still be closing.
+    ///
+    /// Closes run off the UI thread (see [`Workspace::retire`]); what is kept
+    /// here is what the next session and the quit wait for.
+    closing_sessions: Vec<Closing>,
     /// Which connection the answers coming back off background tasks belong to.
     ///
     /// Bumped by every connect and every disconnect. A metadata read that was
@@ -687,9 +694,14 @@ impl Workspace {
         // The one thing that must happen before the process winds down: the
         // session is closed, and the tunnel under it after that. A session left
         // open holds an embedded database's lock file, which the next run then
-        // cannot get past.
+        // cannot get past. The closes run on threads of their own; the quit
+        // waits for them here, but only for so long — a close that hangs on a
+        // server that is gone must not keep the application from leaving.
         let quit = cx.on_app_quit(|workspace: &mut Workspace, _cx| {
             workspace.close_session();
+            if !wait_for_closes(&workspace.closing_sessions) {
+                log::warn!("quitting with a session that has not finished closing");
+            }
             async {}
         });
 
@@ -762,6 +774,7 @@ impl Workspace {
             import,
             jdbgen_config: rudbgen_import::locate(),
             connection: ConnectionState::Idle,
+            closing_sessions: Vec::new(),
             connection_epoch: 0,
             connection_list_open: false,
             explorer,

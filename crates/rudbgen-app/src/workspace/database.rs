@@ -208,8 +208,9 @@ impl Workspace {
             return;
         };
         // The session is gone whatever the close says; the tunnel it ran over
-        // is already down.
-        drop(session);
+        // is already down, which is exactly when a close can hang on a socket
+        // that will never answer — so it is not waited for here.
+        self.retire(session);
         self.connection = ConnectionState::Failed {
             profile,
             message: ts!("connect.tunnel_ended", reason = reason),
@@ -230,17 +231,24 @@ impl Workspace {
     ///
     /// Shared by [`Workspace::disconnect`], by every reconnection, and by the
     /// quit observer, which is why it takes no context: at quit there is no
-    /// frame left to ask for.
+    /// frame left to ask for. The close itself is [`Workspace::retire`]'s, and
+    /// is not over when this returns.
     pub(super) fn close_session(&mut self) {
         if let ConnectionState::Open {
             profile, session, ..
         } = std::mem::replace(&mut self.connection, ConnectionState::Idle)
         {
             log::info!("closing the session on {}", profile.name);
-            if let Err(error) = session.close() {
-                log::warn!("the session did not close cleanly: {error:#}");
-            }
+            self.retire(session);
         }
+    }
+
+    /// Lets go of a session: it is closed, and the tunnel under it released,
+    /// off the UI thread ([`Connected::close_in_background`]), and remembered
+    /// in [`Workspace::closing_sessions`] until that is over.
+    pub(super) fn retire(&mut self, session: Box<Connected>) {
+        self.closing_sessions.retain(|closing| !closing.is_done());
+        self.closing_sessions.push(session.close_in_background());
     }
 
     /// A handle a background task can carry, while a session is open.

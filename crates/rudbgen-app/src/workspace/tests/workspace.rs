@@ -142,3 +142,48 @@ fn the_dialogs_open_from_their_actions_and_close_on_escape(cx: &mut gpui::TestAp
         .expect("the window is open");
     cx.run_until_parked();
 }
+
+/// Disconnecting hands the close to a thread of its own: the window is back
+/// on the welcome screen before `CLOSE_SESSION` has answered, which over a
+/// tunnel whose far end is gone can take minutes. The close is remembered
+/// until it is over, for the next session and the quit to wait on.
+#[gpui::test]
+fn a_disconnect_does_not_wait_for_the_close(cx: &mut gpui::TestAppContext) {
+    let profile = connection::h2::profile("disconnect");
+    let driver = connection::h2::driver();
+    let session = connection::connect(
+        &profile,
+        &driver,
+        &Credentials::typed(Some(String::new()), None),
+        &AppSettings::default(),
+    )
+    .expect("H2 opens an in-memory database without a server");
+
+    cx.update(|cx| {
+        app_settings::init(cx);
+        rugpui::init(cx);
+        rugpui_grid::init(cx);
+        rugpui_editor::init(cx);
+    });
+    cx.executor().allow_parking();
+    silence_the_update_check();
+    let window = cx.add_window(|window, cx| Workspace::new(TitlebarStyle::Custom, window, cx));
+    window
+        .update(cx, |workspace, _window, cx| {
+            workspace.connection = ConnectionState::Open {
+                profile: Box::new(profile.clone()),
+                driver: Box::new(driver.clone()),
+                session: Box::new(session),
+            };
+            workspace.reset_panels(cx);
+            workspace.disconnect(cx);
+
+            assert!(matches!(workspace.connection, ConnectionState::Idle));
+            assert_eq!(workspace.closing_sessions.len(), 1);
+            assert!(
+                wait_for_closes(&workspace.closing_sessions),
+                "the close never finished"
+            );
+        })
+        .expect("the window is open");
+}

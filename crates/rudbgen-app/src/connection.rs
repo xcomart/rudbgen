@@ -40,8 +40,10 @@
 #[cfg(test)]
 use std::collections::HashMap;
 use std::fmt;
-use std::sync::Arc;
 use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::{Arc, mpsc};
+use std::thread;
+use std::time::Duration;
 
 use futures::StreamExt;
 use futures::channel::oneshot;
@@ -348,6 +350,77 @@ impl Connected {
             }
         }
     }
+
+    /// [`Connected::close`] on a thread of its own, for a caller that must not
+    /// wait for it — the UI thread, above all.
+    ///
+    /// `CLOSE_SESSION` is a JDBC call, and over a tunnel whose far end has
+    /// gone away it blocks until a socket gives up, which on some drivers is
+    /// minutes; on the UI thread that is a frozen window. The order is still
+    /// [`Connected::close`]'s — the session first, then the tunnel — and a
+    /// failure is only logged, since nobody is left to show it to. The answer
+    /// says when the close is over, for the two callers that have to care: a
+    /// new session, which must not race the old one for an embedded
+    /// database's lock, and the quit, which must not leave before it.
+    pub fn close_in_background(self) -> Closing {
+        let (done, closing) = mpsc::channel();
+        let close = move || {
+            if let Err(error) = self.close() {
+                log::warn!("the session did not close cleanly: {error:#}");
+            }
+            drop(done);
+        };
+        // A thread of its own rather than a task on the background executor:
+        // a close that hangs then holds nothing but itself, and the quit can
+        // wait for it without that executor having to run first.
+        if let Err(error) = thread::Builder::new()
+            .name("rudbgen-session-close".into())
+            .spawn(close)
+        {
+            // The closure went down with the refusal and took the session
+            // with it, through the same close in `Live`'s drop.
+            log::warn!("no thread to close the session on, closed it here: {error}");
+        }
+        Closing(closing)
+    }
+}
+
+/// A session closing on a thread of its own; see
+/// [`Connected::close_in_background`].
+#[derive(Debug)]
+pub struct Closing(mpsc::Receiver<()>);
+
+impl Closing {
+    /// How long a new session or the quit waits for an earlier session to
+    /// close. A healthy close — an embedded database writing its last page and
+    /// letting go of its lock — is over long before this; one that is not has
+    /// lost its server, and holds nothing a new session could trip over.
+    pub const GRACE: Duration = Duration::from_secs(5);
+
+    /// Whether the session is closed and its tunnel released.
+    pub fn is_done(&self) -> bool {
+        matches!(self.0.try_recv(), Err(mpsc::TryRecvError::Disconnected))
+    }
+
+    /// Waits for the close for at most `timeout`; whether it is over.
+    ///
+    /// Nothing is ever sent: the closing thread drops its end when it is
+    /// done, which is what wakes this.
+    pub fn wait(&self, timeout: Duration) -> bool {
+        matches!(
+            self.0.recv_timeout(timeout),
+            Err(mpsc::RecvTimeoutError::Disconnected)
+        )
+    }
+}
+
+/// Waits for every close in `closing`, all of them together for at most
+/// [`Closing::GRACE`]; whether they are all over.
+pub fn wait_for_closes(closing: &[Closing]) -> bool {
+    let deadline = std::time::Instant::now() + Closing::GRACE;
+    closing
+        .iter()
+        .all(|closing| closing.wait(deadline.saturating_duration_since(std::time::Instant::now())))
 }
 
 /// Builds the connection specification a profile asks for, without connecting.
@@ -1238,6 +1311,62 @@ mod tests {
     /// the session closes. Everything above this — the tab, the status bar — is
     /// a rendering of what `SESSION_INFO` said, so if this passes and the bar is
     /// wrong the bug is in the view.
+    #[test]
+    fn a_close_is_over_when_the_closing_thread_lets_go() {
+        let (done, closing) = mpsc::channel();
+        let closing = Closing(closing);
+        assert!(!closing.is_done());
+        assert!(
+            !closing.wait(Duration::from_millis(10)),
+            "a close still running is waited for, not assumed over"
+        );
+        drop(done);
+        assert!(closing.is_done());
+        assert!(closing.wait(Duration::ZERO));
+        assert!(wait_for_closes(&[closing]));
+        assert!(
+            wait_for_closes(&[]),
+            "nothing closing is nothing to wait for"
+        );
+    }
+
+    /// The close moved off the calling thread still happens, and in time for
+    /// the next session: an H2 database in memory is dropped with its last
+    /// session, so a table that survives the close means the close never ran.
+    #[test]
+    fn a_session_closed_in_the_background_is_closed() {
+        use rudbgen_jdbc::StatementSpec;
+
+        let profile = h2::profile("background-close");
+        let open = || {
+            connect(
+                &profile,
+                &h2::driver(),
+                &Credentials::typed(Some(String::new()), None),
+                &AppSettings::default(),
+            )
+            .expect("H2 opens an in-memory database without a server")
+        };
+        let first = open();
+        first
+            .session()
+            .execute(&StatementSpec::new("create table T_GONE (ID integer)"))
+            .expect("the table is created");
+
+        let closing = first.close_in_background();
+        assert!(closing.wait(Closing::GRACE), "the close did not finish");
+
+        let second = open();
+        assert!(
+            second
+                .session()
+                .execute(&StatementSpec::new("select count(*) from T_GONE"))
+                .is_err(),
+            "the first session was still open: its database outlived it"
+        );
+        second.close().expect("the session closes");
+    }
+
     #[test]
     fn a_real_h2_session_opens_reports_its_product_and_closes() {
         let profile = h2::profile("integration");

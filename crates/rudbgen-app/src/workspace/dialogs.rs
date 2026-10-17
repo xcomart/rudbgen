@@ -248,7 +248,13 @@ impl Workspace {
         let settings = app_settings::current(cx);
         let opening = profile.clone();
         let definition = driver.clone();
+        let closing = std::mem::take(&mut self.closing_sessions);
         let run = cx.background_spawn(async move {
+            // The session this one replaces may still be closing, and an
+            // embedded database lets one of them in at a time.
+            if !connection::wait_for_closes(&closing) {
+                log::warn!("opening a session while an earlier one is still closing");
+            }
             // Read here rather than on the UI thread: a keychain that is locked
             // puts a system prompt up, and waiting for that on the UI thread
             // would freeze the window behind it.

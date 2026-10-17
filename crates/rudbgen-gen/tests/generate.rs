@@ -348,6 +348,41 @@ fn the_skip_policy_leaves_what_is_there_and_writes_the_rest() {
     assert_eq!(outcome.handled(), 2);
 }
 
+#[test]
+fn a_skipped_file_never_has_its_body_rendered() {
+    let fx = Fixture::new();
+    std::fs::create_dir_all(&fx.out).expect("out dir");
+    std::fs::write(at(&fx.out, "T_ONE.java"), "hand written").expect("existing file");
+
+    // a body that cannot render against any table, and warns before failing:
+    // had it been rendered, the pair would be a failure and not a skip
+    let plan = plan(
+        vec![table("T_ONE")],
+        vec![template(
+            &fx.templates,
+            "one.java",
+            "${nosuchfield}${for:key=nowhere}x${endfor}",
+            "${name}.java",
+        )],
+        &fx.out,
+    );
+
+    let outcome = generate(&plan, Overwrite::Skip, &live(), &quiet);
+    assert!(outcome.is_ok(), "{outcome:?}");
+    assert_eq!(outcome.skipped.len(), 1);
+    assert!(
+        outcome.diagnostics.is_empty(),
+        "the body was rendered after all: {:?}",
+        outcome.diagnostics
+    );
+
+    let policy = Overwrite::Ask(Box::new(|_: &Path| Decision::Skip));
+    let outcome = generate(&plan, policy, &live(), &quiet);
+    assert!(outcome.is_ok(), "{outcome:?}");
+    assert_eq!(outcome.skipped[0].reason, SkipReason::UserSkipped);
+    assert_eq!(read(&fx.out, "T_ONE.java"), "hand written");
+}
+
 /// Every answer the *ask* policy takes, and what the run does with it.
 fn ask_run(answers: Vec<Decision>) -> (Fixture, rudbgen_gen::Outcome, Vec<PathBuf>) {
     let fx = Fixture::new();

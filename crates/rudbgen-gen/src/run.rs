@@ -23,12 +23,6 @@ struct Prepared {
     out_name: Template,
 }
 
-/// One rendered pair, before anything is decided about the disk.
-struct Rendered {
-    path: PathBuf,
-    content: String,
-}
-
 /// Render `plan` and write it (architecture document, §9).
 ///
 /// Answers with the summary rather than with a `Result`: a run that failed on
@@ -81,8 +75,8 @@ pub fn generate(
             }
             index += 1;
 
-            let rendered = match render_pair(plan, table, prep, &ctx, &mut outcome.diagnostics) {
-                Ok(rendered) => rendered,
+            let path = match render_path(plan, table, prep, &ctx, &mut outcome.diagnostics) {
+                Ok(path) => path,
                 Err(error) => {
                     report_failure(
                         &mut outcome.failed,
@@ -98,9 +92,10 @@ pub fn generate(
             };
 
             // Rule 3 of §9's step list: the policy is applied to the resolved
-            // path *before* the body is written, so a skipped file costs
-            // nothing but the name.
-            let write = if rendered.path.exists() {
+            // path *before* the body is rendered, so a skipped file costs
+            // nothing but the name — no render pass, and none of the body's
+            // warnings either, since a file left alone has nothing to warn of.
+            let write = if path.exists() {
                 match settled {
                     Some(overwrite) => {
                         if !overwrite {
@@ -111,7 +106,7 @@ pub fn generate(
                                 total,
                                 table,
                                 prep,
-                                &rendered.path,
+                                &path,
                                 SkipReason::ExistingFile,
                             );
                             continue;
@@ -122,7 +117,7 @@ pub fn generate(
                         let Overwrite::Ask(ask) = &policy else {
                             unreachable!("only the ask policy leaves the decision open")
                         };
-                        match ask(&rendered.path) {
+                        match ask(&path) {
                             Decision::Overwrite => true,
                             Decision::OverwriteAll => {
                                 settled = Some(true);
@@ -152,23 +147,39 @@ pub fn generate(
                     total,
                     table,
                     prep,
-                    &rendered.path,
+                    &path,
                     SkipReason::UserSkipped,
                 );
                 continue;
             }
 
+            let content = match render_body(table, prep, &ctx, &mut outcome.diagnostics) {
+                Ok(content) => content,
+                Err(error) => {
+                    report_failure(
+                        &mut outcome.failed,
+                        progress,
+                        index,
+                        total,
+                        table,
+                        prep,
+                        error,
+                    );
+                    continue;
+                }
+            };
+
             // Rule 4: UTF-8, always. Rule 3: through the same atomic write the
             // configuration files use.
-            match write_atomic(&rendered.path, rendered.content.as_bytes()) {
+            match write_atomic(&path, content.as_bytes()) {
                 Ok(()) => {
-                    outcome.written.push(rendered.path.clone());
+                    outcome.written.push(path.clone());
                     progress(Progress::File {
                         index,
                         total,
                         table: table.name.clone(),
                         template: prep.name.clone(),
-                        path: Some(rendered.path),
+                        path: Some(path),
                         status: FileStatus::Written,
                     });
                 }
@@ -177,7 +188,7 @@ pub fn generate(
                     outcome.failed.push(Failure {
                         table: Some(table.name.clone()),
                         template: prep.name.clone(),
-                        path: Some(rendered.path.clone()),
+                        path: Some(path.clone()),
                         message: message.clone(),
                     });
                     progress(Progress::File {
@@ -185,7 +196,7 @@ pub fn generate(
                         total,
                         table: table.name.clone(),
                         template: prep.name.clone(),
-                        path: Some(rendered.path),
+                        path: Some(path),
                         status: FileStatus::Failed(message),
                     });
                 }
@@ -237,21 +248,21 @@ pub fn dry_run(plan: &Plan, cancel: &CancelToken, progress: &dyn Fn(Progress)) -
             index += 1;
 
             match render_pair(plan, table, prep, &ctx, &mut result.diagnostics) {
-                Ok(rendered) => {
+                Ok((path, content)) => {
                     progress(Progress::File {
                         index,
                         total,
                         table: table.name.clone(),
                         template: prep.name.clone(),
-                        path: Some(rendered.path.clone()),
+                        path: Some(path.clone()),
                         status: FileStatus::Written,
                     });
                     result.files.push(RenderedFile {
                         table: table.name.clone(),
                         template: prep.name.clone(),
-                        exists: rendered.path.exists(),
-                        path: rendered.path,
-                        content: rendered.content,
+                        exists: path.exists(),
+                        path,
+                        content,
                     });
                 }
                 Err(error) => report_failure(
@@ -296,11 +307,11 @@ pub fn preview(plan: &Plan, table_index: usize, template_index: usize) -> Result
 
     let prepared = prepare_one(spec)?;
     let mut diagnostics = Vec::new();
-    let rendered = render_pair(plan, table, &prepared, &plan.context(), &mut diagnostics)?;
+    let (path, content) = render_pair(plan, table, &prepared, &plan.context(), &mut diagnostics)?;
 
     Ok(Preview {
-        path: rendered.path,
-        content: rendered.content,
+        path,
+        content,
         diagnostics: diagnostics.into_iter().map(|d| d.warning).collect(),
     })
 }
@@ -374,19 +385,35 @@ fn read_template(spec: &TemplateSpec) -> Result<String, Error> {
     })
 }
 
-/// Render the output name, resolve it, then render the body.
-///
-/// That order is §9's, and it is what makes a skipped file cheap: the body of
-/// a template is never rendered for a file the policy is going to leave alone.
+/// Render the output name, resolve it, then render the body: one pair whole,
+/// for the two entry points that have no policy to consult in between.
 fn render_pair(
     plan: &Plan,
     table: &Table,
     prep: &Prepared,
     ctx: &RenderContext,
     diagnostics: &mut Vec<Diagnostic>,
-) -> Result<Rendered, Error> {
-    let mut diags = Diagnostics::new();
+) -> Result<(PathBuf, String), Error> {
+    let path = render_path(plan, table, prep, ctx, diagnostics)?;
+    let content = render_body(table, prep, ctx, diagnostics)?;
+    Ok((path, content))
+}
 
+/// Render the output name of a pair and resolve it against the output
+/// directory.
+///
+/// Kept apart from [`render_body`] because that is §9's order, and it is what
+/// makes a skipped file cheap: [`generate`] settles the policy on this path,
+/// and the body of a template is never rendered for a file the policy is
+/// going to leave alone.
+fn render_path(
+    plan: &Plan,
+    table: &Table,
+    prep: &Prepared,
+    ctx: &RenderContext,
+    diagnostics: &mut Vec<Diagnostic>,
+) -> Result<PathBuf, Error> {
+    let mut diags = Diagnostics::new();
     let name = prep
         .out_name
         .render_diagnosed(table, ctx, &mut diags)
@@ -404,12 +431,21 @@ fn render_pair(
         TemplatePart::OutputName,
     );
 
-    let path = resolve_output(plan.output_dir(), &name).map_err(|message| Error::OutputPath {
+    resolve_output(plan.output_dir(), &name).map_err(|message| Error::OutputPath {
         template: prep.name.clone(),
         table: table.name.clone(),
         message,
-    })?;
+    })
+}
 
+/// Render the body of a pair: the text of the file.
+fn render_body(
+    table: &Table,
+    prep: &Prepared,
+    ctx: &RenderContext,
+    diagnostics: &mut Vec<Diagnostic>,
+) -> Result<String, Error> {
+    let mut diags = Diagnostics::new();
     let content = prep
         .body
         .render_diagnosed(table, ctx, &mut diags)
@@ -420,8 +456,7 @@ fn render_pair(
             error,
         })?;
     collect(diagnostics, &mut diags, table, prep, TemplatePart::Body);
-
-    Ok(Rendered { path, content })
+    Ok(content)
 }
 
 /// Rule 7: move the warnings of one pass into the summary and empty the pass.

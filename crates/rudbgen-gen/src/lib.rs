@@ -80,9 +80,9 @@
 //!
 //! * **It does not choose an encoding.** Output is UTF-8, always, as jdbgen's
 //!   is. A template file that is not UTF-8 fails to load rather than being
-//!   transliterated. (The one place a byte encoding is honoured is padding
-//!   width, and that lives in the engine — see `rudbgen_template`'s EUC-KR
-//!   rule.)
+//!   transliterated. (Padding width is not a byte count either: the engine
+//!   pads to display columns, where jdbgen counted EUC-KR bytes — see
+//!   `rudbgen_template`'s crate documentation.)
 //! * **It does not roll back.** A run that fails on the tenth file leaves the
 //!   nine before it on disk. Deleting them would be worse: the files are the
 //!   user's source tree, some of them are what the run was for, and nothing

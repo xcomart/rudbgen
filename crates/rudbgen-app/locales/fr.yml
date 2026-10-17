@@ -473,6 +473,7 @@ update:
   installing: Installation…
   failed: La mise à jour a échoué.
   open_release: Ouvrir la page de la version
+  notes: Nouveautés
 
 template:
   menu_undo: Annuler

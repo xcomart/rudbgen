@@ -20,9 +20,10 @@
 //! **Superseded form**, with no prefix: plain Base64 of an AES-128/CBC/PKCS#5
 //! ciphertext whose key is the first half of SHA-256(master) and whose
 //! initialisation vector is the second. It has no authentication tag, so a
-//! wrong password is detected only by the padding — which is why
-//! [`Decryptor::decrypt`] answers [`Error::WrongPassword`] to a padding failure
-//! and to a plaintext that is not UTF-8 alike.
+//! wrong password is detected only by what it decrypts to — which is why
+//! [`Decryptor::decrypt`] answers [`Error::WrongPassword`] to a padding
+//! failure, to a plaintext that is not UTF-8, and to one that is not text a
+//! person typed ([`plausible`]) alike.
 //!
 //! The key derivation is deliberately expensive and a configuration decrypts
 //! three values per connection, so [`Decryptor`] caches the derived key per
@@ -146,11 +147,19 @@ impl Decryptor {
         let plain = cipher
             .decrypt(&nonce, body)
             .map_err(|_| Error::WrongPassword)?;
-        String::from_utf8(plain).map_err(|_| Error::WrongPassword)
+        String::from_utf8(plain).map_err(|error| {
+            error.into_bytes().zeroize();
+            Error::WrongPassword
+        })
     }
 
-    /// The superseded format: no salt, no tag, and the padding is the only
-    /// evidence that the key was right.
+    /// The superseded format: no salt, no tag, and nothing but the plaintext
+    /// itself to say whether the key was right.
+    ///
+    /// Decrypted in place in the buffer the Base64 decoded into, so that a
+    /// plaintext refused for any reason is wiped rather than left for the
+    /// allocator: under a wrong key it is noise, but under the right key and a
+    /// damaged value it is most of a password.
     fn decrypt_legacy(&self, value: &str, field: &'static str) -> Result<String> {
         let raw = BASE64.decode(value.trim()).map_err(|_| Error::Malformed {
             field,
@@ -163,10 +172,27 @@ impl Decryptor {
             });
         }
         let (key, iv) = self.legacy_key();
-        let plain = cbc::Decryptor::<aes::Aes128>::new(&key.into(), &iv.into())
-            .decrypt_padded_vec::<Pkcs7>(&raw)
-            .map_err(|_| Error::WrongPassword)?;
-        String::from_utf8(plain).map_err(|_| Error::WrongPassword)
+        let mut plain = raw;
+        let unpadded = cbc::Decryptor::<aes::Aes128>::new(&key.into(), &iv.into())
+            .decrypt_padded::<Pkcs7>(&mut plain)
+            .map(<[u8]>::len);
+        let Ok(len) = unpadded else {
+            plain.zeroize();
+            return Err(Error::WrongPassword);
+        };
+        // The padding past `len` is the scheme's and not the value's.
+        plain.truncate(len);
+        match String::from_utf8(plain) {
+            Ok(text) if plausible(&text) => Ok(text),
+            Ok(mut text) => {
+                text.zeroize();
+                Err(Error::WrongPassword)
+            }
+            Err(error) => {
+                error.into_bytes().zeroize();
+                Err(Error::WrongPassword)
+            }
+        }
     }
 
     /// Stretch the master password with `salt`, remembering the result.
@@ -194,6 +220,28 @@ impl Decryptor {
         *self.legacy.borrow_mut() = Some((key, iv));
         (key, iv)
     }
+}
+
+/// Whether a legacy plaintext is text jdbgen could have stored.
+///
+/// The three encrypted fields hold a JDBC URL, a user name and a password:
+/// text typed into a form, which may run across lines and carry a tab but has
+/// no other control character in it — C0, DEL or C1. A wrong key, on the other
+/// hand, decrypts to noise that has to pass three tests by chance: the padding
+/// (about 1 in 256 for the single-block value that is the likeliest case), then
+/// UTF-8 (fifteen random bytes are valid about 1.7 times in 10,000), then this
+/// one, which about one UTF-8 survivor in 25 passes — mostly because random
+/// UTF-8 is mostly ASCII, and a third of ASCII bytes are control characters.
+/// That puts a single value's false acceptance near 1 in 40 million rather
+/// than 1 in 1.5 million, and [`crate::decrypt`] needs every value of the file
+/// to pass under one key, so the odds multiply per encrypted value.
+///
+/// Checked on the superseded scheme alone: the current one has a tag that
+/// already answers the question.
+fn plausible(text: &str) -> bool {
+    !text
+        .chars()
+        .any(|c| c.is_control() && !matches!(c, '\t' | '\n' | '\r'))
 }
 
 impl Drop for Decryptor {
@@ -278,6 +326,74 @@ mod tests {
         let second = dec.derive(&salt);
         assert_eq!(first, second);
         assert_eq!(dec.keys.borrow().len(), 1);
+    }
+
+    /// Encrypts `plain` the way jdbgen's superseded scheme did, under `master`.
+    fn legacy_encrypt(master: &str, plain: &[u8]) -> String {
+        use cbc::cipher::BlockModeEncrypt;
+        let (key, iv) = Decryptor::new(master).legacy_key();
+        let cipher = cbc::Encryptor::<aes::Aes128>::new(&key.into(), &iv.into());
+        BASE64.encode(cipher.encrypt_padded_vec::<Pkcs7>(plain))
+    }
+
+    #[test]
+    fn text_a_person_typed_is_plausible_and_noise_with_control_characters_is_not() {
+        for text in [
+            "",
+            "jdbc:oracle:thin:@db:1521/ORCL",
+            "p@ss w0rd",
+            "한글 비밀번호",
+            "🔑",
+            "line one\nline two\ttabbed\r\n",
+        ] {
+            assert!(plausible(text), "{text:?}");
+        }
+        for text in [
+            "\0",
+            "a\u{1}b",
+            "esc\u{1b}[0m",
+            "del\u{7f}",
+            "c1\u{85}",
+            "\u{9f}",
+        ] {
+            assert!(!plausible(text), "{text:?}");
+        }
+    }
+
+    #[test]
+    fn a_legacy_plaintext_with_a_control_character_is_a_wrong_password() {
+        let master = "correct horse battery staple";
+        let dec = Decryptor::new(master);
+        // What a wrong key that pads and decodes by chance looks like: valid
+        // UTF-8 with a control character in it.
+        let noise = legacy_encrypt(master, b"x\x01\x7fq\x1b");
+        assert!(matches!(
+            dec.decrypt(&noise, "userPassword"),
+            Err(Error::WrongPassword)
+        ));
+        // The same scheme over text jdbgen stores opens as before.
+        let typed = legacy_encrypt(master, "line one\nline two\ttabbed".as_bytes());
+        assert_eq!(
+            dec.decrypt(&typed, "userPassword").unwrap(),
+            "line one\nline two\ttabbed"
+        );
+    }
+
+    #[test]
+    fn noise_that_pads_and_decodes_by_chance_is_still_a_wrong_password() {
+        // Random blocks found by a search for exactly this: under this key
+        // each one ends in a valid pad and decodes as UTF-8, so the padding
+        // and UTF-8 checks alone opened all three — to `"\u{33e}\u{89}T…"`,
+        // `"nOzĐȡm\u{f}\0…"` and `"ڏm5W…\u{7f}qI"`.
+        let dec = Decryptor::new("not the master password");
+        for value in [
+            "f6US+tjWKnBqguJ6HZ36eQ==",
+            "yUO1azkh0fz0dU+T6T6dQg==",
+            "XO8npdakveYlJKMH6dOhkA==",
+        ] {
+            let opened = dec.decrypt(value, "userPassword");
+            assert!(matches!(opened, Err(Error::WrongPassword)), "{opened:?}");
+        }
     }
 
     #[test]

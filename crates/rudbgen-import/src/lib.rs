@@ -70,6 +70,8 @@ pub mod preview;
 use std::fs;
 use std::path::{Path, PathBuf};
 
+use zeroize::Zeroize;
+
 pub use config::{JdbAbbr, JdbConnection, JdbDriver, JdbPreset, JdbTemplate, JdbgenConfig};
 pub use crypt::Decryptor;
 pub use error::{Error, Result};
@@ -145,7 +147,9 @@ pub fn read(path: &Path) -> Result<JdbgenConfig> {
 /// through both jdbgen releases holds a mixture, and this reads it.
 ///
 /// The master password is not kept: the [`Decryptor`] built here is dropped
-/// before this function returns, and wipes it.
+/// before this function returns, and wipes it. Nor are the values opened
+/// before one that fails: an error wipes them along with the copy they were
+/// opened into.
 ///
 /// # Errors
 ///
@@ -157,15 +161,32 @@ pub fn decrypt(cfg: &JdbgenConfig, master: &str) -> Result<Decrypted> {
     let mut config = cfg.clone();
     let mut legacy = false;
 
-    for conn in &mut config.connections {
+    let mut failure = None;
+    'connections: for conn in &mut config.connections {
         for (field, value) in [
             ("connectionUrl", &mut conn.connection_url),
             ("userName", &mut conn.user_name),
             ("userPassword", &mut conn.user_password),
         ] {
             legacy |= Decryptor::is_legacy(value);
-            *value = decryptor.decrypt(value, field)?;
+            match decryptor.decrypt(value, field) {
+                Ok(plain) => *value = plain,
+                Err(error) => {
+                    failure = Some(error);
+                    break 'connections;
+                }
+            }
         }
+    }
+    if let Some(error) = failure {
+        // The values past the failure are still ciphertext; wiping them too
+        // is cheaper than remembering where the plaintext stops.
+        for conn in &mut config.connections {
+            conn.connection_url.zeroize();
+            conn.user_name.zeroize();
+            conn.user_password.zeroize();
+        }
+        return Err(error);
     }
 
     Ok(Decrypted { config, legacy })

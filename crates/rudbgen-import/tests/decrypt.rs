@@ -93,9 +93,9 @@ fn a_wrong_master_password_fails_the_legacy_padding_the_same_way() {
     let vectors = vectors();
     let decryptor = Decryptor::new(&vectors.wrong_master);
     // Every legacy vector, because the superseded scheme has no authentication
-    // tag: the padding is the only evidence, and one value in a hundred pads
-    // plausibly under the wrong key. All of them failing is the assertion worth
-    // making.
+    // tag: the padding, the UTF-8 and the text itself are the only evidence,
+    // and one value in a few hundred pads plausibly under the wrong key. All
+    // of them failing is the assertion worth making.
     for vector in vectors.values.iter().filter(|v| !v.legacy.is_empty()) {
         assert!(
             matches!(

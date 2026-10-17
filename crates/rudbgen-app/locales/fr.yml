@@ -294,6 +294,8 @@ generate:
   var_value: valeur
   apply_abbreviations: Appliquer les règles d'abréviation
   rules: Règles…
+  sets_failed: "Les jeux de modèles ne peuvent être ni enregistrés ni supprimés tant que ceci n’est pas réglé : %{error}"
+  abbr_failed: "L’application des abréviations ne peut pas être changée tant que ceci n’est pas réglé : %{error}"
   preview: Aperçu
   dry_run: Simulation
   run: Générer
@@ -667,6 +669,8 @@ import:
   nothing_written: Rien n’a été importé.
   skipped: "Laissé de côté, le nom étant pris : %{names}"
   no_keychain: "Ces connexions ont été enregistrées sans leur mot de passe, faute de pouvoir le mettre dans le trousseau : %{names}. À l’ouverture, il sera demandé."
+  load_failed: "Rien n’a été importé, car un fichier que l’import compléterait n’a pas pu être lu : %{error}. Réparez ou déplacez ce fichier, puis importez à nouveau."
+  not_saved: "Non enregistré, car le fichier n’a pas pu être écrit : %{errors}"
   wrong_password: Ce n’est pas le mot de passe maître de cette configuration.
   malformed: "Cette configuration est endommagée : l’une des valeurs chiffrées n’en est pas une."
   unreadable: Ce fichier n’a pas pu être lu.

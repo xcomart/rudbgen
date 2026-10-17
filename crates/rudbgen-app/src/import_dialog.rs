@@ -180,8 +180,19 @@ pub struct Imported {
     pub sets: usize,
     /// Abbreviation rules appended.
     pub rules: usize,
+    /// Whether the import turned on applying the rules to generated names.
+    ///
+    /// `false` when the box was not ticked *and* when the switch was already
+    /// on: either way `abbreviations.json` has nothing new to say about it.
+    pub switched_on: bool,
     /// Names left behind, because something here already had them.
     pub skipped: Vec<String>,
+    /// Why a store the import changed could not be written, one line per
+    /// file, in the words of the error (which name the file).
+    ///
+    /// What the import put in such a store is not on disk, whatever the counts
+    /// above say, and the last step says so in place of a quiet success.
+    pub not_saved: Vec<String>,
     /// Passwords on their way to the keychain, one per imported profile that
     /// had one.
     ///
@@ -198,7 +209,9 @@ impl std::fmt::Debug for Imported {
             .field("drivers", &self.drivers)
             .field("sets", &self.sets)
             .field("rules", &self.rules)
+            .field("switched_on", &self.switched_on)
             .field("skipped", &self.skipped)
+            .field("not_saved", &self.not_saved)
             .field(
                 "secrets",
                 &format_args!("<{} redacted>", self.secrets.len()),
@@ -374,8 +387,9 @@ pub fn merge(
             out.rules += 1;
         }
     }
-    if selection.apply_abbr {
+    if selection.apply_abbr && !stores.abbreviations.apply_to_names {
         stores.abbreviations.apply_to_names = true;
+        out.switched_on = true;
     }
 
     out
@@ -451,7 +465,10 @@ enum Stage {
     /// Reading and decrypting, on a background task.
     Opening,
     /// The checklist.
-    Review,
+    Review {
+        /// Why the last press of *Import* wrote nothing, if it did not.
+        error: Option<SharedString>,
+    },
     /// Writing the stores and the keychain.
     Importing,
     /// What was written.
@@ -649,11 +666,16 @@ impl ImportDialog {
         self.hint = mapped.settings_hint.clone();
         self.selection = Selection::everything(&mapped);
         self.mapped = Some(mapped);
-        self.stage = Stage::Review;
+        self.stage = Stage::Review { error: None };
         cx.notify();
     }
 
     /// Step 2 → step 3: write the stores, then the keychain.
+    ///
+    /// A store that cannot be read writes nothing and leaves the wizard on the
+    /// checklist with the reason under it, so the file can be fixed or moved
+    /// and the import pressed again; the shell hears nothing, because there is
+    /// nothing for it to re-read.
     fn import(&mut self, cx: &mut Context<Self>) {
         let Some(mapped) = self.mapped.clone() else {
             return;
@@ -665,11 +687,27 @@ impl ImportDialog {
 
         cx.spawn(async move |dialog, cx| {
             let written = cx
-                .background_spawn(async move { write_stores(&mapped, &selection, on_conflict) })
+                .background_spawn(async move {
+                    let files = StoreFiles::configured()?;
+                    write_stores(&files, &mapped, &selection, on_conflict, &mut Keychain)
+                })
                 .await;
             dialog
                 .update(cx, |dialog, cx| {
-                    let (result, no_keychain) = written;
+                    let (result, no_keychain) = match written {
+                        Ok(written) => written,
+                        Err(error) => {
+                            log::error!("the import wrote nothing: {error:#}");
+                            dialog.stage = Stage::Review {
+                                error: Some(ts!(
+                                    "import.load_failed",
+                                    error = format!("{error:#}")
+                                )),
+                            };
+                            cx.notify();
+                            return;
+                        }
+                    };
                     let settings = dialog
                         .selection
                         .settings
@@ -1129,6 +1167,17 @@ impl ImportDialog {
                         .child(ts!("import.skipped", names = result.skipped.join(", "))),
                 )
             })
+            .when(!result.not_saved.is_empty(), |body| {
+                body.child(
+                    div()
+                        .text_size(px(11.))
+                        .text_color(chrome.danger)
+                        .child(ts!(
+                            "import.not_saved",
+                            errors = result.not_saved.join("; ")
+                        )),
+                )
+            })
             .when(!no_keychain.is_empty(), |body| {
                 body.child(
                     div()
@@ -1163,15 +1212,17 @@ impl ImportDialog {
                         }
                     })
             }
-            Stage::Review | Stage::Importing => Button::new("import-run", ts!("import.import"))
-                .variant(ButtonVariant::Primary)
-                .disabled(matches!(self.stage, Stage::Importing) || self.selection.is_empty())
-                .on_click({
-                    let this = this.clone();
-                    move |_, _window, cx| {
-                        this.update(cx, |dialog, cx| dialog.import(cx));
-                    }
-                }),
+            Stage::Review { .. } | Stage::Importing => {
+                Button::new("import-run", ts!("import.import"))
+                    .variant(ButtonVariant::Primary)
+                    .disabled(matches!(self.stage, Stage::Importing) || self.selection.is_empty())
+                    .on_click({
+                        let this = this.clone();
+                        move |_, _window, cx| {
+                            this.update(cx, |dialog, cx| dialog.import(cx));
+                        }
+                    })
+            }
             Stage::Done { .. } => Button::new("import-close", ts!("common.close"))
                 .variant(ButtonVariant::Primary)
                 .on_click({
@@ -1235,11 +1286,23 @@ impl Render for ImportDialog {
         self.watch_scroll(cx);
 
         let chrome = theme(cx);
+        // Under the scrolling checklist rather than at its head, so it is on
+        // screen beside the button that was pressed however far down the list
+        // the user had scrolled.
+        let review_error = match &self.stage {
+            Stage::Review { error } => error.clone().map(|message| {
+                div()
+                    .text_size(px(11.))
+                    .text_color(chrome.danger)
+                    .child(message)
+            }),
+            _ => None,
+        };
         let step = match &self.stage {
             Stage::Password { .. } | Stage::Opening => {
                 self.render_password(&chrome, cx).into_any_element()
             }
-            Stage::Review => self.render_review(&chrome, cx).into_any_element(),
+            Stage::Review { .. } => self.render_review(&chrome, cx).into_any_element(),
             Stage::Importing => div()
                 .text_size(px(12.))
                 .text_color(chrome.text_muted)
@@ -1285,6 +1348,7 @@ impl Render for ImportDialog {
                             .render(&chrome),
                     ),
             )
+            .children(review_error)
             .child(self.render_footer(cx));
 
         let on_dismiss = {
@@ -1372,34 +1436,98 @@ fn read_and_open(path: &Path, master: &str) -> Result<Decrypted, Error> {
     rudbgen_import::decrypt(&config, master)
 }
 
+/// Where the four stores are read from and written to.
+///
+/// The configuration directory's files in the application. A field per file
+/// rather than one directory, so that [`write_stores`] can be pointed at a
+/// temporary directory by a test without the configuration directory itself
+/// being something a test can redirect.
+#[derive(Debug, Clone)]
+pub struct StoreFiles {
+    /// `connections.json`.
+    pub connections: PathBuf,
+    /// `drivers.json`.
+    pub drivers: PathBuf,
+    /// `template-sets.json`.
+    pub sets: PathBuf,
+    /// `abbreviations.json`.
+    pub abbreviations: PathBuf,
+}
+
+impl StoreFiles {
+    /// The four files in the configuration directory.
+    ///
+    /// # Errors
+    ///
+    /// Fails when no home directory can be determined for the current user.
+    pub fn configured() -> anyhow::Result<Self> {
+        Ok(Self {
+            connections: rudbgen_core::connections_file()?,
+            drivers: rudbgen_core::drivers_file()?,
+            sets: rudbgen_core::template_sets_file()?,
+            abbreviations: rudbgen_core::abbreviations_file()?,
+        })
+    }
+}
+
 /// Merge and save, on the background task.
 ///
 /// The four stores are read here rather than passed in, so that the wizard
 /// folds into whatever is on disk at the moment the button is pressed rather
-/// than into a copy taken when the window opened. A store that cannot be read
-/// starts empty, which is what every other reader in the application does.
-fn write_stores(
+/// than into a copy taken when the window opened.
+///
+/// Only a store the merge changed is written back, and the passwords go to
+/// `sink` last, once `connections.json` holds the profiles they belong to. A
+/// store that could not be written is reported in [`Imported::not_saved`]
+/// rather than only logged; when that store is `connections.json` the
+/// passwords are not stored at all, because no saved profile would ever look
+/// them up.
+///
+/// # Errors
+///
+/// A store that cannot be read stops the import before anything is written —
+/// no file and no password. Other readers start from an empty store when a
+/// file is unreadable, but a reader that then *saves* would replace the user's
+/// file with nothing but what the import brought.
+pub fn write_stores(
+    files: &StoreFiles,
     mapped: &Mapped,
     selection: &Selection,
     on_conflict: OnConflict,
-) -> (Imported, Vec<String>) {
+    sink: &mut dyn SecretSink,
+) -> anyhow::Result<(Imported, Vec<String>)> {
     let mut stores = Stores {
-        connections: ConnectionStore::load().unwrap_or_default(),
-        drivers: DriverStore::load().unwrap_or_default(),
-        sets: TemplateSetStore::load().unwrap_or_default(),
-        abbreviations: AbbreviationStore::load().unwrap_or_default(),
+        connections: ConnectionStore::load_from(&files.connections)?,
+        drivers: DriverStore::load_from(&files.drivers)?,
+        sets: TemplateSetStore::load_from(&files.sets)?,
+        abbreviations: AbbreviationStore::load_from(&files.abbreviations)?,
     };
-    let result = merge(mapped, selection, on_conflict, &mut stores);
+    let mut result = merge(mapped, selection, on_conflict, &mut stores);
 
-    for (what, outcome) in [
-        ("connections.json", stores.connections.save()),
-        ("drivers.json", stores.drivers.save()),
-        ("template-sets.json", stores.sets.save()),
-        ("abbreviations.json", stores.abbreviations.save()),
-    ] {
-        if let Err(error) = outcome {
-            log::error!("the import could not write {what}: {error:#}");
-        }
+    let mut not_saved = Vec::new();
+    let connections_saved = save_changed(
+        result.connections > 0,
+        || stores.connections.save_to(&files.connections),
+        &mut not_saved,
+    );
+    save_changed(
+        result.drivers > 0,
+        || stores.drivers.save_to(&files.drivers),
+        &mut not_saved,
+    );
+    save_changed(
+        result.sets > 0,
+        || stores.sets.save_to(&files.sets),
+        &mut not_saved,
+    );
+    save_changed(
+        result.rules > 0 || result.switched_on,
+        || stores.abbreviations.save_to(&files.abbreviations),
+        &mut not_saved,
+    );
+    result.not_saved = not_saved;
+    if !connections_saved {
+        return Ok((result, Vec::new()));
     }
 
     let names: HashMap<Uuid, String> = stores
@@ -1408,8 +1536,28 @@ fn write_stores(
         .iter()
         .map(|profile| (profile.id, profile.name.clone()))
         .collect();
-    let failed = store_secrets(&result.secrets, &names, &mut Keychain);
-    (result, failed)
+    let failed = store_secrets(&result.secrets, &names, sink);
+    Ok((result, failed))
+}
+
+/// Writes one store if the import changed it, and records why it could not be.
+///
+/// Returns whether what the import put in the store is now on disk, which an
+/// unchanged store trivially is.
+fn save_changed(
+    changed: bool,
+    save: impl FnOnce() -> anyhow::Result<()>,
+    not_saved: &mut Vec<String>,
+) -> bool {
+    if !changed {
+        return true;
+    }
+    let Err(error) = save() else {
+        return true;
+    };
+    log::error!("the import could not write a store: {error:#}");
+    not_saved.push(format!("{error:#}"));
+    false
 }
 
 /// The directory jdbgen was unpacked into, when there is a plausible one.
@@ -1565,7 +1713,7 @@ mod tests {
         let window = cx.add_window(|_, cx| {
             let mut dialog = ImportDialog::new(cx);
             dialog.open = true;
-            dialog.stage = Stage::Review;
+            dialog.stage = Stage::Review { error: None };
             dialog.preview = Some(preview);
             dialog.hint = mapped.settings_hint.clone();
             dialog.selection = Selection::everything(&mapped);
@@ -1698,6 +1846,172 @@ mod tests {
             AbbreviationStore::load_from(&config.path().join("abbreviations.json")).unwrap();
         assert_eq!(rules.rules.len(), result.rules);
         assert_eq!(rules.apply_to_names, mapped.apply_abbr);
+    }
+
+    /// The four files under `dir`, by the names the application gives them.
+    fn files_in(dir: &Path) -> StoreFiles {
+        StoreFiles {
+            connections: dir.join("connections.json"),
+            drivers: dir.join("drivers.json"),
+            sets: dir.join("template-sets.json"),
+            abbreviations: dir.join("abbreviations.json"),
+        }
+    }
+
+    #[test]
+    fn a_store_that_cannot_be_read_stops_the_import_before_anything_is_written() {
+        // The data-loss case: a corrupt `connections.json` read as an empty
+        // store and then saved would leave the user with only the import.
+        let (_source, mapped) = fixture();
+        for broken in [
+            "connections.json",
+            "drivers.json",
+            "template-sets.json",
+            "abbreviations.json",
+        ] {
+            let config = TempDir::new().unwrap();
+            let files = files_in(config.path());
+            let damaged = b"{ \"connections\": [ this is not json";
+            fs::write(config.path().join(broken), damaged).unwrap();
+            let mut keychain = FakeKeychain::default();
+
+            let error = write_stores(
+                &files,
+                &mapped,
+                &Selection::everything(&mapped),
+                OnConflict::Rename,
+                &mut keychain,
+            )
+            .expect_err("an unreadable store is an error, not an empty store");
+
+            assert!(
+                format!("{error:#}").contains(broken),
+                "the error does not name {broken}: {error:#}"
+            );
+            assert_eq!(
+                fs::read(config.path().join(broken)).unwrap(),
+                damaged,
+                "{broken} was rewritten"
+            );
+            let mut left: Vec<String> = fs::read_dir(config.path())
+                .unwrap()
+                .map(|entry| entry.unwrap().file_name().to_string_lossy().into_owned())
+                .collect();
+            left.sort();
+            assert_eq!(left, [broken], "another store was written beside {broken}");
+            assert!(
+                keychain.stored.is_empty(),
+                "a password reached the keychain"
+            );
+        }
+    }
+
+    #[test]
+    fn an_import_rewrites_only_the_stores_it_changed() {
+        // Every file starts out compact; a save writes it pretty-printed, so
+        // a file whose bytes are unchanged is a file nobody wrote.
+        let (_source, mapped) = fixture();
+        let config = TempDir::new().unwrap();
+        let files = files_in(config.path());
+        let before = [
+            (
+                &files.connections,
+                serde_json::to_vec(&ConnectionStore::default()),
+            ),
+            (&files.drivers, serde_json::to_vec(&no_drivers())),
+            (
+                &files.sets,
+                serde_json::to_vec(&TemplateSetStore::default()),
+            ),
+            (
+                &files.abbreviations,
+                serde_json::to_vec(&AbbreviationStore::default()),
+            ),
+        ]
+        .map(|(path, bytes)| {
+            let bytes = bytes.unwrap();
+            fs::write(path, &bytes).unwrap();
+            (path.clone(), bytes)
+        });
+        let selection = Selection {
+            connections: vec![true; mapped.connections.len()],
+            ..Selection::default()
+        };
+        let mut keychain = FakeKeychain::default();
+
+        let (result, no_keychain) = write_stores(
+            &files,
+            &mapped,
+            &selection,
+            OnConflict::Rename,
+            &mut keychain,
+        )
+        .expect("every store reads");
+
+        assert!(result.connections > 0);
+        assert!(result.not_saved.is_empty(), "{:?}", result.not_saved);
+        assert!(no_keychain.is_empty());
+        assert_eq!(keychain.stored, result.secrets);
+        let [connections, untouched @ ..] = &before;
+        assert_ne!(
+            &fs::read(&connections.0).unwrap(),
+            &connections.1,
+            "connections.json was not written"
+        );
+        assert_eq!(
+            ConnectionStore::load_from(&connections.0).unwrap().len(),
+            result.connections
+        );
+        for (path, bytes) in untouched {
+            assert_eq!(
+                &fs::read(path).unwrap(),
+                bytes,
+                "{} was rewritten although the import added nothing to it",
+                path.display()
+            );
+        }
+    }
+
+    #[test]
+    fn a_store_that_cannot_be_written_is_reported_rather_than_logged_only() {
+        let mut not_saved = Vec::new();
+        assert!(!save_changed(
+            true,
+            || Err(anyhow::anyhow!(
+                "failed to write connections.json: disk full"
+            )),
+            &mut not_saved
+        ));
+        assert_eq!(not_saved, ["failed to write connections.json: disk full"]);
+
+        // An unchanged store is not written at all, so it cannot fail.
+        assert!(save_changed(
+            false,
+            || panic!("an unchanged store was written"),
+            &mut not_saved
+        ));
+        assert!(save_changed(true, || Ok(()), &mut not_saved));
+        assert_eq!(not_saved.len(), 1);
+    }
+
+    #[test]
+    fn the_switch_counts_as_a_change_only_when_it_was_off() {
+        let mapped = Mapped {
+            connections: Vec::new(),
+            drivers: Vec::new(),
+            sets: Vec::new(),
+            rules: Vec::new(),
+            apply_abbr: true,
+            settings_hint: SettingsHint::default(),
+            notes: Vec::new(),
+        };
+        let selection = Selection {
+            apply_abbr: true,
+            ..Selection::default()
+        };
+        let mut stores = bare();
+        assert!(merge(&mapped, &selection, OnConflict::Rename, &mut stores).switched_on);
+        assert!(!merge(&mapped, &selection, OnConflict::Rename, &mut stores).switched_on);
     }
 
     #[test]
@@ -2153,7 +2467,7 @@ mod tests {
         cx.update(|cx| {
             dialog.update(cx, |dialog, _cx| {
                 assert!(
-                    matches!(dialog.stage, Stage::Review),
+                    matches!(dialog.stage, Stage::Review { error: None }),
                     "the checklist did not open"
                 );
                 let mapped = dialog.mapped.as_ref().expect("the mapping is held");
@@ -2239,6 +2553,8 @@ mod tests {
             ts!("import.nothing_written"),
             ts!("import.skipped", names = "a"),
             ts!("import.no_keychain", names = "a"),
+            ts!("import.not_saved", errors = "a"),
+            ts!("import.load_failed", error = "a"),
             ts!("import.wrong_password"),
             ts!("import.malformed"),
             ts!("import.unreadable"),

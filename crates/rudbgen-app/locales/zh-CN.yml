@@ -291,6 +291,8 @@ generate:
   var_value: 值
   apply_abbreviations: 应用缩写规则
   rules: 规则…
+  sets_failed: "在此问题解决之前，无法保存或删除模板集：%{error}"
+  abbr_failed: "在此问题解决之前，无法更改是否应用缩写规则：%{error}"
   preview: 预览
   dry_run: 试运行
   run: 生成
@@ -664,6 +666,8 @@ import:
   nothing_written: 没有导入任何内容。
   skipped: "名称被占用，已跳过：%{names}"
   no_keychain: "以下连接因无法写入钥匙串而未保存密码：%{names}。打开时会再询问。"
+  load_failed: "无法读取导入要写入的文件，因此没有导入任何内容：%{error}。请修复或移走该文件后重新导入。"
+  not_saved: "无法写入文件，以下内容未保存：%{errors}"
   wrong_password: 这不是该配置的主密码。
   malformed: 该配置已损坏：其中一个加密值根本不是一个值。
   unreadable: 无法读取该文件。

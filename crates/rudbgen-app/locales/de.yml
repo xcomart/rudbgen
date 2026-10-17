@@ -294,6 +294,8 @@ generate:
   var_value: Wert
   apply_abbreviations: Abkürzungsregeln anwenden
   rules: Regeln…
+  sets_failed: "Vorlagensätze können erst gespeichert oder gelöscht werden, wenn dies behoben ist: %{error}"
+  abbr_failed: "Der Abkürzungsschalter kann erst geändert werden, wenn dies behoben ist: %{error}"
   preview: Vorschau
   dry_run: Probelauf
   run: Erzeugen
@@ -667,6 +669,8 @@ import:
   nothing_written: Es wurde nichts importiert.
   skipped: "Zurückgelassen, weil der Name vergeben war: %{names}"
   no_keychain: "Diese Verbindungen wurden ohne ihr Passwort gespeichert, weil es nicht in den Schlüsselbund gelegt werden konnte: %{names}. Beim Öffnen wird danach gefragt."
+  load_failed: "Es wurde nichts importiert, weil eine Datei, in die der Import schreiben würde, nicht gelesen werden konnte: %{error}. Reparieren oder verschieben Sie die Datei und importieren Sie erneut."
+  not_saved: "Nicht gespeichert, weil die Datei nicht geschrieben werden konnte: %{errors}"
   wrong_password: Das ist nicht das Hauptpasswort dieser Konfiguration.
   malformed: "Diese Konfiguration ist beschädigt: einer der verschlüsselten Werte ist gar kein Wert."
   unreadable: Diese Datei konnte nicht gelesen werden.

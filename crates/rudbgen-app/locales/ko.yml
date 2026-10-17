@@ -292,6 +292,8 @@ generate:
   var_value: 값
   apply_abbreviations: 약어 규칙 적용
   rules: 규칙…
+  sets_failed: "이 문제를 해결하기 전에는 템플릿 세트를 저장하거나 삭제할 수 없습니다: %{error}"
+  abbr_failed: "이 문제를 해결하기 전에는 약어 규칙 적용 여부를 바꿀 수 없습니다: %{error}"
   preview: 미리보기
   dry_run: 시험 실행
   run: 생성
@@ -665,6 +667,8 @@ import:
   nothing_written: 가져온 것이 없습니다.
   skipped: "이름이 겹쳐 건너뛰었습니다: %{names}"
   no_keychain: "키체인에 넣지 못해 다음 연결은 비밀번호 없이 저장했습니다: %{names}. 열 때 다시 묻습니다."
+  load_failed: "가져온 내용을 넣을 파일을 읽지 못해 아무것도 가져오지 않았습니다: %{error}. 그 파일을 고치거나 옮긴 뒤 다시 가져오세요."
+  not_saved: "파일을 쓰지 못해 저장되지 않았습니다: %{errors}"
   wrong_password: 이 설정의 마스터 패스워드가 아닙니다.
   malformed: 이 설정은 손상되었습니다. 암호화된 값 하나가 값의 꼴이 아닙니다.
   unreadable: 그 파일을 읽지 못했습니다.

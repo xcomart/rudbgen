@@ -292,6 +292,8 @@ generate:
   var_value: 値
   apply_abbreviations: 略語規則を適用
   rules: 規則…
+  sets_failed: "この問題が直るまで、テンプレートセットは保存も削除もできません: %{error}"
+  abbr_failed: "この問題が直るまで、略語規則の適用は切り替えられません: %{error}"
   preview: プレビュー
   dry_run: ドライラン
   run: 生成
@@ -665,6 +667,8 @@ import:
   nothing_written: 何も取り込みませんでした。
   skipped: "名前が使われていたため見送りました: %{names}"
   no_keychain: "キーチェーンに入れられなかったため、次の接続はパスワードなしで保存しました: %{names}。開くときに尋ねます。"
+  load_failed: "取り込み先のファイルを読めなかったため、何も取り込みませんでした: %{error}。そのファイルを直すか移動してから、もう一度取り込んでください。"
+  not_saved: "ファイルに書き込めなかったため、保存されていません: %{errors}"
   wrong_password: この設定のマスターパスワードではありません。
   malformed: この設定は壊れています。暗号化された値の一つが値の体をなしていません。
   unreadable: そのファイルは読めませんでした。

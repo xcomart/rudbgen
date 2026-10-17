@@ -218,6 +218,32 @@ pub fn store_template_path(file: &Path) -> PathBuf {
     }
 }
 
+/// Re-reads a global store, applies `change` to that copy, and writes it back.
+///
+/// What the panel keeps of `template-sets.json` and `abbreviations.json` was
+/// read when the connection opened, and the import wizard or the rules editor
+/// may have written either file since; saving that copy would undo them. So
+/// every change starts from the file as it is now, and the store handed back
+/// is the one that was written, for the panel to keep instead.
+///
+/// # Errors
+///
+/// A file that cannot be read is left exactly as it is: `change` is not
+/// applied and nothing is written. Starting from an empty store instead, as a
+/// reader may, would have the save replace the file with only this change. A
+/// failed write is the other error, and leaves the panel's copy the one to
+/// keep.
+pub fn read_modify_write<S>(
+    load: impl FnOnce() -> anyhow::Result<S>,
+    change: impl FnOnce(&mut S),
+    save: impl FnOnce(&S) -> anyhow::Result<()>,
+) -> anyhow::Result<S> {
+    let mut store = load()?;
+    change(&mut store);
+    save(&store)?;
+    Ok(store)
+}
+
 /// One row of the template list, as the panel holds it.
 ///
 /// The name and the output template are text fields rather than strings for the
@@ -263,9 +289,22 @@ pub struct GeneratePane {
     /// The author field.
     author: Entity<TextInput>,
     /// The saved sets, re-read whenever the panel is pointed at a connection.
+    ///
+    /// What the selector shows, never what a change is saved from: see
+    /// [`read_modify_write`].
     sets: TemplateSetStore,
+    /// Why the sets cannot be changed, shown under the selector.
+    ///
+    /// Set when `template-sets.json` could not be read — the selector is empty
+    /// then — or written. A save or delete still re-reads the file first, so it
+    /// refuses for as long as the file stays unreadable and goes through, and
+    /// clears this, once it has been fixed.
+    sets_error: Option<SharedString>,
     /// The abbreviation rules — one global store, not part of the profile.
     abbr: AbbreviationStore,
+    /// Why the abbreviation switch cannot be changed; the same as
+    /// [`Self::sets_error`], for `abbreviations.json`.
+    abbr_error: Option<SharedString>,
     /// Whether the set dropdown is showing.
     set_open: bool,
     /// Whether the "Save as set…" prompt is up.
@@ -307,7 +346,9 @@ impl GeneratePane {
             output,
             author,
             sets: TemplateSetStore::default(),
+            sets_error: None,
             abbr: AbbreviationStore::default(),
+            abbr_error: None,
             set_open: false,
             naming_set: false,
             set_name,
@@ -326,21 +367,26 @@ impl GeneratePane {
     /// Called by every connect. The sets and the abbreviation rules are re-read
     /// here rather than kept: both are global files another part of the
     /// application may have written since the last connection.
+    ///
+    /// A file that cannot be read shows as an empty store with the reason
+    /// beside it. The empty store is only ever *shown*: every change re-reads
+    /// the file (see [`read_modify_write`]), so it is never what gets saved
+    /// over the one that could not be read.
     pub fn load(&mut self, id: Uuid, profile: &GenerationProfile, cx: &mut Context<Self>) {
         self.profile_id = Some(id);
         self.saved = profile.clone();
-        self.sets = match TemplateSetStore::load() {
-            Ok(sets) => sets,
+        (self.sets, self.sets_error) = match TemplateSetStore::load() {
+            Ok(sets) => (sets, None),
             Err(error) => {
                 log::error!("could not read template-sets.json: {error:#}");
-                TemplateSetStore::default()
+                (TemplateSetStore::default(), Some(sets_failed(&error)))
             }
         };
-        self.abbr = match AbbreviationStore::load() {
-            Ok(rules) => rules,
+        (self.abbr, self.abbr_error) = match AbbreviationStore::load() {
+            Ok(rules) => (rules, None),
             Err(error) => {
                 log::error!("could not read abbreviations.json: {error:#}");
-                AbbreviationStore::default()
+                (AbbreviationStore::default(), Some(abbr_failed(&error)))
             }
         };
         self.rebuild(profile, cx);
@@ -395,6 +441,9 @@ impl GeneratePane {
     /// the second answer to a question already answered.
     pub fn adopt_abbreviations(&mut self, store: AbbreviationStore, cx: &mut Context<Self>) {
         self.abbr = store;
+        // The caller has just read or written the file, so whatever kept the
+        // switch from changing is no longer true.
+        self.abbr_error = None;
         cx.emit(GeneratePaneEvent::Changed);
         cx.notify();
     }
@@ -626,13 +675,17 @@ impl GeneratePane {
             return;
         }
         let templates = self.collect(cx).templates;
-        self.sets.upsert(TemplateSet::new(name, templates));
-        // The flag goes with it: a store with a set of the user's own in it is
-        // no longer a first run, whatever it was before.
-        self.sets.builtins_seeded = true;
-        if let Err(error) = self.sets.save() {
-            log::error!("could not write template-sets.json: {error:#}");
-        }
+        let written = read_modify_write(
+            TemplateSetStore::load,
+            |sets| {
+                sets.upsert(TemplateSet::new(name, templates));
+                // The flag goes with it: a store with a set of the user's own
+                // in it is no longer a first run, whatever it was before.
+                sets.builtins_seeded = true;
+            },
+            TemplateSetStore::save,
+        );
+        self.keep_sets(written);
         self.naming_set = false;
         cx.notify();
     }
@@ -641,12 +694,30 @@ impl GeneratePane {
     /// deleted set is one fewer thing to pick, not an instruction to clear
     /// what is already ticked.
     fn delete_set(&mut self, id: Uuid, cx: &mut Context<Self>) {
-        self.sets.remove(id);
-        if let Err(error) = self.sets.save() {
-            log::error!("could not write template-sets.json: {error:#}");
-        }
+        let written = read_modify_write(
+            TemplateSetStore::load,
+            |sets| {
+                sets.remove(id);
+            },
+            TemplateSetStore::save,
+        );
+        self.keep_sets(written);
         self.deleting_set = None;
         cx.notify();
+    }
+
+    /// Keeps the sets a change wrote, or the reason it wrote nothing.
+    fn keep_sets(&mut self, written: anyhow::Result<TemplateSetStore>) {
+        match written {
+            Ok(sets) => {
+                self.sets = sets;
+                self.sets_error = None;
+            }
+            Err(error) => {
+                log::error!("template-sets.json was not changed: {error:#}");
+                self.sets_error = Some(sets_failed(&error));
+            }
+        }
     }
 
     /// Asks the platform for template files and appends what it hands back.
@@ -746,11 +817,24 @@ impl GeneratePane {
     /// Flips the global abbreviation switch and writes it straight away.
     ///
     /// Not debounced: it is one boolean and one click, and the rules file is
-    /// not the connection's.
+    /// not the connection's. The rules come along with the switch: the panel
+    /// keeps the file as it was written, rules another window added included.
+    /// When it cannot be written the switch stays where it was.
     fn toggle_abbreviations(&mut self, on: bool, cx: &mut Context<Self>) {
-        self.abbr.apply_to_names = on;
-        if let Err(error) = self.abbr.save() {
-            log::error!("could not write abbreviations.json: {error:#}");
+        let written = read_modify_write(
+            AbbreviationStore::load,
+            |store| store.apply_to_names = on,
+            AbbreviationStore::save,
+        );
+        match written {
+            Ok(store) => {
+                self.abbr = store;
+                self.abbr_error = None;
+            }
+            Err(error) => {
+                log::error!("abbreviations.json was not changed: {error:#}");
+                self.abbr_error = Some(abbr_failed(&error));
+            }
         }
         cx.emit(GeneratePaneEvent::Changed);
         cx.notify();
@@ -1267,7 +1351,12 @@ impl Render for GeneratePane {
                     .w_full()
                     .min_w_0()
                     .child(heading(ts!("generate.template_set")))
-                    .child(self.render_sets(cx)),
+                    .child(self.render_sets(cx))
+                    .children(
+                        self.sets_error
+                            .clone()
+                            .map(|message| error_line(message, &theme)),
+                    ),
             )
             .child(
                 div()
@@ -1290,7 +1379,12 @@ impl Render for GeneratePane {
                     .child(labelled(ts!("generate.output_dir"), output))
                     .child(labelled(ts!("generate.author"), self.author.clone()))
                     .child(labelled(ts!("generate.variables"), self.render_vars()))
-                    .child(self.render_abbreviations(cx)),
+                    .child(self.render_abbreviations(cx))
+                    .children(
+                        self.abbr_error
+                            .clone()
+                            .map(|message| error_line(message, &theme)),
+                    ),
             );
 
         let bar = self
@@ -1336,6 +1430,24 @@ impl Render for GeneratePane {
             .children(prompt)
             .children(delete_prompt)
     }
+}
+
+/// A line saying why a global store could not be changed.
+fn error_line(message: SharedString, theme: &Theme) -> impl IntoElement + use<> {
+    div()
+        .text_size(px(11.))
+        .text_color(theme.danger)
+        .child(message)
+}
+
+/// What [`GeneratePane::sets_error`] says about `error`.
+fn sets_failed(error: &anyhow::Error) -> SharedString {
+    ts!("generate.sets_failed", error = format!("{error:#}"))
+}
+
+/// What [`GeneratePane::abbr_error`] says about `error`.
+fn abbr_failed(error: &anyhow::Error) -> SharedString {
+    ts!("generate.abbr_failed", error = format!("{error:#}"))
 }
 
 /// A labelled row of the options block.
@@ -1596,6 +1708,58 @@ mod tests {
         let stored = store_template_path(&below);
         assert_eq!(stored, PathBuf::from("templates/java_model.java"));
         assert_eq!(resolve_template(&stored), below);
+    }
+
+    #[test]
+    fn a_template_set_file_that_cannot_be_read_is_not_saved_over() {
+        // Saving the empty store the panel shows in its place would replace
+        // every set the user has with the one being saved.
+        let dir = tempfile::TempDir::new().unwrap();
+        let path = dir.path().join("template-sets.json");
+        let damaged = b"{ \"sets\": [ not json";
+        std::fs::write(&path, damaged).unwrap();
+
+        let written = read_modify_write(
+            || TemplateSetStore::load_from(&path),
+            |_| panic!("a change was applied to a store that could not be read"),
+            |sets| sets.save_to(&path),
+        );
+
+        assert!(written.is_err());
+        assert_eq!(std::fs::read(&path).unwrap(), damaged);
+    }
+
+    #[test]
+    fn a_change_starts_from_the_file_rather_than_the_copy_read_at_connect() {
+        // The panel read the sets when the connection opened; the import
+        // wizard has written one since. Saving a set of the panel's own must
+        // keep the wizard's.
+        let dir = tempfile::TempDir::new().unwrap();
+        let path = dir.path().join("template-sets.json");
+        let stale = TemplateSetStore::default();
+        let mut meanwhile = stale.clone();
+        meanwhile.upsert(TemplateSet::new("imported", vec![reference("a", true)]));
+        meanwhile.save_to(&path).unwrap();
+
+        let written = read_modify_write(
+            || TemplateSetStore::load_from(&path),
+            |sets| sets.upsert(TemplateSet::new("mine", vec![reference("b", true)])),
+            |sets| sets.save_to(&path),
+        )
+        .expect("the file reads and writes");
+
+        let names: Vec<&str> = written.sets.iter().map(|set| set.name.as_str()).collect();
+        assert_eq!(names, ["imported", "mine"]);
+        assert_eq!(TemplateSetStore::load_from(&path).unwrap(), written);
+    }
+
+    #[test]
+    fn the_error_lines_are_translated() {
+        let error = anyhow::anyhow!("failed to parse");
+        for label in [sets_failed(&error), abbr_failed(&error)] {
+            assert!(!label.starts_with("generate."), "untranslated {label:?}");
+            assert!(label.contains("failed to parse"), "{label:?}");
+        }
     }
 
     /// The pane as the workspace draws it: through `cached_view`, above the

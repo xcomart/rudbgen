@@ -294,6 +294,8 @@ generate:
   var_value: valor
   apply_abbreviations: Aplicar reglas de abreviatura
   rules: Reglas…
+  sets_failed: "Los conjuntos de plantillas no se pueden guardar ni eliminar hasta que esto se resuelva: %{error}"
+  abbr_failed: "El interruptor de abreviaturas no se puede cambiar hasta que esto se resuelva: %{error}"
   preview: Vista previa
   dry_run: Simulación
   run: Generar
@@ -667,6 +669,8 @@ import:
   nothing_written: No se importó nada.
   skipped: "Dejado atrás porque el nombre estaba ocupado: %{names}"
   no_keychain: "Estas conexiones se guardaron sin su contraseña porque no se pudo poner en el llavero: %{names}. Al abrir una, la pedirá."
+  load_failed: "No se importó nada porque no se pudo leer un archivo al que la importación añadiría datos: %{error}. Repare o mueva ese archivo e importe de nuevo."
+  not_saved: "No se guardó porque no se pudo escribir el archivo: %{errors}"
   wrong_password: Esa no es la contraseña maestra de esta configuración.
   malformed: "Esta configuración está dañada: uno de los valores cifrados no es un valor."
   unreadable: No se pudo leer ese archivo.

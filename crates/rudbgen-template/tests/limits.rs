@@ -116,3 +116,36 @@ fn an_else_before_an_elif_still_loses_its_body() {
     assert_eq!(render(source, &model()), "");
     assert_eq!(render(source, &Fixture::named("y")), "elif");
 }
+
+#[test]
+fn a_width_up_to_the_limit_is_honoured() {
+    let padded = render("[${item:key=name, padSize=4096}]", &model());
+    assert_eq!(padded.len(), 4096 + 2);
+    assert_eq!(
+        render(
+            "${for:key=rows, indent=4096, inStr='\\n'}x${endfor}",
+            &model()
+        ),
+        "x",
+        "one element writes no separator"
+    );
+    assert_eq!(
+        render("[${item:key=name, padSize=-99999999999}]", &model()),
+        "[tb_user]",
+        "a negative width writes no blanks and costs nothing"
+    );
+}
+
+#[test]
+fn a_width_beyond_the_limit_is_a_parse_error_and_not_an_abort() {
+    for source in [
+        "${item:key=name, padSize=4097}",
+        "${item:key=name, padSize=9999999999}",
+        "${user:padSize=9999999999}",
+        "${for:key=rows, indent=9999999999}x${endfor}",
+    ] {
+        let error = Template::parse(source).expect_err(source);
+        assert!(error.message.contains("is too large"), "{source}: {error}");
+        assert!(error.span.is_some(), "{source}: the statement is marked");
+    }
+}

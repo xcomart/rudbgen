@@ -25,6 +25,9 @@ use crate::strutil;
 /// spare. No real template comes near it; the shipped ones nest two deep.
 pub(crate) const MAX_DEPTH: usize = 64;
 
+/// The largest `padSize` or `indent`, in display columns.
+pub(crate) const MAX_WIDTH: i64 = 4096;
+
 /// The attribute list of a statement, in the order it was written.
 ///
 /// jdbgen keeps these in a `HashMap`, where a repeated name overwrites the
@@ -73,15 +76,26 @@ impl Attrs {
         self.get("key").or_else(|| self.get("item"))
     }
 
-    /// The whole number an attribute such as `padSize` holds, `0` when it is
-    /// not there. `label` is the attribute as the template writer spells it.
+    /// The width an attribute such as `padSize` holds, `0` when it is not
+    /// there. `label` is the attribute as the template writer spells it.
+    ///
+    /// A width is a count of blanks the renderer writes, so it is refused
+    /// above [`MAX_WIDTH`]: `padSize=9999999999` would otherwise ask for ten
+    /// gigabytes per value, and an allocation that cannot be served aborts the
+    /// process. A negative width writes no blanks and is left alone.
     pub(crate) fn number(&self, name: &str, label: &str) -> Result<i64, String> {
-        match self.get(name) {
-            Some(text) => text
-                .parse::<i64>()
-                .map_err(|_| format!("{label} is not a number: \"{text}\"")),
-            None => Ok(0),
+        let Some(text) = self.get(name) else {
+            return Ok(0);
+        };
+        let width = text
+            .parse::<i64>()
+            .map_err(|_| format!("{label} is not a number: \"{text}\""))?;
+        if width > MAX_WIDTH {
+            return Err(format!(
+                "{label} is too large: {width} (at most {MAX_WIDTH})"
+            ));
         }
+        Ok(width)
     }
 }
 

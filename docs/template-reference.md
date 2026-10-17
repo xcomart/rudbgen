@@ -278,7 +278,7 @@ work on [`super`](#super) and on [`author`, `user` and
 
 | Decoration | Description |
 |:---|:---|
-| `padSize=<size>` | Pad the value with spaces up to `<size>` display columns |
+| `padSize=<size>` | Pad the value with spaces up to `<size>` display columns, at most 4096 |
 | `padDir=<direction>` | `left` or `right` — the side the spaces go to. Default `right` |
 | `quote=<quote>` | Wrap the value in `<quote>` on both sides |
 | `prepend=<text>` | Put `<text>` in front of the value |
@@ -713,7 +713,7 @@ are part of `inStr`.
   `<output column where the for statement started> + <indent>`. The column is
   measured in display columns (see [Decorations](#decorations)).
 - `indent` defaults to `0`, and a non-numeric value fails the parse with
-  `indent is not a number`.
+  `indent is not a number`, as does one above 4096 with `indent is too large`.
 
 This is why the idiomatic layout puts the whole body on the same line as the
 `for` header and moves the line break into `inStr`:
@@ -968,7 +968,7 @@ which the editor refuses to save — the later one wins.
 | Missing `endif` / `endfor` | Parse error: `if statements not closed` / `for statements not closed` |
 | `if`s and `for`s nested more than 64 deep | Parse error: `statements nested more than 64 deep` |
 | Unknown statement type | Parse error: `Unknown template: …` |
-| Non-numeric `padSize` or `indent` | Parse error |
+| Non-numeric `padSize` or `indent`, or one above 4096 | Parse error |
 | `matches`/`notMatches` pattern that is not a valid regular expression | Parse error |
 | Two tables or templates with the same output path | Run error before any file is written |
 

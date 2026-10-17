@@ -588,10 +588,9 @@ impl Workspace {
     ///
     /// `strip` names the strip reporting — always [`WORK_STRIP_TAG`], the one
     /// strip this window has — and `index` the insertion gap the pointer is
-    /// over, or `None` once it has left the strip. A `None` clears only when
-    /// it names this strip's own bar, so a drag that was never here wipes
-    /// nothing; a `Some` is kept only from this strip's own source, so a
-    /// foreign drag never raises the bar.
+    /// over, or `None` once it has left the strip. [`TabDropState::drag_over`]
+    /// keeps the rules: a `None` clears only this strip's own bar, and only a
+    /// tab of this strip's own source raises one, the verdict passed here.
     pub(super) fn drag_over_tab(
         &mut self,
         strip: u64,
@@ -599,33 +598,37 @@ impl Workspace {
         index: Option<usize>,
         cx: &mut Context<Self>,
     ) {
-        let Some(index) = index else {
-            if self.tab_drop.is_some_and(|(tag, _)| tag == strip) {
-                self.tab_drop = None;
-                cx.notify();
-            }
-            return;
-        };
-        if dragged.source != WORK_STRIP_TAG {
-            return;
-        }
-        let next = Some((strip, index));
-        if self.tab_drop != next {
-            self.tab_drop = next;
+        if self
+            .tab_drop
+            .drag_over(strip, index, dragged.source == WORK_STRIP_TAG)
+        {
             cx.notify();
         }
     }
 
-    /// The index a drop on `strip` lands at: the bar the pointer last named
-    /// for this strip, or `fallback` — the static drop position — when the
-    /// bar belongs to another strip or to no drag at all.
+    /// Moves a tab dropped on the work strip into the gap `to`, and takes the
+    /// bar down.
     ///
-    /// Takes the bar in any case: a drop ends the gesture, wherever it lands.
-    pub(super) fn resolve_tab_drop(&mut self, strip: u64, fallback: usize) -> usize {
-        match self.tab_drop.take() {
-            Some((tag, index)) if tag == strip => index,
-            _ => fallback,
+    /// `to` is the gap [`TabBar::on_reorder`] reports — the one the bar stood
+    /// in, or the keyboard reorder's neighbour — so nothing has to be looked
+    /// up here. A foreign strip's tab is not ours: the bar never shows for
+    /// it, and the move refuses it. Answers whether the tab moved.
+    pub(super) fn drop_tab(
+        &mut self,
+        dragged: DraggedTab,
+        to: usize,
+        cx: &mut Context<Self>,
+    ) -> bool {
+        self.tab_drop.clear();
+        // The bar is gone either way, and even a refused move has to notify:
+        // the strip still has to lose the bar it drew.
+        cx.notify();
+        if dragged.source != WORK_STRIP_TAG {
+            return false;
         }
+        // A move is not a close, so no dirty guard here: the dot travels with
+        // the item it marks.
+        self.pane.relocate(dragged.index, to)
     }
 
     /// Takes down the drop bar, if one is up.
@@ -634,7 +637,7 @@ impl Workspace {
     /// drop handler, so the root's own release clears whatever is left; a
     /// drop already took it, which makes this a no-op.
     pub(super) fn clear_tab_drop(&mut self, cx: &mut Context<Self>) {
-        if self.tab_drop.take().is_some() {
+        if self.tab_drop.clear() {
             cx.notify();
         }
     }
@@ -659,7 +662,9 @@ impl Workspace {
                 // different tab after every reorder, shuffling whatever gpui
                 // keeps per element — including the drag the reorder itself
                 // started. The Generate tab is one of a kind, a template is
-                // keyed by its file, and the preview is one of a kind too.
+                // keyed by its file, and the preview is one of a kind too —
+                // keyed by nothing, since its title follows the file it shows
+                // and changes under a drag when a render comes back.
                 let id: ElementId = match item {
                     PaneItem::Generate => "work-tab-generate".into(),
                     PaneItem::Template { file, .. } => (
@@ -667,9 +672,7 @@ impl Workspace {
                         file.to_string_lossy().into_owned(),
                     )
                         .into(),
-                    PaneItem::Preview { title } => {
-                        (ElementId::from("work-tab-preview"), title.clone()).into()
-                    }
+                    PaneItem::Preview { .. } => "work-tab-preview".into(),
                 };
                 let tab = TabItem::new(id, title).closable(!matches!(item, PaneItem::Generate));
                 // The dirty marker is the strip's own dot rather than a
@@ -702,10 +705,7 @@ impl Workspace {
                     .menu_open(self.pane_menu_open)
                     .menu_icon(icons::TAB_LIST)
                     .drag_source(WORK_STRIP_TAG)
-                    .drop_indicator(
-                        self.tab_drop
-                            .and_then(|(tag, index)| (tag == WORK_STRIP_TAG).then_some(index)),
-                    )
+                    .drop_indicator(self.tab_drop.indicator(WORK_STRIP_TAG))
                     .on_drag_over(move |dragged, index, _window, cx| {
                         over.update(cx, |workspace, cx| {
                             workspace.drag_over_tab(WORK_STRIP_TAG, dragged, index, cx);
@@ -713,20 +713,7 @@ impl Workspace {
                     })
                     .on_reorder(move |dragged, to, _window, cx| {
                         reorder.update(cx, |workspace, cx| {
-                            // A foreign strip's tab is not ours: the bar never
-                            // shows for it, and the move refuses it.
-                            if dragged.source != WORK_STRIP_TAG {
-                                workspace.clear_tab_drop(cx);
-                                return;
-                            }
-                            let at = workspace.resolve_tab_drop(WORK_STRIP_TAG, to);
-                            // A move is not a close, so no dirty guard here:
-                            // the dot travels with the item it marks.
-                            workspace.pane.relocate(dragged.index, at);
-                            // The bar is already taken, but a refused move
-                            // notifies nothing — the strip still has to lose
-                            // the bar it drew.
-                            cx.notify();
+                            workspace.drop_tab(dragged, to, cx);
                         });
                     })
                     .on_select(move |index, window, cx| {

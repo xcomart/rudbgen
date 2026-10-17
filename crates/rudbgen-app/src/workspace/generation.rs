@@ -304,11 +304,17 @@ impl Workspace {
     }
 
     /// Relabels the preview tab with the file it now shows.
+    ///
+    /// In place: the tab keeps the gap it was dragged to and the strip keeps
+    /// the tab that is on top, where closing and pushing it again would move
+    /// it to the end and bring it to the front behind the user's back — in
+    /// the middle of a drag, if the render came back during one.
     pub(super) fn retitle_preview(&mut self, cx: &mut Context<Self>) {
         let title = self.preview.read(cx).title();
-        if let Some(index) = self.preview_tab() {
-            self.pane.close(index);
-            self.pane.push(PaneItem::Preview { title });
+        if let Some(index) = self.preview_tab()
+            && let Some(PaneItem::Preview { title: shown }) = self.pane.get_mut(index)
+        {
+            *shown = title;
         }
         cx.notify();
     }

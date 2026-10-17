@@ -97,8 +97,8 @@ use rudbgen_meta::{MetaReader, Table};
 use rugpui::{
     Button, ButtonVariant, DraggedTab, DraggedThumb, EditorThemeEntry, EditorThemeRegistry,
     MenuButton, MenuEntry, ResizeHandle, Scrollbar, ScrollbarAxis, ScrollbarState, Select, TabBar,
-    TabItem, Theme, ThemeRegistry, hide_later, hide_now, scroll_to, scrolled, set_editor_theme,
-    set_theme, set_window_tint, theme, tooltip_label,
+    TabDropState, TabItem, Theme, ThemeRegistry, hide_later, hide_now, scroll_to, scrolled,
+    set_editor_theme, set_theme, set_window_tint, theme, tooltip_label,
 };
 use rugpui_shell::{
     AboutDialog, AboutDialogEvent, AppIdentity, Pane, UpdateDialog, UpdateDialogEvent,
@@ -594,10 +594,11 @@ struct Workspace {
     pane_menu_open: bool,
     /// Where a dragged tab would land, while it is over the strip.
     ///
-    /// The strip reporting and the insertion gap the pointer last named — the
-    /// bar [`Workspace::render_tabs`] draws. `None` is no bar: no drag, a
-    /// foreign drag, or a drag that has left the strip or already dropped.
-    tab_drop: Option<(u64, usize)>,
+    /// rugpui's bookkeeping for the bar [`Workspace::render_tabs`] draws: the
+    /// strip reporting and the insertion gap the pointer last named, or no
+    /// bar at all — no drag, a foreign drag, or a drag that has left the strip
+    /// or already dropped.
+    tab_drop: TabDropState,
     /// The ticked tables, as the last run read them.
     ///
     /// Kept so that moving the preview header's dropdowns re-renders without
@@ -788,7 +789,7 @@ impl Workspace {
             job,
             pane,
             pane_menu_open: false,
-            tab_drop: None,
+            tab_drop: TabDropState::new(),
             run_tables: Vec::new(),
             explorer_visible: layout.explorer_visible,
             inspector_visible: layout.inspector_visible,

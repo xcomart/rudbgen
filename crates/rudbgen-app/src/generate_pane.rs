@@ -433,6 +433,15 @@ impl GeneratePane {
         &self.abbr
     }
 
+    /// Why the panel could not read or write `abbreviations.json` the last
+    /// time it tried, if it could not.
+    ///
+    /// While this stands [`Self::abbreviations`] may be an empty stand-in
+    /// rather than the user's rules.
+    pub fn abbreviations_error(&self) -> Option<&SharedString> {
+        self.abbr_error.as_ref()
+    }
+
     /// Takes on the rules the editor has just written.
     ///
     /// The dialog saved the file; this replaces the panel's copy with the same

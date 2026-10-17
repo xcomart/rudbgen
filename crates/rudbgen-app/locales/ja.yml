@@ -118,7 +118,7 @@ connect:
   name_required: 接続の名前を入力してください。
   url_required: 接続の URL が空です。
   no_driver: "「%{driver}」というドライバー定義がありません。"
-  load_failed: "保存された接続を読み込めませんでした: %{error}"
+  load_failed: "保存された接続を読み込めなかったため、そのファイルを修正するか移動するまで保存も削除もできません: %{error}"
   save_failed: "接続を保存できませんでした: %{error}"
   keychain_failed: "パスワードをキーチェーンに保存できませんでした: %{error}"
 
@@ -352,6 +352,7 @@ settings:
   title: 設定
   system_default: システムの設定に従う
   save_failed: "設定を保存できませんでした: %{error}"
+  load_failed: "rudbgen の起動時に設定ファイルを読み込めなかったため、設定を保存できません: %{error}。そのファイルを修正するか移動してから、rudbgen を再起動してください。"
 
   section:
     appearance: 外観
@@ -632,6 +633,8 @@ abbr:
   pick_table: テーブル…
   tip_remove: この規則を削除
   duplicate: "%{abbreviation}: 有効な規則が二つ同じものを探しています。実際に効くのは片方だけです。"
+  load_failed: "abbreviations.json を読み込めなかったため、ルールを編集できません: %{error}。そのファイルを修正するか移動してから、もう一度開いてください。"
+  save_failed: "ルールを保存できませんでした: %{error}"
 
 import:
   title: jdbgen から取り込む

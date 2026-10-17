@@ -173,7 +173,7 @@ connect:
   name_required: Give the connection a name.
   url_required: The connection has no URL.
   no_driver: "No driver definition named “%{driver}”."
-  load_failed: "The saved connections could not be read: %{error}"
+  load_failed: "The saved connections could not be read, so nothing can be saved or deleted until that file is fixed or moved: %{error}"
   save_failed: "The connections could not be saved: %{error}"
   keychain_failed: "The password could not be saved to the keychain: %{error}"
 
@@ -499,6 +499,7 @@ settings:
   # the same whether or not its list is open.
   system_default: Use the system setting
   save_failed: "The settings could not be saved: %{error}"
+  load_failed: "Settings cannot be saved, because the settings file could not be read when rudbgen started: %{error}. Fix or move that file and restart rudbgen."
 
   section:
     appearance: Appearance
@@ -852,6 +853,8 @@ abbr:
   tip_remove: Remove this rule
   # Why Save is greyed. `%{abbreviation}` is the user's own text.
   duplicate: "%{abbreviation}: two rules that are on look for this, and only one of them could ever fire."
+  load_failed: "The rules cannot be edited, because abbreviations.json could not be read: %{error}. Fix or move that file and open this again."
+  save_failed: "The rules were not saved: %{error}"
 
 # The one-time import of a jdbgen configuration (D5), in three steps: the file
 # and the master password, the checklist, the result.

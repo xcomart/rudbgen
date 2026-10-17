@@ -118,7 +118,7 @@ connect:
   name_required: 请为该连接取个名字。
   url_required: 该连接没有 URL。
   no_driver: "没有名为“%{driver}”的驱动定义。"
-  load_failed: "无法读取已保存的连接：%{error}"
+  load_failed: "无法读取已保存的连接，在修复或移走该文件之前无法保存或删除：%{error}"
   save_failed: "无法保存连接：%{error}"
   keychain_failed: "无法把密码保存到密钥链：%{error}"
 
@@ -351,6 +351,7 @@ settings:
   title: 设置
   system_default: 跟随系统设置
   save_failed: "无法保存设置：%{error}"
+  load_failed: "rudbgen 启动时无法读取设置文件，因此无法保存设置：%{error}。请修复或移走该文件，然后重新启动 rudbgen。"
 
   section:
     appearance: 外观
@@ -631,6 +632,8 @@ abbr:
   pick_table: 表…
   tip_remove: 删除此规则
   duplicate: "%{abbreviation}：有两条已启用的规则查找它，最终只有一条能生效。"
+  load_failed: "无法读取 abbreviations.json，因此无法编辑规则：%{error}。请修复或移走该文件后重新打开。"
+  save_failed: "未能保存规则：%{error}"
 
 import:
   title: 从 jdbgen 导入

@@ -218,6 +218,32 @@ pub fn store_template_path(file: &Path) -> PathBuf {
     }
 }
 
+/// Re-reads a global store, applies `change` to that copy, and writes it back.
+///
+/// What the panel keeps of `template-sets.json` and `abbreviations.json` was
+/// read when the connection opened, and the import wizard or the rules editor
+/// may have written either file since; saving that copy would undo them. So
+/// every change starts from the file as it is now, and the store handed back
+/// is the one that was written, for the panel to keep instead.
+///
+/// # Errors
+///
+/// A file that cannot be read is left exactly as it is: `change` is not
+/// applied and nothing is written. Starting from an empty store instead, as a
+/// reader may, would have the save replace the file with only this change. A
+/// failed write is the other error, and leaves the panel's copy the one to
+/// keep.
+pub fn read_modify_write<S>(
+    load: impl FnOnce() -> anyhow::Result<S>,
+    change: impl FnOnce(&mut S),
+    save: impl FnOnce(&S) -> anyhow::Result<()>,
+) -> anyhow::Result<S> {
+    let mut store = load()?;
+    change(&mut store);
+    save(&store)?;
+    Ok(store)
+}
+
 /// One row of the template list, as the panel holds it.
 ///
 /// The name and the output template are text fields rather than strings for the
@@ -263,9 +289,22 @@ pub struct GeneratePane {
     /// The author field.
     author: Entity<TextInput>,
     /// The saved sets, re-read whenever the panel is pointed at a connection.
+    ///
+    /// What the selector shows, never what a change is saved from: see
+    /// [`read_modify_write`].
     sets: TemplateSetStore,
+    /// Why the sets cannot be changed, shown under the selector.
+    ///
+    /// Set when `template-sets.json` could not be read — the selector is empty
+    /// then — or written. A save or delete still re-reads the file first, so it
+    /// refuses for as long as the file stays unreadable and goes through, and
+    /// clears this, once it has been fixed.
+    sets_error: Option<SharedString>,
     /// The abbreviation rules — one global store, not part of the profile.
     abbr: AbbreviationStore,
+    /// Why the abbreviation switch cannot be changed; the same as
+    /// [`Self::sets_error`], for `abbreviations.json`.
+    abbr_error: Option<SharedString>,
     /// Whether the set dropdown is showing.
     set_open: bool,
     /// Whether the "Save as set…" prompt is up.
@@ -307,7 +346,9 @@ impl GeneratePane {
             output,
             author,
             sets: TemplateSetStore::default(),
+            sets_error: None,
             abbr: AbbreviationStore::default(),
+            abbr_error: None,
             set_open: false,
             naming_set: false,
             set_name,
@@ -326,21 +367,26 @@ impl GeneratePane {
     /// Called by every connect. The sets and the abbreviation rules are re-read
     /// here rather than kept: both are global files another part of the
     /// application may have written since the last connection.
+    ///
+    /// A file that cannot be read shows as an empty store with the reason
+    /// beside it. The empty store is only ever *shown*: every change re-reads
+    /// the file (see [`read_modify_write`]), so it is never what gets saved
+    /// over the one that could not be read.
     pub fn load(&mut self, id: Uuid, profile: &GenerationProfile, cx: &mut Context<Self>) {
         self.profile_id = Some(id);
         self.saved = profile.clone();
-        self.sets = match TemplateSetStore::load() {
-            Ok(sets) => sets,
+        (self.sets, self.sets_error) = match TemplateSetStore::load() {
+            Ok(sets) => (sets, None),
             Err(error) => {
                 log::error!("could not read template-sets.json: {error:#}");
-                TemplateSetStore::default()
+                (TemplateSetStore::default(), Some(sets_failed(&error)))
             }
         };
-        self.abbr = match AbbreviationStore::load() {
-            Ok(rules) => rules,
+        (self.abbr, self.abbr_error) = match AbbreviationStore::load() {
+            Ok(rules) => (rules, None),
             Err(error) => {
                 log::error!("could not read abbreviations.json: {error:#}");
-                AbbreviationStore::default()
+                (AbbreviationStore::default(), Some(abbr_failed(&error)))
             }
         };
         self.rebuild(profile, cx);
@@ -387,6 +433,15 @@ impl GeneratePane {
         &self.abbr
     }
 
+    /// Why the panel could not read or write `abbreviations.json` the last
+    /// time it tried, if it could not.
+    ///
+    /// While this stands [`Self::abbreviations`] may be an empty stand-in
+    /// rather than the user's rules.
+    pub fn abbreviations_error(&self) -> Option<&SharedString> {
+        self.abbr_error.as_ref()
+    }
+
     /// Takes on the rules the editor has just written.
     ///
     /// The dialog saved the file; this replaces the panel's copy with the same
@@ -395,6 +450,9 @@ impl GeneratePane {
     /// the second answer to a question already answered.
     pub fn adopt_abbreviations(&mut self, store: AbbreviationStore, cx: &mut Context<Self>) {
         self.abbr = store;
+        // The caller has just read or written the file, so whatever kept the
+        // switch from changing is no longer true.
+        self.abbr_error = None;
         cx.emit(GeneratePaneEvent::Changed);
         cx.notify();
     }
@@ -626,13 +684,17 @@ impl GeneratePane {
             return;
         }
         let templates = self.collect(cx).templates;
-        self.sets.upsert(TemplateSet::new(name, templates));
-        // The flag goes with it: a store with a set of the user's own in it is
-        // no longer a first run, whatever it was before.
-        self.sets.builtins_seeded = true;
-        if let Err(error) = self.sets.save() {
-            log::error!("could not write template-sets.json: {error:#}");
-        }
+        let written = read_modify_write(
+            TemplateSetStore::load,
+            |sets| {
+                sets.upsert(TemplateSet::new(name, templates));
+                // The flag goes with it: a store with a set of the user's own
+                // in it is no longer a first run, whatever it was before.
+                sets.builtins_seeded = true;
+            },
+            TemplateSetStore::save,
+        );
+        self.keep_sets(written);
         self.naming_set = false;
         cx.notify();
     }
@@ -641,12 +703,30 @@ impl GeneratePane {
     /// deleted set is one fewer thing to pick, not an instruction to clear
     /// what is already ticked.
     fn delete_set(&mut self, id: Uuid, cx: &mut Context<Self>) {
-        self.sets.remove(id);
-        if let Err(error) = self.sets.save() {
-            log::error!("could not write template-sets.json: {error:#}");
-        }
+        let written = read_modify_write(
+            TemplateSetStore::load,
+            |sets| {
+                sets.remove(id);
+            },
+            TemplateSetStore::save,
+        );
+        self.keep_sets(written);
         self.deleting_set = None;
         cx.notify();
+    }
+
+    /// Keeps the sets a change wrote, or the reason it wrote nothing.
+    fn keep_sets(&mut self, written: anyhow::Result<TemplateSetStore>) {
+        match written {
+            Ok(sets) => {
+                self.sets = sets;
+                self.sets_error = None;
+            }
+            Err(error) => {
+                log::error!("template-sets.json was not changed: {error:#}");
+                self.sets_error = Some(sets_failed(&error));
+            }
+        }
     }
 
     /// Asks the platform for template files and appends what it hands back.
@@ -746,11 +826,24 @@ impl GeneratePane {
     /// Flips the global abbreviation switch and writes it straight away.
     ///
     /// Not debounced: it is one boolean and one click, and the rules file is
-    /// not the connection's.
+    /// not the connection's. The rules come along with the switch: the panel
+    /// keeps the file as it was written, rules another window added included.
+    /// When it cannot be written the switch stays where it was.
     fn toggle_abbreviations(&mut self, on: bool, cx: &mut Context<Self>) {
-        self.abbr.apply_to_names = on;
-        if let Err(error) = self.abbr.save() {
-            log::error!("could not write abbreviations.json: {error:#}");
+        let written = read_modify_write(
+            AbbreviationStore::load,
+            |store| store.apply_to_names = on,
+            AbbreviationStore::save,
+        );
+        match written {
+            Ok(store) => {
+                self.abbr = store;
+                self.abbr_error = None;
+            }
+            Err(error) => {
+                log::error!("abbreviations.json was not changed: {error:#}");
+                self.abbr_error = Some(abbr_failed(&error));
+            }
         }
         cx.emit(GeneratePaneEvent::Changed);
         cx.notify();
@@ -844,6 +937,9 @@ impl GeneratePane {
             .flex_row()
             .items_center()
             .gap(px(8.))
+            .w_full()
+            .min_w_0()
+            .debug_selector(|| "generate-sets".to_string())
             .child(
                 Select::new("generate-set")
                     .chevron_icon(icons::CHEVRON_DOWN)
@@ -908,6 +1004,9 @@ impl GeneratePane {
             .flex()
             .flex_col()
             .gap(px(4.))
+            .w_full()
+            .min_w_0()
+            .debug_selector(|| "generate-templates".to_string())
             .when(rows.is_empty(), |list| {
                 list.child(
                     div()
@@ -950,6 +1049,8 @@ impl GeneratePane {
             .flex_row()
             .items_center()
             .gap(px(6.))
+            .w_full()
+            .min_w_0()
             .child(
                 Checkbox::new(("generate-tick", index), "")
                     .checked(row.selected)
@@ -1052,11 +1153,20 @@ impl GeneratePane {
                     .flex_row()
                     .items_center()
                     .gap(px(6.))
+                    .w_full()
+                    .min_w_0()
                     .child(div().w(px(150.)).flex_none().child(row.key.clone()))
                     .child(div().flex_1().min_w_0().child(row.value.clone()))
             })
             .collect();
-        div().flex().flex_col().gap(px(4.)).children(rows)
+        div()
+            .flex()
+            .flex_col()
+            .gap(px(4.))
+            .w_full()
+            .min_w_0()
+            .debug_selector(|| "generate-vars".to_string())
+            .children(rows)
     }
 
     /// The abbreviation switch, and the button that opens the rules editor.
@@ -1067,6 +1177,8 @@ impl GeneratePane {
             .flex_row()
             .items_center()
             .gap(px(8.))
+            .w_full()
+            .min_w_0()
             .child(
                 Checkbox::new("generate-abbr", ts!("generate.apply_abbreviations"))
                     .checked(self.abbr.apply_to_names)
@@ -1214,6 +1326,9 @@ impl Render for GeneratePane {
             .flex_row()
             .items_center()
             .gap(px(6.))
+            .w_full()
+            .min_w_0()
+            .debug_selector(|| "generate-output-row".to_string())
             .child(div().flex_1().min_w_0().child(self.output.clone()))
             .child(
                 Button::new("generate-output-pick", ts!("generate.browse"))
@@ -1235,19 +1350,30 @@ impl Render for GeneratePane {
             .flex_col()
             .gap(px(14.))
             .p(px(16.))
+            .w_full()
+            .min_w_0()
             .child(
                 div()
                     .flex()
                     .flex_col()
                     .gap(px(6.))
+                    .w_full()
+                    .min_w_0()
                     .child(heading(ts!("generate.template_set")))
-                    .child(self.render_sets(cx)),
+                    .child(self.render_sets(cx))
+                    .children(
+                        self.sets_error
+                            .clone()
+                            .map(|message| error_line(message, &theme)),
+                    ),
             )
             .child(
                 div()
                     .flex()
                     .flex_col()
                     .gap(px(6.))
+                    .w_full()
+                    .min_w_0()
                     .child(heading(ts!("generate.templates")))
                     .child(self.render_templates(&theme, cx)),
             )
@@ -1256,11 +1382,18 @@ impl Render for GeneratePane {
                     .flex()
                     .flex_col()
                     .gap(px(8.))
+                    .w_full()
+                    .min_w_0()
                     .child(heading(ts!("generate.options")))
                     .child(labelled(ts!("generate.output_dir"), output))
                     .child(labelled(ts!("generate.author"), self.author.clone()))
                     .child(labelled(ts!("generate.variables"), self.render_vars()))
-                    .child(self.render_abbreviations(cx)),
+                    .child(self.render_abbreviations(cx))
+                    .children(
+                        self.abbr_error
+                            .clone()
+                            .map(|message| error_line(message, &theme)),
+                    ),
             );
 
         let bar = self
@@ -1280,14 +1413,23 @@ impl Render for GeneratePane {
             .flex()
             .flex_col()
             .flex_grow_1()
+            .min_w_0()
+            .w_full()
+            // Bounded by `cached_view`'s box, which a grow alone would not do:
+            // without it the root is as tall as the form, the scroll box never
+            // overflows and the form runs under the run buttons.
+            .h_full()
             .min_h_0()
             .child(
                 div()
                     .id(PANE_SCROLL)
+                    .debug_selector(|| PANE_SCROLL.to_string())
                     .track_scroll(&self.scroll)
                     .flex()
                     .flex_col()
                     .flex_grow_1()
+                    .min_w_0()
+                    .w_full()
                     .min_h_0()
                     .overflow_y_scroll()
                     .restrict_scroll_to_axis()
@@ -1297,6 +1439,24 @@ impl Render for GeneratePane {
             .children(prompt)
             .children(delete_prompt)
     }
+}
+
+/// A line saying why a global store could not be changed.
+fn error_line(message: SharedString, theme: &Theme) -> impl IntoElement + use<> {
+    div()
+        .text_size(px(11.))
+        .text_color(theme.danger)
+        .child(message)
+}
+
+/// What [`GeneratePane::sets_error`] says about `error`.
+fn sets_failed(error: &anyhow::Error) -> SharedString {
+    ts!("generate.sets_failed", error = format!("{error:#}"))
+}
+
+/// What [`GeneratePane::abbr_error`] says about `error`.
+fn abbr_failed(error: &anyhow::Error) -> SharedString {
+    ts!("generate.abbr_failed", error = format!("{error:#}"))
 }
 
 /// A labelled row of the options block.
@@ -1310,6 +1470,8 @@ fn labelled(label: SharedString, control: impl IntoElement) -> impl IntoElement 
         .flex_row()
         .items_start()
         .gap(px(10.))
+        .w_full()
+        .min_w_0()
         .child(
             div()
                 .flex_none()
@@ -1555,5 +1717,190 @@ mod tests {
         let stored = store_template_path(&below);
         assert_eq!(stored, PathBuf::from("templates/java_model.java"));
         assert_eq!(resolve_template(&stored), below);
+    }
+
+    #[test]
+    fn a_template_set_file_that_cannot_be_read_is_not_saved_over() {
+        // Saving the empty store the panel shows in its place would replace
+        // every set the user has with the one being saved.
+        let dir = tempfile::TempDir::new().unwrap();
+        let path = dir.path().join("template-sets.json");
+        let damaged = b"{ \"sets\": [ not json";
+        std::fs::write(&path, damaged).unwrap();
+
+        let written = read_modify_write(
+            || TemplateSetStore::load_from(&path),
+            |_| panic!("a change was applied to a store that could not be read"),
+            |sets| sets.save_to(&path),
+        );
+
+        assert!(written.is_err());
+        assert_eq!(std::fs::read(&path).unwrap(), damaged);
+    }
+
+    #[test]
+    fn a_change_starts_from_the_file_rather_than_the_copy_read_at_connect() {
+        // The panel read the sets when the connection opened; the import
+        // wizard has written one since. Saving a set of the panel's own must
+        // keep the wizard's.
+        let dir = tempfile::TempDir::new().unwrap();
+        let path = dir.path().join("template-sets.json");
+        let stale = TemplateSetStore::default();
+        let mut meanwhile = stale.clone();
+        meanwhile.upsert(TemplateSet::new("imported", vec![reference("a", true)]));
+        meanwhile.save_to(&path).unwrap();
+
+        let written = read_modify_write(
+            || TemplateSetStore::load_from(&path),
+            |sets| sets.upsert(TemplateSet::new("mine", vec![reference("b", true)])),
+            |sets| sets.save_to(&path),
+        )
+        .expect("the file reads and writes");
+
+        let names: Vec<&str> = written.sets.iter().map(|set| set.name.as_str()).collect();
+        assert_eq!(names, ["imported", "mine"]);
+        assert_eq!(TemplateSetStore::load_from(&path).unwrap(), written);
+    }
+
+    #[test]
+    fn the_error_lines_are_translated() {
+        let error = anyhow::anyhow!("failed to parse");
+        for label in [sets_failed(&error), abbr_failed(&error)] {
+            assert!(!label.starts_with("generate."), "untranslated {label:?}");
+            assert!(label.contains("failed to parse"), "{label:?}");
+        }
+    }
+
+    /// The pane as the workspace draws it: through `cached_view`, above the
+    /// band the run buttons sit in.
+    struct CachedHarness {
+        pane: Entity<GeneratePane>,
+    }
+
+    impl Render for CachedHarness {
+        fn render(&mut self, _window: &mut Window, _cx: &mut Context<Self>) -> impl IntoElement {
+            div()
+                .size_full()
+                .flex()
+                .flex_col()
+                .child(
+                    div()
+                        .flex()
+                        .flex_1()
+                        .min_h_0()
+                        .child(rugpui::cached_view(self.pane.clone())),
+                )
+                .child(div().flex_none().h(px(60.)))
+        }
+    }
+
+    #[gpui::test]
+    fn a_short_window_scrolls_the_form_above_the_run_buttons(cx: &mut gpui::TestAppContext) {
+        cx.update(|cx| {
+            crate::app_settings::init(cx);
+            rugpui::init(cx);
+        });
+        let window = cx.add_window(|_, cx| {
+            let pane = cx.new(|cx| {
+                let mut pane = GeneratePane::new(cx);
+                pane.rebuild(
+                    &GenerationProfile {
+                        templates: vec![reference("first", true), reference("second", true)],
+                        custom_vars: vec![("package".to_string(), "com.example".to_string())],
+                        output_dir: Some(PathBuf::from("/tmp/out")),
+                        author: "author".to_string(),
+                    },
+                    cx,
+                );
+                pane
+            });
+            CachedHarness { pane }
+        });
+        let mut cx = gpui::VisualTestContext::from_window(window.into(), cx);
+        cx.simulate_resize(gpui::size(px(800.), px(200.)));
+        cx.run_until_parked();
+        let scroll = cx
+            .debug_bounds(PANE_SCROLL)
+            .expect("the scroll box is drawn");
+        // The scroll box has to stop where the button band starts; a root that
+        // only grows lets it run as tall as the form, under the buttons.
+        assert!(
+            (scroll.size.height - px(140.)).abs() < px(2.),
+            "the form was not bounded above the buttons: {scroll:?}"
+        );
+    }
+
+    #[gpui::test]
+    fn narrowing_the_window_narrows_the_generate_controls(cx: &mut gpui::TestAppContext) {
+        cx.update(|cx| {
+            crate::app_settings::init(cx);
+            rugpui::init(cx);
+        });
+        let window = cx.add_window(|_, cx| {
+            let mut pane = GeneratePane::new(cx);
+            pane.rebuild(
+                &GenerationProfile {
+                    templates: vec![reference("first", true), reference("second", true)],
+                    custom_vars: vec![("package".to_string(), "com.example".to_string())],
+                    output_dir: Some(PathBuf::from("/tmp/out")),
+                    author: "author".to_string(),
+                },
+                cx,
+            );
+            pane
+        });
+        let mut cx = gpui::VisualTestContext::from_window(window.into(), cx);
+        cx.simulate_resize(gpui::size(px(1000.), px(700.)));
+        cx.run_until_parked();
+        let wide_output = cx
+            .debug_bounds("generate-output-row")
+            .expect("the output row is drawn")
+            .size
+            .width;
+        let wide_templates = cx
+            .debug_bounds("generate-templates")
+            .expect("the template list is drawn")
+            .size
+            .width;
+        let wide_vars = cx
+            .debug_bounds("generate-vars")
+            .expect("the variable table is drawn")
+            .size
+            .width;
+        cx.simulate_resize(gpui::size(px(700.), px(700.)));
+        cx.run_until_parked();
+        let narrow_output = cx
+            .debug_bounds("generate-output-row")
+            .expect("the output row is drawn")
+            .size
+            .width;
+        let narrow_templates = cx
+            .debug_bounds("generate-templates")
+            .expect("the template list is drawn")
+            .size
+            .width;
+        let narrow_vars = cx
+            .debug_bounds("generate-vars")
+            .expect("the variable table is drawn")
+            .size
+            .width;
+        // The window lost 300px; every stretchable row has to lose the same.
+        // A chain that refuses to shrink keeps the wide width here, which is
+        // the regression this guards against.
+        for (name, wide, narrow) in [
+            ("output", wide_output, narrow_output),
+            ("templates", wide_templates, narrow_templates),
+            ("vars", wide_vars, narrow_vars),
+        ] {
+            assert!(
+                narrow < wide,
+                "{name} did not shrink: wide {wide:?}, narrow {narrow:?}"
+            );
+            let delta = wide - narrow;
+            assert!(
+                (delta - px(300.)).abs() < px(2.),
+                "{name} did not track the window: wide {wide:?}, narrow {narrow:?}, delta {delta:?}"
+            );
+        }
     }
 }

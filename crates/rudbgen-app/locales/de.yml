@@ -118,7 +118,7 @@ connect:
   name_required: Der Verbindung einen Namen geben.
   url_required: Die Verbindung hat keine URL.
   no_driver: "Keine Treiberdefinition namens „%{driver}“."
-  load_failed: "Die gespeicherten Verbindungen konnten nicht gelesen werden: %{error}"
+  load_failed: "Die gespeicherten Verbindungen konnten nicht gelesen werden; bis die Datei repariert oder verschoben ist, kann nichts gespeichert oder gelöscht werden: %{error}"
   save_failed: "Die Verbindungen konnten nicht gespeichert werden: %{error}"
   keychain_failed: "Das Passwort konnte nicht im Schlüsselbund gespeichert werden: %{error}"
 
@@ -294,6 +294,8 @@ generate:
   var_value: Wert
   apply_abbreviations: Abkürzungsregeln anwenden
   rules: Regeln…
+  sets_failed: "Vorlagensätze können erst gespeichert oder gelöscht werden, wenn dies behoben ist: %{error}"
+  abbr_failed: "Der Abkürzungsschalter kann erst geändert werden, wenn dies behoben ist: %{error}"
   preview: Vorschau
   dry_run: Probelauf
   run: Erzeugen
@@ -352,6 +354,7 @@ settings:
   title: Einstellungen
   system_default: Systemeinstellung verwenden
   save_failed: "Die Einstellungen konnten nicht gespeichert werden: %{error}"
+  load_failed: "Die Einstellungen können nicht gespeichert werden, weil die Einstellungsdatei beim Start von rudbgen nicht gelesen werden konnte: %{error}. Reparieren oder verschieben Sie die Datei und starten Sie rudbgen neu."
 
   section:
     appearance: Darstellung
@@ -632,6 +635,8 @@ abbr:
   pick_table: Tabelle…
   tip_remove: Diese Regel entfernen
   duplicate: "%{abbreviation}: Zwei aktive Regeln suchen danach, und nur eine davon könnte je greifen."
+  load_failed: "Die Regeln können nicht bearbeitet werden, weil abbreviations.json nicht gelesen werden konnte: %{error}. Reparieren oder verschieben Sie die Datei und öffnen Sie dies erneut."
+  save_failed: "Die Regeln wurden nicht gespeichert: %{error}"
 
 import:
   title: Aus jdbgen importieren
@@ -667,6 +672,8 @@ import:
   nothing_written: Es wurde nichts importiert.
   skipped: "Zurückgelassen, weil der Name vergeben war: %{names}"
   no_keychain: "Diese Verbindungen wurden ohne ihr Passwort gespeichert, weil es nicht in den Schlüsselbund gelegt werden konnte: %{names}. Beim Öffnen wird danach gefragt."
+  load_failed: "Es wurde nichts importiert, weil eine Datei, in die der Import schreiben würde, nicht gelesen werden konnte: %{error}. Reparieren oder verschieben Sie die Datei und importieren Sie erneut."
+  not_saved: "Nicht gespeichert, weil die Datei nicht geschrieben werden konnte: %{errors}"
   wrong_password: Das ist nicht das Hauptpasswort dieser Konfiguration.
   malformed: "Diese Konfiguration ist beschädigt: einer der verschlüsselten Werte ist gar kein Wert."
   unreadable: Diese Datei konnte nicht gelesen werden.

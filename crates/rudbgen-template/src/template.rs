@@ -2,7 +2,7 @@
 
 use crate::error::{Diagnostics, ParseError, RenderError, Span};
 use crate::model::Model;
-use crate::parse::{Else, Node, Parser, line_end_of};
+use crate::parse::{Node, Parser, line_end_of};
 use crate::render::{RenderContext, Renderer};
 
 /// What kind of statement a [`StatementSpan`] covers.
@@ -144,15 +144,15 @@ fn collect_spans(nodes: &[Node], out: &mut Vec<StatementSpan>) {
 }
 
 fn collect_if_spans(node: &crate::parse::IfNode, out: &mut Vec<StatementSpan>) {
-    out.push(StatementSpan {
-        span: node.span,
-        kind: StatementKind::If,
-    });
-    collect_spans(&node.then_body, out);
-    match node.otherwise.as_deref() {
-        Some(Else::If(nested)) => collect_if_spans(nested, out),
-        Some(Else::Body(body)) => collect_spans(body, out),
-        None => {}
+    for branch in &node.branches {
+        out.push(StatementSpan {
+            span: branch.span,
+            kind: StatementKind::If,
+        });
+        collect_spans(&branch.body, out);
+    }
+    if let Some(body) = &node.otherwise {
+        collect_spans(body, out);
     }
 }
 
@@ -164,15 +164,9 @@ fn collect_fields(nodes: &[Node], out: &mut Vec<String>) {
     };
     for node in nodes {
         match node {
-            Node::Item(item) | Node::Super(item) => {
-                if let Some(chain) = &item.chain {
-                    add(chain.key(), out);
-                }
-            }
+            Node::Item(item) | Node::Super(item) => add(item.chain.key(), out),
             Node::For(node) => {
-                if let Some(key) = &node.key {
-                    add(key, out);
-                }
+                add(&node.key, out);
                 collect_fields(&node.body, out);
             }
             Node::If(node) => collect_if_fields(node, out),
@@ -182,16 +176,14 @@ fn collect_fields(nodes: &[Node], out: &mut Vec<String>) {
 }
 
 fn collect_if_fields(node: &crate::parse::IfNode, out: &mut Vec<String>) {
-    if let Some(chain) = &node.chain {
-        let key = chain.key();
+    for branch in &node.branches {
+        let key = branch.chain.key();
         if !key.is_empty() && !out.iter().any(|k| k == key) {
             out.push(key.to_string());
         }
+        collect_fields(&branch.body, out);
     }
-    collect_fields(&node.then_body, out);
-    match node.otherwise.as_deref() {
-        Some(Else::If(nested)) => collect_if_fields(nested, out),
-        Some(Else::Body(body)) => collect_fields(body, out),
-        None => {}
+    if let Some(body) = &node.otherwise {
+        collect_fields(body, out);
     }
 }

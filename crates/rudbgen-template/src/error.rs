@@ -58,9 +58,13 @@ impl std::error::Error for ParseError {}
 
 /// A template that parses but cannot be rendered against this model.
 ///
-/// jdbgen throws these from the render pass as well - a missing `key`, an
-/// unknown processor, a `padSize` that is no number - and the port keeps them
-/// there so that a template only fails on the model it actually fails on.
+/// Only what depends on the model is left here - a `for` over a member that is
+/// not a collection, a `contains` on a number, a date pattern chrono refuses.
+/// jdbgen throws a missing `key`, an unknown processor, a `padSize` that is no
+/// number and a pattern that does not compile from the render pass as well,
+/// but those are wrong for every model, so the port refuses them as a
+/// [`ParseError`]: a run must not write the files of the tables rendered
+/// before the first one that reached the mistake.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct RenderError {
     /// The message, worded as jdbgen words it.

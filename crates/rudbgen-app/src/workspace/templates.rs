@@ -502,10 +502,9 @@ impl Workspace {
             profile, driver, ..
         } = std::mem::replace(&mut self.connection, ConnectionState::Idle)
         else {
-            if let Ok(session) = outcome
-                && let Err(error) = session.close()
-            {
-                log::warn!("an abandoned session did not close: {error:#}");
+            if let Ok(session) = outcome {
+                log::info!("closing a session nobody waited for");
+                self.retire(Box::new(session));
             }
             return;
         };

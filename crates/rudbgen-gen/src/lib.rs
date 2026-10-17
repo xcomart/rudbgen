@@ -46,7 +46,13 @@
 //!    against [`Plan::output_dir`]. A name that reaches outside of it — an
 //!    absolute path, a drive letter, any `..` component — is refused and
 //!    recorded in [`Outcome::failed`]. A name with `/` in it is a
-//!    subdirectory, which is created.
+//!    subdirectory, which is created. Every output name of the run is
+//!    rendered and resolved before the first file is written, and two pairs
+//!    that land on one file — compared ignoring case on Windows and macOS,
+//!    whose filesystems do — fail the run with **no file written at all**,
+//!    each named with the pairs it collides with: otherwise the second would
+//!    replace the first, or be skipped or asked about as if the file this run
+//!    just wrote had been there before it.
 //! 3. Files are written atomically, through
 //!    [`rudbgen_core::paths::write_atomic`]: the bytes land in a temporary
 //!    sibling that is renamed over the destination, so a crash cannot leave a
@@ -74,9 +80,9 @@
 //!
 //! * **It does not choose an encoding.** Output is UTF-8, always, as jdbgen's
 //!   is. A template file that is not UTF-8 fails to load rather than being
-//!   transliterated. (The one place a byte encoding is honoured is padding
-//!   width, and that lives in the engine — see `rudbgen_template`'s EUC-KR
-//!   rule.)
+//!   transliterated. (Padding width is not a byte count either: the engine
+//!   pads to display columns, where jdbgen counted EUC-KR bytes — see
+//!   `rudbgen_template`'s crate documentation.)
 //! * **It does not roll back.** A run that fails on the tenth file leaves the
 //!   nine before it on disk. Deleting them would be worse: the files are the
 //!   user's source tree, some of them are what the run was for, and nothing

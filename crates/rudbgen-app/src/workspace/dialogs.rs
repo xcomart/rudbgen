@@ -116,12 +116,34 @@ impl Workspace {
     /// screen. The table names come from the explorer, which is what makes the
     /// whole-name picker worth having; with nothing connected the list is empty
     /// and the picker is simply not drawn.
+    ///
+    /// The exception is a panel that could not read or write the file the last
+    /// time it tried, whose copy may be an empty stand-in: the file is asked
+    /// again, and what it answers goes to the panel too. A file that still
+    /// cannot be read opens the editor empty and unable to save, since saving
+    /// that would replace every rule in it.
     pub(super) fn open_abbreviations(&mut self, window: &mut Window, cx: &mut Context<Self>) {
         self.close_overlays(window, cx);
-        let store = self.generate.read(cx).abbreviations().clone();
+        let pane = self.generate.read(cx);
+        let store = match pane.abbreviations_error() {
+            None => Ok(pane.abbreviations().clone()),
+            Some(_) => rudbgen_core::AbbreviationStore::load(),
+        };
+        if let Ok(store) = &store
+            && self.generate.read(cx).abbreviations_error().is_some()
+        {
+            let store = store.clone();
+            self.generate
+                .update(cx, |pane, cx| pane.adopt_abbreviations(store, cx));
+        }
         let tables = self.explorer.read(cx).loaded_table_names(cx);
-        self.abbreviations
-            .update(cx, |dialog, cx| dialog.open(&store, tables, cx));
+        self.abbreviations.update(cx, |dialog, cx| match store {
+            Ok(store) => dialog.open(&store, tables, cx),
+            Err(error) => {
+                log::error!("could not read abbreviations.json: {error:#}");
+                dialog.open_unreadable(&error, tables, cx);
+            }
+        });
         cx.notify();
     }
 
@@ -226,7 +248,13 @@ impl Workspace {
         let settings = app_settings::current(cx);
         let opening = profile.clone();
         let definition = driver.clone();
+        let closing = std::mem::take(&mut self.closing_sessions);
         let run = cx.background_spawn(async move {
+            // The session this one replaces may still be closing, and an
+            // embedded database lets one of them in at a time.
+            if !connection::wait_for_closes(&closing) {
+                log::warn!("opening a session while an earlier one is still closing");
+            }
             // Read here rather than on the UI thread: a keychain that is locked
             // puts a system prompt up, and waiting for that on the UI thread
             // would freeze the window behind it.

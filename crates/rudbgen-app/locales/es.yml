@@ -118,7 +118,7 @@ connect:
   name_required: Dale un nombre a la conexión.
   url_required: La conexión no tiene URL.
   no_driver: "No hay ninguna definición de controlador llamada «%{driver}»."
-  load_failed: "No se pudieron leer las conexiones guardadas: %{error}"
+  load_failed: "No se pudieron leer las conexiones guardadas; no se puede guardar ni eliminar nada hasta que se repare o se mueva ese archivo: %{error}"
   save_failed: "No se pudieron guardar las conexiones: %{error}"
   keychain_failed: "No se pudo guardar la contraseña en el llavero: %{error}"
 
@@ -294,6 +294,8 @@ generate:
   var_value: valor
   apply_abbreviations: Aplicar reglas de abreviatura
   rules: Reglas…
+  sets_failed: "Los conjuntos de plantillas no se pueden guardar ni eliminar hasta que esto se resuelva: %{error}"
+  abbr_failed: "El interruptor de abreviaturas no se puede cambiar hasta que esto se resuelva: %{error}"
   preview: Vista previa
   dry_run: Simulación
   run: Generar
@@ -352,6 +354,7 @@ settings:
   title: Ajustes
   system_default: Usar el ajuste del sistema
   save_failed: "No se pudieron guardar los ajustes: %{error}"
+  load_failed: "No se pueden guardar los ajustes porque no se pudo leer el archivo de ajustes al iniciar rudbgen: %{error}. Repare o mueva ese archivo y reinicie rudbgen."
 
   section:
     appearance: Apariencia
@@ -632,6 +635,8 @@ abbr:
   pick_table: Tabla…
   tip_remove: Quitar esta regla
   duplicate: "%{abbreviation}: dos reglas activas buscan esto, y solo una de ellas podría llegar a actuar."
+  load_failed: "No se pueden editar las reglas porque no se pudo leer abbreviations.json: %{error}. Repare o mueva ese archivo y vuelva a abrir esto."
+  save_failed: "No se guardaron las reglas: %{error}"
 
 import:
   title: Importar desde jdbgen
@@ -667,6 +672,8 @@ import:
   nothing_written: No se importó nada.
   skipped: "Dejado atrás porque el nombre estaba ocupado: %{names}"
   no_keychain: "Estas conexiones se guardaron sin su contraseña porque no se pudo poner en el llavero: %{names}. Al abrir una, la pedirá."
+  load_failed: "No se importó nada porque no se pudo leer un archivo al que la importación añadiría datos: %{error}. Repare o mueva ese archivo e importe de nuevo."
+  not_saved: "No se guardó porque no se pudo escribir el archivo: %{errors}"
   wrong_password: Esa no es la contraseña maestra de esta configuración.
   malformed: "Esta configuración está dañada: uno de los valores cifrados no es un valor."
   unreadable: No se pudo leer ese archivo.

@@ -313,7 +313,10 @@ the one it names.
 
 Every template is parsed **before** any file is written, so a template with a
 syntax error costs you nothing: the run stops, names the template, which half of
-it (body or output name) and the line.
+it (body or output name) and the line. The same holds for two tables or
+templates whose output names land on the same file (ignoring case on Windows and
+macOS): every name is worked out first, and the run stops with each colliding
+pair listed beside the pairs it collides with.
 
 ![The overwrite question](screenshots/overwrite.png)
 

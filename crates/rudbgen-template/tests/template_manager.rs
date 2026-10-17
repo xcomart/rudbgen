@@ -385,8 +385,8 @@ fn replace_collects_its_arguments_quoted_or_bare() {
 
 #[test]
 fn replace_with_too_few_arguments_says_so() {
-    let template = Template::parse("${name.replace(ghi)}").unwrap();
-    let error = template.render(&map_obj(), &context()).unwrap_err();
+    // jdbgen says so when it renders; the port already when it parses
+    let error = Template::parse("${name.replace(ghi)}").unwrap_err();
     assert!(
         error.message.contains("replace"),
         "unexpected message: {error}"
@@ -395,8 +395,8 @@ fn replace_with_too_few_arguments_says_so() {
 
 #[test]
 fn a_placeholder_without_a_key_reports_the_missing_attribute() {
-    let template = Template::parse("${item:padSize=10}").unwrap();
-    let error = template.render(&map_obj(), &context()).unwrap_err();
+    // jdbgen says so when it renders; the port already when it parses
+    let error = Template::parse("${item:padSize=10}").unwrap_err();
     assert!(
         error.message.to_lowercase().contains("key"),
         "unexpected message: {error}"

@@ -209,12 +209,20 @@ impl Render for Workspace {
                 MouseButton::Left,
                 cx.listener(|workspace, _: &MouseUpEvent, _window, cx| {
                     workspace.release_scrollbars(cx);
+                    // A drag cancelled outside any drop target never reaches
+                    // a drop handler; a drop already took the bar, making
+                    // this a no-op.
+                    workspace.clear_tab_drop(cx);
                 }),
             )
             .on_mouse_up_out(
                 MouseButton::Left,
                 cx.listener(|workspace, _: &MouseUpEvent, _window, cx| {
                     workspace.release_scrollbars(cx);
+                    // A drag cancelled outside any drop target never reaches
+                    // a drop handler; a drop already took the bar, making
+                    // this a no-op.
+                    workspace.clear_tab_drop(cx);
                 }),
             )
             .on_action(cx.listener(Self::new_connection_action))
@@ -467,6 +475,8 @@ impl Workspace {
             .flex()
             .flex_col()
             .flex_grow_1()
+            .min_w_0()
+            .w_full()
             .min_h_0()
             .bg(app_settings::window_tint(theme.background, cx))
             .child(body)
@@ -574,6 +584,61 @@ impl Workspace {
             .into_any_element()
     }
 
+    /// Notes where a dragged tab would land while it is over the work strip.
+    ///
+    /// `strip` names the strip reporting — always [`WORK_STRIP_TAG`], the one
+    /// strip this window has — and `index` the insertion gap the pointer is
+    /// over, or `None` once it has left the strip. A `None` clears only when
+    /// it names this strip's own bar, so a drag that was never here wipes
+    /// nothing; a `Some` is kept only from this strip's own source, so a
+    /// foreign drag never raises the bar.
+    pub(super) fn drag_over_tab(
+        &mut self,
+        strip: u64,
+        dragged: DraggedTab,
+        index: Option<usize>,
+        cx: &mut Context<Self>,
+    ) {
+        let Some(index) = index else {
+            if self.tab_drop.is_some_and(|(tag, _)| tag == strip) {
+                self.tab_drop = None;
+                cx.notify();
+            }
+            return;
+        };
+        if dragged.source != WORK_STRIP_TAG {
+            return;
+        }
+        let next = Some((strip, index));
+        if self.tab_drop != next {
+            self.tab_drop = next;
+            cx.notify();
+        }
+    }
+
+    /// The index a drop on `strip` lands at: the bar the pointer last named
+    /// for this strip, or `fallback` — the static drop position — when the
+    /// bar belongs to another strip or to no drag at all.
+    ///
+    /// Takes the bar in any case: a drop ends the gesture, wherever it lands.
+    pub(super) fn resolve_tab_drop(&mut self, strip: u64, fallback: usize) -> usize {
+        match self.tab_drop.take() {
+            Some((tag, index)) if tag == strip => index,
+            _ => fallback,
+        }
+    }
+
+    /// Takes down the drop bar, if one is up.
+    ///
+    /// A drag cancelled with a release outside any drop target never reaches a
+    /// drop handler, so the root's own release clears whatever is left; a
+    /// drop already took it, which makes this a no-op.
+    pub(super) fn clear_tab_drop(&mut self, cx: &mut Context<Self>) {
+        if self.tab_drop.take().is_some() {
+            cx.notify();
+        }
+    }
+
     /// The work area's tab strip.
     ///
     /// The Generate tab is permanent and carries no close button (§4.2); a
@@ -584,15 +649,29 @@ impl Workspace {
             .pane
             .items()
             .iter()
-            .enumerate()
-            .map(|(index, item)| {
+            .map(|item| {
                 let title = match item {
                     PaneItem::Generate => ts!("generate.tab"),
                     PaneItem::Template { title, .. } => title.clone(),
                     PaneItem::Preview { title } => title.clone(),
                 };
-                let tab = TabItem::new(("work-tab", index), title)
-                    .closable(!matches!(item, PaneItem::Generate));
+                // Stable while the tab lives: an index id would name a
+                // different tab after every reorder, shuffling whatever gpui
+                // keeps per element — including the drag the reorder itself
+                // started. The Generate tab is one of a kind, a template is
+                // keyed by its file, and the preview is one of a kind too.
+                let id: ElementId = match item {
+                    PaneItem::Generate => "work-tab-generate".into(),
+                    PaneItem::Template { file, .. } => (
+                        ElementId::from("work-tab-template"),
+                        file.to_string_lossy().into_owned(),
+                    )
+                        .into(),
+                    PaneItem::Preview { title } => {
+                        (ElementId::from("work-tab-preview"), title.clone()).into()
+                    }
+                };
+                let tab = TabItem::new(id, title).closable(!matches!(item, PaneItem::Generate));
                 // The dirty marker is the strip's own dot rather than a
                 // character glued to the title: a title that changes width
                 // when a key is pressed makes the whole strip twitch.
@@ -605,6 +684,8 @@ impl Workspace {
         let select = cx.entity();
         let close = cx.entity();
         let menu = cx.entity();
+        let reorder = cx.entity();
+        let over = cx.entity();
 
         div()
             .flex()
@@ -620,6 +701,34 @@ impl Workspace {
                     .scroll_handle(self.pane.scroll_handle())
                     .menu_open(self.pane_menu_open)
                     .menu_icon(icons::TAB_LIST)
+                    .drag_source(WORK_STRIP_TAG)
+                    .drop_indicator(
+                        self.tab_drop
+                            .and_then(|(tag, index)| (tag == WORK_STRIP_TAG).then_some(index)),
+                    )
+                    .on_drag_over(move |dragged, index, _window, cx| {
+                        over.update(cx, |workspace, cx| {
+                            workspace.drag_over_tab(WORK_STRIP_TAG, dragged, index, cx);
+                        });
+                    })
+                    .on_reorder(move |dragged, to, _window, cx| {
+                        reorder.update(cx, |workspace, cx| {
+                            // A foreign strip's tab is not ours: the bar never
+                            // shows for it, and the move refuses it.
+                            if dragged.source != WORK_STRIP_TAG {
+                                workspace.clear_tab_drop(cx);
+                                return;
+                            }
+                            let at = workspace.resolve_tab_drop(WORK_STRIP_TAG, to);
+                            // A move is not a close, so no dirty guard here:
+                            // the dot travels with the item it marks.
+                            workspace.pane.relocate(dragged.index, at);
+                            // The bar is already taken, but a refused move
+                            // notifies nothing — the strip still has to lose
+                            // the bar it drew.
+                            cx.notify();
+                        });
+                    })
                     .on_select(move |index, window, cx| {
                         select.update(cx, |workspace, cx| {
                             if !workspace.pane.activate(index) {
@@ -667,11 +776,15 @@ impl Workspace {
                         .flex()
                         .flex_col()
                         .flex_1()
+                        .min_w_0()
+                        .w_full()
                         .min_h_0()
                         .child(
                             div()
                                 .flex()
                                 .flex_1()
+                                .min_w_0()
+                                .w_full()
                                 .min_h_0()
                                 .child(rugpui::cached_view(self.generate.clone())),
                         )
@@ -712,6 +825,8 @@ impl Workspace {
             .flex()
             .flex_col()
             .flex_grow_1()
+            .min_w_0()
+            .w_full()
             .min_h_0()
             .child(body)
             .into_any_element()

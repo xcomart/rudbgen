@@ -1,5 +1,6 @@
 //! The run itself: parse everything, then render and write pair by pair.
 
+use std::collections::HashMap;
 use std::fs;
 use std::path::{Component, Path, PathBuf};
 
@@ -23,10 +24,19 @@ struct Prepared {
     out_name: Template,
 }
 
-/// One rendered pair, before anything is decided about the disk.
-struct Rendered {
-    path: PathBuf,
-    content: String,
+/// One table × template pair with its output name rendered and resolved.
+///
+/// The first pass of a run makes one of these for every pair before the first
+/// file is written, which is what lets two pairs that land on one file be told
+/// apart from a file that was there before the run.
+struct Slot<'p> {
+    table: &'p Table,
+    prep: &'p Prepared,
+    /// Where the pair goes, or why it has nowhere to go.
+    path: Result<PathBuf, Error>,
+    /// The output name's warnings, held back until the pair's turn so that the
+    /// summary lists them in the order the pairs are handled.
+    diagnostics: Vec<Diagnostic>,
 }
 
 /// Render `plan` and write it (architecture document, §9).
@@ -62,6 +72,15 @@ pub fn generate(
     });
 
     let ctx = plan.context();
+    let slots = resolve_all(plan, &prepared, &ctx);
+    if let Some(failures) = collisions(&slots) {
+        // Rule 2: two pairs on one file, and the run writes nothing at all.
+        outcome.failed = failures;
+        outcome.diagnostics = slots.into_iter().flat_map(|s| s.diagnostics).collect();
+        progress(Progress::Finished(outcome.clone()));
+        return outcome;
+    }
+
     // The two `*All` answers turn the policy into a state machine; `settled`
     // is what they settle it to.
     let mut settled: Option<bool> = match policy {
@@ -71,124 +90,146 @@ pub fn generate(
     };
     let mut index = 0;
 
-    'run: for table in &plan.tables {
-        for prep in &prepared {
-            // Rule 6: cancellation is checked at file boundaries, so a file is
-            // never half written and never written twice.
-            if cancel.is_cancelled() {
-                outcome.cancelled = true;
-                break 'run;
-            }
-            index += 1;
+    'run: for Slot {
+        table,
+        prep,
+        path,
+        diagnostics,
+    } in slots
+    {
+        // Rule 6: cancellation is checked at file boundaries, so a file is
+        // never half written and never written twice.
+        if cancel.is_cancelled() {
+            outcome.cancelled = true;
+            break 'run;
+        }
+        index += 1;
+        outcome.diagnostics.extend(diagnostics);
 
-            let rendered = match render_pair(plan, table, prep, &ctx, &mut outcome.diagnostics) {
-                Ok(rendered) => rendered,
-                Err(error) => {
-                    report_failure(
-                        &mut outcome.failed,
-                        progress,
-                        index,
-                        total,
-                        table,
-                        prep,
-                        error,
-                    );
-                    continue;
-                }
-            };
-
-            // Rule 3 of §9's step list: the policy is applied to the resolved
-            // path *before* the body is written, so a skipped file costs
-            // nothing but the name.
-            let write = if rendered.path.exists() {
-                match settled {
-                    Some(overwrite) => {
-                        if !overwrite {
-                            skipped(
-                                &mut outcome.skipped,
-                                progress,
-                                index,
-                                total,
-                                table,
-                                prep,
-                                &rendered.path,
-                                SkipReason::ExistingFile,
-                            );
-                            continue;
-                        }
-                        true
-                    }
-                    None => {
-                        let Overwrite::Ask(ask) = &policy else {
-                            unreachable!("only the ask policy leaves the decision open")
-                        };
-                        match ask(&rendered.path) {
-                            Decision::Overwrite => true,
-                            Decision::OverwriteAll => {
-                                settled = Some(true);
-                                true
-                            }
-                            Decision::Skip => false,
-                            Decision::SkipAll => {
-                                settled = Some(false);
-                                false
-                            }
-                            Decision::Cancel => {
-                                outcome.cancelled = true;
-                                break 'run;
-                            }
-                        }
-                    }
-                }
-            } else {
-                true
-            };
-
-            if !write {
-                skipped(
-                    &mut outcome.skipped,
+        let path = match path {
+            Ok(path) => path,
+            Err(error) => {
+                report_failure(
+                    &mut outcome.failed,
                     progress,
                     index,
                     total,
                     table,
                     prep,
-                    &rendered.path,
-                    SkipReason::UserSkipped,
+                    error,
                 );
                 continue;
             }
+        };
 
-            // Rule 4: UTF-8, always. Rule 3: through the same atomic write the
-            // configuration files use.
-            match write_atomic(&rendered.path, rendered.content.as_bytes()) {
-                Ok(()) => {
-                    outcome.written.push(rendered.path.clone());
-                    progress(Progress::File {
-                        index,
-                        total,
-                        table: table.name.clone(),
-                        template: prep.name.clone(),
-                        path: Some(rendered.path),
-                        status: FileStatus::Written,
-                    });
+        // Rule 3 of §9's step list: the policy is applied to the resolved
+        // path *before* the body is rendered, so a skipped file costs
+        // nothing but the name — no render pass, and none of the body's
+        // warnings either, since a file left alone has nothing to warn of.
+        let write = if path.exists() {
+            match settled {
+                Some(overwrite) => {
+                    if !overwrite {
+                        skipped(
+                            &mut outcome.skipped,
+                            progress,
+                            index,
+                            total,
+                            table,
+                            prep,
+                            &path,
+                            SkipReason::ExistingFile,
+                        );
+                        continue;
+                    }
+                    true
                 }
-                Err(err) => {
-                    let message = format!("{err:#}");
-                    outcome.failed.push(Failure {
-                        table: Some(table.name.clone()),
-                        template: prep.name.clone(),
-                        path: Some(rendered.path.clone()),
-                        message: message.clone(),
-                    });
-                    progress(Progress::File {
-                        index,
-                        total,
-                        table: table.name.clone(),
-                        template: prep.name.clone(),
-                        path: Some(rendered.path),
-                        status: FileStatus::Failed(message),
-                    });
+                None => {
+                    let Overwrite::Ask(ask) = &policy else {
+                        unreachable!("only the ask policy leaves the decision open")
+                    };
+                    match ask(&path) {
+                        Decision::Overwrite => true,
+                        Decision::OverwriteAll => {
+                            settled = Some(true);
+                            true
+                        }
+                        Decision::Skip => false,
+                        Decision::SkipAll => {
+                            settled = Some(false);
+                            false
+                        }
+                        Decision::Cancel => {
+                            outcome.cancelled = true;
+                            break 'run;
+                        }
+                    }
                 }
+            }
+        } else {
+            true
+        };
+
+        if !write {
+            skipped(
+                &mut outcome.skipped,
+                progress,
+                index,
+                total,
+                table,
+                prep,
+                &path,
+                SkipReason::UserSkipped,
+            );
+            continue;
+        }
+
+        let content = match render_body(table, prep, &ctx, &mut outcome.diagnostics) {
+            Ok(content) => content,
+            Err(error) => {
+                report_failure(
+                    &mut outcome.failed,
+                    progress,
+                    index,
+                    total,
+                    table,
+                    prep,
+                    error,
+                );
+                continue;
+            }
+        };
+
+        // Rule 4: UTF-8, always. Rule 3: through the same atomic write the
+        // configuration files use.
+        match write_atomic(&path, content.as_bytes()) {
+            Ok(()) => {
+                outcome.written.push(path.clone());
+                progress(Progress::File {
+                    index,
+                    total,
+                    table: table.name.clone(),
+                    template: prep.name.clone(),
+                    path: Some(path),
+                    status: FileStatus::Written,
+                });
+            }
+            Err(err) => {
+                let message = format!("{err:#}");
+                outcome.failed.push(Failure {
+                    table: Some(table.name.clone()),
+                    template: prep.name.clone(),
+                    path: Some(path.clone()),
+                    message: message.clone(),
+                });
+                progress(Progress::File {
+                    index,
+                    total,
+                    table: table.name.clone(),
+                    template: prep.name.clone(),
+                    path: Some(path),
+                    status: FileStatus::Failed(message),
+                });
             }
         }
     }
@@ -226,44 +267,62 @@ pub fn dry_run(plan: &Plan, cancel: &CancelToken, progress: &dyn Fn(Progress)) -
     });
 
     let ctx = plan.context();
+    let slots = resolve_all(plan, &prepared, &ctx);
+    if let Some(failures) = collisions(&slots) {
+        result.failed = failures;
+        result.diagnostics = slots.into_iter().flat_map(|s| s.diagnostics).collect();
+        progress(Progress::Finished(as_outcome(&result)));
+        return result;
+    }
     let mut index = 0;
 
-    'run: for table in &plan.tables {
-        for prep in &prepared {
-            if cancel.is_cancelled() {
-                result.cancelled = true;
-                break 'run;
-            }
-            index += 1;
+    'run: for Slot {
+        table,
+        prep,
+        path,
+        diagnostics,
+    } in slots
+    {
+        if cancel.is_cancelled() {
+            result.cancelled = true;
+            break 'run;
+        }
+        index += 1;
+        result.diagnostics.extend(diagnostics);
 
-            match render_pair(plan, table, prep, &ctx, &mut result.diagnostics) {
-                Ok(rendered) => {
-                    progress(Progress::File {
-                        index,
-                        total,
-                        table: table.name.clone(),
-                        template: prep.name.clone(),
-                        path: Some(rendered.path.clone()),
-                        status: FileStatus::Written,
-                    });
-                    result.files.push(RenderedFile {
-                        table: table.name.clone(),
-                        template: prep.name.clone(),
-                        exists: rendered.path.exists(),
-                        path: rendered.path,
-                        content: rendered.content,
-                    });
-                }
-                Err(error) => report_failure(
-                    &mut result.failed,
-                    progress,
+        let rendered = path.and_then(|path| {
+            Ok((
+                path,
+                render_body(table, prep, &ctx, &mut result.diagnostics)?,
+            ))
+        });
+        match rendered {
+            Ok((path, content)) => {
+                progress(Progress::File {
                     index,
                     total,
-                    table,
-                    prep,
-                    error,
-                ),
+                    table: table.name.clone(),
+                    template: prep.name.clone(),
+                    path: Some(path.clone()),
+                    status: FileStatus::Written,
+                });
+                result.files.push(RenderedFile {
+                    table: table.name.clone(),
+                    template: prep.name.clone(),
+                    exists: path.exists(),
+                    path,
+                    content,
+                });
             }
+            Err(error) => report_failure(
+                &mut result.failed,
+                progress,
+                index,
+                total,
+                table,
+                prep,
+                error,
+            ),
         }
     }
 
@@ -296,11 +355,11 @@ pub fn preview(plan: &Plan, table_index: usize, template_index: usize) -> Result
 
     let prepared = prepare_one(spec)?;
     let mut diagnostics = Vec::new();
-    let rendered = render_pair(plan, table, &prepared, &plan.context(), &mut diagnostics)?;
+    let (path, content) = render_pair(plan, table, &prepared, &plan.context(), &mut diagnostics)?;
 
     Ok(Preview {
-        path: rendered.path,
-        content: rendered.content,
+        path,
+        content,
         diagnostics: diagnostics.into_iter().map(|d| d.warning).collect(),
     })
 }
@@ -374,19 +433,138 @@ fn read_template(spec: &TemplateSpec) -> Result<String, Error> {
     })
 }
 
-/// Render the output name, resolve it, then render the body.
+/// Rule 2's first pass: render and resolve the output name of every pair.
+fn resolve_all<'p>(plan: &'p Plan, prepared: &'p [Prepared], ctx: &RenderContext) -> Vec<Slot<'p>> {
+    let mut slots = Vec::with_capacity(plan.tables.len() * prepared.len());
+    for table in &plan.tables {
+        for prep in prepared {
+            let mut diagnostics = Vec::new();
+            let path = render_path(plan, table, prep, ctx, &mut diagnostics);
+            slots.push(Slot {
+                table,
+                prep,
+                path,
+                diagnostics,
+            });
+        }
+    }
+    slots
+}
+
+/// Rule 2: two pairs of one run that would write the same file, as the
+/// failures that stop the run; `None` when every pair has a file of its own.
 ///
-/// That order is §9's, and it is what makes a skipped file cheap: the body of
-/// a template is never rendered for a file the policy is going to leave alone.
+/// Left to the policy, the second pair would silently replace the first
+/// under [`Overwrite::Overwrite`], be reported as an
+/// [`ExistingFile`](SkipReason::ExistingFile) under [`Overwrite::Skip`], and
+/// be asked about under [`Overwrite::Ask`] although the file "already there"
+/// is the one this run just wrote. A collision is a mistake in the output
+/// name — it does not tell the tables apart — so it is treated like a parse
+/// error: nothing is written, every pair of every collision is reported with
+/// the pairs it collides with, and so is every output name that failed to
+/// render, so that one run names everything there is to fix.
+fn collisions(slots: &[Slot]) -> Option<Vec<Failure>> {
+    let mut by_key: HashMap<String, Vec<usize>> = HashMap::new();
+    for (index, slot) in slots.iter().enumerate() {
+        if let Ok(path) = &slot.path {
+            by_key.entry(collision_key(path)).or_default().push(index);
+        }
+    }
+
+    let mut others: Vec<Vec<usize>> = vec![Vec::new(); slots.len()];
+    for members in by_key.into_values().filter(|members| members.len() > 1) {
+        for &member in &members {
+            others[member] = members.iter().copied().filter(|&o| o != member).collect();
+        }
+    }
+    if others.iter().all(Vec::is_empty) {
+        return None;
+    }
+
+    let failures = slots
+        .iter()
+        .zip(others)
+        .filter_map(|(slot, others)| match &slot.path {
+            Err(error) => Some(failure_of(error, None)),
+            Ok(_) if others.is_empty() => None,
+            Ok(path) => {
+                let error = Error::OutputCollision {
+                    template: slot.prep.name.clone(),
+                    table: slot.table.name.clone(),
+                    path: path.clone(),
+                    others: others
+                        .iter()
+                        .map(|&o| format!("{} on {}", slots[o].prep.name, slots[o].table.name))
+                        .collect(),
+                };
+                Some(failure_of(&error, Some(path.clone())))
+            }
+        })
+        .collect();
+    Some(failures)
+}
+
+/// Whether the filesystems of this platform compare names ignoring case, as
+/// NTFS and APFS do by default.
+const FOLDS_CASE: bool = cfg!(any(windows, target_os = "macos"));
+
+/// What two output paths have to share to be one file.
+///
+/// Every path of a run is the output directory followed by plain components —
+/// [`resolve_output`] refused everything else — so comparing them component by
+/// component is enough, once the names are folded the way the filesystem
+/// folds them: case on Windows and macOS, and on Windows the trailing dots
+/// and spaces it drops from a name as well.
+fn collision_key(path: &Path) -> String {
+    let mut key = String::new();
+    for component in path.components() {
+        let name = component.as_os_str().to_string_lossy();
+        let name: &str = if cfg!(windows) {
+            name.trim_end_matches(['.', ' '])
+        } else {
+            &name
+        };
+        if !key.is_empty() {
+            key.push('/');
+        }
+        if FOLDS_CASE {
+            key.push_str(&name.to_lowercase());
+        } else {
+            key.push_str(name);
+        }
+    }
+    key
+}
+
+/// Render the output name, resolve it, then render the body: one pair whole,
+/// for the two entry points that have no policy to consult in between.
 fn render_pair(
     plan: &Plan,
     table: &Table,
     prep: &Prepared,
     ctx: &RenderContext,
     diagnostics: &mut Vec<Diagnostic>,
-) -> Result<Rendered, Error> {
-    let mut diags = Diagnostics::new();
+) -> Result<(PathBuf, String), Error> {
+    let path = render_path(plan, table, prep, ctx, diagnostics)?;
+    let content = render_body(table, prep, ctx, diagnostics)?;
+    Ok((path, content))
+}
 
+/// Render the output name of a pair and resolve it against the output
+/// directory.
+///
+/// Kept apart from [`render_body`] because that is §9's order, and it is what
+/// makes a skipped file cheap: [`generate`] settles the policy on this path,
+/// and the body of a template is never rendered for a file the policy is
+/// going to leave alone.
+fn render_path(
+    plan: &Plan,
+    table: &Table,
+    prep: &Prepared,
+    ctx: &RenderContext,
+    diagnostics: &mut Vec<Diagnostic>,
+) -> Result<PathBuf, Error> {
+    let mut diags = Diagnostics::new();
     let name = prep
         .out_name
         .render_diagnosed(table, ctx, &mut diags)
@@ -404,12 +582,21 @@ fn render_pair(
         TemplatePart::OutputName,
     );
 
-    let path = resolve_output(plan.output_dir(), &name).map_err(|message| Error::OutputPath {
+    resolve_output(plan.output_dir(), &name).map_err(|message| Error::OutputPath {
         template: prep.name.clone(),
         table: table.name.clone(),
         message,
-    })?;
+    })
+}
 
+/// Render the body of a pair: the text of the file.
+fn render_body(
+    table: &Table,
+    prep: &Prepared,
+    ctx: &RenderContext,
+    diagnostics: &mut Vec<Diagnostic>,
+) -> Result<String, Error> {
+    let mut diags = Diagnostics::new();
     let content = prep
         .body
         .render_diagnosed(table, ctx, &mut diags)
@@ -420,8 +607,7 @@ fn render_pair(
             error,
         })?;
     collect(diagnostics, &mut diags, table, prep, TemplatePart::Body);
-
-    Ok(Rendered { path, content })
+    Ok(content)
 }
 
 /// Rule 7: move the warnings of one pass into the summary and empty the pass.
@@ -494,6 +680,9 @@ fn failure_of(error: &Error, path: Option<PathBuf>) -> Failure {
             template, table, ..
         }
         | Error::OutputPath {
+            template, table, ..
+        }
+        | Error::OutputCollision {
             template, table, ..
         } => (Some(table.clone()), template.clone()),
         // Neither index error can reach a summary: they are the preview's.
@@ -621,6 +810,18 @@ mod tests {
         assert!(
             resolve_output(out, "a/../b.java").is_err(),
             "a '..' that lands back inside is still refused"
+        );
+    }
+
+    #[test]
+    fn two_names_are_one_file_when_the_filesystem_folds_them_together() {
+        let key = |path: &str| collision_key(Path::new(path));
+        assert_eq!(key("/out/a/B.java"), key("/out/a/B.java"));
+        assert_ne!(key("/out/a/B.java"), key("/out/b/B.java"));
+        assert_eq!(
+            key("/out/a/B.java") == key("/out/A/b.JAVA"),
+            FOLDS_CASE,
+            "case is folded exactly where the filesystem folds it"
         );
     }
 

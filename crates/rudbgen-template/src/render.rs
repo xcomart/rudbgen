@@ -10,7 +10,7 @@ use crate::date;
 use crate::error::{Diagnostics, RenderError, Span};
 use crate::keys::{self, KeyChain};
 use crate::model::{Model, Value};
-use crate::parse::{Attrs, Else, ForNode, IfNode, ItemNode, Node, PlainNode};
+use crate::parse::{Attrs, ForNode, IfNode, ItemNode, Node, PlainNode};
 use crate::strutil;
 
 /// Everything a render pass needs besides the model.
@@ -182,8 +182,7 @@ impl<'a> Renderer<'a> {
         model: Option<&dyn Model>,
         no: Option<usize>,
     ) -> Result<(), RenderError> {
-        let chain = require_key(node.chain.as_ref(), &node.attrs, node.span)?;
-        let value = self.resolve(chain, model, no, node.span)?;
+        let value = self.resolve(&node.chain, model, no, node.span)?;
         let text = value.to_text().into_owned();
         self.decorated(&node.attrs, Some(&text), node.span)
     }
@@ -256,12 +255,10 @@ impl<'a> Renderer<'a> {
         let Some(value) = value else {
             return Ok(());
         };
-        let pad_size = match attrs.get("padsize") {
-            Some(text) => text.parse::<i64>().map_err(|_| {
-                RenderError::at(format!("padSize is not a number: \"{text}\""), span)
-            })?,
-            None => 0,
-        };
+        // the parse has already refused a padSize that is no number
+        let pad_size = attrs
+            .number("padsize", "padSize")
+            .map_err(|message| RenderError::at(message, span))?;
         let pad_left = attrs
             .get("paddir")
             .is_some_and(|dir| dir.eq_ignore_ascii_case("left"));
@@ -292,46 +289,42 @@ impl<'a> Renderer<'a> {
         Ok(())
     }
 
-    /// `${if}`: every condition has to hold for the true branch to be
-    /// rendered.
+    /// `${if}`: the first branch whose conditions all hold is rendered, the
+    /// `${else}` when none does. A branch's key is only resolved once every
+    /// branch before it has failed, as it is in jdbgen's nested form.
     fn if_statement(&mut self, node: &IfNode, scope: Scope<'_>) -> Result<(), RenderError> {
-        let chain = require_key(node.chain.as_ref(), &node.attrs, node.span)?;
-        let value = self.resolve(chain, scope.mapper, scope.mapper_no, node.span)?;
-        let mut held = true;
-        for cond in &node.conds {
-            if !cond
-                .eval(&value)
-                .map_err(|e| RenderError::at(e.message, node.span))?
-            {
-                held = false;
-                break;
+        for branch in &node.branches {
+            let value = self.resolve(&branch.chain, scope.mapper, scope.mapper_no, branch.span)?;
+            let mut held = true;
+            for cond in &branch.conds {
+                if !cond
+                    .eval(&value)
+                    .map_err(|e| RenderError::at(e.message, branch.span))?
+                {
+                    held = false;
+                    break;
+                }
+            }
+            if held {
+                return self.nodes(&branch.body, scope);
             }
         }
-
-        if held {
-            self.nodes(&node.then_body, scope)
-        } else {
-            match node.otherwise.as_deref() {
-                Some(Else::If(nested)) => self.if_statement(nested, scope),
-                Some(Else::Body(body)) => self.nodes(body, scope),
-                None => Ok(()),
-            }
+        match &node.otherwise {
+            Some(body) => self.nodes(body, scope),
+            None => Ok(()),
         }
     }
 
     /// `${for}`: render the body once per element, with the element as the
     /// model and the current model as its super.
     fn for_statement(&mut self, node: &ForNode, scope: Scope<'_>) -> Result<(), RenderError> {
-        let Some(key) = node.key.as_deref() else {
-            return Err(missing_key(&node.attrs, node.span));
-        };
+        let key = node.key.as_str();
         let separator = node.attrs.get("instr");
-        let indent = match node.attrs.get("indent") {
-            Some(text) => text.parse::<i64>().map_err(|_| {
-                RenderError::at(format!("indent is not a number: \"{text}\""), node.span)
-            })?,
-            None => 0,
-        };
+        // the parse has already refused an indent that is no number
+        let indent = node
+            .attrs
+            .number("indent", "indent")
+            .map_err(|message| RenderError::at(message, node.span))?;
         // the skip list is a comma separated list of names, compared exactly
         let skips = node
             .attrs
@@ -397,24 +390,4 @@ impl<'a> Renderer<'a> {
             self.out.push_str(part.strip_suffix('\r').unwrap_or(part));
         }
     }
-}
-
-/// The key chain of a statement, or the error jdbgen reports when there is
-/// none.
-fn require_key<'n>(
-    chain: Option<&'n KeyChain>,
-    attrs: &Attrs,
-    span: Span,
-) -> Result<&'n KeyChain, RenderError> {
-    chain.ok_or_else(|| missing_key(attrs, span))
-}
-
-fn missing_key(attrs: &Attrs, span: Span) -> RenderError {
-    RenderError::at(
-        format!(
-            "'key' or 'item' is required, but none given in: {:?}",
-            attrs.names()
-        ),
-        span,
-    )
 }

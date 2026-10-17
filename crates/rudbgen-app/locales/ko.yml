@@ -118,7 +118,7 @@ connect:
   name_required: 연결 이름을 입력하세요.
   url_required: 연결 URL이 비어 있습니다.
   no_driver: "“%{driver}”이라는 드라이버 정의가 없습니다."
-  load_failed: "저장된 연결을 읽지 못했습니다: %{error}"
+  load_failed: "저장된 연결을 읽지 못해, 그 파일을 고치거나 옮기기 전까지는 저장하거나 삭제할 수 없습니다: %{error}"
   save_failed: "연결을 저장하지 못했습니다: %{error}"
   keychain_failed: "비밀번호를 키체인에 저장하지 못했습니다: %{error}"
 
@@ -292,6 +292,8 @@ generate:
   var_value: 값
   apply_abbreviations: 약어 규칙 적용
   rules: 규칙…
+  sets_failed: "이 문제를 해결하기 전에는 템플릿 세트를 저장하거나 삭제할 수 없습니다: %{error}"
+  abbr_failed: "이 문제를 해결하기 전에는 약어 규칙 적용 여부를 바꿀 수 없습니다: %{error}"
   preview: 미리보기
   dry_run: 시험 실행
   run: 생성
@@ -350,6 +352,7 @@ settings:
   title: 설정
   system_default: 시스템 설정 따름
   save_failed: "설정을 저장하지 못했습니다: %{error}"
+  load_failed: "rudbgen 시작 시 설정 파일을 읽지 못해 설정을 저장할 수 없습니다: %{error}. 그 파일을 고치거나 옮긴 뒤 rudbgen을 다시 시작하세요."
 
   section:
     appearance: 모양
@@ -630,6 +633,8 @@ abbr:
   pick_table: 테이블…
   tip_remove: 이 규칙 삭제
   duplicate: "%{abbreviation}: 켜져 있는 규칙 둘이 같은 것을 찾습니다. 실제로 걸리는 것은 하나뿐입니다."
+  load_failed: "abbreviations.json을 읽지 못해 규칙을 편집할 수 없습니다: %{error}. 그 파일을 고치거나 옮긴 뒤 다시 여세요."
+  save_failed: "규칙을 저장하지 못했습니다: %{error}"
 
 import:
   title: jdbgen에서 가져오기
@@ -665,6 +670,8 @@ import:
   nothing_written: 가져온 것이 없습니다.
   skipped: "이름이 겹쳐 건너뛰었습니다: %{names}"
   no_keychain: "키체인에 넣지 못해 다음 연결은 비밀번호 없이 저장했습니다: %{names}. 열 때 다시 묻습니다."
+  load_failed: "가져온 내용을 넣을 파일을 읽지 못해 아무것도 가져오지 않았습니다: %{error}. 그 파일을 고치거나 옮긴 뒤 다시 가져오세요."
+  not_saved: "파일을 쓰지 못해 저장되지 않았습니다: %{errors}"
   wrong_password: 이 설정의 마스터 패스워드가 아닙니다.
   malformed: 이 설정은 손상되었습니다. 암호화된 값 하나가 값의 꼴이 아닙니다.
   unreadable: 그 파일을 읽지 못했습니다.

@@ -10,8 +10,10 @@
 //!
 //! D7: nothing here touches [`AbbreviationStore`] until **Save**. The rows are
 //! text fields and two booleans; `Save` collects them, drops the blank ones,
-//! writes the file and reports the store it wrote so that the Generate tab can
-//! adopt it without re-reading the disk. `Cancel`, `Escape` and a click on the
+//! writes them into the file as it is then (see [`AbbreviationDialog::write_draft`])
+//! and reports the store it wrote so that the Generate tab can adopt it without
+//! re-reading the disk. A file that could not be read is never saved over: the
+//! dialog opens over nothing with the reason showing and **Save** greyed out. `Cancel`, `Escape` and a click on the
 //! backdrop throw the draft away, the freshly typed rule included.
 //!
 //! # The `apply` switch is the Generate tab's
@@ -101,9 +103,16 @@ pub struct AbbreviationDialog {
     focus_handle: FocusHandle,
     /// Whether focus should move into the dialog on the next render.
     pending_focus: bool,
-    /// The store the draft was filled from, kept for its version and for the
-    /// unknown top-level keys a save has to round-trip.
+    /// The store the draft was filled from.
     store: AbbreviationStore,
+    /// Whether the dialog was opened over a file that could not be read.
+    ///
+    /// The draft is then empty rather than the user's rules, and saving it
+    /// would replace them all, so **Save** stays greyed out until the dialog is
+    /// opened again over a file that reads.
+    unreadable: bool,
+    /// Why the rules could not be read or written, shown above the buttons.
+    error: Option<SharedString>,
     /// The draft: one row per rule, plus the trailing blank one.
     rows: Vec<RuleRow>,
     /// The draft's copy of the global switch.
@@ -128,6 +137,8 @@ impl AbbreviationDialog {
             focus_handle: cx.focus_handle(),
             pending_focus: false,
             store: AbbreviationStore::default(),
+            unreadable: false,
+            error: None,
             rows: Vec::new(),
             apply_to_names: false,
             tables: Vec::new(),
@@ -151,6 +162,8 @@ impl AbbreviationDialog {
         cx: &mut Context<Self>,
     ) {
         self.store = store.clone();
+        self.unreadable = false;
+        self.error = None;
         self.apply_to_names = store.apply_to_names;
         self.tables = tables;
         self.picker = None;
@@ -164,6 +177,21 @@ impl AbbreviationDialog {
         self.open = true;
         self.pending_focus = true;
         cx.notify();
+    }
+
+    /// Shows the dialog over a rules file that could not be read.
+    ///
+    /// Opened empty, with `error` showing and **Save** greyed out: the rules
+    /// are still in the file, and the empty draft must never replace them.
+    pub fn open_unreadable(
+        &mut self,
+        error: &anyhow::Error,
+        tables: Vec<SharedString>,
+        cx: &mut Context<Self>,
+    ) {
+        self.open(&AbbreviationStore::default(), tables, cx);
+        self.unreadable = true;
+        self.error = Some(ts!("abbr.load_failed", error = format!("{error:#}")));
     }
 
     /// Whether the dialog is visible.
@@ -261,19 +289,54 @@ impl AbbreviationDialog {
 
     /// Writes the draft to `abbreviations.json` and reports what was written.
     ///
-    /// Refuses while a duplicate stands — the Save button is disabled then, so
-    /// this is the belt to that brace rather than a path a click can reach.
+    /// Refuses while a duplicate stands or the dialog was opened over a file
+    /// that could not be read — the Save button is disabled then, so this is
+    /// the belt to that brace rather than a path a click can reach. A failed
+    /// read or write leaves the dialog open with the reason showing.
     fn save(&mut self, cx: &mut Context<Self>) {
-        if !duplicates(&self.draft(cx)).is_empty() {
+        if self.unreadable || !duplicates(&self.draft(cx)).is_empty() {
             return;
         }
-        let store = self.drafted_store(cx);
-        if let Err(error) = store.save() {
-            log::error!("could not write abbreviations.json: {error:#}");
-            return;
+        match self.write_draft(AbbreviationStore::load, AbbreviationStore::save, cx) {
+            Ok(store) => {
+                cx.emit(AbbreviationDialogEvent::Saved(Box::new(store)));
+                self.close(cx);
+            }
+            Err(error) => {
+                log::error!("abbreviations.json was not changed: {error:#}");
+                self.error = Some(ts!("abbr.save_failed", error = format!("{error:#}")));
+                cx.notify();
+            }
         }
-        cx.emit(AbbreviationDialogEvent::Saved(Box::new(store)));
-        self.close(cx);
+    }
+
+    /// Re-reads the rules file, puts the draft's rules and switch in that copy,
+    /// and writes it back.
+    ///
+    /// The draft replaces the rules — it is the whole table, as the user left
+    /// it — but everything else comes from the file as it is now rather than as
+    /// it was when the dialog opened: its version and the unknown top-level
+    /// keys a save has to round-trip.
+    ///
+    /// # Errors
+    ///
+    /// A file that cannot be read is left exactly as it is and nothing is
+    /// written. A failed write is the other error.
+    fn write_draft(
+        &self,
+        load: impl FnOnce() -> anyhow::Result<AbbreviationStore>,
+        save: impl FnOnce(&AbbreviationStore) -> anyhow::Result<()>,
+        cx: &App,
+    ) -> anyhow::Result<AbbreviationStore> {
+        let draft = self.drafted_store(cx);
+        crate::generate_pane::read_modify_write(
+            load,
+            |store| {
+                store.apply_to_names = draft.apply_to_names;
+                store.rules = draft.rules;
+            },
+            save,
+        )
     }
 
     /// Builds one editable row over `rule`.
@@ -672,6 +735,13 @@ impl Render for AbbreviationDialog {
                 ))
         });
 
+        let error = self.error.clone().map(|message| {
+            div()
+                .text_size(px(11.))
+                .text_color(chrome.danger)
+                .child(message)
+        });
+
         let footer = div()
             .flex()
             .flex_row()
@@ -687,7 +757,7 @@ impl Render for AbbreviationDialog {
             .child(
                 Button::new("abbr-save", ts!("common.save"))
                     .variant(ButtonVariant::Primary)
-                    .disabled(!clashes.is_empty())
+                    .disabled(self.unreadable || !clashes.is_empty())
                     .on_click({
                         let this = this.clone();
                         move |_, _window, cx| {
@@ -711,6 +781,7 @@ impl Render for AbbreviationDialog {
             .child(self.render_head(&chrome))
             .child(table)
             .children(complaint)
+            .children(error)
             .child(footer);
 
         let on_dismiss = {
@@ -857,6 +928,81 @@ mod tests {
             );
             dialog
         })
+    }
+
+    #[gpui::test]
+    fn a_rules_file_that_cannot_be_read_is_not_saved_over(cx: &mut gpui::TestAppContext) {
+        // The file went bad after the dialog opened. Saving the draft anyway
+        // would put fifty rules where the file has however many it has.
+        let window = populated_window(cx);
+        let dir = tempfile::TempDir::new().unwrap();
+        let path = dir.path().join("abbreviations.json");
+        let damaged = b"{ \"rules\": [ not json";
+        std::fs::write(&path, damaged).unwrap();
+
+        let written = window
+            .update(cx, |dialog, _, cx| {
+                dialog.write_draft(
+                    || AbbreviationStore::load_from(&path),
+                    |store| store.save_to(&path),
+                    cx,
+                )
+            })
+            .unwrap();
+
+        assert!(written.is_err());
+        assert_eq!(std::fs::read(&path).unwrap(), damaged);
+    }
+
+    #[gpui::test]
+    fn a_dialog_opened_over_an_unreadable_file_cannot_save(cx: &mut gpui::TestAppContext) {
+        cx.update(rugpui::init);
+        let window = cx.add_window(|_, cx| {
+            let mut dialog = AbbreviationDialog::new(cx);
+            dialog.open_unreadable(&anyhow::anyhow!("expected value"), Vec::new(), cx);
+            dialog
+        });
+        window
+            .update(cx, |dialog, _, cx| {
+                assert!(dialog.error.is_some(), "the reason is on screen");
+                // Returns before reading or writing anything: the empty draft is
+                // not the user's rules.
+                dialog.save(cx);
+                assert!(dialog.is_open());
+            })
+            .unwrap();
+    }
+
+    #[gpui::test]
+    fn a_save_replaces_the_rules_and_keeps_the_rest_of_the_file(cx: &mut gpui::TestAppContext) {
+        let window = populated_window(cx);
+        let dir = tempfile::TempDir::new().unwrap();
+        let path = dir.path().join("abbreviations.json");
+        let mut on_disk = AbbreviationStore {
+            rules: vec![rule(true, false, "OLD", "Old")],
+            ..Default::default()
+        };
+        // Written by a later version since the dialog opened.
+        on_disk
+            .extra
+            .insert("later".to_owned(), serde_json::json!("kept"));
+        on_disk.save_to(&path).unwrap();
+
+        let written = window
+            .update(cx, |dialog, _, cx| {
+                dialog.write_draft(
+                    || AbbreviationStore::load_from(&path),
+                    |store| store.save_to(&path),
+                    cx,
+                )
+            })
+            .unwrap()
+            .expect("the file reads and writes");
+
+        let reread = AbbreviationStore::load_from(&path).unwrap();
+        assert_eq!(reread.rules.len(), 50);
+        assert_eq!(reread.extra.get("later"), Some(&serde_json::json!("kept")));
+        assert_eq!(written.rules, reread.rules);
     }
 
     #[gpui::test]
@@ -1133,6 +1279,8 @@ mod tests {
             ts!("abbr.pick_table"),
             ts!("abbr.tip_remove"),
             ts!("abbr.duplicate", abbreviation = "EMP"),
+            ts!("abbr.load_failed", error = "e"),
+            ts!("abbr.save_failed", error = "e"),
         ] {
             assert!(!label.is_empty(), "empty label");
             assert!(!label.starts_with("abbr."), "untranslated label {label:?}");

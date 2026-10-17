@@ -110,5 +110,6 @@ fn answer_conflict(
 
 mod generation;
 mod settings;
+mod tabs;
 mod templates;
 mod workspace;

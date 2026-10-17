@@ -158,6 +158,10 @@ pub(crate) fn eq_ignore_case(a: &str, b: &str) -> bool {
 }
 
 /// `n` blanks.
+///
+/// Every width a template writes comes through here, which is why the parser
+/// refuses a `padSize` or an `indent` above `parse::MAX_WIDTH`: what reaches
+/// this is never more than that plus the width of a line already written.
 pub(crate) fn spaces(n: usize) -> String {
     " ".repeat(n)
 }

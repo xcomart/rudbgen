@@ -84,6 +84,38 @@ fn one_broken_template_writes_no_file_at_all() {
 }
 
 #[test]
+fn a_mistake_only_one_table_reaches_still_writes_nothing() {
+    let fx = Fixture::new();
+    // T_ONE renders fine; only T_TWO reaches the unknown processor, and the
+    // run would have written T_ONE.java before finding it
+    let plan = plan(
+        vec![table("T_ONE"), table("T_TWO")],
+        vec![template(
+            &fx.templates,
+            "one.java",
+            "class ${name} {}\n${if:key=name, equals='T_TWO'}${name.pascl}${endif}",
+            "${name}.java",
+        )],
+        &fx.out,
+    );
+
+    let outcome = generate(&plan, Overwrite::Overwrite, &live(), &quiet);
+
+    assert!(outcome.written.is_empty(), "{:?}", outcome.written);
+    assert!(!fx.out.exists());
+    assert_eq!(outcome.failed.len(), 1);
+    assert_eq!(
+        outcome.failed[0].table, None,
+        "it is the template's mistake"
+    );
+    assert!(
+        outcome.failed[0].message.contains("line 2"),
+        "{:?}",
+        outcome.failed[0].message
+    );
+}
+
+#[test]
 fn a_broken_output_name_is_named_as_such() {
     let fx = Fixture::new();
     let plan = plan(
@@ -293,6 +325,130 @@ fn an_output_name_that_renders_empty_is_refused() {
     );
 }
 
+/// Two tables whose output name does not tell them apart, under `policy`.
+fn colliding_run(policy: Overwrite) -> (Fixture, rudbgen_gen::Outcome) {
+    let fx = Fixture::new();
+    std::fs::create_dir_all(&fx.out).expect("out dir");
+    std::fs::write(at(&fx.out, "Model.java"), "hand written").expect("existing file");
+    let plan = plan(
+        vec![table("T_ONE"), table("T_TWO"), table("T_THREE")],
+        vec![template(
+            &fx.templates,
+            "one.java",
+            "class ${name} {}",
+            "${if:key=name, equals='T_THREE'}${name}${else}Model${endif}.java",
+        )],
+        &fx.out,
+    );
+    let outcome = generate(&plan, policy, &live(), &quiet);
+    (fx, outcome)
+}
+
+#[test]
+fn two_pairs_on_one_file_write_nothing_under_any_policy() {
+    let asked = Arc::new(Mutex::new(0));
+    let count = Arc::clone(&asked);
+    let ask = Overwrite::Ask(Box::new(move |_: &Path| {
+        *count.lock().unwrap() += 1;
+        Decision::Overwrite
+    }));
+
+    for policy in [Overwrite::Overwrite, Overwrite::Skip, ask] {
+        let (fx, outcome) = colliding_run(policy);
+
+        assert!(outcome.written.is_empty(), "{:?}", outcome.written);
+        assert!(
+            outcome.skipped.is_empty(),
+            "a collision is not an existing file: {:?}",
+            outcome.skipped
+        );
+        assert_eq!(
+            tree(&fx.out),
+            ["Model.java"],
+            "not even the pair without a collision was written"
+        );
+        assert_eq!(read(&fx.out, "Model.java"), "hand written");
+
+        assert_eq!(outcome.failed.len(), 2, "one per colliding pair");
+        let first = &outcome.failed[0];
+        assert_eq!(first.table.as_deref(), Some("T_ONE"));
+        assert_eq!(
+            first.path.as_deref(),
+            Some(at(&fx.out, "Model.java").as_path())
+        );
+        assert!(
+            first
+                .message
+                .contains("also the output of one.java on T_TWO"),
+            "{:?}",
+            first.message
+        );
+        assert!(
+            outcome.failed[1]
+                .message
+                .contains("also the output of one.java on T_ONE"),
+            "{:?}",
+            outcome.failed[1].message
+        );
+    }
+    assert_eq!(*asked.lock().unwrap(), 0, "nothing was asked about");
+}
+
+#[test]
+fn two_templates_that_name_one_file_collide_as_well() {
+    let fx = Fixture::new();
+    let plan = plan(
+        vec![table("T_ONE")],
+        vec![
+            template(&fx.templates, "a.java", "a", "${name}.java"),
+            template(&fx.templates, "b.java", "b", "./${name}.java"),
+            template(&fx.templates, "c.java", "c", "../${name}.java"),
+        ],
+        &fx.out,
+    );
+
+    let events = Events::new();
+    let outcome = generate(&plan, Overwrite::Overwrite, &live(), &events.sink());
+
+    assert!(!fx.out.exists(), "nothing was written");
+    let templates: Vec<&str> = outcome.failed.iter().map(|f| f.template.as_str()).collect();
+    assert_eq!(
+        templates,
+        ["a.java", "b.java", "c.java"],
+        "the broken name is reported beside the collision, in pair order"
+    );
+    assert!(
+        outcome.failed[2]
+            .message
+            .contains("leaves the output directory")
+    );
+    assert_eq!(
+        events.labels(),
+        ["started 3", "parsed 3", "finished 0"],
+        "no pair was started"
+    );
+}
+
+#[test]
+fn a_dry_run_reports_a_collision_and_renders_nothing() {
+    let fx = Fixture::new();
+    let plan = plan(
+        vec![table("T_ONE"), table("T_TWO")],
+        vec![template(
+            &fx.templates,
+            "one.java",
+            "class ${name} {}",
+            "Model.java",
+        )],
+        &fx.out,
+    );
+
+    let result = dry_run(&plan, &live(), &quiet);
+    assert!(result.files.is_empty());
+    assert_eq!(result.failed.len(), 2);
+    assert!(result.failed[0].message.contains("also the output of"));
+}
+
 // --- the three policies ---------------------------------------------------
 
 #[test]
@@ -346,6 +502,41 @@ fn the_skip_policy_leaves_what_is_there_and_writes_the_rest() {
     assert_eq!(outcome.skipped[0].table, "T_ONE");
     assert!(outcome.is_ok(), "a skip is not a failure");
     assert_eq!(outcome.handled(), 2);
+}
+
+#[test]
+fn a_skipped_file_never_has_its_body_rendered() {
+    let fx = Fixture::new();
+    std::fs::create_dir_all(&fx.out).expect("out dir");
+    std::fs::write(at(&fx.out, "T_ONE.java"), "hand written").expect("existing file");
+
+    // a body that cannot render against any table, and warns before failing:
+    // had it been rendered, the pair would be a failure and not a skip
+    let plan = plan(
+        vec![table("T_ONE")],
+        vec![template(
+            &fx.templates,
+            "one.java",
+            "${nosuchfield}${for:key=nowhere}x${endfor}",
+            "${name}.java",
+        )],
+        &fx.out,
+    );
+
+    let outcome = generate(&plan, Overwrite::Skip, &live(), &quiet);
+    assert!(outcome.is_ok(), "{outcome:?}");
+    assert_eq!(outcome.skipped.len(), 1);
+    assert!(
+        outcome.diagnostics.is_empty(),
+        "the body was rendered after all: {:?}",
+        outcome.diagnostics
+    );
+
+    let policy = Overwrite::Ask(Box::new(|_: &Path| Decision::Skip));
+    let outcome = generate(&plan, policy, &live(), &quiet);
+    assert!(outcome.is_ok(), "{outcome:?}");
+    assert_eq!(outcome.skipped[0].reason, SkipReason::UserSkipped);
+    assert_eq!(read(&fx.out, "T_ONE.java"), "hand written");
 }
 
 /// Every answer the *ask* policy takes, and what the run does with it.

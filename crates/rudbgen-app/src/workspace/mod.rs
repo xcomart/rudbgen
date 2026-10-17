@@ -83,10 +83,10 @@ use view::centered_scroll;
 use std::path::{Path, PathBuf};
 
 use gpui::{
-    AnyElement, App, Axis, Context, Div, DragMoveEvent, Entity, FocusHandle, Hsla, KeyBinding,
-    Menu, MenuItem, MouseButton, MouseUpEvent, Pixels, Point, QuitMode, ScrollHandle, SharedString,
-    Subscription, Task, TitlebarOptions, Window, WindowBackgroundAppearance, WindowBounds,
-    WindowControlArea, WindowOptions, div, img, prelude::*, px,
+    AnyElement, App, Axis, Context, Div, DragMoveEvent, ElementId, Entity, FocusHandle, Hsla,
+    KeyBinding, Menu, MenuItem, MouseButton, MouseUpEvent, Pixels, Point, QuitMode, ScrollHandle,
+    SharedString, Subscription, Task, TitlebarOptions, Window, WindowBackgroundAppearance,
+    WindowBounds, WindowControlArea, WindowOptions, div, img, prelude::*, px,
 };
 use rudbgen_core::{
     AppSettings, ConnectionProfile, ConnectionStore, DriverDef, DriverStore, TemplateSetStore,
@@ -95,10 +95,10 @@ use rudbgen_core::{
 use rudbgen_gen::{Plan, TemplateSpec};
 use rudbgen_meta::{MetaReader, Table};
 use rugpui::{
-    Button, ButtonVariant, DraggedThumb, EditorThemeEntry, EditorThemeRegistry, MenuButton,
-    MenuEntry, ResizeHandle, Scrollbar, ScrollbarAxis, ScrollbarState, Select, TabBar, TabItem,
-    Theme, ThemeRegistry, hide_later, hide_now, scroll_to, scrolled, set_editor_theme, set_theme,
-    set_window_tint, theme, tooltip_label,
+    Button, ButtonVariant, DraggedTab, DraggedThumb, EditorThemeEntry, EditorThemeRegistry,
+    MenuButton, MenuEntry, ResizeHandle, Scrollbar, ScrollbarAxis, ScrollbarState, Select, TabBar,
+    TabItem, Theme, ThemeRegistry, hide_later, hide_now, scroll_to, scrolled, set_editor_theme,
+    set_theme, set_window_tint, theme, tooltip_label,
 };
 use rugpui_shell::{
     AboutDialog, AboutDialogEvent, AppIdentity, Pane, UpdateDialog, UpdateDialogEvent,
@@ -106,7 +106,9 @@ use rugpui_shell::{
 };
 
 use crate::abbreviation_dialog::{AbbreviationDialog, AbbreviationDialogEvent};
-use crate::connection::{ConnectError, Connected, Credentials, SessionHandle};
+use crate::connection::{
+    Closing, ConnectError, Connected, Credentials, SessionHandle, wait_for_closes,
+};
 use crate::connection_dialog::{ConnectionDialog, ConnectionDialogEvent};
 use crate::explorer::{Explorer, ExplorerEvent, SchemaKey, TableKey};
 use crate::generate_job::{GenerationJob, JobEvent};
@@ -482,6 +484,13 @@ fn label_of(profile: &ConnectionProfile) -> SharedString {
     }
 }
 
+/// Tag identifying the work area's tab strip as a tab-drag source.
+///
+/// The window holds a single strip, so one tag names it; the source guard on
+/// the reorder path compares against this, refusing whatever foreign drag a
+/// future second strip — or another window — might report here.
+pub(super) const WORK_STRIP_TAG: u64 = u64::MAX;
+
 /// The whole of the window.
 struct Workspace {
     /// Focus target for the window, so the shortcuts stay live.
@@ -536,6 +545,11 @@ struct Workspace {
     jdbgen_config: Option<PathBuf>,
     /// Whether a session is open, opening, or has just failed.
     connection: ConnectionState,
+    /// The sessions this window let go of that may still be closing.
+    ///
+    /// Closes run off the UI thread (see [`Workspace::retire`]); what is kept
+    /// here is what the next session and the quit wait for.
+    closing_sessions: Vec<Closing>,
     /// Which connection the answers coming back off background tasks belong to.
     ///
     /// Bumped by every connect and every disconnect. A metadata read that was
@@ -578,6 +592,12 @@ struct Workspace {
     pane: Pane<PaneItem>,
     /// Whether the tab strip's dropdown is showing.
     pane_menu_open: bool,
+    /// Where a dragged tab would land, while it is over the strip.
+    ///
+    /// The strip reporting and the insertion gap the pointer last named — the
+    /// bar [`Workspace::render_tabs`] draws. `None` is no bar: no drag, a
+    /// foreign drag, or a drag that has left the strip or already dropped.
+    tab_drop: Option<(u64, usize)>,
     /// The ticked tables, as the last run read them.
     ///
     /// Kept so that moving the preview header's dropdowns re-renders without
@@ -674,9 +694,14 @@ impl Workspace {
         // The one thing that must happen before the process winds down: the
         // session is closed, and the tunnel under it after that. A session left
         // open holds an embedded database's lock file, which the next run then
-        // cannot get past.
+        // cannot get past. The closes run on threads of their own; the quit
+        // waits for them here, but only for so long — a close that hangs on a
+        // server that is gone must not keep the application from leaving.
         let quit = cx.on_app_quit(|workspace: &mut Workspace, _cx| {
             workspace.close_session();
+            if !wait_for_closes(&workspace.closing_sessions) {
+                log::warn!("quitting with a session that has not finished closing");
+            }
             async {}
         });
 
@@ -749,6 +774,7 @@ impl Workspace {
             import,
             jdbgen_config: rudbgen_import::locate(),
             connection: ConnectionState::Idle,
+            closing_sessions: Vec::new(),
             connection_epoch: 0,
             connection_list_open: false,
             explorer,
@@ -762,6 +788,7 @@ impl Workspace {
             job,
             pane,
             pane_menu_open: false,
+            tab_drop: None,
             run_tables: Vec::new(),
             explorer_visible: layout.explorer_visible,
             inspector_visible: layout.inspector_visible,

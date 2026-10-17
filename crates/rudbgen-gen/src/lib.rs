@@ -45,8 +45,11 @@
 //! 2. The output name is a template too, rendered per table, and is resolved
 //!    against [`Plan::output_dir`]. A name that reaches outside of it — an
 //!    absolute path, a drive letter, any `..` component — is refused and
-//!    recorded in [`Outcome::failed`]. A name with `/` in it is a
-//!    subdirectory, which is created. Every output name of the run is
+//!    recorded in [`Outcome::failed`], and so — on every platform, since
+//!    generated sources travel — is a name Windows cannot hold: a reserved
+//!    device name such as `CON` or `com1.java`, one of `<>:"|?*` or a
+//!    control character, or a component ending in a dot or a space. A name
+//!    with `/` in it is a subdirectory, which is created. Every output name of the run is
 //!    rendered and resolved before the first file is written, and two pairs
 //!    that land on one file — compared ignoring case on Windows and macOS,
 //!    whose filesystems do — fail the run with **no file written at all**,

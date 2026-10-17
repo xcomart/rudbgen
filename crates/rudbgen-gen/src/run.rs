@@ -513,24 +513,20 @@ const FOLDS_CASE: bool = cfg!(any(windows, target_os = "macos"));
 /// Every path of a run is the output directory followed by plain components —
 /// [`resolve_output`] refused everything else — so comparing them component by
 /// component is enough, once the names are folded the way the filesystem
-/// folds them: case on Windows and macOS, and on Windows the trailing dots
-/// and spaces it drops from a name as well.
+/// folds them: case on Windows and macOS. The trailing dots and spaces Windows
+/// drops from a name need no folding, because no name that has one gets this
+/// far.
 fn collision_key(path: &Path) -> String {
     let mut key = String::new();
     for component in path.components() {
         let name = component.as_os_str().to_string_lossy();
-        let name: &str = if cfg!(windows) {
-            name.trim_end_matches(['.', ' '])
-        } else {
-            &name
-        };
         if !key.is_empty() {
             key.push('/');
         }
         if FOLDS_CASE {
             key.push_str(&name.to_lowercase());
         } else {
-            key.push_str(name);
+            key.push_str(&name);
         }
     }
     key
@@ -641,6 +637,12 @@ fn collect(
 /// The check is on the name, not on what the filesystem makes of it: a symlink
 /// already inside the output directory can still lead out of it, and catching
 /// that would mean canonicalising a path that does not exist yet.
+///
+/// Every component must also be a name Windows can hold ([`windows_unsafe`]),
+/// on every platform: generated sources are committed and checked out
+/// elsewhere, and a `Con.java` or a `Foo:Bar.java` written happily on Linux is
+/// a file a Windows checkout cannot create — or, worse, one it silently
+/// creates as something else.
 fn resolve_output(output_dir: &Path, rendered: &str) -> Result<PathBuf, String> {
     let trimmed = rendered.trim();
     if trimmed.is_empty() {
@@ -650,7 +652,12 @@ fn resolve_output(output_dir: &Path, rendered: &str) -> Result<PathBuf, String> 
     let mut path = output_dir.to_path_buf();
     for component in Path::new(trimmed).components() {
         match component {
-            Component::Normal(part) => path.push(part),
+            Component::Normal(part) => {
+                if let Some(why) = windows_unsafe(&part.to_string_lossy()) {
+                    return Err(format!("output name '{trimmed}' {why}"));
+                }
+                path.push(part);
+            }
             Component::CurDir => {}
             Component::ParentDir => {
                 return Err(format!(
@@ -667,6 +674,62 @@ fn resolve_output(output_dir: &Path, rendered: &str) -> Result<PathBuf, String> 
         return Err(format!("output name '{trimmed}' names no file"));
     }
     Ok(path)
+}
+
+/// Device names Windows reserves in every directory, whatever the extension:
+/// `nul.java` is the null device there and `aux/Model.java` a path through it.
+///
+/// Microsoft's list, which is longer than the one everybody knows: the `0`
+/// ports, the superscript ones, and the two console names are on it too.
+#[rustfmt::skip]
+const WINDOWS_DEVICES: [&str; 32] = [
+    "CON", "PRN", "AUX", "NUL", "CONIN$", "CONOUT$",
+    "COM0", "COM1", "COM2", "COM3", "COM4", "COM5", "COM6", "COM7", "COM8", "COM9",
+    "COM\u{b9}", "COM\u{b2}", "COM\u{b3}",
+    "LPT0", "LPT1", "LPT2", "LPT3", "LPT4", "LPT5", "LPT6", "LPT7", "LPT8", "LPT9",
+    "LPT\u{b9}", "LPT\u{b2}", "LPT\u{b3}",
+];
+
+/// Why one path component cannot be a file or directory name on Windows, or
+/// `None` when it can.
+///
+/// Three ways a name is lost there: it is a reserved device name
+/// ([`WINDOWS_DEVICES`]) — compared ignoring case, on the part before the
+/// first dot with the spaces Windows ignores before an extension taken off;
+/// it holds a character NTFS refuses, `<>:"|?*` and the control characters —
+/// `:` above all, which Windows reads as an alternate data stream and turns
+/// `Foo:Bar.java` into an invisible stream of a file called `Foo`; or it ends
+/// in a dot or a space, which Windows drops, so that `Model.` and `Model` are
+/// one file there and two everywhere else.
+///
+/// A `\` is not among them: on Windows it is a separator, and the path walk
+/// has already split on it there, while refusing it everywhere would refuse
+/// the Windows user's own way of writing a package tree.
+fn windows_unsafe(part: &str) -> Option<String> {
+    // ASCII case folding leaves the superscript digits as they are, which is
+    // exactly how Windows compares them.
+    let stem = part.split('.').next().unwrap_or(part).trim_end_matches(' ');
+    if WINDOWS_DEVICES
+        .iter()
+        .any(|device| device.eq_ignore_ascii_case(stem))
+    {
+        return Some(format!("has '{part}', a device name Windows reserves"));
+    }
+    if let Some(c) = part
+        .chars()
+        .find(|c| c.is_ascii_control() || matches!(c, '<' | '>' | ':' | '"' | '|' | '?' | '*'))
+    {
+        return Some(format!(
+            "has {c:?} in '{}', a character Windows does not allow in a file name",
+            part.escape_debug()
+        ));
+    }
+    if part.ends_with(['.', ' ']) {
+        return Some(format!(
+            "has '{part}', which ends in a dot or a space that Windows drops"
+        ));
+    }
+    None
 }
 
 /// The summary line one [`Error`] makes.
@@ -823,6 +886,79 @@ mod tests {
             FOLDS_CASE,
             "case is folded exactly where the filesystem folds it"
         );
+    }
+
+    #[test]
+    fn a_device_name_windows_reserves_is_refused_whatever_the_case_and_extension() {
+        let out = Path::new("/out");
+        for name in [
+            "CON",
+            "con.java",
+            "Nul.tar.gz",
+            "aux/Model.java",
+            "a/com1/b.java",
+            "LPT9.txt",
+            "lpt\u{b9}.java",
+            "PRN .java",
+            "conin$",
+        ] {
+            let refused = resolve_output(out, name).expect_err(name);
+            assert!(refused.contains("device name"), "{name}: {refused}");
+        }
+        // Only the whole stem is a device: these are ordinary names.
+        for name in [
+            "Console.java",
+            "com10.java",
+            "nullable/X.java",
+            "x.con",
+            "LPT.java",
+        ] {
+            assert!(resolve_output(out, name).is_ok(), "{name} was refused");
+        }
+    }
+
+    #[test]
+    fn a_character_windows_refuses_is_refused_on_every_platform() {
+        let out = Path::new("/out");
+        for name in [
+            "Foo:Bar.java",
+            "a<b.java",
+            "a>b.java",
+            "say\"hi\".java",
+            "pipe|d.java",
+            "what?.java",
+            "glob*.java",
+            "tab\tname.java",
+            "dir\u{1}/x.java",
+            "del\u{7f}.java",
+        ] {
+            let refused = resolve_output(out, name).expect_err(name);
+            assert!(refused.contains("does not allow"), "{name}: {refused}");
+        }
+    }
+
+    #[test]
+    fn a_component_ending_in_a_dot_or_a_space_is_refused() {
+        let out = Path::new("/out");
+        for name in [
+            "Model.",
+            "pkg./Model.java",
+            "pkg /Model.java",
+            "a/.../b.java",
+        ] {
+            let refused = resolve_output(out, name).expect_err(name);
+            assert!(refused.contains("dot or a space"), "{name}: {refused}");
+        }
+        // The space the whole name is trimmed of is not part of it, and one
+        // inside a name, or leading a component, is an ordinary character.
+        for name in [
+            "Model.java ",
+            "My Model.java",
+            "a/ b.java",
+            ".hidden/x.java",
+        ] {
+            assert!(resolve_output(out, name).is_ok(), "{name} was refused");
+        }
     }
 
     #[test]

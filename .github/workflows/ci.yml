@@ -5,7 +5,7 @@
 # `#[ignore]`d, and gpui comes from a pinned revision of Zed's monorepo with four
 # crates patched on top of it, which `rugpui` vendors and this workspace's patch
 # table points at. The widgets themselves come from rugpui too, as `git`
-# dependencies pinned to one revision across all seven entries; see the root
+# dependencies pinned to one revision across all eight entries; see the root
 # Cargo.toml. The only network the build needs is crates.io plus two git
 # fetches — plus a JVM. The bridge JAR is
 # built and tested first, because `rudbgen-jdbc`'s build script refuses to build

@@ -279,8 +279,9 @@ It ships the base lexers — `SqlHighlighter` (keywords, strings, comments, `${p
 
 1. Load columns (and keys/FKs/indexes) for every ticked table — one `DESCRIBE` each, cached per connection until refresh.
 2. Parse every ticked template and every output-name template once; a parse error aborts **before** any file is written.
-3. For each table × template: render the name, resolve against the output dir (and refuse anything that escapes it), apply the policy, render the body, write atomically.
-4. `Outcome { written, skipped, failed: Vec<(path, reason)>, cancelled }`.
+3. For each table × template: render the name and resolve it against the output dir (and refuse anything that escapes it). Two pairs that resolve to one file abort **before** any file is written.
+4. For each table × template: apply the policy to the resolved path, then render the body, then write atomically — a skipped file is never rendered.
+5. `Outcome { written, skipped, failed: Vec<(path, reason)>, cancelled }`.
 
 Dry run is the same function with a `Sink::Memory` and no policy. Preview is a dry run of one pair.
 

@@ -69,4 +69,21 @@ pub enum Error {
         /// Why the name was refused.
         message: String,
     },
+    /// The rendered output name is also the output name of another pair of
+    /// the same run.
+    #[error(
+        "{template} on {table}: {} is also the output of {}",
+        path.display(),
+        others.join(", ")
+    )]
+    OutputCollision {
+        /// The template's name in the profile.
+        template: String,
+        /// The table whose name rendered it.
+        table: String,
+        /// The file both pairs would write.
+        path: PathBuf,
+        /// The other pairs that would write it, as `template on table`.
+        others: Vec<String>,
+    },
 }

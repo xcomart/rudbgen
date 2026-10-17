@@ -968,6 +968,7 @@ which the editor refuses to save — the later one wins.
 | Missing `endif` / `endfor` | Parse error: `if statements not closed` / `for statements not closed` |
 | Unknown statement type | Parse error: `Unknown template: …` |
 | Non-numeric `padSize` or `indent` | Render error |
+| Two tables or templates with the same output path | Run error before any file is written |
 
 **Parse errors** are found before any file is written: every template body and
 every output-name template of a run is parsed first, so a template with a syntax

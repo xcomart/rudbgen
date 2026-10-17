@@ -46,7 +46,13 @@
 //!    against [`Plan::output_dir`]. A name that reaches outside of it — an
 //!    absolute path, a drive letter, any `..` component — is refused and
 //!    recorded in [`Outcome::failed`]. A name with `/` in it is a
-//!    subdirectory, which is created.
+//!    subdirectory, which is created. Every output name of the run is
+//!    rendered and resolved before the first file is written, and two pairs
+//!    that land on one file — compared ignoring case on Windows and macOS,
+//!    whose filesystems do — fail the run with **no file written at all**,
+//!    each named with the pairs it collides with: otherwise the second would
+//!    replace the first, or be skipped or asked about as if the file this run
+//!    just wrote had been there before it.
 //! 3. Files are written atomically, through
 //!    [`rudbgen_core::paths::write_atomic`]: the bytes land in a temporary
 //!    sibling that is renamed over the destination, so a crash cannot leave a

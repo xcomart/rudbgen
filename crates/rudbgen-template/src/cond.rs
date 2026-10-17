@@ -76,46 +76,42 @@ impl CondKind {
 ///
 /// jdbgen compiles the pattern on every evaluation; compiling it once keeps a
 /// template that is rendered against a hundred tables from paying for it a
-/// hundred times. A pattern that does not compile is kept as the message it
-/// failed with and reported when the condition is evaluated, which is where
-/// jdbgen reports it too.
+/// hundred times. It also moves the verdict on a pattern that does not
+/// compile from the render pass, where jdbgen reports it, to the parse: the
+/// pattern is the same for every table, and a run must not write the files of
+/// the tables rendered before the first one that reached it.
 #[derive(Debug)]
 pub(crate) struct Cond {
     pub(crate) kind: CondKind,
     pub(crate) value: String,
-    pub(crate) regex: Option<Result<Regex, String>>,
+    pub(crate) regex: Option<Regex>,
 }
 
 impl Cond {
-    pub(crate) fn new(kind: CondKind, value: String) -> Cond {
+    /// A condition, or the message a pattern that does not compile fails with.
+    pub(crate) fn new(kind: CondKind, value: String) -> Result<Cond, String> {
         let regex = match kind {
             CondKind::Matches | CondKind::NotMatches => {
                 // Pattern.matches() asks the whole value to match
                 Some(
                     Regex::new(&format!("^(?:{value})$"))
-                        .map_err(|e| format!("invalid regular expression '{value}': {e}")),
+                        .map_err(|e| format!("invalid regular expression '{value}': {e}"))?,
                 )
             }
             _ => None,
         };
-        Cond { kind, value, regex }
+        Ok(Cond { kind, value, regex })
     }
 
     /// Evaluate this condition against the value the key chain produced.
     pub(crate) fn eval(&self, val: &Value<'_>) -> Result<bool, RenderError> {
         let held = match self.kind {
             CondKind::Contains | CondKind::NotContains => self.contains(val)?,
-            CondKind::Matches | CondKind::NotMatches => {
-                let text = val.to_text();
-                match self
-                    .regex
-                    .as_ref()
-                    .expect("compiled for a matches condition")
-                {
-                    Ok(re) => re.is_match(text.as_ref()),
-                    Err(message) => return Err(RenderError::new(message.clone())),
-                }
-            }
+            CondKind::Matches | CondKind::NotMatches => self
+                .regex
+                .as_ref()
+                .expect("compiled for a matches condition")
+                .is_match(val.to_text().as_ref()),
             CondKind::Equals | CondKind::NotEquals => {
                 strutil::eq_ignore_case(&self.value, val.to_text().as_ref())
             }

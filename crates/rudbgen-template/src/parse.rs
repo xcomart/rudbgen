@@ -60,6 +60,17 @@ impl Attrs {
     fn key(&self) -> Option<&str> {
         self.get("key").or_else(|| self.get("item"))
     }
+
+    /// The whole number an attribute such as `padSize` holds, `0` when it is
+    /// not there. `label` is the attribute as the template writer spells it.
+    pub(crate) fn number(&self, name: &str, label: &str) -> Result<i64, String> {
+        match self.get(name) {
+            Some(text) => text
+                .parse::<i64>()
+                .map_err(|_| format!("{label} is not a number: \"{text}\"")),
+            None => Ok(0),
+        }
+    }
 }
 
 /// A statement of the parsed template, or the literal text between two of
@@ -94,7 +105,7 @@ pub(crate) enum Node {
 pub(crate) struct ItemNode {
     pub(crate) span: Span,
     pub(crate) attrs: Attrs,
-    pub(crate) chain: Option<KeyChain>,
+    pub(crate) chain: KeyChain,
 }
 
 /// A statement whose whole content is its attribute list.
@@ -108,8 +119,7 @@ pub(crate) struct PlainNode {
 #[derive(Debug)]
 pub(crate) struct IfNode {
     pub(crate) span: Span,
-    pub(crate) attrs: Attrs,
-    pub(crate) chain: Option<KeyChain>,
+    pub(crate) chain: KeyChain,
     pub(crate) conds: Vec<Cond>,
     pub(crate) then_body: Vec<Node>,
     pub(crate) otherwise: Option<Box<Else>>,
@@ -132,7 +142,7 @@ pub(crate) struct ForNode {
     pub(crate) attrs: Attrs,
     /// The member holding the collection. A `for` never runs the key through
     /// the processors, so this is the plain name rather than a chain.
-    pub(crate) key: Option<String>,
+    pub(crate) key: String,
     pub(crate) body: Vec<Node>,
 }
 
@@ -257,6 +267,46 @@ impl Parser {
         ParseError::new(message, self.line)
     }
 
+    /// An error about one statement, marked on the statement and reported on
+    /// the line it starts on - the place a render error about it would have
+    /// named.
+    fn invalid(&self, message: impl Into<String>, span: Span) -> ParseError {
+        ParseError {
+            message: message.into(),
+            line: span.line,
+            span: Some(span),
+        }
+    }
+
+    /// The key chain of a statement, which every statement that reads one
+    /// must have, with every processor in it checked.
+    fn require_chain(&self, attrs: &Attrs, span: Span) -> Result<KeyChain, ParseError> {
+        let Some(key) = attrs.key() else {
+            return Err(self.invalid(missing_key(attrs), span));
+        };
+        let chain = KeyChain::parse(key);
+        chain
+            .check()
+            .map_err(|message| self.invalid(message, span))?;
+        Ok(chain)
+    }
+
+    /// Make sure the decorations of a value statement can be applied, so that
+    /// a `padSize` that is no number fails the parse rather than the render.
+    fn check_decorations(&self, attrs: &Attrs, span: Span) -> Result<(), ParseError> {
+        attrs
+            .number("padsize", "padSize")
+            .map_err(|message| self.invalid(message, span))?;
+        Ok(())
+    }
+
+    /// The attributes of a `${date}`, `${user}` or `${author}`, checked.
+    fn plain(&self, options: &str, span: Span) -> Result<PlainNode, ParseError> {
+        let attrs = self.parse_nv_pairs(options)?;
+        self.check_decorations(&attrs, span)?;
+        Ok(PlainNode { span, attrs })
+    }
+
     // --------------------------------------------------------------- parse
 
     /// Advance to the next statement, appending the literal text passed on the
@@ -368,17 +418,10 @@ impl Parser {
                 } else {
                     format!("format={options}")
                 };
-                let attrs = self.parse_nv_pairs(&options)?;
-                Ok(Node::Date(PlainNode { span, attrs }))
+                Ok(Node::Date(self.plain(&options, span)?))
             }
-            "user" => Ok(Node::User(PlainNode {
-                span,
-                attrs: self.parse_nv_pairs(&options)?,
-            })),
-            "author" => Ok(Node::Author(PlainNode {
-                span,
-                attrs: self.parse_nv_pairs(&options)?,
-            })),
+            "user" => Ok(Node::User(self.plain(&options, span)?)),
+            "author" => Ok(Node::Author(self.plain(&options, span)?)),
             _ => Err(ParseError {
                 message: format!("Unknown template: {body}, before: {}", self.near()),
                 line: self.line,
@@ -389,7 +432,8 @@ impl Parser {
 
     fn parse_item(&mut self, options: &str, span: Span) -> Result<ItemNode, ParseError> {
         let attrs = self.parse_nv_pairs(options)?;
-        let chain = attrs.key().map(KeyChain::parse);
+        let chain = self.require_chain(&attrs, span)?;
+        self.check_decorations(&attrs, span)?;
         Ok(ItemNode { span, attrs, chain })
     }
 
@@ -482,22 +526,22 @@ impl Parser {
     }
 
     /// One branch of an if/elif chain while it is being read.
-    fn branch(&self, attrs: Attrs, span: Span) -> IfNode {
-        let chain = attrs.key().map(KeyChain::parse);
+    fn branch(&self, attrs: Attrs, span: Span) -> Result<IfNode, ParseError> {
+        let chain = self.require_chain(&attrs, span)?;
         let conds = attrs
             .iter()
             .filter_map(|(name, value)| {
                 CondKind::from_name(name).map(|kind| Cond::new(kind, value.to_string()))
             })
-            .collect();
-        IfNode {
+            .collect::<Result<_, _>>()
+            .map_err(|message| self.invalid(message, span))?;
+        Ok(IfNode {
             span,
-            attrs,
             chain,
             conds,
             then_body: Vec::new(),
             otherwise: None,
-        }
+        })
     }
 
     /// Read an `if` up to its `${endif}`.
@@ -508,7 +552,7 @@ impl Parser {
     fn parse_if(&mut self, extra: &str, span: Span) -> Result<IfNode, ParseError> {
         let attrs = self.parse_nv_pairs(extra)?;
         self.check_if_conditions(&attrs, extra)?;
-        let mut branches = vec![self.branch(attrs, span)];
+        let mut branches = vec![self.branch(attrs, span)?];
         let mut tail: Option<Vec<Node>> = None;
 
         loop {
@@ -526,7 +570,7 @@ impl Parser {
                 let attrs = self.parse_nv_pairs(&extra)?;
                 self.check_if_conditions(&attrs, &extra)?;
                 tail = None;
-                branches.push(self.branch(attrs, stmt.span));
+                branches.push(self.branch(attrs, stmt.span)?);
             } else if stmt.body == "else" {
                 tail = Some(Vec::new());
             } else if stmt.body == "endif" {
@@ -563,7 +607,12 @@ impl Parser {
     /// Read a `for` up to its `${endfor}`.
     fn parse_for(&mut self, extra: &str, span: Span) -> Result<ForNode, ParseError> {
         let attrs = self.parse_nv_pairs(extra)?;
-        let key = attrs.key().map(|k| strutil::trim(k).to_string());
+        let Some(key) = attrs.key().map(|k| strutil::trim(k).to_string()) else {
+            return Err(self.invalid(missing_key(&attrs), span));
+        };
+        attrs
+            .number("indent", "indent")
+            .map_err(|message| self.invalid(message, span))?;
         let mut body = Vec::new();
         loop {
             let Some(stmt) = self.next(&mut body)? else {
@@ -585,6 +634,14 @@ impl Parser {
             body,
         })
     }
+}
+
+/// What a statement that reads a key but names none is reported as.
+fn missing_key(attrs: &Attrs) -> String {
+    format!(
+        "'key' or 'item' is required, but none given in: {:?}",
+        attrs.names()
+    )
 }
 
 /// The line separator a template is written with, reused wherever the engine

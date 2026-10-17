@@ -712,7 +712,7 @@ are part of `inStr`.
   the fragment after it is indented to
   `<output column where the for statement started> + <indent>`. The column is
   measured in display columns (see [Decorations](#decorations)).
-- `indent` defaults to `0`, and a non-numeric value fails the render with
+- `indent` defaults to `0`, and a non-numeric value fails the parse with
   `indent is not a number`.
 
 This is why the idiomatic layout puts the whole body on the same line as the
@@ -957,8 +957,8 @@ which the editor refuses to save — the later one wins.
 | Situation | Behaviour |
 |:---|:---|
 | Unknown field or variable | Warning with a line number, expands to an empty string — not an error |
-| Unknown processor | Render error listing the valid processors |
-| `replace` with fewer than 2 arguments | Render error |
+| Unknown processor | Parse error listing the valid processors |
+| `replace` with fewer than 2 arguments | Parse error |
 | Unknown condition name in `if` | Parse error |
 | Missing `key`/`item` | Parse error |
 | `for` over a field that does not exist | Render error: `Model has no 'x' member` |
@@ -967,13 +967,18 @@ which the editor refuses to save — the later one wins.
 | Unterminated `}` | Parse error: `'}' not found, before: …` |
 | Missing `endif` / `endfor` | Parse error: `if statements not closed` / `for statements not closed` |
 | Unknown statement type | Parse error: `Unknown template: …` |
-| Non-numeric `padSize` or `indent` | Render error |
+| Non-numeric `padSize` or `indent` | Parse error |
+| `matches`/`notMatches` pattern that is not a valid regular expression | Parse error |
 | Two tables or templates with the same output path | Run error before any file is written |
 
 **Parse errors** are found before any file is written: every template body and
 every output-name template of a run is parsed first, so a template with a syntax
 error costs nothing — the run stops and names the template, which half of it, and
-the line. **Render errors** depend on the model, so they surface per table; the
+the line. That includes every mistake that is wrong whatever the table — an
+unknown processor, a `padSize` that is no number, a pattern that does not
+compile — even inside an `if` branch no table reaches; jdbgen reported those
+while rendering, after the files of the tables before had been written.
+**Render errors** depend on the model, so they surface per table; the
 run reports the file that failed, carries on with the rest, and lists the
 failures in the result summary. Nothing already written is rolled back.
 

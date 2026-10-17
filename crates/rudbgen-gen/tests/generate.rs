@@ -84,6 +84,38 @@ fn one_broken_template_writes_no_file_at_all() {
 }
 
 #[test]
+fn a_mistake_only_one_table_reaches_still_writes_nothing() {
+    let fx = Fixture::new();
+    // T_ONE renders fine; only T_TWO reaches the unknown processor, and the
+    // run would have written T_ONE.java before finding it
+    let plan = plan(
+        vec![table("T_ONE"), table("T_TWO")],
+        vec![template(
+            &fx.templates,
+            "one.java",
+            "class ${name} {}\n${if:key=name, equals='T_TWO'}${name.pascl}${endif}",
+            "${name}.java",
+        )],
+        &fx.out,
+    );
+
+    let outcome = generate(&plan, Overwrite::Overwrite, &live(), &quiet);
+
+    assert!(outcome.written.is_empty(), "{:?}", outcome.written);
+    assert!(!fx.out.exists());
+    assert_eq!(outcome.failed.len(), 1);
+    assert_eq!(
+        outcome.failed[0].table, None,
+        "it is the template's mistake"
+    );
+    assert!(
+        outcome.failed[0].message.contains("line 2"),
+        "{:?}",
+        outcome.failed[0].message
+    );
+}
+
+#[test]
 fn a_broken_output_name_is_named_as_such() {
     let fx = Fixture::new();
     let plan = plan(

@@ -70,7 +70,7 @@
 //! parentheses, and `${''}` standing for no text at all. jdbgen's three engine
 //! test classes are ported case for case and are the canary for all of it.
 //!
-//! Three differences are deliberate:
+//! Four differences are deliberate:
 //!
 //! * **D10** - word level abbreviation rules match ignoring case. jdbgen
 //!   looked the raw segment up in a lower cased map, so a word rule never
@@ -82,6 +82,11 @@
 //!   rendered nothing.
 //! * Errors that jdbgen reported with a character offset in place of a line
 //!   number report the line.
+//! * Mistakes that are wrong for every model - a statement without its `key`,
+//!   an unknown processor or a `replace` short of its arguments, a `padSize`
+//!   or an `indent` that is no number, a `matches` pattern that does not
+//!   compile - are [`ParseError`]s, where jdbgen only found them while
+//!   rendering, and so only on the tables that reached them.
 
 #![warn(missing_docs)]
 

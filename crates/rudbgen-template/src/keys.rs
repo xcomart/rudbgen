@@ -115,6 +115,24 @@ impl KeyChain {
         }
     }
 
+    /// Make sure every processor of the chain exists and is given what it
+    /// needs, so that a misspelled `${name.pascl}` is a parse error rather than
+    /// a render error on the first table that reaches it.
+    ///
+    /// The answer is the message [`apply`] would have failed with.
+    pub(crate) fn check(&self) -> Result<(), String> {
+        for step in self.steps.iter().skip(1) {
+            let proc = strutil::trim(&step.name).to_lowercase();
+            if !PROCESSORS.contains(&proc.as_str()) {
+                return Err(unknown_processor(&proc));
+            }
+            if proc == "replace" && step.params.len() < 2 {
+                return Err(replace_arity(&step.params));
+            }
+        }
+        Ok(())
+    }
+
     /// Whether the automatic `abbr` step applies to this chain, that is
     /// whether it reads a member called `name`.
     pub(crate) fn takes_auto_abbr(&self) -> bool {
@@ -154,22 +172,30 @@ pub(crate) fn apply(
         "upper" => value.to_uppercase(),
         "replace" => {
             if params.len() < 2 {
-                return Err(RenderError::new(format!(
-                    "'replace' processor requires 2 arguments - replace(find, replacement), but got {}: {:?}",
-                    params.len(),
-                    params
-                )));
+                return Err(RenderError::new(replace_arity(params)));
             }
             value.replace(params[0].as_str(), params[1].as_str())
         }
         "abbr" => abbr.apply(value),
-        _ => {
-            return Err(RenderError::new(format!(
-                "cannot find '{proc}' in string processors, valid values are: [{}]",
-                PROCESSORS.join(", ")
-            )));
-        }
+        _ => return Err(RenderError::new(unknown_processor(&proc))),
     })
+}
+
+/// What a processor nobody knows is reported as.
+fn unknown_processor(proc: &str) -> String {
+    format!(
+        "cannot find '{proc}' in string processors, valid values are: [{}]",
+        PROCESSORS.join(", ")
+    )
+}
+
+/// What a `replace` with fewer than its two arguments is reported as.
+fn replace_arity(params: &[String]) -> String {
+    format!(
+        "'replace' processor requires 2 arguments - replace(find, replacement), but got {}: {:?}",
+        params.len(),
+        params
+    )
 }
 
 #[cfg(test)]
@@ -203,6 +229,20 @@ mod tests {
             mixed.steps[1].params,
             vec!["ghi".to_string(), "xyz".to_string()]
         );
+    }
+
+    #[test]
+    fn a_chain_is_checked_step_by_step_behind_the_member() {
+        assert!(KeyChain::parse("name.suffix.Pascal").check().is_ok());
+        assert!(
+            KeyChain::parse("pascl").check().is_ok(),
+            "the first step is a member, never a processor"
+        );
+        let error = KeyChain::parse("name.pascl").check().unwrap_err();
+        assert!(error.contains("'pascl'"), "{error}");
+        let error = KeyChain::parse("name.replace(a)").check().unwrap_err();
+        assert!(error.contains("requires 2 arguments"), "{error}");
+        assert!(KeyChain::parse("name.replace(a, b)").check().is_ok());
     }
 
     #[test]

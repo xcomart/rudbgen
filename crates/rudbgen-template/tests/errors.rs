@@ -138,34 +138,6 @@ fn the_message_points_at_the_text_the_error_was_found_in() {
 // ----------------------------------------------------------- render errors
 
 #[test]
-fn a_placeholder_without_a_key_is_reported() {
-    let error = render_failure("${for:instr=','}x${endfor}");
-    assert!(
-        error.message.contains("'key' or 'item' is required"),
-        "{error}"
-    );
-}
-
-#[test]
-fn an_if_without_a_key_is_reported() {
-    let error = render_failure("${if:equals='x'}yes${endif}");
-    assert!(
-        error.message.contains("'key' or 'item' is required"),
-        "{error}"
-    );
-}
-
-#[test]
-fn an_unknown_string_processor_is_reported_with_the_valid_ones() {
-    let error = render_failure("${name.capitalize}");
-    assert!(error.message.contains("capitalize"), "{error}");
-    assert!(
-        error.message.contains("camel") && error.message.contains("replace"),
-        "the valid processors are listed: {error}"
-    );
-}
-
-#[test]
 fn a_for_over_something_the_model_does_not_have_is_reported() {
     let error = render_failure("${for:key=nowhere}${item:key=name}${endfor}");
     assert!(error.message.contains("nowhere"), "{error}");
@@ -179,18 +151,6 @@ fn contains_on_a_value_that_is_neither_a_collection_nor_a_text_is_reported() {
 }
 
 #[test]
-fn a_padding_that_is_no_number_is_reported() {
-    let error = render_failure("${item:key=name, padSize=wide}");
-    assert!(error.message.contains("wide"), "{error}");
-}
-
-#[test]
-fn an_indent_that_is_no_number_is_reported() {
-    let error = render_failure("${for:key=rows, indent=two}${item:key=name}${endfor}");
-    assert!(error.message.contains("two"), "{error}");
-}
-
-#[test]
 fn an_invalid_date_format_is_reported() {
     let error = render_failure("${date:yyyy-bb}");
     assert!(error.message.to_lowercase().contains("pattern"), "{error}");
@@ -198,6 +158,89 @@ fn an_invalid_date_format_is_reported() {
 
 #[test]
 fn a_render_error_knows_the_line_it_is_on() {
-    let error = render_failure("one\ntwo\n${item:key=name, padSize=wide}");
+    let error = render_failure("one\ntwo\n${for:key=nowhere}x${endfor}");
     assert_eq!(error.line(), Some(2));
+}
+
+// ------------------------- errors jdbgen reported from the render pass
+//
+// Each of these is wrong for every model, so the parse refuses it: a run must
+// not write the files of the tables rendered before the first one to reach it.
+
+#[test]
+fn a_placeholder_without_a_key_is_reported() {
+    let error = parse_failure("${for:instr=','}x${endfor}");
+    assert!(
+        error.message.contains("'key' or 'item' is required"),
+        "{error}"
+    );
+}
+
+#[test]
+fn an_if_without_a_key_is_reported() {
+    let error = parse_failure("${if:equals='x'}yes${endif}");
+    assert!(
+        error.message.contains("'key' or 'item' is required"),
+        "{error}"
+    );
+}
+
+#[test]
+fn an_unknown_string_processor_is_reported_with_the_valid_ones() {
+    let error = parse_failure("${name.capitalize}");
+    assert!(error.message.contains("capitalize"), "{error}");
+    assert!(
+        error.message.contains("camel") && error.message.contains("replace"),
+        "the valid processors are listed: {error}"
+    );
+}
+
+#[test]
+fn an_unknown_processor_of_an_if_key_is_reported() {
+    let error = parse_failure("${if:key=name.pascl, equals='x'}yes${endif}");
+    assert!(error.message.contains("'pascl'"), "{error}");
+}
+
+#[test]
+fn a_padding_that_is_no_number_is_reported() {
+    let error = parse_failure("${item:key=name, padSize=wide}");
+    assert!(error.message.contains("wide"), "{error}");
+    let error = parse_failure("${date:format=yyyy, padSize=wide}");
+    assert!(error.message.contains("wide"), "{error}");
+}
+
+#[test]
+fn an_indent_that_is_no_number_is_reported() {
+    let error = parse_failure("${for:key=rows, indent=two}${item:key=name}${endfor}");
+    assert!(error.message.contains("two"), "{error}");
+}
+
+#[test]
+fn a_regular_expression_that_does_not_compile_is_reported() {
+    let error =
+        parse_failure("${if:key=name, equals='x'}a${elif:key=name, notMatches='[a-'}b${endif}");
+    assert!(
+        error.message.contains("invalid regular expression"),
+        "{error}"
+    );
+}
+
+#[test]
+fn a_mistake_is_found_in_a_branch_no_model_reaches() {
+    // the branch is never rendered against the model, and the parse refuses
+    // the template anyway
+    let error = parse_failure("${if:key=name, equals='never'}\n\n${name.pascl}${endif}");
+    assert!(error.message.contains("'pascl'"), "{error}");
+}
+
+#[test]
+fn a_statement_mistake_is_marked_on_the_statement_and_its_line() {
+    let source = "one\ntwo\n${item:key=name, padSize=wide} three";
+    let error = parse_failure(source);
+    assert_eq!(error.line, 2);
+    let span = error.span.expect("the statement is known");
+    assert_eq!(
+        &source[span.start..span.end],
+        "${item:key=name, padSize=wide}"
+    );
 }

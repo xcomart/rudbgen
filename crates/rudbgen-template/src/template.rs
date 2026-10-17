@@ -164,15 +164,9 @@ fn collect_fields(nodes: &[Node], out: &mut Vec<String>) {
     };
     for node in nodes {
         match node {
-            Node::Item(item) | Node::Super(item) => {
-                if let Some(chain) = &item.chain {
-                    add(chain.key(), out);
-                }
-            }
+            Node::Item(item) | Node::Super(item) => add(item.chain.key(), out),
             Node::For(node) => {
-                if let Some(key) = &node.key {
-                    add(key, out);
-                }
+                add(&node.key, out);
                 collect_fields(&node.body, out);
             }
             Node::If(node) => collect_if_fields(node, out),
@@ -182,11 +176,9 @@ fn collect_fields(nodes: &[Node], out: &mut Vec<String>) {
 }
 
 fn collect_if_fields(node: &crate::parse::IfNode, out: &mut Vec<String>) {
-    if let Some(chain) = &node.chain {
-        let key = chain.key();
-        if !key.is_empty() && !out.iter().any(|k| k == key) {
-            out.push(key.to_string());
-        }
+    let key = node.chain.key();
+    if !key.is_empty() && !out.iter().any(|k| k == key) {
+        out.push(key.to_string());
     }
     collect_fields(&node.then_body, out);
     match node.otherwise.as_deref() {

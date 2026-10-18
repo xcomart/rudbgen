@@ -283,11 +283,11 @@ and it never touches your configuration directory. A copy you cannot overwrite â
 a system package, a read-only mount, a `.app` opened from a disk image â€” fails
 the swap and the dialog offers the release page instead.
 
-On Windows, once a database connection has been opened the JVM is loaded and
-holds `lib/rudbgen-bridge.jar` and the runtime open. rudbgen does not yet ask
-the updater to defer the swap to the next launch in that case, so an update
-started then attempts the swap in place, and if Windows refuses it the dialog
-offers the release page. Updating before opening a connection avoids this.
+On Windows, if you have already opened a database connection (or probed a
+driver) the JVM is loaded and holds `lib/rudbgen-bridge.jar` and the runtime
+open, so the swap is deferred: the update is parked beside the installation and
+applied at the very start of the next launch, before anything Java has been
+touched. You see the same flow either way.
 
 An installed (rather than unzipped) Windows copy also has its recorded version
 in *Apps & features* corrected after an update, so `winget list` and

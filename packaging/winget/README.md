@@ -170,16 +170,13 @@ creates an entry nor touches the installed copy's.
 
 Two edges remain, and both are narrow.
 
-When the updater defers the file swap to the next launch, the registry value is
-written straight away while the files change on the following start. The entry
-therefore reads one release ahead for as long as rudbgen stays open. In the
-rarer case where the staged update turns out to be unapplicable and is
-discarded, it stays one ahead until the next successful update corrects it.
-rudbgen does not ask for that deferral yet: the `must_defer` hook it hands
-`rugpui-shell` (`crates/rudbgen-app/src/workspace/mod.rs`) answers `false`
-unconditionally, even after a database connection has loaded the JVM and
-Windows holds the JAR and the runtime open, so an update started then attempts
-the swap in place.
+When the updater has to defer the file swap to the next launch — which it does
+on Windows if a database connection has already loaded the JVM, because the JAR
+and the runtime are then locked — the registry value is written straight away
+while the files change on the following start. The entry therefore reads one
+release ahead for as long as rudbgen stays open. In the rarer case where the
+staged update turns out to be unapplicable and is discarded, it stays one ahead
+until the next successful update corrects it.
 
 **Uninstalling after several self-updates can leave files behind.** Inno's
 uninstall log is written at install time and lists what the installer put down.

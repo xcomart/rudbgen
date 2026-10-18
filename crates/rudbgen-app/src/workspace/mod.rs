@@ -251,12 +251,11 @@ const IDENTITY: AppIdentity = AppIdentity {
     payload: PAYLOAD,
     bundle_executable: "Contents/MacOS/rudbgen",
     windows_arp_key: ARP_KEY,
-    // Whether an install has to leave its renames to the next launch. The
-    // question is "is a JVM loaded into this process", because on Windows one
-    // holds open handles on the very files the swap renames — and the answer is
-    // `false` until `rudbgen-jdbc` starts one, which no path reachable from an
-    // update check does.
-    must_defer: || false,
+    // On Windows a JVM loaded into this process holds open handles on the very
+    // files the swap renames, so the renames have to wait for the next launch.
+    // The first connection or driver probe starts one, and Help → Check for
+    // updates stays reachable after that, so the answer can change at runtime.
+    must_defer: || cfg!(windows) && rudbgen_jdbc::Jvm::get().is_some(),
 };
 
 /// The shell's window onto rudbgen's translations.

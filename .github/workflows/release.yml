@@ -13,7 +13,7 @@
 # bridge/build/libs/rudbgen-bridge.jar, and the archives ship a jlink runtime
 # so users need no JDK of their own. What comes out is a tree, not a binary.
 #
-# The asset names are a contract with crates/rudbgen-app/src/update.rs, which
+# The asset names are a contract with rugpui-shell's updater, which
 # builds the name it downloads from the tag and its own target triple:
 #
 #   rudbgen-<tag>-<target>.zip      (windows)
@@ -447,7 +447,7 @@ jobs:
 
       # The second Windows artifact: an Inno Setup installer wrapped around the
       # very tree the step above just vouched for. The zip stays — the in-app
-      # updater downloads and unpacks it (crates/rudbgen-app/src/update.rs), so
+      # updater (rugpui-shell's update.rs) downloads and unpacks it, so
       # removing it would break every copy already installed. The installer is
       # what makes the package installable by winget: unzipping registers
       # nothing with Windows, and winget reads the "Apps & features" registry
@@ -564,7 +564,7 @@ jobs:
           # The whole point of shipping an installer: winget looks the package
           # up here. The key name is the AppId from rudbgen.iss with Inno's
           # "_is1" suffix, under HKCU because the install is per-user, and it is
-          # the same string ARP_KEY in crates/rudbgen-app/src/update.rs names.
+          # the same string ARP_KEY in crates/rudbgen-app/src/workspace/mod.rs names.
           $key = "HKCU:\Software\Microsoft\Windows\CurrentVersion\Uninstall\{9A84AE34-E54B-46EA-B55D-61C0666D6890}_is1"
           $arp = Get-ItemProperty -Path $key -ErrorAction SilentlyContinue
           if (-not $arp) { throw "the install left no Add/Remove Programs entry at $key" }

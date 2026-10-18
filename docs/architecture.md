@@ -31,6 +31,7 @@ this document.
 | D11 | **Generation is a cancellable job with an overwrite policy** (overwrite / skip existing / ask) and a **result summary** listing every file written, skipped or failed. A **dry run** renders to memory only | jdbgen's progress window has no cancel, no close, and a failed run leaves half the files on disk with no list of which |
 | D13 | **The widget layer moves out to [`rugpui`](https://github.com/xcomart/rugpui)**, together with the patched gpui it is written against, and comes back as a dependency at a pinned revision | D1 and D2 had rulogman, rudbman and rudbgen carrying byte-identical copies of the same widget kit, grid, editor and four vendored gpui crates, kept in step by hand. rugpui is that code with the host's concepts taken out: no configuration directory (the theme store is handed a `ThemeDirs`), no template grammar (the editor composes an `Overlay` the host supplies). What was `rudbgen-ui`, `rudbgen-grid` and `rudbgen-editor` is now `rugpui`, `rugpui-grid` and `rugpui-editor`; the template highlighter stayed behind, in `rudbgen-app`, because it is jdbgen's grammar and not a widget kit's. The patch table has to point at rugpui's vendored gpui rather than a copy of its own, or two gpui crates end up in one binary |
 | D13a | **The application-level shell follows it, as `rugpui-shell`** — a fourth crate at the same revision | The same argument one layer up. Window chrome, the self-updater, the about and update dialogs, the palette catalogues and their editor, the split-pane tree, the context-menu rows and the pieces a settings form is built out of were application code, and therefore not D13's to take — but they were also written once and copied twice, so a fix to one of them was three fixes or, more often, one. `rugpui-shell` is that code with rudbgen taken out of it: the name, the version, the release endpoints, the words and where the ignored-release tag is kept are injected by `main` through `AppIdentity`, `Strings` and `UpdatePolicy`. What stays here is what the shell cannot know — the `Workspace`, what a tab is (`PaneItem`), the body of the settings form, the domain icons, and the `i18n!` invocation with the locale files it compiles. Two consequences are deliberate: the restart after an update is an event the `Workspace` answers with `cx.restart()` — pointed first at `rugpui_shell::restart_path()`, the path recorded before the install renamed the running image aside, since Linux's `current_exe()` would otherwise follow the swap back onto the build that was just replaced — not something a dialog does to its host; and `rudbgen_core::TitlebarStyle` stays where it is, converted at the two call sites, because `rudbgen-core` is gpui-free and `rugpui-shell` is not. `main` also calls `rugpui_shell::init_process_identity` before `update::apply_pending` and `gpui_platform::application()`, ahead of `rugpui_shell::init` itself: those two update paths run before an `App` can exist and need the identity to answer through, not panic, if a host ever reached them without it |
+| D14 | **The database plumbing moves out to [`rudbkit`](https://github.com/xcomart/rudbkit)** — `rudbkit-core`, `rudbkit-ssh` and `rudbkit-jdbc`, pinned to one revision in the root `Cargo.toml` and bumped together | What rugpui did for the widgets, one layer down: the SSH tunnel, the profile's tunnel block, the validate-then-save order of a connection dialog and finding and starting a JVM were the same code in rudbman and rudbgen. The rudbgen crates in front of them stay, deliberately thin, so nothing above them changed its imports: `rudbgen-ssh` is a single `pub use rudbkit_ssh::*` that keeps the tunnel's integration tests; `rudbgen-core` re-exports `TunnelConfig`/`TunnelAuth` from `rudbkit-core` and keeps everything rudbgen persists; `rudbgen-jdbc` wraps `rudbkit_jdbc::Jvm`/`JvmConfig` with rudbgen's `RuntimeIdentity` (its name, `comart/rudbgen/bridge/Bridge`, `RUDBGEN_JAVA_HOME`/`RUDBGEN_BRIDGE_JAR`) and owns everything above the VM — the session workers, the wire codec and the bridge protocol. `rudbgen-app` names `rudbkit-core` directly for the URL helpers and `rudbkit_core::save` |
 | D12 | **Templates are first-class documents**: an in-app editor with template-language highlighting, a variable palette, diagnostics for unknown fields, and a live preview against a selected table | This is where the port earns its keep. jdbgen stores a file path and nothing else; a typo in a field name is a silent empty string found in the output |
 
 ---
@@ -45,8 +46,8 @@ this document.
 | `Cargo.toml` profile tables, `[patch]` table, `.gitattributes` | same | Dependency comments rewritten where the reason differs |
 | `crates/rudbman-ui/` (17 modules) | `rugpui` (D13) | Whole. `actions!(rudbman_input, …)` → `rugpui_input`. Grid tokens stay (the table inspector uses the grid). The theme store lost its `paths` dependency and takes a `ThemeDirs` instead |
 | `crates/rudbman-core/` | `crates/rudbgen-core/` | `paths`, `secrets`, `settings` skeleton, `profile`'s `DriverDef`/`DriverStore`/`builtins()` and the `Redacted`/`MaskedUrl`/`MaskedProps` Debug impls. `ConnectionProfile` gains generation fields (§5). `known_hosts` stays with SSH |
-| `crates/rudbman-ssh/` | `crates/rudbgen-ssh/` | Whole. Tunnels are already wired into the connection dialog; removing them costs more than keeping them |
-| `crates/rudbman-jdbc/` | `crates/rudbgen-jdbc/` | `jvm`, `session`, `protocol`, `codec`, `error`, `response`; `spec` loses `ExtractSpec`/`TransferSpec`/`BackupSpec`; `Op` loses `Job*` and `LobRead` |
+| `crates/rudbman-ssh/` | `crates/rudbgen-ssh/` | Whole. Tunnels are already wired into the connection dialog; removing them costs more than keeping them. The code has since moved to `rudbkit-ssh` (D14); `rudbgen-ssh` re-exports it and keeps the tests |
+| `crates/rudbman-jdbc/` | `crates/rudbgen-jdbc/` | `jvm`, `session`, `protocol`, `codec`, `error`, `response`; `spec` loses `ExtractSpec`/`TransferSpec`/`BackupSpec`; `Op` loses `Job*` and `LobRead`. JVM discovery and start-up have since moved to `rudbkit-jdbc` (D14); `jvm` wraps it under rudbgen's name |
 | `bridge/` | `bridge/` | Per D3. Package renamed, `template/` dropped (it moves to Rust, D4) |
 | `crates/rudbman-grid/` | `rugpui-grid` (D13) | Whole. Used by the table inspector and the custom-query test result |
 | `crates/rudbman-editor/` | `rugpui-editor` (D13) | The `Highlighter` is made pluggable (a trait over a token stream) and the SQL highlighter's dependency on `rudbman-sql` is replaced by a lexer of its own. The template-language highlighter written for §8 stayed in `rudbgen-app` when the rest moved out, and composes over a base language through the crate's `Overlay` trait |
@@ -75,13 +76,15 @@ rudbgen/
 ├── docs/status.md              progress and handoff
 ├── docs/template-reference.md  the template language (ported from jdbgen, corrected)
 ├── bridge/                     Gradle → rudbgen-bridge.jar
-├── assets/                     icon, driver icons
+├── assets/                     icon, driver icons, the sample H2 database
 ├── templates/                  built-in template set (copied to the config dir on first run)
 ├── packaging/
 └── crates/
-    ├── rudbgen-core/           settings, profiles, drivers, secrets, paths, known_hosts
-    ├── rudbgen-ssh/            SSH local port forwarding
-    ├── rudbgen-jdbc/           JNI: JVM bootstrap, session worker, DESCRIBE, EXECUTE
+    ├── rudbgen-core/           settings, profiles, drivers, secrets, paths, known_hosts;
+    │                            the tunnel block re-exported from rudbkit-core
+    ├── rudbgen-ssh/            SSH local port forwarding: one `pub use rudbkit_ssh::*` and its tests
+    ├── rudbgen-jdbc/           JNI: session worker, DESCRIBE, EXECUTE; the JVM bootstrap
+    │                            is rudbkit-jdbc's, under rudbgen's name
     ├── rudbgen-template/       the template engine — pure, no gpui, no JNI
     ├── rudbgen-meta/           the table model: DESCRIBE + custom queries → template Model
     ├── rudbgen-gen/            the generation job: plan → render → write (§9), no gpui
@@ -97,6 +100,10 @@ editor, the split-pane tree, the context-menu rows and the pieces a settings
 form is built out of) come from [rugpui](https://github.com/xcomart/rugpui) at a
 pinned revision, along with the patched gpui they are written against (D13).
 Taken as `git` dependencies at that one revision; see the root `Cargo.toml`.
+The database plumbing — the SSH tunnel, the profile's tunnel block, the
+connection dialog's validate-then-save order and the JVM start-up — comes the
+same way from [rudbkit](https://github.com/xcomart/rudbkit) as `rudbkit-core`,
+`rudbkit-ssh` and `rudbkit-jdbc`, all three at one pinned revision (D14).
 
 Dependency direction (no cycles, no back-edges):
 
@@ -105,14 +112,19 @@ rudbgen-app
  ├─→ rugpui-shell ──┐
  ├─→ rugpui-grid ───┤
  ├─→ rugpui-editor ─┼─→ rugpui ─→ gpui          (all four from rugpui, D13)
- ├─→ rudbgen-template          (pure: encoding_rs, regex, chrono only)
+ ├─→ rudbgen-template          (pure: unicode-width, regex, chrono only)
  ├─→ rudbgen-meta ─→ rudbgen-jdbc, rudbgen-template, rudbgen-core
  ├─→ rudbgen-gen ─→ rudbgen-meta, rudbgen-template, rudbgen-core
  ├─→ rudbgen-import ─→ rudbgen-core
- ├─→ rudbgen-jdbc ─→ rudbgen-core
- ├─→ rudbgen-ssh  ─→ rudbgen-core
- └─→ rudbgen-core
+ ├─→ rudbgen-jdbc ─┬→ rudbkit-jdbc
+ │                 └→ rudbgen-core
+ ├─→ rudbgen-ssh  ──→ rudbkit-ssh ─→ rudbkit-core   (all three from rudbkit, D14)
+ └─→ rudbgen-core ──→ rudbkit-core
 ```
+
+`rudbgen-app` also names `rudbkit-core` directly, for the URL helpers and the
+save order its connection dialog shares with the other applications'
+(`rudbkit_core::save`).
 
 `rudbgen-template` knows nothing of JDBC: it renders a `Model` trait (§7.3) that the app implements over metadata. This is what makes it testable with the ported jdbgen fixtures and reusable for the output-file-name templates.
 
@@ -131,7 +143,7 @@ rudbgen-app
 ### 4.2 Window structure
 
 ```
-┌ [⌂ rudbgen]  [● Sample H2 ▾]                      [⚙] [?]  ─ □ ✕ ┐
+┌ [⌂ rudbgen] [≡] [● Sample H2 ▾]                            ─ □ ✕ ┐
 ├──────────────┬─────────────────────────────────┬─────────────────┤
 │ EXPLORER     │ WORK AREA (tabs)                │ INSPECTOR       │
 │ 🔍 filter    │ ┌ Generate ┐┌ java_model ┐┌ … ┐ │ T_SAMPLE_ALBUM  │
@@ -152,7 +164,7 @@ rudbgen-app
 └──────────────────────────────────────────────────────────────────┘
 ```
 
-- **Title bar**: the connection selector (a `TabBar`-less `Select` with the status dot: connecting / connected / error), settings and help. Switching the connection swaps the explorer and the Generate tab's options (they are per connection), never the open template tabs.
+- **Title bar**: the mark and the name (drawn only when the window draws its own title bar), the application menu (≡ — settings, about, update check and every other command; on macOS the menu bar carries it instead), and the connection selector (a `TabBar`-less `Select` with the status dot: connecting / connected / error). Switching the connection swaps the explorer and the Generate tab's options (they are per connection), never the open template tabs.
 - **Explorer** (left, collapsible): catalog → schema → table tree with a filter box (contains, case-insensitive — jdbgen's `filterTables` rule), a *views* toggle, and a **checkbox per table row**. Selection is the set of ticked rows, which survives filtering and schema switching. Context menu: select all visible, clear, invert, open in inspector.
 - **Work area** (center): a tab strip. The **Generate** tab is permanent and has no close button. Template tabs open from the template list (§4.4). A **Preview** tab opens from the Generate tab's action row.
 - **Inspector** (right, collapsible): the table under the cursor or the last ticked one — columns (ordinal, name, type, nullable, default, comment, PK marker), keys, foreign keys in and out, indexes. This replaces jdbgen's Table View modal. When a template tab is active it shows the **variable palette** instead (§4.5).
@@ -178,13 +190,13 @@ The editor (`rugpui-editor`) with the template highlighter, split with a **live 
 
 | Dialog | From | Notes |
 |---|---|---|
-| Connection | welcome, title bar | rudbman's connection dialog: name, driver, URL with placeholder substitution, credentials (keychain), properties, keep-alive, SSH tunnel, **Test**. The driver editor replaces the form body (one tab ring, never nested) |
+| Connection | welcome, app menu | rudbman's connection dialog: name, driver, URL with placeholder substitution, credentials (keychain), properties, keep-alive, SSH tunnel, **Test**. The driver editor replaces the form body (one tab ring, never nested) |
 | Driver editor | connection dialog | rudbman's driver manager plus a **Custom queries** section: four `[enable] [SQL editor] [Test]` rows. Test runs the SQL on a chosen open connection and reports the labels it found against the labels required |
 | Abbreviation rules | Generate tab | The four-column table (apply, whole name, abbreviation, replacement), the trailing empty row, duplicate rejection, and a table-name picker for whole-name rows |
-| Settings | title bar | Theme, editor theme, language (live, no restart), fonts, JVM heap, update channel |
+| Settings | app menu | Theme, editor theme, language (live, no restart), fonts, word wrap, window opacity and blur, title-bar style, the default overwrite policy, JVM heap and arguments |
 | Generation progress | Generate | Bar + log + **Cancel**. On completion a **result summary**: files written / skipped / failed with paths, `Open output directory`, and for conflicts under the *ask* policy a per-file choice |
 | Import from jdbgen | welcome | Asks for the master password once, shows what it found (connections, drivers, sets, rules) with checkboxes, then writes the stores and the keychain. Reports the D10 behaviour change |
-| About | title bar | rudbman's |
+| About | app menu | rudbman's |
 
 ---
 
@@ -204,9 +216,9 @@ themes/, editor-themes/
 known_hosts
 ```
 
-`GenerationProfile { templates: Vec<TemplateRef { name, file, out_template, selected }>, output_dir, author, custom_vars: IndexMap }` lives inside `ConnectionProfile`. Paths are stored relative to the config dir when below it, absolute otherwise (jdbgen's rule; the install-dir fallback goes — a Rust binary has no `templates/` beside it).
+`GenerationProfile { templates: Vec<TemplateRef { name, file, out_template, selected }>, output_dir: Option, author, custom_vars: Vec<(String, String)> }` (a list of pairs, in the order the user typed them) lives inside `ConnectionProfile`. Paths are stored relative to the config dir when below it, absolute otherwise (jdbgen's rule; the install-dir fallback goes — a Rust binary has no `templates/` beside it).
 
-Secrets: `SecretSlot::Connection(uuid)` for the database password, `SecretSlot::Tunnel(uuid)` for the bastion. The URL and user name are **not** secrets here (they were encrypted in jdbgen only because the master password existed); `MaskedUrl` still keeps inline credentials out of logs.
+Secrets: `SecretSlot::Connection` for the database password, stored under the profile id, and `SecretSlot::Tunnel` for the bastion, under `<profile-id>:tunnel`. The URL and user name are **not** secrets here (they were encrypted in jdbgen only because the master password existed); `MaskedUrl` still keeps inline credentials out of logs.
 
 ---
 
@@ -228,7 +240,7 @@ Every catalogue read is one round trip on the session worker; the UI thread neve
 
 ### 7.1 Scope
 
-jdbgen's language, exactly: `${item}` shorthand and long forms, `super`, `if/elif/else/endif` with the ten conditions, `for/endfor` with `inStr`/`indent`/`skipList`, `date`, `user`, `author`, literal escapes, the twelve decorators, the five extra decorators, the quoting and escaping rules, the error messages with line numbers. Parse once, render many; the parsed template is immutable.
+jdbgen's language, exactly: `${item}` shorthand and long forms, `super`, `if/elif/else/endif` with the ten conditions, `for/endfor` with `inStr`/`indent`/`skipList`, `date`, `user`, `author`, literal escapes, the twelve decorators, the five extra decorators, the quoting and escaping rules, the error messages with line numbers. Parse once, render many; the parsed template is immutable. `if` and `for` nest at most 64 deep — deeper is a parse error, so a template cannot overflow the stack.
 
 ### 7.2 Compatibility canary
 
@@ -242,11 +254,10 @@ Known deliberate differences, listed in `docs/template-reference.md`:
 
 ```rust
 pub trait Model {
-    fn get(&self, key: &str) -> Option<Value>;          // Value: Str | Int | Bool | List(Vec<Box<dyn Model>>) | Null
-    fn set_no(&mut self, no: usize);                    // the for-loop counter
+    fn get(&self, key: &str) -> Option<Value<'_>>;      // Value: Str(Cow<str>) | Int | Bool | List(Vec<&dyn Model>) | Null
 }
 ```
-The app implements it for `Table`, `Column`, `ForeignKey`, `Index` and for the custom-variable map (the fallback, looked up after the model, as in jdbgen). `Diagnostics` collects unknown-field warnings with source spans so the editor can mark them.
+The `for` loop counter is not part of the trait: the renderer hands `no` to the element it is rendering, so a model needs no interior mutability and a whole metadata tree renders through a shared reference. `rudbgen-meta` implements it for `Table`, `Column`, `ForeignKey`, `Index` and the rest of its model (§6); the engine implements it for the custom-variable map, a `HashMap<String, String>` (the fallback, looked up after the model, as in jdbgen). `Diagnostics` collects unknown-field warnings with source spans so the editor can mark them.
 
 ### 7.4 Width
 
@@ -259,6 +270,8 @@ canary holds; they part on what EUC-KR encodes as two bytes but terminals draw
 in one column (Cyrillic, Greek, box drawing) and on what EUC-KR cannot encode
 at all (emoji, most of CJK Ext-B), where the column count is the one the
 generated file is actually viewed in. Zero-width characters count zero.
+A `padSize` or `indent` above 4096 columns is refused at parse time, so a
+template cannot ask for gigabytes of blanks.
 
 ---
 
@@ -267,23 +280,23 @@ generated file is actually viewed in. Zero-width characters count zero.
 `rugpui-editor` is rudbman's editor with `Highlighter` behind a trait:
 
 ```rust
-pub trait Highlighter: Send + Sync { fn tokens(&self, line: &str, state: State) -> (Vec<Span>, State); }
+pub trait Highlighter: Send + Sync + 'static { fn line(&self, text: &str, state: LineState) -> (Vec<Span>, LineState); }
 ```
-It ships the base lexers — `SqlHighlighter` (keywords, strings, comments, `${placeholder}`) for the custom-query editors, and one per language a generated file is written in — and no template grammar at all: jdbgen's is rudbgen's business, so `TemplateHighlighter` (text, `${`…`}` statement, statement name, option name, value, decorator, literal; unbalanced `}` as error) lives in `rudbgen-app/src/template_syntax.rs`. It implements the crate's `Overlay` trait — spans plus the byte ranges it took charge of — and `CompositeHighlighter` cuts the base language's spans around those ranges, so a `Model.java.tpl` is Java with its statements standing out of it. The editor theme's twelve token colours are mapped onto both halves.
+It ships the base lexers — `SqlHighlighter` (keywords, strings, comments, `${placeholder}`) for the custom-query editors, and one per language a generated file is written in — and no template grammar at all: jdbgen's is rudbgen's business, so `TemplateHighlighter` (text, `${`…`}` statement, statement name, option name, value, decorator, literal; unbalanced `}` as error) lives in `rudbgen-app/src/template_syntax.rs`. It implements the crate's `Overlay` trait — spans plus the byte ranges it took charge of — and `CompositeHighlighter` cuts the base language's spans around those ranges, so a `Model.java.tpl` is Java with its statements standing out of it. The editor theme's fourteen token colours are mapped onto both halves.
 
 ---
 
 ## 9. Generation
 
-`rudbgen-gen`'s `generate(plan: Plan, policy: Overwrite, cancel: CancelToken, progress: Sender<Progress>) -> Outcome`, run by the app on a background thread:
+`rudbgen-gen`'s `generate(plan: &Plan, policy: Overwrite, cancel: &CancelToken, progress: &dyn Fn(Progress)) -> Outcome`, run by the app on a background thread:
 
-1. Load columns (and keys/FKs/indexes) for every ticked table — one `DESCRIBE` each, cached per connection until refresh.
+1. Load columns (and keys/FKs/indexes) for every ticked table — one `DESCRIBE` each, cached per connection until refresh. This step is the app's: the `Plan` hands `generate` the tables already loaded.
 2. Parse every ticked template and every output-name template once; a parse error aborts **before** any file is written.
-3. For each table × template: render the name and resolve it against the output dir (and refuse anything that escapes it). Two pairs that resolve to one file abort **before** any file is written.
+3. For each table × template: render the name and resolve it against the output dir (and refuse anything that escapes it, and any name Windows cannot hold — a reserved device name, `<>:"|?*` or a control character, a trailing dot or space — on every platform). Two pairs that resolve to one file abort **before** any file is written.
 4. For each table × template: apply the policy to the resolved path, then render the body, then write atomically — a skipped file is never rendered.
-5. `Outcome { written, skipped, failed: Vec<(path, reason)>, cancelled }`.
+5. `Outcome { written, skipped, failed: Vec<Failure>, cancelled, diagnostics }` — a failure names the table, the template, the path when there is one and the reason; `diagnostics` the unknown-field warnings per table × template.
 
-Dry run is the same function with a `Sink::Memory` and no policy. Preview is a dry run of one pair.
+Dry run is `dry_run`, which renders the same way into memory with no policy. Preview is `preview`, which renders exactly one pair.
 
 ---
 
@@ -305,7 +318,7 @@ Each milestone is a PR onto `main` from `dev` (rudbman's flow); `docs/status.md`
 
 ## 11. Open questions
 
-1. Should the output-name template and the body template be allowed to come from the same file (a front-matter header), so a template is one file rather than a file plus a row in a set? Decided in M4 at the latest.
+1. Should the output-name template and the body template be allowed to come from the same file (a front-matter header), so a template is one file rather than a file plus a row in a set? Decided in M4 at the latest — and decided **no** (see `docs/status.md`).
 2. A second, saner `javaType` mapping (`DECIMAL`→`BigDecimal`, `TIMESTAMP`→`LocalDateTime`) is offered under a new field name — which name? (`javaType2` is ugly; `jtype`? `modernJavaType`?)
 
 ---

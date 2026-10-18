@@ -148,6 +148,16 @@ jlink image, or H2 on the test classpath, is reached.
 global mutable state this bridge stays away from. A caller that knows its driver
 should set the real property in `props`.
 
+Two further optional members, `table_comments_sql` and `column_comments_sql`,
+are accepted and held on the session: where one is set, `DESCRIBE` `tables` /
+`columns` top up empty `REMARKS` from it instead of from `meta/Comments.java`'s
+built-in vendor query, on any product. The bridge substitutes `${catalog}` and
+`${schema}` and reads the result positionally — table name and comment, or table
+name, column name and comment. A blank value means the same as an absent one.
+rudbgen itself always leaves both unset: the four custom queries of
+architecture.md D9 have jdbgen's contract, so `rudbgen-meta` runs them through
+`EXECUTE` on the Rust side.
+
 ### `EXECUTE`
 
 ```json
@@ -384,7 +394,7 @@ lists, so a fix in one is a plain diff into the other.
 
 ## Inherited code
 
-From [jdbgen](https://github.com/comart/jdbgen) (MIT, Dennis Soungjin Park):
+From [jdbgen](https://github.com/xcomart/jdbgen) (MIT, Dennis Soungjin Park):
 
 - `types/db/DBMeta.java` → `Session.java`, `Loaders.java` — the child class
   loader, the deliberate avoidance of `DriverManager`, the explicit `null` check

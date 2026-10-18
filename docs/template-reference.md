@@ -107,7 +107,8 @@ indentation included. See [`for` statement](#for-statement) for the details, and
 
 The **Preview** tab renders exactly this — pick a table and a template from its
 two dropdowns — and **Dry run** renders every pair without writing anything. Both
-are on the status bar; see the [UI guide](ui-guide.md#preview-and-dry-run).
+sit beside **Generate** at the bottom of the Generate tab; see the [UI
+guide](ui-guide.md#preview-and-dry-run).
 
 ## Syntax overview
 
@@ -361,13 +362,14 @@ guide](ui-guide.md#the-template-tab).
 | `exports` | list of foreign key | Foreign keys **from** other tables to this one (D8, new) |
 | `indexes` | list of index | Indexes of this table (D8, new) |
 | `icon` | text | The icon key the explorer uses (`fa:TABLE` or `fa:EYE`) |
-| `no` | int | 1-based position of this table in the generation run (**Corrected**) |
+| `no` | int | 1-based position of this table in its schema's table list (**Corrected**) |
 | `source` | text | Declared for jdbgen compatibility — **always empty** |
 
 > **Corrected — `no` on a table.**
 > jdbgen's documentation says a table's `no` is always `0` because nothing
-> assigned it. rudbgen numbers the tables of a run from 1, so `${no}` outside a
-> loop is the table's position in the list you ticked.
+> assigned it. rudbgen numbers the tables of a schema from 1 in the order the
+> table list reads them, views included, so `${no}` outside a loop is the
+> table's position in that list — not its place among the tables you ticked.
 
 > **Note**
 > The table comment field is `remarks`, **not** `remark`. `${remark}` is not a
@@ -417,7 +419,7 @@ For the sample table:
 |:---|:---|
 | `${remarks}` | `Music Album` |
 | `${name}` / `${table}` / `${type}` | `T_SAMPLE_ALBUM` / `T_SAMPLE_ALBUM` / `TABLE` |
-| `${for:item=columns, inStr=","}${name}:${javaType}:${jdbcType}:${typeString}${endfor}` | `ALBUM_ID:Integer:INTEGER:INT,ALBUM_NAME:String:VARCHAR:VARCHAR(256),ARTIST_NAME:String:VARCHAR:VARCHAR(512),PUBLISH_DATE:Date:DATE:DATE` |
+| `${for:item=columns, inStr=","}${name}:${javaType}:${jdbcType}:${typeString}${endfor}` | `ALBUM_ID:Integer:INTEGER:INTEGER,ALBUM_NAME:String:VARCHAR:CHARACTER VARYING(256),ARTIST_NAME:String:VARCHAR:CHARACTER VARYING(512),PUBLISH_DATE:Date:DATE:DATE` |
 
 ### Foreign key fields (D8, new)
 
@@ -436,7 +438,7 @@ For the sample table:
 | `no` | int | 1-based position in the list |
 
 A **key column** — the element of `columns`, `refColumns` and an index's
-`columns` — has just two fields, `name` and `no`. It is a model rather than a
+`columns` — has just `name` (also answered as `column`) and `no`. It is a model rather than a
 bare string so that `${for}` can walk it and `${name}` read it.
 
 ### Index fields (D8, new)
@@ -467,16 +469,9 @@ ${endfor}
 Its fields are `name` (the constraint), `catalog`, `schema`, `table` and
 `column` — the table and column it points at.
 
-> **Known limitation.** A column that has no foreign key answers `fk` as *null*
-> rather than as an empty list, and a `for` over a null fails the render with
-> `'fk' is not a collection but Null`. There is no `if` that guards it either:
-> `contains` on a null fails the same way. So today `${for:item=fk}` is only
-> safe on a table where **every** column has exactly one foreign key, which in
-> practice means it is not usable. Loop over `${imports}` instead — that list is
-> always a list, empty when there is none — and match on `${name}` inside it.
-> The one-line fix (answering an empty list) is tracked in `docs/status.md`;
-> when it lands, the loop above starts working and no template that used
-> `imports` breaks.
+A column that no foreign key uses — or that two different ones do — answers
+`fk` with an **empty list**, never with null, so the loop above simply renders
+nothing for it and needs no guard.
 
 ### JDBC and Java type mapping
 
@@ -596,8 +591,8 @@ repeated, `else` is optional, and `endif` is mandatory.
 > The dialect is Rust's `regex` crate rather than `java.util.regex`. The two
 > agree on everything a template realistically writes; what Rust's has not got
 > is backreferences and lookaround, which it refuses at parse time rather than
-> matching slowly. A pattern that does not compile is reported when the
-> condition is evaluated.
+> matching slowly. A pattern that does not compile is a parse error, reported
+> before any file is written.
 
 For a string value, `contains` reads as *"is one of"*:
 `${if:item=type, contains='TABLE,VIEW'}` is true when `type` is exactly `TABLE`
@@ -890,11 +885,12 @@ Points to keep in mind:
   package directory tree; the directories are created for you.
 - An undefined name is not an error: it warns and expands to an empty string.
 
-The inspector lists the same fields the model offers for the table under the
-cursor, which is the quickest way to check a name you are unsure of. **Next
-release**: with a template tab open the inspector becomes a *variable palette*
-proper — every name including your custom variables, clickable to insert `${…}`
-at the caret.
+With a template tab open the inspector becomes the *variable palette* — every
+field the model offers, the statements, decorations and conditions, and your
+custom variables, each clickable to insert `${…}` at the caret and showing what
+it renders to for the table the live preview uses — which is the quickest way
+to check a name you are unsure of. See the [user interface
+guide](ui-guide.md#the-inspector).
 
 ## Abbreviations
 
@@ -923,7 +919,7 @@ being deleted. The `.abbr` processor applies them in two steps:
 > work, which is why the jdbgen import reports it whether or not the file it
 > read holds a single rule.
 
-The Generate tab has a switch, **apply abbreviations**. When it is on, `.abbr`
+The Generate tab has a switch, **Apply abbreviation rules**. When it is on, `.abbr`
 is inserted automatically as the **first** processor of every `item` reference
 whose first key is `name` — you do not have to write `.abbr` at all, and
 `${name.lower}` silently becomes `${name.abbr.lower}`. Aliases are not covered:
@@ -971,6 +967,7 @@ which the editor refuses to save — the later one wins.
 | Non-numeric `padSize` or `indent`, or one above 4096 | Parse error |
 | `matches`/`notMatches` pattern that is not a valid regular expression | Parse error |
 | Two tables or templates with the same output path | Run error before any file is written |
+| Output name that reaches outside the output directory, or that Windows cannot hold (a reserved name such as `CON`, a forbidden character, a trailing dot or space) | That pair fails and is listed in the result summary |
 
 **Parse errors** are found before any file is written: every template body and
 every output-name template of a run is parsed first, so a template with a syntax
@@ -1051,8 +1048,8 @@ INSERT INTO ${table} (${for:item=columns, inStr=", "}${if:item=autoIncrement, eq
 The separator is written between *iterations*, not between the fragments an
 `if` decided to emit, so a skipped column still leaves its `, ` behind. Where
 the list has to come out exactly right, name the generated column in
-`skipList` instead — or loop over `notKeys`, which is what the shipped MyBatis
-template does.
+`skipList` instead — or, when the generated column is the key, loop over
+`notKeys`, as the shipped MyBatis template's `UPDATE` does.
 
 ### A Java field per outgoing foreign key (D8)
 
@@ -1062,8 +1059,8 @@ template does.
     ${endfor}
 ```
 
-The column's own `fk` would be the shorter way round, but see the limitation
-under [The `fk` of a column](#the-fk-of-a-column-d8-new) before reaching for it.
+The column's own `fk` is the shorter way round when a field per referencing
+column is what you want; see [The `fk` of a column](#the-fk-of-a-column-d8-new).
 
 ### A unique-index lookup method per index (D8)
 

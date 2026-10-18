@@ -109,7 +109,7 @@ the update. It downloads `wingetcreate`, points it at the new release's setup
 `.exe`, and lets it compute the hash, bump the version and open the PR:
 
 ```
-wingetcreate update Xcomart.Rudbgen --version <version> --urls <setup.exe url> --submit
+wingetcreate update Xcomart.Rudbgen --version <version> --urls <setup.exe url> --submit --token <WINGET_PAT>
 ```
 
 The job is a no-op unless the **`WINGET_PAT`** repository secret is set — it
@@ -157,7 +157,8 @@ installer will still raise "Windows protected your PC" on a machine that has
 not seen it before. winget is a distribution channel, not a trust anchor.
 
 **The built-in updater keeps the version in step, with a gap.** rudbgen has an
-updater of its own (`crates/rudbgen-app/src/update.rs`) that fetches a release
+updater of its own (`rugpui-shell`'s `update.rs`, from the pinned
+[rugpui](https://github.com/xcomart/rugpui) revision) that fetches a release
 and replaces the installation in place, and winget's record of the installed
 version is the `DisplayVersion` under the uninstall key Inno wrote. Those would
 drift apart — `winget list` reporting a version that has not been on disk for
@@ -169,13 +170,16 @@ creates an entry nor touches the installed copy's.
 
 Two edges remain, and both are narrow.
 
-When the updater has to defer the file swap to the next launch — which it does
-on Windows if a database connection has already loaded the JVM, because the JAR
-and the runtime are then locked — the registry value is written straight away
-while the files change on the following start. The entry therefore reads one
-release ahead for as long as rudbgen stays open. In the rarer case where the
-staged update turns out to be unapplicable and is discarded, it stays one ahead
-until the next successful update corrects it.
+When the updater defers the file swap to the next launch, the registry value is
+written straight away while the files change on the following start. The entry
+therefore reads one release ahead for as long as rudbgen stays open. In the
+rarer case where the staged update turns out to be unapplicable and is
+discarded, it stays one ahead until the next successful update corrects it.
+rudbgen does not ask for that deferral yet: the `must_defer` hook it hands
+`rugpui-shell` (`crates/rudbgen-app/src/workspace/mod.rs`) answers `false`
+unconditionally, even after a database connection has loaded the JVM and
+Windows holds the JAR and the runtime open, so an update started then attempts
+the swap in place.
 
 **Uninstalling after several self-updates can leave files behind.** Inno's
 uninstall log is written at install time and lists what the installer put down.

@@ -572,7 +572,8 @@ struct Workspace {
     /// The tab strip holds the paths and this holds the buffers, which is what
     /// lets a template tab survive a reconnection: the strip is rebuilt when
     /// the connection changes and these are not (§4.2 — switching the
-    /// connection never closes an open template).
+    /// connection never closes an open template). Disconnecting does: it is
+    /// the way back to the welcome screen ([`Workspace::request_disconnect`]).
     templates: Vec<Entity<TemplatePane>>,
     /// Keeps the template tabs' subscriptions alive, one per entry above.
     template_events: Vec<Subscription>,
@@ -581,6 +582,9 @@ struct Workspace {
     palette: Entity<VariablePalette>,
     /// The tab a close is waiting on an answer about, when one is.
     closing: Option<usize>,
+    /// A disconnect is putting the template tabs away first, and goes on
+    /// with the next one once [`Workspace::closing`] is answered.
+    disconnecting: bool,
     /// The progress dialog, the overwrite question and the summary (D11).
     job: Entity<GenerationJob>,
     /// The work area's tab strip.
@@ -785,6 +789,7 @@ impl Workspace {
             template_events: Vec::new(),
             palette,
             closing: None,
+            disconnecting: false,
             job,
             pane,
             pane_menu_open: false,

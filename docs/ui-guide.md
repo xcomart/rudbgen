@@ -73,7 +73,9 @@ unsaved edits.
 The title bar carries the connection selector: the open connection with a status
 dot (connecting, connected, failed), every saved connection under it, and a
 **Disconnect** row. Switching connections swaps the explorer and the Generate
-tab's options, because those belong to the connection.
+tab's options, because those belong to the connection; open template tabs stay.
+**Disconnect** goes back to the welcome screen and closes the template tabs on
+the way, asking about any with unsaved edits — *Cancel* keeps the connection.
 
 ![Connected](screenshots/connected.png)
 

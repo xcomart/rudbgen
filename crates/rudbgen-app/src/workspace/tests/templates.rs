@@ -696,3 +696,70 @@ fn the_completion_popup_offers_and_accepts(cx: &mut gpui::TestAppContext) {
         })
         .expect("the window is open");
 }
+
+/// Disconnecting is the way back to the welcome screen, so it puts the
+/// template tabs away: a clean one closes on its own, one with edits asks,
+/// and Cancel stops the disconnect with that tab still open.
+#[gpui::test]
+fn a_disconnect_closes_the_template_tabs(cx: &mut gpui::TestAppContext) {
+    cx.update(|cx| {
+        app_settings::init(cx);
+        rugpui::init(cx);
+        rugpui_editor::init(cx);
+    });
+
+    let dir = tempfile::tempdir().expect("a temporary directory");
+    let clean = dir.path().join("clean.java");
+    let edited = dir.path().join("edited.java");
+    std::fs::write(&clean, "class ${name.pascal} {}\n").expect("the file");
+    std::fs::write(&edited, "class ${name.pascal} {}\n").expect("the file");
+
+    silence_the_update_check();
+    let window = cx.add_window(|window, cx| Workspace::new(TitlebarStyle::Custom, window, cx));
+    window
+        .update(cx, |workspace, window, cx| {
+            workspace.open_template(clean.clone(), cx);
+            workspace.open_template(edited.clone(), cx);
+            let at = workspace
+                .template_index(&edited, cx)
+                .expect("the edited tab");
+            let pane = workspace.templates[at].clone();
+            pane.update(cx, |pane, cx| pane.insert("// edit\n", window, cx));
+        })
+        .expect("the window is open");
+    cx.run_until_parked();
+
+    // The clean tab goes without a word; the edited one asks.
+    window
+        .update(cx, |workspace, window, cx| {
+            workspace.request_disconnect(window, cx);
+            assert!(workspace.closing.is_some(), "the edited tab did not ask");
+            assert_eq!(workspace.templates.len(), 1, "the clean tab stayed");
+        })
+        .expect("the window is open");
+
+    // Cancel keeps the edited tab, and the disconnect is over.
+    window
+        .update(cx, |workspace, window, cx| {
+            workspace.cancel_close(window, cx);
+            assert!(!workspace.disconnecting);
+            assert!(workspace.has_templates());
+        })
+        .expect("the window is open");
+
+    // Asked again and answered "don't save": no tab, no strip, home.
+    window
+        .update(cx, |workspace, window, cx| {
+            workspace.request_disconnect(window, cx);
+            workspace.answer_close(false, window, cx);
+            assert_eq!(workspace.closing, None);
+            assert!(!workspace.disconnecting);
+            assert!(!workspace.has_templates(), "a template tab stayed open");
+            assert!(matches!(workspace.pane.items(), [PaneItem::Generate]));
+            assert!(matches!(workspace.connection, ConnectionState::Idle));
+        })
+        .expect("the window is open");
+
+    let written = std::fs::read_to_string(&edited).expect("the file is still there");
+    assert!(!written.contains("// edit"), "a discarded edit was written");
+}

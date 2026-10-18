@@ -325,14 +325,14 @@ impl Workspace {
                     .selected(selected)
                     .open(self.connection_list_open)
                     .width(px(CONNECTION_SELECT_WIDTH))
-                    .on_select(move |index, _text, _window, cx| {
+                    .on_select(move |index, _text, window, cx| {
                         this.update(cx, |workspace, cx| {
                             workspace.connection_list_open = false;
                             match workspace.profiles.connections().get(index).cloned() {
                                 Some(profile) => workspace.connect_to(profile, cx),
                                 // Past the end of the list is the
                                 // "Disconnect" row.
-                                None if index == count => workspace.disconnect(cx),
+                                None if index == count => workspace.request_disconnect(window, cx),
                                 None => {}
                             }
                         });
@@ -859,8 +859,7 @@ impl Workspace {
                             Button::new("template-close-cancel", ts!("common.cancel")).on_click(
                                 move |_, window, cx| {
                                     cancel.update(cx, |workspace, cx| {
-                                        workspace.closing = None;
-                                        workspace.focus_shell(window, cx);
+                                        workspace.cancel_close(window, cx);
                                     });
                                 },
                             ),
@@ -886,8 +885,7 @@ impl Workspace {
                 ),
             move |window, cx| {
                 dismissed.update(cx, |workspace, cx| {
-                    workspace.closing = None;
-                    workspace.focus_shell(window, cx);
+                    workspace.cancel_close(window, cx);
                 });
             },
         )

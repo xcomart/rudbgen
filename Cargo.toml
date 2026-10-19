@@ -47,13 +47,13 @@ members = ["crates/*"]
 # gpui crates below can be overridden by path the same way if they, too, are
 # being edited locally.
 [patch."https://github.com/zed-industries/zed"]
-gpui = { git = "https://github.com/xcomart/rugpui", rev = "d14f6d46cd9a323efca6817ce653118af5de0027" }
-gpui_linux = { git = "https://github.com/xcomart/rugpui", rev = "d14f6d46cd9a323efca6817ce653118af5de0027" }
-gpui_macos = { git = "https://github.com/xcomart/rugpui", rev = "d14f6d46cd9a323efca6817ce653118af5de0027" }
-gpui_windows = { git = "https://github.com/xcomart/rugpui", rev = "d14f6d46cd9a323efca6817ce653118af5de0027" }
+gpui = { git = "https://github.com/xcomart/rugpui", rev = "b95bcb2c1538fbe031b381923446663ce6ec7a05" }
+gpui_linux = { git = "https://github.com/xcomart/rugpui", rev = "b95bcb2c1538fbe031b381923446663ce6ec7a05" }
+gpui_macos = { git = "https://github.com/xcomart/rugpui", rev = "b95bcb2c1538fbe031b381923446663ce6ec7a05" }
+gpui_windows = { git = "https://github.com/xcomart/rugpui", rev = "b95bcb2c1538fbe031b381923446663ce6ec7a05" }
 
 [workspace.package]
-version = "0.1.13"
+version = "0.2.0"
 edition = "2024"
 license = "MIT"
 authors = ["rudbgen contributors"]
@@ -61,9 +61,9 @@ repository = "https://github.com/xcomart/rudbgen"
 
 [workspace.dependencies]
 # Shared database infrastructure; keep all three crates on the same revision.
-rudbkit-core = { git = "https://github.com/xcomart/rudbkit", rev = "434dacb069367b23e55837800fb0a947a314b51b" }
-rudbkit-ssh = { git = "https://github.com/xcomart/rudbkit", rev = "434dacb069367b23e55837800fb0a947a314b51b" }
-rudbkit-jdbc = { git = "https://github.com/xcomart/rudbkit", rev = "434dacb069367b23e55837800fb0a947a314b51b" }
+rudbkit-core = { git = "https://github.com/xcomart/rudbkit", rev = "48fd96850c5419ed967e7d7a75c9c1b1d873e60c" }
+rudbkit-ssh = { git = "https://github.com/xcomart/rudbkit", rev = "48fd96850c5419ed967e7d7a75c9c1b1d873e60c" }
+rudbkit-jdbc = { git = "https://github.com/xcomart/rudbkit", rev = "48fd96850c5419ed967e7d7a75c9c1b1d873e60c" }
 
 # --- shared utilities ---
 anyhow = "1"
@@ -222,10 +222,10 @@ jni = { version = "0.22", features = ["invocation"] }
 #
 # All four are built on `rugpui` and taken at one revision along with the gpui the
 # patch table at the top of this file points at.
-rugpui = { git = "https://github.com/xcomart/rugpui", rev = "d14f6d46cd9a323efca6817ce653118af5de0027" }
-rugpui-grid = { git = "https://github.com/xcomart/rugpui", rev = "d14f6d46cd9a323efca6817ce653118af5de0027" }
-rugpui-editor = { git = "https://github.com/xcomart/rugpui", rev = "d14f6d46cd9a323efca6817ce653118af5de0027" }
-rugpui-shell = { git = "https://github.com/xcomart/rugpui", rev = "d14f6d46cd9a323efca6817ce653118af5de0027" }
+rugpui = { git = "https://github.com/xcomart/rugpui", rev = "b95bcb2c1538fbe031b381923446663ce6ec7a05" }
+rugpui-grid = { git = "https://github.com/xcomart/rugpui", rev = "b95bcb2c1538fbe031b381923446663ce6ec7a05" }
+rugpui-editor = { git = "https://github.com/xcomart/rugpui", rev = "b95bcb2c1538fbe031b381923446663ce6ec7a05" }
+rugpui-shell = { git = "https://github.com/xcomart/rugpui", rev = "b95bcb2c1538fbe031b381923446663ce6ec7a05" }
 
 # --- internal crates ---
 rudbgen-core = { path = "crates/rudbgen-core" }

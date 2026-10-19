@@ -29,14 +29,13 @@ every surface the [architecture document](architecture.md) §4 describes.
 ![The welcome screen](screenshots/welcome.png)
 
 With nothing connected, the work area is the welcome screen: your saved
-connections as a list — icon, name, driver, when it was last used — and a **New
-connection** button. Clicking a row connects. The explorer and the inspector
-stay out of the frame until a connection opens, so there is nothing on screen
-that has nothing to say.
+connections as a list — name and driver — and a **New connection** button.
+Clicking a row connects. The explorer and the inspector stay out of the frame
+until a connection opens, so there is nothing on screen that has nothing to say.
 
 **Open a template…** under it opens a template file in a tab of its own, with no
 database in the picture at all: editing a template needs no connection, and only
-the live preview does. **Import from jdbgen…** appears beside it when a jdbgen
+the live preview does. **Import from jdbgen…** appears above it when a jdbgen
 `config.json` is where jdbgen keeps it — see [Importing from
 jdbgen](#importing-from-jdbgen); the same command is in the menu whether or not
 it is, so a configuration copied from another machine still has a door.
@@ -64,15 +63,19 @@ unsaved edits.
 - **The password** goes to the OS keychain, never to `connections.json`. See
   [Installation](installation.md#passwords-and-the-os-keychain).
 - **Test** opens the connection, reports what came back, and closes it again.
-- **SSH tunnel** takes a bastion host, a password or a private key, and binds
-  only on loopback. It does not ask for a PTY, so a `nologin` jump host works.
-- **Save** is the only thing that writes. Every field is a draft until then —
-  cancel and nothing changed, including the keychain.
+- **SSH tunnel** takes a bastion host, an SSH agent, a password or a private
+  key, and binds only on loopback. It does not ask for a PTY, so a `nologin`
+  jump host works.
+- **Save** and **Connect** (which saves, then opens the connection) are the only
+  things that write. Every field is a draft until then — cancel and nothing
+  changed, including the keychain.
 
 The title bar carries the connection selector: the open connection with a status
 dot (connecting, connected, failed), every saved connection under it, and a
 **Disconnect** row. Switching connections swaps the explorer and the Generate
-tab's options, because those belong to the connection.
+tab's options, because those belong to the connection; open template tabs stay.
+**Disconnect** goes back to the welcome screen and closes the template tabs on
+the way, asking about any with unsaved edits — *Cancel* keeps the connection.
 
 ![Connected](screenshots/connected.png)
 
@@ -84,17 +87,17 @@ wrong.
 
 ![The driver editor's custom queries](screenshots/driver-custom-queries.png)
 
-**Edit** beside the driver picker replaces the connection dialog's body with the
-driver editor — one tab ring, never a dialog inside a dialog. It holds the
+**Drivers…** beside the driver picker replaces the connection dialog's body with
+the driver editor — one tab ring, never a dialog inside a dialog. It holds the
 driver's class, its JARs, its URL template, its default port and the properties
 handed to every connection that uses it.
 
 - **JARs** come from Maven Central by coordinate (`group:artifact:version`, with
   a progress bar and a Cancel) or from disk.
-- **The driver class is detected** from the JARs rather than typed: rudbgen asks
-  the bridge which `java.sql.Driver` implementations they hold, without running
-  a single static initialiser. Picking a sources or javadoc JAR by mistake says
-  so in those words.
+- **The driver class is detected** from the JARs with **Detect** rather than
+  typed: rudbgen asks the bridge which `java.sql.Driver` implementations they
+  hold, without running a single static initialiser. Picking a sources or
+  javadoc JAR by mistake says so in those words.
 - **Custom queries** is the section at the bottom: four rows — table list,
   column list, table comments, column comments — each a tick, a SQL field, the
   contract it has to satisfy, and a **Test** button. One shared row of test
@@ -197,19 +200,21 @@ written.
   **Save as set…** stores the current list under a name.
 - **The template list** — one row per template: a tick, its name, its file, the
   **output name template** that names the file it writes, and buttons to edit or
-  remove it. *Add template…* opens a file picker starting in your templates
-  directory.
+  remove it. *Add template…* opens a file picker.
 
   The output name is itself a template: `${name.suffix.pascal}Model.java`, or
   `${package.replace('.','/')}/${name.suffix.pascal}.java` to write into a
   package tree — the directories are created for you. An absolute path, or one
-  that climbs out of the output directory with `..`, is refused.
-- **Output directory**, with a chooser.
+  that climbs out of the output directory with `..`, is refused, and so — on
+  every platform — is a name Windows cannot hold: a reserved device name such as
+  `CON` or `com1.java`, one of `<>:"|?*` or a control character, or a component
+  ending in a dot or a space.
+- **Output** — the output directory, with a chooser.
 - **Author** — what `${author}` renders as.
-- **Custom variables** — a key/value table with a trailing empty row that
-  becomes a real row as soon as you type in it.
-- **Apply abbreviations** — the switch that inserts `.abbr` into every `${name}`
-  reference automatically. **Rules…** beside it opens the [rules
+- **Variables** — your custom variables, a key/value table with a trailing
+  empty row that becomes a real row as soon as you type in it.
+- **Apply abbreviation rules** — the switch that inserts `.abbr` into every
+  `${name}` reference automatically. **Rules…** beside it opens the [rules
   editor](#abbreviation-rules); the switch there and the switch here are the
   same value.
 
@@ -377,15 +382,16 @@ here, and rudbgen asks for the password when you open one.
 <kbd>Ctrl</kbd>+<kbd>,</kbd> opens Settings: the UI theme and the editor theme
 (both with live preview, both importable from a file and extensible from a user
 theme directory), the interface language, the fonts, the Java heap the embedded
-JVM starts with, the window chrome, and the default overwrite policy. The
-language changes live — there is nothing to restart.
+JVM starts with and its extra arguments, the window chrome, and the default
+overwrite policy. The language changes live — there is nothing to restart.
 
 Eight languages ship: English, Korean, Japanese, Simplified Chinese, German,
 Spanish, French and Russian.
 
 ## Keyboard shortcuts
 
-On macOS, read <kbd>Cmd</kbd> for <kbd>Ctrl</kbd>.
+On macOS, read <kbd>Cmd</kbd> for <kbd>Ctrl</kbd> — except in
+<kbd>Ctrl</kbd>+<kbd>Space</kbd>, which is <kbd>Ctrl</kbd> on every platform.
 
 | Shortcut | Action |
 |:---|:---|
@@ -397,7 +403,7 @@ On macOS, read <kbd>Cmd</kbd> for <kbd>Ctrl</kbd>.
 | <kbd>Ctrl</kbd>+<kbd>S</kbd> | Save the template tab on top |
 | <kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>P</kbd> | Show/hide the live preview |
 | <kbd>Ctrl</kbd>+<kbd>Space</kbd> | Suggest what may be written here |
-| <kbd>Esc</kbd> | Dismiss the dialog on top |
+| <kbd>Esc</kbd> | Close the open menu, or dismiss the dialog on top |
 | <kbd>Ctrl</kbd>+<kbd>Q</kbd> | Quit |
 
 Preview and Dry run are deliberately unbound: they are one button press away,

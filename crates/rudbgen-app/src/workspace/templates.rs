@@ -475,13 +475,55 @@ impl Workspace {
             let pane = self.templates[at].clone();
             if !pane.update(cx, |pane, cx| pane.save(cx)) {
                 // The write failed and the tab is showing why; closing it now
-                // would take the message away with the text it is about.
+                // would take the message away with the text it is about — and
+                // a disconnect waiting on it stops here with it.
                 self.closing = None;
+                self.disconnecting = false;
                 cx.notify();
                 return;
             }
         }
         self.close_tab(index, window, cx);
+        if self.disconnecting {
+            self.continue_disconnect(window, cx);
+        }
+    }
+
+    /// Takes the "save before closing?" question away unanswered, and with it
+    /// the disconnect that may have been waiting on it.
+    pub(super) fn cancel_close(&mut self, window: &mut Window, cx: &mut Context<Self>) {
+        self.closing = None;
+        self.disconnecting = false;
+        self.focus_shell(window, cx);
+        cx.notify();
+    }
+
+    /// The title bar's "Disconnect" row: back to the welcome screen.
+    ///
+    /// Where switching to another connection keeps the template tabs (§4.2),
+    /// a disconnect is the way home, and the welcome screen has no tab strip —
+    /// so every template tab is closed first, one with unsaved edits asking
+    /// as its own close button would, and a Cancel keeps the session open.
+    pub(super) fn request_disconnect(&mut self, window: &mut Window, cx: &mut Context<Self>) {
+        self.disconnecting = true;
+        self.continue_disconnect(window, cx);
+    }
+
+    /// Closes template tabs until one asks or none is left, then disconnects.
+    fn continue_disconnect(&mut self, window: &mut Window, cx: &mut Context<Self>) {
+        while let Some(index) = self
+            .pane
+            .items()
+            .iter()
+            .position(|item| matches!(item, PaneItem::Template { .. }))
+        {
+            self.request_close_tab(index, window, cx);
+            if self.closing.is_some() {
+                return;
+            }
+        }
+        self.disconnecting = false;
+        self.disconnect(cx);
     }
 
     /// Records what the connection attempt came back with.

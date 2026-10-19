@@ -1,7 +1,7 @@
 ; Inno Setup script for the Windows installer.
 ;
 ; Why an installer at all, when the zip already works. The zip is what the
-; in-app updater downloads and unpacks (crates/rudbgen-app/src/update.rs), so
+; in-app updater (rugpui-shell's update.rs) downloads and unpacks, so
 ; it is not going anywhere. What it cannot do is register the program with
 ; Windows: unzipping leaves no entry under "Apps & features" (the ARP keys
 ; below HKCU\Software\Microsoft\Windows\CurrentVersion\Uninstall), and winget
@@ -48,7 +48,7 @@
 ; derives the uninstall registry key from it, winget records it as the
 ; package's ProductCode, and both an upgrade in place and `winget uninstall`
 ; find the existing install by matching it. It is also the GUID
-; crates/rudbgen-app/src/update.rs hard-codes in ARP_KEY, so the updater can
+; crates/rudbgen-app/src/workspace/mod.rs hard-codes in ARP_KEY, so the updater can
 ; correct the recorded version after a self-update. Changing it would orphan
 ; every copy already on disk — the old entry would linger in "Apps & features"
 ; with no way to remove it and the new one would install alongside. It never

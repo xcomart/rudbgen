@@ -67,9 +67,9 @@ deleted the sample — is never seeded again.
 into `drivers/` in your configuration directory and put on the **H2 Embedded**
 driver's class path, so the sample connection opens straight away with no
 network. It is the only driver rudbgen ships. Every other one is downloaded from
-Maven Central through **Drivers** in the toolbar, because their licences do not
-allow anyone else to redistribute them; H2 is dual licensed under MPL 2.0 and
-EPL 1.0, which do. A JAR of the same name already in your configuration — one
+Maven Central through **Drivers…** in the connection dialog, because their
+licences do not allow anyone else to redistribute them; H2 is dual licensed
+under MPL 2.0 and EPL 1.0, which do. A JAR of the same name already in your configuration — one
 you downloaded yourself — is left alone, and the file name carries the version,
 so it is the same artefact either way.
 
@@ -165,7 +165,7 @@ sudo apt-get install -y libxkbcommon0 libxkbcommon-x11-0 libwayland-client0 libf
 
 ## Using your own JDK
 
-To use a JDK of your own instead of the bundled runtime, point
+To use a JDK of your own where there is no bundled runtime, point
 `RUDBGEN_JAVA_HOME` at it (Java 17 or newer):
 
 ```sh
@@ -182,13 +182,14 @@ actually holds a JVM library wins:
 4. failing all of those, whatever `java` on `PATH` resolves to.
 
 A build from source has no bundled runtime, so it falls through to step 2. Note
-the order: a bundled runtime **wins over** `JAVA_HOME`, which is what makes a
-download behave the same on a machine with a JDK installed and one without. Set
-`RUDBGEN_JAVA_HOME` to overrule it.
+the order: a bundled runtime **wins over** both `RUDBGEN_JAVA_HOME` and
+`JAVA_HOME`, which is what makes a download behave the same on a machine with a
+JDK installed and one without. Neither variable overrules it.
 
-Settings has a **JVM heap** field (the `-Xmx` the embedded JVM starts with) but
-no path field: the JVM is started once per process and cannot be restarted, so
-the runtime is chosen before the window is up.
+Settings has a **Java heap** field (the `-Xmx` the embedded JVM starts with) and
+an **Extra arguments** field, but no path field: the JVM is started once per
+process, at the first connection, and cannot be restarted, so the runtime comes
+from the environment rudbgen was launched with.
 
 `RUDBGEN_BRIDGE_JAR` overrides where the bridge JAR is looked for, in the same
 spirit; it is a development convenience and a packaged install never needs it.
@@ -208,7 +209,7 @@ Inside it:
 
 | Entry | What it holds |
 |:---|:---|
-| `settings.json` | Theme, editor theme, language, fonts, JVM heap, window state, the default overwrite policy |
+| `settings.json` | Theme, editor theme, language, fonts, JVM heap and extra arguments, window state, the default overwrite policy, the release an update dialog was told to ignore |
 | `connections.json` | Saved connections, each with its generation profile — template ticks, output directory, author, custom variables |
 | `drivers.json` | Driver definitions: class, JARs, URL shape, properties, the four custom queries |
 | `template-sets.json` | Named template sets (jdbgen's presets) |
@@ -217,8 +218,9 @@ Inside it:
 | `drivers/` | JDBC driver JARs: the bundled H2 one, copied here on first run, and whatever you download from Maven Central |
 | `themes/`, `editor-themes/` | User theme files |
 | `known_hosts` | SSH host keys you have accepted |
+| `sample_h2.db.mv.db` | The copy of the sample database the first run made, which **Sample H2 Embedded** opens |
 
-Every file is JSON, read leniently and written atomically: an unknown field is
+Every `.json` file is read leniently and written atomically: an unknown field is
 ignored rather than fatal, and a crash mid-write cannot leave a half-written
 file. They are meant to be editable by hand, and a UTF-8 BOM — which several
 Windows editors add on save — is tolerated.
@@ -262,9 +264,12 @@ jdbgen](ui-guide.md#importing-from-jdbgen).
 
 rudbgen checks for a new release once per launch, in the background, and says
 nothing at all when it cannot reach GitHub — the check is the least important
-thing happening at startup. When there is one, a dialog offers to install it.
-**Check for updates** in the menu asks the same question on demand and answers
-even when the answer is "I could not reach GitHub".
+thing happening at startup. When there is one, a dialog shows the release notes
+and offers **Update**, **Ignore this version** and **Cancel**; an ignored
+version is not announced at startup again, though a later one is. **Check for
+updates** in the menu asks the same question on demand, regardless of an
+ignored version, and answers even when the answer is "I could not reach
+GitHub".
 
 Installing an update downloads the archive built for your exact platform,
 verifies it against the checksum the release API reported, unpacks it beside the
@@ -278,11 +283,11 @@ and it never touches your configuration directory. A copy you cannot overwrite �
 a system package, a read-only mount, a `.app` opened from a disk image — fails
 the swap and the dialog offers the release page instead.
 
-On Windows, if you have already opened a database connection the JVM is loaded
-and holds `lib/rudbgen-bridge.jar` and the runtime open, so the swap is deferred:
-the update is parked beside the installation and applied at the very start of
-the next launch, before anything Java has been touched. You see the same flow
-either way.
+On Windows, if you have already opened a database connection (or probed a
+driver) the JVM is loaded and holds `lib/rudbgen-bridge.jar` and the runtime
+open, so the swap is deferred: the update is parked beside the installation and
+applied at the very start of the next launch, before anything Java has been
+touched. You see the same flow either way.
 
 An installed (rather than unzipped) Windows copy also has its recorded version
 in *Apps & features* corrected after an update, so `winget list` and

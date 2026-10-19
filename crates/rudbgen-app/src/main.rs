@@ -1,3 +1,5 @@
+#![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
+
 //! rudbgen application entry point. Window behavior lives in [`workspace`].
 
 use gpui::actions;

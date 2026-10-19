@@ -19,9 +19,9 @@ or generation workflow before implementing them.
 
 ## Set up a development checkout
 
-Use Git, stable Rust with `rustfmt` and `clippy`, a native compiler toolchain,
-and JDK 17 or newer. CI uses JDK 17. Set `JAVA_HOME` to the JDK and put its `bin`
-directory on `PATH`. The Gradle wrapper is included; a separate Gradle install
+Use Git, stable Rust with `rustfmt` and `clippy` (CI and the release builds pin
+Rust 1.98.0), a native compiler toolchain, and JDK 17 or newer. CI uses JDK 17.
+Set `JAVA_HOME` to the JDK and put its `bin` directory on `PATH`. The Gradle wrapper is included; a separate Gradle install
 is unnecessary. Windows needs MSVC and the Windows SDK; macOS needs Xcode
 command line tools.
 
@@ -180,8 +180,8 @@ Include a minimal reproduction, screenshots for UI changes, database/driver
 versions when relevant, and any checks you could not run. Exclude build output,
 credentials, local Cargo patches and unrelated formatting from the diff.
 
-CI runs on pull requests and pushes to `main`, so a direct `dev` push requires
-local validation. Routine work ends at `origin/dev`. A release is a separate
+CI runs on pull requests and on pushes to `dev` and `main`; validate locally
+before a direct `dev` push all the same. Routine work ends at `origin/dev`. A release is a separate
 maintainer action: merge the `dev` → `main` PR after required checks, fetch
 `origin/main`, then tag its verified latest commit and publish. Do not move an
 existing release tag.

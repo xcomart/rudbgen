@@ -97,8 +97,8 @@ use rudbgen_meta::{MetaReader, Table};
 use rugpui::{
     Button, ButtonVariant, DraggedTab, DraggedThumb, EditorThemeEntry, EditorThemeRegistry,
     MenuButton, MenuEntry, ResizeHandle, Scrollbar, ScrollbarAxis, ScrollbarState, Select, TabBar,
-    TabItem, Theme, ThemeRegistry, hide_later, hide_now, scroll_to, scrolled, set_editor_theme,
-    set_theme, set_window_tint, theme, tooltip_label,
+    TabDropState, TabItem, Theme, ThemeRegistry, hide_later, hide_now, scroll_to, scrolled,
+    set_editor_theme, set_theme, set_window_tint, theme, tooltip_label,
 };
 use rugpui_shell::{
     AboutDialog, AboutDialogEvent, AppIdentity, Pane, UpdateDialog, UpdateDialogEvent,
@@ -251,12 +251,11 @@ const IDENTITY: AppIdentity = AppIdentity {
     payload: PAYLOAD,
     bundle_executable: "Contents/MacOS/rudbgen",
     windows_arp_key: ARP_KEY,
-    // Whether an install has to leave its renames to the next launch. The
-    // question is "is a JVM loaded into this process", because on Windows one
-    // holds open handles on the very files the swap renames — and the answer is
-    // `false` until `rudbgen-jdbc` starts one, which no path reachable from an
-    // update check does.
-    must_defer: || false,
+    // On Windows a JVM loaded into this process holds open handles on the very
+    // files the swap renames, so the renames have to wait for the next launch.
+    // The first connection or driver probe starts one, and Help → Check for
+    // updates stays reachable after that, so the answer can change at runtime.
+    must_defer: || cfg!(windows) && rudbgen_jdbc::Jvm::get().is_some(),
 };
 
 /// The shell's window onto rudbgen's translations.
@@ -573,7 +572,8 @@ struct Workspace {
     /// The tab strip holds the paths and this holds the buffers, which is what
     /// lets a template tab survive a reconnection: the strip is rebuilt when
     /// the connection changes and these are not (§4.2 — switching the
-    /// connection never closes an open template).
+    /// connection never closes an open template). Disconnecting does: it is
+    /// the way back to the welcome screen ([`Workspace::request_disconnect`]).
     templates: Vec<Entity<TemplatePane>>,
     /// Keeps the template tabs' subscriptions alive, one per entry above.
     template_events: Vec<Subscription>,
@@ -582,6 +582,9 @@ struct Workspace {
     palette: Entity<VariablePalette>,
     /// The tab a close is waiting on an answer about, when one is.
     closing: Option<usize>,
+    /// A disconnect is putting the template tabs away first, and goes on
+    /// with the next one once [`Workspace::closing`] is answered.
+    disconnecting: bool,
     /// The progress dialog, the overwrite question and the summary (D11).
     job: Entity<GenerationJob>,
     /// The work area's tab strip.
@@ -594,10 +597,11 @@ struct Workspace {
     pane_menu_open: bool,
     /// Where a dragged tab would land, while it is over the strip.
     ///
-    /// The strip reporting and the insertion gap the pointer last named — the
-    /// bar [`Workspace::render_tabs`] draws. `None` is no bar: no drag, a
-    /// foreign drag, or a drag that has left the strip or already dropped.
-    tab_drop: Option<(u64, usize)>,
+    /// rugpui's bookkeeping for the bar [`Workspace::render_tabs`] draws: the
+    /// strip reporting and the insertion gap the pointer last named, or no
+    /// bar at all — no drag, a foreign drag, or a drag that has left the strip
+    /// or already dropped.
+    tab_drop: TabDropState,
     /// The ticked tables, as the last run read them.
     ///
     /// Kept so that moving the preview header's dropdowns re-renders without
@@ -785,10 +789,11 @@ impl Workspace {
             template_events: Vec::new(),
             palette,
             closing: None,
+            disconnecting: false,
             job,
             pane,
             pane_menu_open: false,
-            tab_drop: None,
+            tab_drop: TabDropState::new(),
             run_tables: Vec::new(),
             explorer_visible: layout.explorer_visible,
             inspector_visible: layout.inspector_visible,

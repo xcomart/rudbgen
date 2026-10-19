@@ -36,7 +36,8 @@ pub enum Error {
     ///
     /// This is the answer to every *cryptographic* failure, whichever scheme
     /// the value was written in: a GCM tag that does not verify, a PKCS#5
-    /// padding that is not a padding, or a plaintext that is not UTF-8. They
+    /// padding that is not a padding, a plaintext that is not UTF-8, or a
+    /// legacy plaintext with a control character no typed value has. They
     /// are one and the same event — the key was wrong — and telling them apart
     /// would only describe the shape of the guess back to whoever made it.
     #[error("the master password does not open this configuration")]

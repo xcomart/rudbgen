@@ -191,8 +191,7 @@ impl Workspace {
         // thing on screen whenever it is up: it was opened by a press on a
         // tab's close button, over whatever else was already there.
         if self.closing.is_some() {
-            self.closing = None;
-            self.focus_shell(window, cx);
+            self.cancel_close(window, cx);
             return;
         }
         if self.update.read(cx).is_open() {

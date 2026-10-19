@@ -109,7 +109,7 @@ the update. It downloads `wingetcreate`, points it at the new release's setup
 `.exe`, and lets it compute the hash, bump the version and open the PR:
 
 ```
-wingetcreate update Xcomart.Rudbgen --version <version> --urls <setup.exe url> --submit
+wingetcreate update Xcomart.Rudbgen --version <version> --urls <setup.exe url> --submit --token <WINGET_PAT>
 ```
 
 The job is a no-op unless the **`WINGET_PAT`** repository secret is set — it
@@ -157,7 +157,8 @@ installer will still raise "Windows protected your PC" on a machine that has
 not seen it before. winget is a distribution channel, not a trust anchor.
 
 **The built-in updater keeps the version in step, with a gap.** rudbgen has an
-updater of its own (`crates/rudbgen-app/src/update.rs`) that fetches a release
+updater of its own (`rugpui-shell`'s `update.rs`, from the pinned
+[rugpui](https://github.com/xcomart/rugpui) revision) that fetches a release
 and replaces the installation in place, and winget's record of the installed
 version is the `DisplayVersion` under the uninstall key Inno wrote. Those would
 drift apart — `winget list` reporting a version that has not been on disk for

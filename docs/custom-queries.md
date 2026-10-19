@@ -85,7 +85,10 @@ The four queries are independent switches. Whatever you leave unchecked keeps
 using the bridge's standard `DatabaseMetaData` path, so you only need to
 override the parts your driver gets wrong. A driver that lists tables and
 columns correctly but exposes no comments only needs the two comment queries —
-which is exactly how the bundled Microsoft SQL Server entry is configured.
+which is why the bundled Microsoft SQL Server entry carries exactly those two.
+They ship switched **off**, because the bridge already reads SQL Server's
+comments (its `MS_Description` extended properties) by itself; tick them only
+if your server disagrees with what the bridge finds.
 
 One combination changes behaviour rather than just the data source:
 
@@ -120,7 +123,7 @@ of the tables is safe.
 | 1 | text | Table name. Must match the name in the table list exactly, letter case included |
 | 2 | text | Table comment |
 
-Example for Microsoft SQL Server (shipped with the built-in entry):
+Example for Microsoft SQL Server (shipped, switched off, with the built-in entry):
 
 ```sql
 SELECT OBJNAME, cast(value as varchar(8000)) as VALUE
@@ -152,7 +155,7 @@ comments are: column 1 is the column name, column 2 is the comment.
 | 1 | text | Column name. Must match the name in the column list exactly, letter case included |
 | 2 | text | Column comment |
 
-Example for Microsoft SQL Server (shipped with the built-in entry):
+Example for Microsoft SQL Server (shipped, switched off, with the built-in entry):
 
 ```sql
 SELECT OBJNAME, cast(value as varchar(8000)) as VALUE
@@ -196,7 +199,7 @@ Point 4 is the usual reason for a mysteriously short table list. Types such as
 `SYNONYM`, `ALIAS` or `SEQUENCE` disappear silently; map them to `TABLE`
 yourself if you want to generate code from them.
 
-Views are additionally hidden unless the **views** toggle in the explorer is on.
+Views are additionally hidden unless the **Show views** toggle in the explorer is on.
 
 Example for H2 (shipped with the built-in `H2 Embedded` and `H2 Server`
 entries):
@@ -238,11 +241,13 @@ Columns are numbered in the order the query returns them, so add an `ORDER BY`
 if your database does not already return them in declaration order. `keySeq`
 counts the key columns in that same order.
 
-Three template fields have **no label in this contract** and are therefore not
-available on a driver that overrides the column list: `scale` is `0`,
-`autoIncrement` is `false`, and `fk` is empty. Adding labels for them would make
-a statement written for jdbgen fail here, which is the trade the contract makes.
-A driver good enough to need no column override gets all three.
+Two template fields have **no label in this contract** and are therefore not
+available on a driver that overrides the column list: `scale` is `0` and
+`autoIncrement` is `false`. Adding labels for them would make a statement
+written for jdbgen fail here, which is the trade the contract makes. A driver
+good enough to need no column override gets both. A column's `fk` is not one of
+them: it is filled in from the driver's foreign keys, matched on
+`COLUMN_NAME`, whichever way the columns were listed.
 
 ### `IS_KEY` must be numeric
 
@@ -340,9 +345,11 @@ Built-in drivers shipping with a custom query out of the box:
 |:---|:---|
 | H2 Embedded | Table list |
 | H2 Server | Table list |
-| Microsoft SQL Server | Table comments, column comments |
 
-Every other bundled driver relies entirely on standard JDBC metadata.
+Microsoft SQL Server carries a table-comments and a column-comments statement,
+both switched off (see [Mixing custom and standard
+metadata](#mixing-custom-and-standard-metadata)). Every other bundled driver
+relies entirely on standard JDBC metadata.
 
 ---
 
@@ -358,11 +365,12 @@ The answer is one line under the row:
 
 | Line | Meaning |
 |:---|:---|
-| `OK — 42 rows, and every column the reader needs is there.` | The shape is right. A row count of 0 with an OK shape means the statement is correct and this schema has nothing to say |
+| `OK — 42 rows, and every column the reader needs is there.` | The shape is right. A row count of 0 with an OK shape means the statement is correct and this schema has nothing to say. The test fetches at most 200 rows, so the count stops there |
 | `Missing columns: IS_KEY` | A label-read query is short of a label — the whole list of what is missing, not just the first |
 | `The first 2 columns are read; only 1 came back.` | A positional query came back too narrow to read. Extra columns past the ones that are read are fine and are not reported |
 | `The statement failed: …` | The database rejected it. An unsubstituted `${schema}` shows up here, as a syntax error naming the placeholder |
 | `Connect to a database that uses this driver first…` | There is no session to run it on. A statement run against another product would fail for reasons that say nothing about the statement |
+| `There is no statement to test.` | The SQL field is empty |
 
 Only the shape is reported; the rows themselves are not shown.
 
@@ -392,7 +400,9 @@ because the reader takes the first two and ignores the rest.
 9. **Match letter case.** The comment queries join on names, and the join is
    case-sensitive.
 10. **Use Test**, then watch the log while connecting: unsubstituted
-    placeholders and unmatched names are reported there.
+    placeholders are reported there. A comment row whose name matches nothing
+    is dropped without a word, so check letter case first when a comment does
+    not arrive.
 
 ---
 

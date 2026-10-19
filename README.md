@@ -70,15 +70,16 @@ Written against jdbgen, because that is what most of this is for:
   ![The overwrite question, mid-run](docs/screenshots/overwrite.png)
 - **Any JDBC driver.** Drivers are downloaded from Maven Central by coordinate
   or picked from disk, the driver class is detected from the JAR without running
-  a static initialiser, and each connection gets its own isolated class loader.
+  a static initialiser, and each set of driver JARs gets its own isolated class
+  loader.
 - **jdbgen's four custom queries, with a Test button.** For a driver whose
   `DatabaseMetaData` is wrong or missing, supply your own SQL for the table list,
   the column list and the two comment queries. Test runs the statement on a live
   session and tells you *which required label is missing*, instead of letting you
   discover it halfway through a run.
   ![The driver editor's custom queries](docs/screenshots/driver-custom-queries.png)
-- **SSH tunnels** with password or private-key auth, loopback binds only, and no
-  PTY on the bastion — `nologin` jump hosts work.
+- **SSH tunnels** with SSH-agent, password or private-key auth, loopback binds
+  only, and no PTY on the bastion — `nologin` jump hosts work.
 - **Templates are documents, not file paths.** A template opens in a tab of its
   own: the editor with template-language highlighting layered over the output
   file's own language, a live preview that follows the *buffer* against a table
@@ -166,8 +167,9 @@ something to connect to before there is anything to connect to.
 Every platform's caveats, the data directory, the keychain and the updater are
 in [docs/installation.md](docs/installation.md).
 
-To use a JDK of your own instead of the bundled runtime, point
-`RUDBGEN_JAVA_HOME` at it (Java 17 or newer).
+The bundled runtime always wins when it is there. `RUDBGEN_JAVA_HOME` (Java 17
+or newer), then `JAVA_HOME`, are only consulted when there is no `runtime`
+directory beside the executable.
 
 ## Building
 

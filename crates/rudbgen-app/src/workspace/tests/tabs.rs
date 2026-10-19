@@ -16,10 +16,10 @@ fn template(file: &str, dirty: bool) -> PaneItem {
 /// The drop bar follows the pointer, and a drop lands where it last pointed.
 ///
 /// The whole gesture at workspace level: `drag_over_tab` arms the bar while
-/// the pointer is over the strip, `resolve_tab_drop` takes it on drop, and
-/// `relocate` moves the item — the visible tab following along, the dirty
-/// dot travelling with its item, and no close prompt anywhere, because a
-/// move is not a close.
+/// the pointer is over the strip, and `drop_tab` takes it and moves the item
+/// into the gap the strip reports — the visible tab following along, the
+/// dirty dot travelling with its item, and no close prompt anywhere, because
+/// a move is not a close.
 #[gpui::test]
 fn work_tabs_reorder_to_the_drop_bar_and_keep_the_visible_tab(cx: &mut gpui::TestAppContext) {
     cx.update(|cx| {
@@ -47,10 +47,10 @@ fn work_tabs_reorder_to_the_drop_bar_and_keep_the_visible_tab(cx: &mut gpui::Tes
             };
             // The bar arms while the pointer names a gap...
             workspace.drag_over_tab(WORK_STRIP_TAG, own, Some(4), cx);
-            assert_eq!(workspace.tab_drop, Some((WORK_STRIP_TAG, 4)));
+            assert_eq!(workspace.tab_drop.indicator(WORK_STRIP_TAG), Some(4));
             // ...and moves with it, gap by gap.
             workspace.drag_over_tab(WORK_STRIP_TAG, own, Some(2), cx);
-            assert_eq!(workspace.tab_drop, Some((WORK_STRIP_TAG, 2)));
+            assert_eq!(workspace.tab_drop.indicator(WORK_STRIP_TAG), Some(2));
             // A foreign drag never raises this strip's bar...
             workspace.drag_over_tab(
                 WORK_STRIP_TAG,
@@ -61,7 +61,7 @@ fn work_tabs_reorder_to_the_drop_bar_and_keep_the_visible_tab(cx: &mut gpui::Tes
                 Some(2),
                 cx,
             );
-            assert_eq!(workspace.tab_drop, Some((WORK_STRIP_TAG, 2)));
+            assert_eq!(workspace.tab_drop.indicator(WORK_STRIP_TAG), Some(2));
             // ...and leaving the strip on another tag's report wipes
             // nothing, while leaving this strip takes the bar down.
             workspace.drag_over_tab(
@@ -73,18 +73,16 @@ fn work_tabs_reorder_to_the_drop_bar_and_keep_the_visible_tab(cx: &mut gpui::Tes
                 None,
                 cx,
             );
-            assert_eq!(workspace.tab_drop, Some((WORK_STRIP_TAG, 2)));
+            assert_eq!(workspace.tab_drop.indicator(WORK_STRIP_TAG), Some(2));
             workspace.drag_over_tab(WORK_STRIP_TAG, own, None, cx);
-            assert_eq!(workspace.tab_drop, None);
+            assert_eq!(workspace.tab_drop.current(), None);
 
             // Re-arm and drop: the Generate tab itself rides to gap 2,
             // the dirty template keeps its dot, and the tab on top is
             // still the Generate tab — at its new index.
             workspace.drag_over_tab(WORK_STRIP_TAG, own, Some(2), cx);
-            let at = workspace.resolve_tab_drop(WORK_STRIP_TAG, 0);
-            assert_eq!(at, 2);
-            assert_eq!(workspace.tab_drop, None);
-            assert!(workspace.pane.relocate(own.index, at));
+            assert!(workspace.drop_tab(own, 2, cx));
+            assert_eq!(workspace.tab_drop.current(), None);
             assert_eq!(
                 workspace.pane.items().to_vec(),
                 vec![
@@ -114,14 +112,16 @@ fn work_tabs_reorder_to_the_drop_bar_and_keep_the_visible_tab(cx: &mut gpui::Tes
         .expect("the window is open");
 }
 
-/// A cancelled drag leaves no bar behind, and a drop with no bar lands on
-/// the static position.
+/// A cancelled drag leaves no bar behind, a drop with no bar still lands in
+/// the gap the strip reports, and a foreign tab is refused.
 ///
 /// The root's own release is what clears a cancelled gesture — the drop
-/// handler never runs for it — and `resolve_tab_drop` falls back when the
-/// gesture left nothing to take.
+/// handler never runs for it — while `drop_tab` reads nothing back from the
+/// bar: the strip hands it the gap, and the keyboard reorder has no bar.
 #[gpui::test]
-fn a_cancelled_tab_drag_leaves_no_bar_and_a_bare_drop_falls_back(cx: &mut gpui::TestAppContext) {
+fn a_cancelled_tab_drag_leaves_no_bar_and_a_bare_drop_lands_in_the_reported_gap(
+    cx: &mut gpui::TestAppContext,
+) {
     cx.update(|cx| {
         app_settings::init(cx);
         rugpui::init(cx);
@@ -137,16 +137,70 @@ fn a_cancelled_tab_drag_leaves_no_bar_and_a_bare_drop_falls_back(cx: &mut gpui::
             };
             // Clearing nothing is a no-op...
             workspace.clear_tab_drop(cx);
-            assert_eq!(workspace.tab_drop, None);
+            assert_eq!(workspace.tab_drop.current(), None);
             // ...arming then releasing takes the bar down...
             workspace.drag_over_tab(WORK_STRIP_TAG, own, Some(2), cx);
-            assert_eq!(workspace.tab_drop, Some((WORK_STRIP_TAG, 2)));
+            assert_eq!(workspace.tab_drop.indicator(WORK_STRIP_TAG), Some(2));
             workspace.clear_tab_drop(cx);
-            assert_eq!(workspace.tab_drop, None);
-            // ...and a drop with no bar behind it lands on the static
-            // position the bar would have reported.
-            assert_eq!(workspace.resolve_tab_drop(WORK_STRIP_TAG, 2), 2);
-            assert_eq!(workspace.tab_drop, None);
+            assert_eq!(workspace.tab_drop.current(), None);
+            // ...a drop with no bar behind it lands in the gap reported...
+            workspace.pane.push(template("/cfg/a.java", false));
+            assert!(workspace.drop_tab(own, 2, cx));
+            assert_eq!(
+                workspace.pane.items().to_vec(),
+                vec![template("/cfg/a.java", false), PaneItem::Generate]
+            );
+            // ...and a foreign tab moves nothing but still takes the bar.
+            workspace.drag_over_tab(WORK_STRIP_TAG, own, Some(0), cx);
+            let foreign = DraggedTab {
+                source: 7,
+                index: 0,
+            };
+            assert!(!workspace.drop_tab(foreign, 0, cx));
+            assert_eq!(workspace.tab_drop.current(), None);
+            assert_eq!(
+                workspace.pane.items().to_vec(),
+                vec![template("/cfg/a.java", false), PaneItem::Generate]
+            );
+        })
+        .expect("the window is open");
+}
+
+/// A render coming back relabels the preview tab where it stands.
+///
+/// The tab keeps the gap it was dragged to and the strip keeps the tab on
+/// top: closing it and pushing it again would send it to the end and to the
+/// front — mid-drag, if the render came back during one.
+#[gpui::test]
+fn the_preview_tab_is_retitled_in_place(cx: &mut gpui::TestAppContext) {
+    cx.update(|cx| {
+        app_settings::init(cx);
+        rugpui::init(cx);
+    });
+    silence_the_update_check();
+    let window = cx.add_window(|window, cx| Workspace::new(TitlebarStyle::Custom, window, cx));
+
+    window
+        .update(cx, |workspace, _window, cx| {
+            workspace.pane.push(PaneItem::Preview {
+                title: SharedString::from("stale.java"),
+            });
+            workspace.pane.push(template("/cfg/a.java", false));
+            assert!(workspace.pane.relocate(1, 0));
+            // Something other than the preview on top: the Generate tab.
+            assert!(workspace.pane.activate(1));
+
+            workspace.retitle_preview(cx);
+            let shown = workspace.preview.read(cx).title();
+            assert_eq!(
+                workspace.pane.items().to_vec(),
+                vec![
+                    PaneItem::Preview { title: shown },
+                    PaneItem::Generate,
+                    template("/cfg/a.java", false),
+                ]
+            );
+            assert_eq!(workspace.pane.active(), Some(&PaneItem::Generate));
         })
         .expect("the window is open");
 }

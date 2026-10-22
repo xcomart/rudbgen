@@ -82,7 +82,7 @@ pub(crate) fn editor_theme_for(
 
 /// Records the window's placement in the settings global.
 pub(super) fn record_window_geometry(window: &Window, cx: &mut App) {
-    app_settings::record_window_geometry(rugpui_shell::window_geometry(window), cx);
+    app_settings::record_window_geometry(rugpui_shell::window_geometry(window, cx), cx);
 }
 
 /// The placement to open the window at.

@@ -145,7 +145,7 @@ It copies the tree to `~/.local/share/rudbgen`, links it from
 `~/.local/bin/rudbgen`, and installs the desktop entry and the hicolor icons
 under `~/.local/share`. Make sure `~/.local/bin` is on your `PATH`.
 
-The binary needs glibc 2.36 or newer: Debian 12, Ubuntu 23.04 and later, or a
+The binary needs glibc 2.35 or newer: Ubuntu 22.04, Debian 12 and later, or a
 distribution built on them, MX Linux 23 among them.
 
 The link is a symlink rather than a copy on purpose: the executable resolves

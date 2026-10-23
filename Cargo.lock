@@ -5594,6 +5594,7 @@ dependencies = [
  "keyring",
  "log",
  "rudbkit-core",
+ "secret-service",
  "serde",
  "serde_json",
  "tempfile",

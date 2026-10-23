@@ -145,6 +145,9 @@ It copies the tree to `~/.local/share/rudbgen`, links it from
 `~/.local/bin/rudbgen`, and installs the desktop entry and the hicolor icons
 under `~/.local/share`. Make sure `~/.local/bin` is on your `PATH`.
 
+The binary needs glibc 2.36 or newer: Debian 12, Ubuntu 23.04 and later, or a
+distribution built on them, MX Linux 23 among them.
+
 The link is a symlink rather than a copy on purpose: the executable resolves
 symlinks when it looks for itself, so it still finds `lib/` and `runtime/` in
 `~/.local/share/rudbgen`.
@@ -244,6 +247,11 @@ credential store, under the service name `rudbgen`:
 
 Each connection has up to two entries — one for the database password, one for
 the tunnel's — so that the two can be changed independently.
+
+A Secret Service with no default keyring yet — Xfce on MX Linux, for one, never
+creates the login keyring — gets one the first time a password is saved: the
+service asks for the new keyring's password in a prompt of its own, and the
+password is saved into it once you answer.
 
 On a machine with no such store — a headless Linux box with no Secret Service
 running — rudbgen starts anyway and behaves as though no password had ever been

@@ -1,7 +1,33 @@
 [Desktop Entry]
 Type=Application
 Name=rudbgen
+GenericName=Code Generator
+GenericName[de]=Codegenerator
+GenericName[es]=Generador de código
+GenericName[fr]=Générateur de code
+GenericName[ja]=コードジェネレーター
+GenericName[ko]=코드 생성기
+GenericName[ru]=Генератор кода
+GenericName[zh_CN]=代码生成器
 Comment=Source code generator from JDBC database metadata
+Comment[de]=Quellcode-Generator auf Basis von JDBC-Datenbankmetadaten
+Comment[es]=Generador de código fuente a partir de metadatos de bases de datos JDBC
+Comment[fr]=Générateur de code source à partir des métadonnées de bases de données JDBC
+Comment[ja]=JDBC データベースのメタデータからソースコードを生成
+Comment[ko]=JDBC 데이터베이스 메타데이터로 소스 코드 생성
+Comment[ru]=Генератор исходного кода по метаданным баз данных JDBC
+Comment[zh_CN]=根据 JDBC 数据库元数据生成源代码
+Keywords=code generator;database;jdbc;template;schema;
+Keywords[de]=codegenerator;datenbank;jdbc;vorlage;schema;
+Keywords[es]=generador de código;base de datos;jdbc;plantilla;esquema;
+Keywords[fr]=générateur de code;base de données;jdbc;modèle;schéma;
+Keywords[ja]=コード生成;データベース;jdbc;テンプレート;スキーマ;
+Keywords[ko]=코드 생성;데이터베이스;jdbc;템플릿;스키마;
+Keywords[ru]=генератор кода;база данных;jdbc;шаблон;схема;
+Keywords[zh_CN]=代码生成;数据库;jdbc;模板;模式;
+# install.sh rewrites the binary name here to the absolute path of the link it
+# puts in ~/.local/bin, so the launcher works whether or not that directory is
+# on PATH.
 Exec=rudbgen
 Icon=rudbgen
 Terminal=false

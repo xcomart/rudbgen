@@ -8,3 +8,7 @@
 /bridge/build
 /bridge/.gradle
 /bridge/bin
+
+# graft/trail local data — not committed.
+/graft/
+/.trail/

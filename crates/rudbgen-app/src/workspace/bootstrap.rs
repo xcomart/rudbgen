@@ -85,14 +85,24 @@ pub(super) fn record_window_geometry(window: &Window, cx: &mut App) {
     app_settings::record_window_geometry(rugpui_shell::window_geometry(window, cx), cx);
 }
 
-/// The placement to open the window at.
+/// The placement to open the window at, no smaller than the window's minimum.
 pub(super) fn window_bounds(state: &WindowState, cx: &mut App) -> WindowBounds {
-    rugpui_shell::window_bounds(
+    rugpui_shell::window_bounds_at_least(
         app_settings::saved_geometry(state),
         state.width,
         state.height,
         state.maximized,
+        min_window_size(),
+        chrome::opening_client_inset(chrome_style(state.titlebar)),
         cx,
+    )
+}
+
+/// The smallest the window may be, which is also the smallest it opens at.
+pub(super) fn min_window_size() -> gpui::Size<Pixels> {
+    gpui::size(
+        px(rudbgen_core::settings::MIN_WINDOW_WIDTH as f32),
+        px(rudbgen_core::settings::MIN_WINDOW_HEIGHT as f32),
     )
 }
 
@@ -408,6 +418,12 @@ pub(super) fn run() {
                 // [`draws_own_titlebar`] follows what the window actually got.
                 window_decorations: (titlebar == TitlebarStyle::Custom)
                     .then_some(gpui::WindowDecorations::Client),
+                // The shadow band the frame will carry, announced before the
+                // window is mapped: X11 window managers disagree about extents
+                // that only arrive with the first frame, and xfwm4 shrank the
+                // window by the band on every launch.
+                client_inset: chrome::opening_client_inset(chrome_style(titlebar)),
+                window_min_size: Some(min_window_size()),
                 app_id: Some(APP_ID.into()),
                 // A translucent or blurred window needs the platform surface to
                 // permit alpha; the body then tints its own background.

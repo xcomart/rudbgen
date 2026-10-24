@@ -143,7 +143,9 @@ cd rudbgen-vX.Y.Z-x86_64-unknown-linux-gnu
 
 It copies the tree to `~/.local/share/rudbgen`, links it from
 `~/.local/bin/rudbgen`, and installs the desktop entry and the hicolor icons
-under `~/.local/share`. Make sure `~/.local/bin` is on your `PATH`.
+under `~/.local/share`. The desktop entry is written with the link's absolute
+path, so the launcher in the application menu works whether or not
+`~/.local/bin` is on your `PATH`; add it to start rudbgen from a shell too.
 
 The binary needs glibc 2.35 or newer: Ubuntu 22.04, Debian 12 and later, or a
 distribution built on them, MX Linux 23 among them.
@@ -165,6 +167,10 @@ Debian and Ubuntu:
 ```sh
 sudo apt-get install -y libxkbcommon0 libxkbcommon-x11-0 libwayland-client0 libfontconfig1
 ```
+
+`install.sh` checks for them when it runs, together with glibc and an EGL or
+Vulkan loader, and prints the command that installs whatever is missing with
+apt, dnf, pacman or zypper.
 
 ## Using your own JDK
 

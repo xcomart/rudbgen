@@ -240,7 +240,7 @@ const ARP_KEY: &str = concat!(
 /// start an update check. The shell composes none of it — it only reads — which
 /// is why every field is a constant of this crate, [`AppIdentity::version`]
 /// above all: `rugpui-shell` has a version of its own and it is not this one.
-const IDENTITY: AppIdentity = AppIdentity {
+pub(crate) const IDENTITY: AppIdentity = AppIdentity {
     name: APP_NAME,
     version: env!("CARGO_PKG_VERSION"),
     repository_url: "https://github.com/xcomart/rudbgen",

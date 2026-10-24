@@ -6,6 +6,7 @@ use gpui::actions;
 mod abbreviation_dialog;
 mod app_settings;
 mod builtin_templates;
+mod cli;
 mod connection;
 mod connection_dialog;
 mod driver_manager;

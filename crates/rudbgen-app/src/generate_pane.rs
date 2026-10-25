@@ -63,6 +63,10 @@ const LABEL_WIDTH: f32 = 110.;
 /// Width of the template set selector.
 const SET_WIDTH: f32 = 220.;
 
+/// Narrowest the output name field of a template row gets; it grows with the
+/// window beyond this.
+const OUT_MIN_WIDTH: f32 = 200.;
+
 /// Element id of the panel's scrolling box.
 const PANE_SCROLL: &str = "generate-scroll";
 
@@ -1159,7 +1163,17 @@ impl GeneratePane {
                     })
                     .child(shown.clone()),
             )
-            .child(div().w(px(200.)).flex_none().child(row.out.clone()))
+            .child(
+                // The output name takes two thirds of the room the window gives
+                // the row, the file the rest: a name that writes into a package
+                // tree is the longest thing a row holds, and the one typed in.
+                div()
+                    .debug_selector(move || format!("generate-out-{index}"))
+                    .flex_1()
+                    .flex_grow(2.)
+                    .min_w(px(OUT_MIN_WIDTH))
+                    .child(row.out.clone()),
+            )
             .child(
                 // The way into the template tab (§4.5). The path the event
                 // carries is the profile's, which the shell resolves against
@@ -2007,6 +2021,43 @@ mod tests {
         assert!(
             (scroll.size.height - px(140.)).abs() < px(2.),
             "the form was not bounded above the buttons: {scroll:?}"
+        );
+    }
+
+    #[gpui::test]
+    fn the_output_name_field_grows_with_the_window(cx: &mut gpui::TestAppContext) {
+        cx.update(|cx| {
+            crate::app_settings::init(cx);
+            rugpui::init(cx);
+        });
+        let window = cx.add_window(|_, cx| {
+            let mut pane = GeneratePane::new(cx);
+            pane.rebuild(
+                &GenerationProfile {
+                    templates: vec![reference("first", true)],
+                    ..Default::default()
+                },
+                cx,
+            );
+            pane
+        });
+        let mut cx = gpui::VisualTestContext::from_window(window.into(), cx);
+        let mut widths = Vec::new();
+        for width in [600., 1000., 1400.] {
+            cx.simulate_resize(gpui::size(px(width), px(700.)));
+            cx.run_until_parked();
+            let field = cx
+                .debug_bounds("generate-out-0")
+                .expect("the output name field is drawn");
+            widths.push(field.size.width);
+        }
+        // Never narrower than the fixed width it used to have, and two thirds
+        // of what the window gains on top of that.
+        assert!(widths[0] >= px(OUT_MIN_WIDTH), "{widths:?}");
+        let gained = widths[2] - widths[1];
+        assert!(
+            (gained - px(400. * 2. / 3.)).abs() < px(2.),
+            "the field did not grow with the window: {widths:?}"
         );
     }
 

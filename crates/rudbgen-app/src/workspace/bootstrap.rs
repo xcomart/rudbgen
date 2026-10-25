@@ -167,6 +167,7 @@ pub(super) fn app_menus() -> Vec<Menu> {
         Menu {
             name: ts!("menu.template"),
             items: vec![
+                MenuItem::action(ts!("menu.new_template"), NewTemplate),
                 MenuItem::action(ts!("menu.open_template"), OpenTemplate),
                 MenuItem::action(ts!("menu.save_template"), SaveTemplate),
                 MenuItem::separator(),

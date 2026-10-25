@@ -220,6 +220,7 @@ menu:
   connection: Подключение
   view: Вид
   template: Шаблон
+  new_template: Новый шаблон…
   open_template: Открыть шаблон…
   save_template: Сохранить шаблон
   toggle_live_preview: Живой просмотр
@@ -491,6 +492,7 @@ template:
   preview_no_table: Отметьте таблицу в обозревателе, чтобы увидеть этот шаблон применённым.
   preview_parse_error: Шаблон не разбирается; что именно не так, перечислено ниже.
   read_failed: "Не удалось открыть %{file}: %{reason}"
+  create_failed: "Не удалось создать %{file}: %{reason}"
   write_failed: "Не удалось записать %{file}: %{reason}"
   not_utf8: "%{file} — не текст в UTF-8, здесь его редактировать нельзя."
   open_select: Открыть шаблон

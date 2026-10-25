@@ -5,6 +5,16 @@ use super::*;
 impl Workspace {
     // --- the template actions ---------------------------------------------
 
+    /// Creates a template file through the platform's save dialog.
+    pub(super) fn new_template_action(
+        &mut self,
+        _: &NewTemplate,
+        _window: &mut Window,
+        cx: &mut Context<Self>,
+    ) {
+        self.create_template(cx);
+    }
+
     /// Opens a template file through the platform picker.
     pub(super) fn open_template_action(
         &mut self,

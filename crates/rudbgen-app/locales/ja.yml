@@ -219,6 +219,7 @@ menu:
   connection: 接続
   view: 表示
   template: テンプレート
+  new_template: 新しいテンプレート…
   open_template: テンプレートを開く…
   save_template: テンプレートを保存
   toggle_live_preview: ライブプレビュー
@@ -489,6 +490,7 @@ template:
   preview_no_table: エクスプローラーでテーブルを選ぶと、当てた結果が出ます。
   preview_parse_error: テンプレートを解析できません。何が悪いかは下に並んでいます。
   read_failed: "%{file} を開けませんでした: %{reason}"
+  create_failed: "%{file} を作成できませんでした: %{reason}"
   write_failed: "%{file} を書けませんでした: %{reason}"
   not_utf8: "%{file} は UTF-8 のテキストではないため、ここでは編集できません。"
   open_select: テンプレートを開く

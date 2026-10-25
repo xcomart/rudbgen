@@ -220,6 +220,7 @@ menu:
   connection: Conexión
   view: Ver
   template: Plantilla
+  new_template: Nueva plantilla…
   open_template: Abrir plantilla…
   save_template: Guardar plantilla
   toggle_live_preview: Vista previa en vivo
@@ -491,6 +492,7 @@ template:
   preview_no_table: Marque una tabla en el explorador para ver esta plantilla aplicada.
   preview_parse_error: La plantilla no se puede analizar; lo que falla está listado abajo.
   read_failed: "No se pudo abrir %{file}: %{reason}"
+  create_failed: "No se pudo crear %{file}: %{reason}"
   write_failed: "No se pudo escribir %{file}: %{reason}"
   not_utf8: "%{file} no es texto UTF-8, así que no se puede editar aquí."
   open_select: Abrir una plantilla

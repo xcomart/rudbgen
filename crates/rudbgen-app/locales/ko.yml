@@ -219,6 +219,7 @@ menu:
   connection: 연결
   view: 보기
   template: 템플릿
+  new_template: 새 템플릿…
   open_template: 템플릿 열기…
   save_template: 템플릿 저장
   toggle_live_preview: 실시간 미리보기
@@ -489,6 +490,7 @@ template:
   preview_no_table: 탐색기에서 테이블을 고르면 이 템플릿을 적용한 결과를 보여 줍니다.
   preview_parse_error: 템플릿을 해석할 수 없습니다. 무엇이 잘못됐는지는 아래에 있습니다.
   read_failed: "%{file}을(를) 열지 못했습니다: %{reason}"
+  create_failed: "%{file}을(를) 만들지 못했습니다: %{reason}"
   write_failed: "%{file}을(를) 쓰지 못했습니다: %{reason}"
   not_utf8: "%{file}은(는) UTF-8 텍스트가 아니어서 여기서 편집할 수 없습니다."
   open_select: 템플릿 열기

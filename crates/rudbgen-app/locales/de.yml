@@ -220,6 +220,7 @@ menu:
   connection: Verbindung
   view: Ansicht
   template: Vorlage
+  new_template: Neue Vorlage…
   open_template: Vorlage öffnen…
   save_template: Vorlage speichern
   toggle_live_preview: Live-Vorschau
@@ -491,6 +492,7 @@ template:
   preview_no_table: Haken Sie im Explorer eine Tabelle an, um diese Vorlage angewandt zu sehen.
   preview_parse_error: Die Vorlage lässt sich nicht lesen; was daran fehlt, steht unten.
   read_failed: "%{file} ließ sich nicht öffnen: %{reason}"
+  create_failed: "%{file} ließ sich nicht anlegen: %{reason}"
   write_failed: "%{file} ließ sich nicht schreiben: %{reason}"
   not_utf8: "%{file} ist kein UTF-8-Text und kann hier nicht bearbeitet werden."
   open_select: Vorlage öffnen

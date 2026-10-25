@@ -311,10 +311,12 @@ menu:
   connection: Connection
   # Name of its third, holding what changes the layout of the window.
   view: View
-  # Name of the menu holding the template tab's own commands, and the four
-  # rows in it. Every one of them acts on the template that is on top, so all
-  # but the first are greyed while no template tab is.
+  # Name of the menu holding the template tab's own commands, and the five
+  # rows in it. All but the first two act on the template that is on top, so
+  # they are greyed while no template tab is. The first asks where to put a new,
+  # empty template file and opens it.
   template: Template
+  new_template: New template…
   open_template: Open template…
   save_template: Save template
   toggle_live_preview: Live preview
@@ -690,6 +692,8 @@ template:
   # The file could not be opened or written. `%{file}` is a path and
   # `%{reason}` the operating system's own words.
   read_failed: "%{file} could not be opened: %{reason}"
+  # A new template's file could not be made where the save dialog said.
+  create_failed: "%{file} could not be created: %{reason}"
   write_failed: "%{file} could not be written: %{reason}"
   not_utf8: "%{file} is not UTF-8 text, so it cannot be edited here."
   # Title of the platform file picker the welcome screen and the menu open.

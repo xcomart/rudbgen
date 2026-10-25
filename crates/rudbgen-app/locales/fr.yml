@@ -220,6 +220,7 @@ menu:
   connection: Connexion
   view: Affichage
   template: Modèle
+  new_template: Nouveau modèle…
   open_template: Ouvrir un modèle…
   save_template: Enregistrer le modèle
   toggle_live_preview: Aperçu en direct
@@ -491,6 +492,7 @@ template:
   preview_no_table: Cochez une table dans l'explorateur pour voir ce modèle appliqué.
   preview_parse_error: Le modèle ne peut pas être analysé ; ce qui cloche est listé ci-dessous.
   read_failed: "%{file} n'a pas pu être ouvert : %{reason}"
+  create_failed: "%{file} n'a pas pu être créé : %{reason}"
   write_failed: "%{file} n'a pas pu être écrit : %{reason}"
   not_utf8: "%{file} n'est pas du texte UTF-8 et ne peut pas être édité ici."
   open_select: Ouvrir un modèle

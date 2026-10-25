@@ -230,6 +230,7 @@ impl Render for Workspace {
             .on_action(cx.listener(Self::generate_action))
             .on_action(cx.listener(Self::preview_action))
             .on_action(cx.listener(Self::dry_run_action))
+            .on_action(cx.listener(Self::new_template_action))
             .on_action(cx.listener(Self::open_template_action))
             .on_action(cx.listener(Self::save_template_action))
             .on_action(cx.listener(Self::toggle_live_preview_action))
@@ -379,8 +380,10 @@ impl Workspace {
                 .disabled(!matches!(self.connection, ConnectionState::Open { .. }))
                 .on_activate(|window, cx| window.dispatch_action(Box::new(ToggleInspector), cx)),
             MenuEntry::separator(),
-            // The one way into a template tab that needs no connection and no
+            // The ways into a template tab that need no connection and no
             // template list (§4.3), beside the save that writes it back.
+            MenuEntry::new(ts!("menu.new_template"))
+                .on_activate(|window, cx| window.dispatch_action(Box::new(NewTemplate), cx)),
             MenuEntry::new(ts!("menu.open_template"))
                 .on_activate(|window, cx| window.dispatch_action(Box::new(OpenTemplate), cx)),
             MenuEntry::new(ts!("menu.save_template"))

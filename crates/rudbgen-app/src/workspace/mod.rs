@@ -61,9 +61,9 @@ pub(crate) use bootstrap::editor_theme_for;
 
 use crate::{
     CheckUpdates, DismissDialog, DryRun, EditAbbreviations, Generate, ImportJdbgen, NewConnection,
-    OpenSettings, OpenTemplate, Preview, Quit, SaveTemplate, ShowAbout, ToggleExplorer,
-    ToggleInspector, ToggleLivePreview, TriggerCompletion, app_settings, builtin_templates,
-    connection, generate_pane, i18n, icons, palette, sample_db,
+    NewTemplate, OpenSettings, OpenTemplate, Preview, Quit, SaveTemplate, ShowAbout,
+    ToggleExplorer, ToggleInspector, ToggleLivePreview, TriggerCompletion, app_settings,
+    builtin_templates, connection, generate_pane, i18n, icons, palette, sample_db,
 };
 
 mod actions;

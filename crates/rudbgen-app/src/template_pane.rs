@@ -452,6 +452,13 @@ impl TemplatePane {
         });
     }
 
+    /// Puts `message` where the buffer would be, as a file that could not be
+    /// read does: the tab says why and offers nothing to type into.
+    pub fn show_failure(&mut self, message: SharedString, cx: &mut Context<Self>) {
+        self.failure = Some(message);
+        cx.notify();
+    }
+
     /// The file this tab edits.
     pub fn path(&self) -> &Path {
         &self.path
@@ -476,6 +483,12 @@ impl TemplatePane {
     #[cfg(test)]
     pub fn diagnostics(&self) -> &[Diagnostic] {
         &self.diagnostics
+    }
+
+    /// Why the tab has no buffer to offer, for the tests.
+    #[cfg(test)]
+    pub fn failure(&self) -> Option<&SharedString> {
+        self.failure.as_ref()
     }
 
     /// Writes the buffer back to the file, atomically.

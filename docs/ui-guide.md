@@ -295,6 +295,14 @@ where the caret is: the statement names at the start of one, the option names
 inside it, and the fields of the current model. Each entry carries the same
 one-line description the palette shows.
 
+**New template…** in the menu starts one from nothing: the save dialog opens in
+the `templates/` folder of the [configuration
+directory](installation.md#where-rudbgen-keeps-your-data), and the file you name
+there is created empty and opened. Give it the extension of what it will
+write — `dto.java`, or `dto.java.tpl` — since that picks the highlighting. A
+file that is already there is opened as it is, never emptied. To generate from
+the new template, add it with *Add template…* on the Generate tab.
+
 ## Preview and dry run
 
 Both sit beside **Generate** at the bottom of the connected **Generate** tab,

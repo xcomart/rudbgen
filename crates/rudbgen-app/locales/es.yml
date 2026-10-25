@@ -273,6 +273,8 @@ generate:
   delete_set: Eliminar conjunto
   delete_set_confirm: "¿Eliminar el conjunto de plantillas «%{name}»?"
   set_name: Nombre
+  overwrite_set: Sobrescribir
+  overwrite_set_note: "Sustituye el conjunto de plantillas «%{name}» por la lista actual."
   templates: Plantillas
   no_templates: "Aún no hay plantillas: añada una y la ejecución tendrá algo que escribir."
   add_template: Añadir plantilla…

@@ -197,7 +197,10 @@ written.
 
 - **Template set** — the saved sets, plus `Custom` as soon as the list matches
   none of them. Two sets ship: *Java + MyBatis* and *PHP CodeIgniter*.
-  **Save as set…** stores the current list under a name.
+  **Save as set…** stores the current list under a name. It opens on the name
+  of the set the list came from: keep that name and the button reads
+  **Overwrite**, which replaces that set with the list as it now stands — same
+  place in the selector — while any other name is saved as a new set.
 - **The template list** — one row per template: a tick, its name, its file, the
   **output name template** that names the file it writes, and buttons to edit or
   remove it. *Add template…* opens a file picker.

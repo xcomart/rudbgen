@@ -398,6 +398,10 @@ generate:
   delete_set: Delete set
   delete_set_confirm: "Delete the template set “%{name}”?"
   set_name: Name
+  # The prompt's button and the line under the name while the name is
+  # already a set's: saving replaces that set in place.
+  overwrite_set: Overwrite
+  overwrite_set_note: "This replaces the set “%{name}” with the current list."
   templates: Templates
   no_templates: No templates yet — add one, and the run has something to write.
   add_template: Add template…

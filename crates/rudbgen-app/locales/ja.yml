@@ -271,6 +271,8 @@ generate:
   delete_set: セットを削除
   delete_set_confirm: "テンプレートセット「%{name}」を削除しますか？"
   set_name: 名前
+  overwrite_set: 上書き
+  overwrite_set_note: "テンプレートセット「%{name}」を現在のリストで置き換えます。"
   templates: テンプレート
   no_templates: テンプレートがまだありません。追加すれば実行が書くものを持てます。
   add_template: テンプレートを追加…

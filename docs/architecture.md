@@ -176,7 +176,7 @@ Shown in the work area when no connection is open: saved connections as a list (
 
 ### 4.4 Generate tab
 
-- **Template set** selector (jdbgen's presets, renamed): `Built-in: Java + MyBatis`, user sets, and `Custom` once the list diverges. `Save as set…` stores the current list.
+- **Template set** selector (jdbgen's presets, renamed): `Built-in: Java + MyBatis`, user sets, and `Custom` once the list diverges. `Save as set…` stores the current list; under the name of an existing set it overwrites that set in place.
 - **Template list**: one row per template — tick, name, output name template, and an **Edit** glyph that opens the template tab. Inline add/remove; the file picker starts in `<config>/templates`. The ticks are stored per connection as in jdbgen.
 - **Options**: output directory (with the `...` chooser), author, custom variables (key/value table with the trailing empty row rule), the abbreviation toggle with a link to the rules editor.
 - **Actions**: standard-sized **Preview**, **Dry run**, and **Generate** buttons in a fixed row at the bottom, outside the scrolling form. The row appears only while the connected Generate tab is active. Each action is disabled with a reason in a tooltip when its requirements are missing or a generation job is running.

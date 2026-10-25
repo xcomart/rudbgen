@@ -273,6 +273,8 @@ generate:
   delete_set: Удалить набор
   delete_set_confirm: "Удалить набор шаблонов «%{name}»?"
   set_name: Имя
+  overwrite_set: Заменить
+  overwrite_set_note: "Набор шаблонов «%{name}» будет заменён текущим списком."
   templates: Шаблоны
   no_templates: Шаблонов пока нет — добавьте один, и запуску будет что писать.
   add_template: Добавить шаблон…

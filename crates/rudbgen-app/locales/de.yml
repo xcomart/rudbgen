@@ -273,6 +273,8 @@ generate:
   delete_set: Satz löschen
   delete_set_confirm: "Den Vorlagensatz „%{name}“ löschen?"
   set_name: Name
+  overwrite_set: Überschreiben
+  overwrite_set_note: "Ersetzt den Vorlagensatz „%{name}“ durch die aktuelle Liste."
   templates: Vorlagen
   no_templates: Noch keine Vorlagen — fügen Sie eine hinzu, damit der Lauf etwas zu schreiben hat.
   add_template: Vorlage hinzufügen…

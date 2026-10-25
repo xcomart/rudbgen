@@ -270,6 +270,8 @@ generate:
   delete_set: 删除模板集
   delete_set_confirm: "删除模板集“%{name}”？"
   set_name: 名称
+  overwrite_set: 覆盖
+  overwrite_set_note: "将用当前列表替换模板集“%{name}”。"
   templates: 模板
   no_templates: 还没有模板 —— 添加一个，这次运行才有东西可写。
   add_template: 添加模板…

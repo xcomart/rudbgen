@@ -315,6 +315,39 @@ fn an_elif_chain_without_an_else_renders_nothing_when_no_branch_matches() {
 }
 
 #[test]
+fn the_block_keywords_are_case_insensitive() {
+    // A deliberate break from jdbgen, which matched these four in lower case
+    // only: there ${ELSE} was a lookup of a member called ELSE, so both
+    // branches were written, and ${ENDIF} left the if open.
+    for (elif, otherwise, end) in [
+        ("ELIF", "ELSE", "ENDIF"),
+        ("Elif", "Else", "EndIf"),
+        ("eLiF", "eLsE", "eNdIf"),
+    ] {
+        let tpl = format!(
+            "[${{if:key=type, equals='TABLE'}}T${{{elif}:key=type, equals='VIEW'}}V${{{otherwise}}}?${{{end}}}]"
+        );
+        assert_eq!(render(&tpl, &row("a", "TABLE")), "[T]", "in {tpl}");
+        assert_eq!(render(&tpl, &row("a", "VIEW")), "[V]", "in {tpl}");
+        assert_eq!(render(&tpl, &row("a", "SEQUENCE")), "[?]", "in {tpl}");
+    }
+}
+
+#[test]
+fn an_elif_may_have_white_space_before_its_colon_like_any_statement() {
+    let tpl = "${if:key=type, equals='TABLE'}T${ elif : key=type, equals='VIEW'}V${endif}";
+    assert_eq!(render(tpl, &row("a", "VIEW")), "V");
+}
+
+#[test]
+fn an_elif_without_its_colon_is_still_a_member_lookup() {
+    // `${elif}` names no condition, so it is the shorthand ${item:key=elif}
+    // as it always was - an unknown member, rendered as nothing.
+    let tpl = "${if:key=type, equals='TABLE'}T${ELIF}V${endif}";
+    assert_eq!(render(tpl, &row("a", "TABLE")), "TV");
+}
+
+#[test]
 fn the_negated_conditions_are_the_opposite_of_their_counterparts() {
     let model = Fixture::named("tb_user");
     assert_eq!(
@@ -552,6 +585,21 @@ fn an_if_inside_a_loop_is_evaluated_per_element() {
             &model
         ),
         "a c "
+    );
+}
+
+#[test]
+fn endfor_closes_a_loop_in_any_case() {
+    let model = Fixture::new().with_list(
+        "rows",
+        vec![row("a", "TABLE"), row("b", "VIEW"), row("c", "TABLE")],
+    );
+    assert_eq!(
+        render(
+            "${FOR:key=rows}${IF:key=type, equals='TABLE'}${name} ${ENDIF}${EndFor}!",
+            &model
+        ),
+        "a c !"
     );
 }
 

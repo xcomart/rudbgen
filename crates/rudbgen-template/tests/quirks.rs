@@ -26,19 +26,6 @@ fn a_placeholder_ends_at_the_first_brace_even_inside_a_quoted_value() {
 }
 
 #[test]
-fn an_upper_case_keyword_is_read_as_a_member_lookup() {
-    // ${ELSE} is not the else branch: it is a lookup of a member called ELSE,
-    // which renders as nothing, so both branches end up in the output
-    assert_eq!(
-        render(
-            "${if:key=name, equals='abc_def'}a${ELSE}b${endif}",
-            &model()
-        ),
-        "ab"
-    );
-}
-
-#[test]
 fn a_template_ending_in_a_bare_placeholder_start_drops_it() {
     assert_eq!(render("abc${", &model()), "abc");
 }

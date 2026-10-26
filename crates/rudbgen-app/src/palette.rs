@@ -655,8 +655,8 @@ fn trailing_word(line: &str) -> String {
 /// Ranked rather than merely filtered: an entry whose name *starts* with what
 /// was typed comes before one that merely contains it, and a shorter name
 /// before a longer one, so typing `na` offers `name` before `typeName` and
-/// `nullable`. The comparison is case-insensitive because everything in the
-/// language but `endif` and its three companions is.
+/// `nullable`. The comparison is case-insensitive because every statement,
+/// attribute, processor and condition name in the language is.
 pub fn matching<'a>(items: &'a [PaletteItem], request: &CompletionRequest) -> Vec<&'a PaletteItem> {
     let query = request.prefix.to_ascii_lowercase();
     let mut found: Vec<(u8, usize, &PaletteItem)> = items

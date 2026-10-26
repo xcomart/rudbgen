@@ -3,10 +3,13 @@
 //! The parser follows jdbgen's statement for statement, because a template is
 //! only compatible if it is read the same way - including the rules that look
 //! like accidents: a `${` is closed by the **first** `}` behind it, even one
-//! inside a quoted attribute value; `endif`, `endfor`, `else` and `elif:` are
-//! recognised in lower case only while every other name is case insensitive;
-//! and a trailing `${` at the very end of a template is dropped without a
-//! word.
+//! inside a quoted attribute value; and a trailing `${` at the very end of a
+//! template is dropped without a word.
+//!
+//! One accident is deliberately not reproduced: jdbgen recognised `endif`,
+//! `endfor`, `else` and `elif:` in lower case only, so `${ELSE}` silently
+//! became a member lookup. Here they are case insensitive like every other
+//! statement name - see [`is_keyword`] and [`elif_options`].
 
 use crate::cond::{COND_NAMES, Cond, CondKind};
 use crate::error::{ParseError, Span};
@@ -615,15 +618,15 @@ impl Parser {
                     self.error(format!("if statements not closed, before: {}", self.near()))
                 );
             };
-            if let Some(rest) = stmt.body.strip_prefix("elif:") {
+            if let Some(rest) = elif_options(&stmt.body) {
                 let extra = strutil::trim(rest).to_string();
                 let attrs = self.parse_nv_pairs(&extra)?;
                 self.check_if_conditions(&attrs, &extra)?;
                 tail = None;
                 branches.push(self.branch(attrs, stmt.span)?);
-            } else if stmt.body == "else" {
+            } else if is_keyword(&stmt.body, "else") {
                 tail = Some(Vec::new());
-            } else if stmt.body == "endif" {
+            } else if is_keyword(&stmt.body, "endif") {
                 break;
             } else {
                 let node = self.parse_one(stmt)?;
@@ -668,7 +671,7 @@ impl Parser {
                     self.near()
                 )));
             };
-            if stmt.body == "endfor" {
+            if is_keyword(&stmt.body, "endfor") {
                 break;
             }
             let node = self.parse_one(stmt)?;
@@ -682,6 +685,26 @@ impl Parser {
             body,
         })
     }
+}
+
+/// Whether a statement body is the block keyword `word` - `else`, `endif` or
+/// `endfor` - written in any case.
+///
+/// jdbgen compared these in lower case only, so `${ENDIF}` left its `if` open
+/// and `${ELSE}` was silently read as a member lookup. Every other statement
+/// name is case insensitive, and these follow them.
+fn is_keyword(body: &str, word: &str) -> bool {
+    body.eq_ignore_ascii_case(word)
+}
+
+/// The options of an `${elif:...}`, or `None` when the statement is no `elif`.
+///
+/// The name is trimmed and matched ignoring case, exactly as
+/// [`Parser::parse_one`] reads the name of any other statement, so
+/// `${ELIF:...}` and `${elif :...}` are an `elif` too.
+fn elif_options(body: &str) -> Option<&str> {
+    let (name, options) = body.split_once(':')?;
+    is_keyword(strutil::trim(name), "elif").then_some(options)
 }
 
 /// What a statement that reads a key but names none is reported as.

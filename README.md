@@ -14,9 +14,10 @@ file per pair.
 > [jdbgen](https://github.com/xcomart/jdbgen), and its template language is
 > jdbgen's, engine and all — the same placeholders, conditions, loops and
 > decorators, checked against jdbgen's own test suite and byte-identical output
-> fixtures. Templates written for jdbgen render here unchanged. What has changed
-> is everything around them. See [docs/status.md](docs/status.md) for how far
-> the work has come.
+> fixtures. Templates written for jdbgen render here unchanged, but for
+> `javaType`, which now gives a `DECIMAL`, `NUMERIC` or `FLOAT` column a Java
+> type that holds its values. What has changed is everything around them. See
+> [docs/status.md](docs/status.md) for how far the work has come.
 
 ![The Generate tab, with the explorer and the inspector either side](docs/screenshots/generate.png)
 
@@ -55,7 +56,9 @@ Written against jdbgen, because that is what most of this is for:
 - **Foreign keys and indexes in the model the templates see.** `imports`,
   `exports`, `indexes` on a table; `precision`, `scale`, `autoIncrement`,
   `keySeq` and a single-column `fk` on a column. All new, all additions — every
-  field jdbgen had answers exactly as it did.
+  field jdbgen had answers exactly as it did, but for `javaType`, which follows a
+  `DECIMAL`'s precision and scale (`Integer`, `Long` or `BigDecimal` where
+  jdbgen said `Integer` for all of them) and calls a `FLOAT` a `Double`.
 - **Preview before you write.** The status bar does the arithmetic — *n* tables ·
   *m* templates → *n*×*m* files — **Preview** renders one pair into a tab, and
   **Dry run** renders all of them without writing anything, listing every path,
@@ -86,15 +89,17 @@ Written against jdbgen, because that is what most of this is for:
   you pick, gutter marks for parse errors and for **unknown fields** — jdbgen's
   way of finding a typo like `${nmae}` was to read the generated file — a
   clickable variable palette of every field the model offers, and completion on
-  <kbd>Ctrl</kbd>+<kbd>Space</kbd>.
+  <kbd>Ctrl</kbd>+<kbd>Space</kbd>. `${ENDIF}`, `${Else}` and the rest of the
+  block keywords work in any case, as every other statement name always did —
+  jdbgen took only lower case and silently read `${ELSE}` as a field.
   ![The template editor with its live preview](docs/screenshots/template-editor.png)
   ![Completion offering the model's fields, each with what it renders to](docs/screenshots/completion.png)
 - **An abbreviation rules editor.** The four-column table jdbgen kept in its
   configuration window, with a trailing empty row, a table-name picker for
   whole-name rules, and a refusal to save two rules that would silently become
-  one. Word rules now match **whatever the case**, which is the one deliberate
-  behavioural break from jdbgen — where they only ever matched lower-case
-  segments and so never fired on `TB_USR`.
+  one. Word rules now match **whatever the case**, a deliberate behavioural
+  break from jdbgen — where they only ever matched lower-case segments and so
+  never fired on `TB_USR`.
   ![The abbreviation rules editor](docs/screenshots/abbreviations.png)
 - **A one-time import from jdbgen.** Point it at a `config.json`, type the
   master password once, and it reads both of jdbgen's encryption formats, shows
@@ -219,7 +224,7 @@ tag: Gradle, then `jlink`, then `cargo`, then packaging.
 - [Installation](docs/installation.md) · [User interface
   guide](docs/ui-guide.md)
 - [Template reference](docs/template-reference.md) — the language, its fields,
-  and the three places the port deliberately differs from jdbgen
+  and every place the port deliberately differs from jdbgen
 - [Custom queries](docs/custom-queries.md) — for a driver whose metadata is
   wrong
 

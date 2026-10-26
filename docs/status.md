@@ -270,10 +270,25 @@ oversights:
   live preview renders both, and moving it into the file would make a template
   unreadable to jdbgen for no gain the template tab does not already give.
 - **Open question 2** — the name of the second, saner `javaType` mapping
-  (`DECIMAL` → `BigDecimal`, `TIMESTAMP` → `LocalDateTime`) — is still open, and
-  is the one piece of §6 that has no code behind it yet. Nothing depends on it:
-  `javaType` keeps jdbgen's table verbatim, as D8 requires, so the new field can
-  be added later without changing a single shipped template.
+  (`DECIMAL` → `BigDecimal`, `TIMESTAMP` → `LocalDateTime`) — is decided
+  **neither** (D16): there is no second field, and `javaType` itself changed
+  where jdbgen's type could not hold the column's values. `DECIMAL` and
+  `NUMERIC` are `Integer` up to nine whole digits, `Long` up to eighteen and
+  `BigDecimal` for a fraction, for more digits or for a precision the driver
+  does not report; `FLOAT` is `Double`, as JDBC defines it. A second field
+  would have left the broken mapping as the default every shipped template
+  uses. `TIMESTAMP` → `String` and the rest of jdbgen's table are unchanged, and
+  a custom column query may now answer an optional `DECIMAL_DIGITS` — without
+  one, a decimal is always a `BigDecimal`, since only a scale tells a whole
+  number from a fraction.
+- **The block keywords match ignoring case** (D15). jdbgen took `endif`,
+  `endfor`, `else` and `elif:` in lower case only, and appendix A asked for
+  that to be reproduced; it no longer is. `${ENDIF}` closes an `if`, `${Else}`
+  is the else branch rather than a silent lookup of a field called `Else`, and
+  `${elif :…}` may carry white space before its `:` as `${if :…}` always could.
+  The highlighter paints them as keywords in any case; only an `${elif}` with
+  no `:` — still an item lookup — is a warning. Every shipped template is
+  written in lower case and renders byte for byte as before.
 - The **abbreviation duplicate check is per kind** — a whole-name rule and a
   word rule may look for the same thing — because that is exactly the pair the
   engine keeps in two dictionaries. The architecture document says "duplicate

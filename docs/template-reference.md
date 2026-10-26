@@ -12,8 +12,7 @@ for case, and the three shipped templates rendered against jdbgen's own fixture
 must come out byte for byte identical. Where this page differs from jdbgen's
 documentation it is because the *code* differed from it — jdbgen's engine is the
 specification, not its manual. Everything corrected that way is marked
-**Corrected**; the three deliberate behaviour changes are marked
-**Changed**.
+**Corrected**; the deliberate behaviour changes are marked **Changed**.
 
 [← Documentation index](README.md)
 
@@ -172,7 +171,7 @@ A statement without a `:` is shorthand for `item:key=`, so `${name.camel}` and
 | Attribute names (`key`, `item`, `padSize`, `inStr`, `indent`, …) | Ignored |
 | Processor names (`.suffix`, `.pascal`, …) | Ignored — `${name.SUFFIX.PASCAL}` works |
 | Field names (`remarks`, `javaType`, …) | **Respected** (**Corrected**, see below) |
-| `endif`, `endfor`, `else`, `elif:` | **Lower case only** |
+| `endif`, `endfor`, `else`, `elif:` | Ignored — `${ENDIF}`, `${Else}`, `${ELIF:…}` work (**Changed**, see below) |
 
 > **Corrected**
 > jdbgen resolved field names through Java reflection, which made them look
@@ -182,13 +181,18 @@ A statement without a `:` is shorthand for `item:key=`, so `${name.camel}` and
 > every jdbgen template seen in the wild use the documented spelling, so this
 > only bites a template that was relying on the accident.
 
-> **Note**
-> `${ENDIF}` and `${ENDFOR}` are not recognised as terminators, so the statement
-> stays open and parsing fails with `if statements not closed` /
-> `for statements not closed`. `${ELSE}` is worse: it is silently parsed as an
-> `item` statement for a field named `ELSE`, which resolves to an empty string,
-> so the `else` branch simply disappears without an error. Always write these
-> four in lower case.
+> **Changed — D15: the block keywords match ignoring case.**
+> jdbgen recognised `endif`, `endfor`, `else` and `elif:` in lower case only:
+> `${ENDIF}` and `${ENDFOR}` left the statement open, so parsing failed with
+> `if statements not closed` / `for statements not closed`, and `${ELSE}` was
+> silently an `item` statement for a field named `ELSE` — both branches ended
+> up in the output. rudbgen matches them ignoring case, like every other
+> statement name, and an `elif` may have white space before its `:` as `if`
+> always could (`${elif :key=type, …}`). A template written for jdbgen in lower
+> case renders exactly as before.
+>
+> An `${elif}` with no `:` names no condition, so it is still read as the
+> shorthand for a field called `elif`; the editor paints it as a warning.
 
 ### Escaping `${`
 
@@ -404,7 +408,7 @@ guide](ui-guide.md#the-template-tab).
 | `defVal` | text | Default value (`COLUMN_DEF`) |
 | `dataType` | int | Raw `java.sql.Types` constant (`4`, `12`, `91`, …) |
 | `jdbcType` | text | JDBC type name derived from `dataType` |
-| `javaType` | text | Java type name derived from `dataType` |
+| `javaType` | text | Java type name derived from `dataType` — and from `precision` and `scale` for `DECIMAL`/`NUMERIC` (D16), see [JDBC and Java type mapping](#jdbc-and-java-type-mapping) |
 | `fk` | list of 0 or 1 reference | What this column points at, when exactly one foreign key uses it (D8, new) |
 | `no` | int | 1-based position, see [`for` statement](#for-statement) |
 | `nvlColName` | text | Declared for jdbgen compatibility — **always empty** |
@@ -477,8 +481,8 @@ nothing for it and needs no guard.
 
 `jdbcType` and `javaType` are looked up from the numeric `DATA_TYPE` the JDBC
 driver reports (`dataType`), *not* from `typeName`. The table is jdbgen's,
-carried over unchanged — including its oddities — because changing it would
-change the output of every template written against it.
+oddities included, except where jdbgen's Java type could not hold the values
+the column does: `DECIMAL`, `NUMERIC` and `FLOAT` (**Changed**, see below).
 
 | `java.sql.Types` | `dataType` | `jdbcType` | `javaType` |
 |:---|---:|:---|:---|
@@ -492,10 +496,10 @@ change the output of every template written against it.
 | `CLOB` | 2005 | `CLOB` | `String` |
 | `DATALINK` | 70 | `DATALINK` | `String` |
 | `DATE` | 91 | `DATE` | `Date` |
-| `DECIMAL` | 3 | `DECIMAL` | `Integer` |
+| `DECIMAL` | 3 | `DECIMAL` | by precision and scale, see below |
 | `DISTINCT` | 2001 | `DISTINCT` | `String` |
 | `DOUBLE` | 8 | `DOUBLE` | `Double` |
-| `FLOAT` | 6 | `FLOAT` | `Float` |
+| `FLOAT` | 6 | `FLOAT` | `Double` (**Changed**) |
 | `INTEGER` | 4 | `INTEGER` | `Integer` |
 | `JAVA_OBJECT` | 2000 | `JAVA_OBJECT` | `String` |
 | `LONGNVARCHAR` | -16 | `LONGNVARCHAR` | `String` |
@@ -504,7 +508,7 @@ change the output of every template written against it.
 | `NCHAR` | -15 | `NCHAR` | `String` |
 | `NCLOB` | 2011 | `NCLOB` | `String` |
 | `NULL` | 0 | `NULL` | `null` |
-| `NUMERIC` | 2 | `NUMERIC` | `Integer` |
+| `NUMERIC` | 2 | `NUMERIC` | by precision and scale, see below |
 | `NVARCHAR` | -9 | `NVARCHAR` | `String` |
 | `OTHER` | 1111 | `OTHER` | `String` |
 | `REAL` | 7 | `REAL` | `Float` |
@@ -519,14 +523,37 @@ change the output of every template written against it.
 | `VARBINARY` | -3 | `VARBINARY` | `byte[]` |
 | `VARCHAR` | 12 | `VARCHAR` | `String` |
 
+`DECIMAL` and `NUMERIC` take the smallest Java type that holds every value
+their `precision` and `scale` allow:
+
+| `precision` | `scale` | `javaType` | Example |
+|---:|---:|:---|:---|
+| 1 – 9 | 0 | `Integer` | `NUMERIC(5)`, Oracle `NUMBER(9)` |
+| 10 – 18 | 0 | `Long` | `NUMERIC(12)`, Oracle `NUMBER(18)` |
+| 19 or more | 0 | `BigDecimal` | `NUMERIC(30)`, Oracle `NUMBER(38)` (`INTEGER`) |
+| any | not 0 | `BigDecimal` | `DECIMAL(10,2)`, Oracle `NUMBER` (scale `-127`) |
+| 0 or unknown | any | `BigDecimal` | a driver that reports no precision |
+
+Nine digits is the limit for `Integer` because `Integer.MAX_VALUE`
+(2,147,483,647) has ten digits but `9,999,999,999` does not fit; eighteen is
+the limit for `Long` for the same reason. `BigDecimal` is written without its
+package, like `Date` and `Time`, so a model needs `import java.math.BigDecimal;`.
+
+> **Changed — D16: `DECIMAL`, `NUMERIC` and `FLOAT` follow their precision.**
+> jdbgen mapped `DECIMAL` and `NUMERIC` to `Integer` whatever their precision
+> and scale, so a `NUMERIC(18,2)` lost its fraction and a `NUMBER(12)`
+> overflowed, and `FLOAT` to `Float`, although JDBC's `FLOAT` is a double
+> precision type. A model generated from a template written for jdbgen changes
+> for exactly those columns — `Integer` becomes `Long` or `BigDecimal`, `Float`
+> becomes `Double` — and for no other. A template that wants jdbgen's names
+> back can branch on `jdbcType`:
+> `${if:item=jdbcType, contains='DECIMAL,NUMERIC'}Integer${else}${javaType}${endif}`.
+
 > **Note**
-> The Java mapping has sharp edges to work around in your templates:
+> The Java mapping still has sharp edges to work around in your templates:
 >
 > - `TIMESTAMP` maps to `String`, not to a date type. `DATE` maps to `Date` and
 >   `TIME` to `Time`, neither qualified with a package.
-> - `DECIMAL` and `NUMERIC` map to `Integer`, ignoring precision and scale, so a
->   `NUMERIC(18,2)` column produces `Integer`. `precision` and `scale` are new
->   fields precisely so a template can do better: branch on `${scale}`.
 > - `TINYINT` maps to `Short`, `ROWID` to `Integer`.
 > - `ARRAY`, `REF`, `STRUCT` and `NULL` map to the lower-case words `array`,
 >   `ref`, `struct` and `null`, which are not Java types at all.
@@ -1070,10 +1097,15 @@ column is what you want; see [The `fk` of a column](#the-fk-of-a-column-d8-new).
     ${endif}${endfor}
 ```
 
-### A numeric column that keeps its precision (D8)
+### A numeric column with a fully qualified type (D8)
+
+`javaType` already follows `precision` and `scale` (see
+[JDBC and Java type mapping](#jdbc-and-java-type-mapping)); it writes
+`BigDecimal` without its package. Where a model cannot import it, qualify it in
+the template:
 
 ```java
-    ${if:item=jdbcType, contains='DECIMAL,NUMERIC'}${if:item=scale, equals='0'}Long${else}java.math.BigDecimal${endif}${else}${javaType}${endif}
+    ${if:item=javaType, equals='BigDecimal'}java.math.BigDecimal${else}${javaType}${endif}
 ```
 
 ### A qualified class name from a custom variable

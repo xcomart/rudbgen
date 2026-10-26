@@ -237,17 +237,42 @@ which has no JDBC equivalent.
 | `COLUMN_DEF` | text | Column default value | `defVal` |
 | `IS_KEY` | int | Non-zero when the column is part of the primary key | `isKey`, `keySeq` |
 
+One more label is read when it is there, and is **optional**, so a statement
+written for jdbgen still works without it:
+
+| Label | Type | Description | Template field |
+|:---:|:---:|:---|:---:|
+| `DECIMAL_DIGITS` | int | The scale of an exact numeric type — digits after the decimal point | `scale`, and through it `javaType` |
+
 Columns are numbered in the order the query returns them, so add an `ORDER BY`
 if your database does not already return them in declaration order. `keySeq`
 counts the key columns in that same order.
 
-Two template fields have **no label in this contract** and are therefore not
-available on a driver that overrides the column list: `scale` is `0` and
-`autoIncrement` is `false`. Adding labels for them would make a statement
-written for jdbgen fail here, which is the trade the contract makes. A driver
-good enough to need no column override gets both. A column's `fk` is not one of
+`autoIncrement` has **no label in this contract** and is therefore `false` on a
+driver that overrides the column list; requiring a label for it would make a
+statement written for jdbgen fail here, which is the trade the contract makes.
+`scale` is `0` unless the statement answers `DECIMAL_DIGITS`. A driver good
+enough to need no column override gets both. A column's `fk` is not one of
 them: it is filled in from the driver's foreign keys, matched on
 `COLUMN_NAME`, whichever way the columns were listed.
+
+### `DECIMAL_DIGITS` sizes a decimal's `javaType`
+
+The `javaType` of a `DECIMAL` or `NUMERIC` column (`DATA_TYPE` 3 or 2) follows
+its precision — `COLUMN_SIZE` — and its scale: `Integer` for up to nine whole
+digits, `Long` for up to eighteen, `BigDecimal` otherwise (see the
+[template reference](template-reference.md#jdbc-and-java-type-mapping)). Only a
+scale tells a whole number from a fraction, so a statement that does not answer
+`DECIMAL_DIGITS` gets `BigDecimal` for **every** decimal column, `NUMBER(5)`
+included — never a `Long` that would drop the cents of a `DECIMAL(10,2)`. A null
+`DECIMAL_DIGITS` counts as not answered. Answer it, and answer the precision in
+`COLUMN_SIZE`, wherever a whole-number decimal should be an `Integer` or a
+`Long`:
+
+```sql
+       NUMERIC_PRECISION as "COLUMN_SIZE",
+       NUMERIC_SCALE as "DECIMAL_DIGITS",
+```
 
 ### `IS_KEY` must be numeric
 
@@ -331,7 +356,7 @@ select TABLE_CATALOG as "TABLE_CAT",
 | Table comments | position (1, 2) | 2 columns or more | Table keeps its previous comment |
 | Column comments | position (1, 2) | 2 columns or more | Column keeps its previous comment (**Changed**) |
 | Table list | label | `TABLE_CAT`, `TABLE_SCHEM`, `TABLE_NAME`, `TABLE_TYPE`, `REMARKS` | Table is not listed |
-| Column list | label | `TABLE_CAT`, `TABLE_SCHEM`, `TABLE_NAME`, `COLUMN_NAME`, `DATA_TYPE`, `TYPE_NAME`, `COLUMN_SIZE`, `NULLABLE`, `REMARKS`, `COLUMN_DEF`, `IS_KEY` | Column is not listed |
+| Column list | label | `TABLE_CAT`, `TABLE_SCHEM`, `TABLE_NAME`, `COLUMN_NAME`, `DATA_TYPE`, `TYPE_NAME`, `COLUMN_SIZE`, `NULLABLE`, `REMARKS`, `COLUMN_DEF`, `IS_KEY` (optional: `DECIMAL_DIGITS`) | Column is not listed |
 
 For the label-based queries a missing **label** is fatal — the read fails and
 names the first label it could not find. A missing **value** (null) is tolerated
@@ -391,7 +416,8 @@ because the reader takes the first two and ignores the rest.
    the placeholder rather than comparing against it — an empty one is left in
    the statement and the query fails.
 5. **Return real `java.sql.Types` numbers** for `DATA_TYPE`, and cover every type
-   your schema uses. Avoid `0`.
+   your schema uses. Avoid `0`. For `DECIMAL`/`NUMERIC` columns, return the
+   precision in `COLUMN_SIZE` and the scale in `DECIMAL_DIGITS`.
 6. **Return `0`/`1` for `IS_KEY`**, never `'Y'`/`'N'`, and cast rather than pad.
 7. **Order the column list** explicitly; the row order is the column order and
    the key order.

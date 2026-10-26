@@ -2507,7 +2507,7 @@ dependencies = [
 [[package]]
 name = "gpui"
 version = "0.2.2"
-source = "git+https://github.com/xcomart/rugpui?rev=be7216883e71d635e6106a6786f1d46dbd00eaa4#be7216883e71d635e6106a6786f1d46dbd00eaa4"
+source = "git+https://github.com/xcomart/rugpui?rev=0b8ddee147ffcb7a0ee8bb05a908ee99bd34321a#0b8ddee147ffcb7a0ee8bb05a908ee99bd34321a"
 dependencies = [
  "accesskit",
  "anyhow",
@@ -2637,7 +2637,7 @@ dependencies = [
 [[package]]
 name = "gpui_linux"
 version = "0.1.0"
-source = "git+https://github.com/xcomart/rugpui?rev=be7216883e71d635e6106a6786f1d46dbd00eaa4#be7216883e71d635e6106a6786f1d46dbd00eaa4"
+source = "git+https://github.com/xcomart/rugpui?rev=0b8ddee147ffcb7a0ee8bb05a908ee99bd34321a#0b8ddee147ffcb7a0ee8bb05a908ee99bd34321a"
 dependencies = [
  "accesskit",
  "accesskit_unix",
@@ -2681,7 +2681,7 @@ dependencies = [
 [[package]]
 name = "gpui_macos"
 version = "0.1.0"
-source = "git+https://github.com/xcomart/rugpui?rev=be7216883e71d635e6106a6786f1d46dbd00eaa4#be7216883e71d635e6106a6786f1d46dbd00eaa4"
+source = "git+https://github.com/xcomart/rugpui?rev=0b8ddee147ffcb7a0ee8bb05a908ee99bd34321a#0b8ddee147ffcb7a0ee8bb05a908ee99bd34321a"
 dependencies = [
  "accesskit",
  "accesskit_macos",
@@ -2821,7 +2821,7 @@ dependencies = [
 [[package]]
 name = "gpui_windows"
 version = "0.1.0"
-source = "git+https://github.com/xcomart/rugpui?rev=be7216883e71d635e6106a6786f1d46dbd00eaa4#be7216883e71d635e6106a6786f1d46dbd00eaa4"
+source = "git+https://github.com/xcomart/rugpui?rev=0b8ddee147ffcb7a0ee8bb05a908ee99bd34321a#0b8ddee147ffcb7a0ee8bb05a908ee99bd34321a"
 dependencies = [
  "accesskit",
  "accesskit_windows",
@@ -5721,7 +5721,7 @@ dependencies = [
 [[package]]
 name = "rugpui"
 version = "0.1.12"
-source = "git+https://github.com/xcomart/rugpui?rev=be7216883e71d635e6106a6786f1d46dbd00eaa4#be7216883e71d635e6106a6786f1d46dbd00eaa4"
+source = "git+https://github.com/xcomart/rugpui?rev=0b8ddee147ffcb7a0ee8bb05a908ee99bd34321a#0b8ddee147ffcb7a0ee8bb05a908ee99bd34321a"
 dependencies = [
  "anyhow",
  "gpui",
@@ -5734,7 +5734,7 @@ dependencies = [
 [[package]]
 name = "rugpui-editor"
 version = "0.1.12"
-source = "git+https://github.com/xcomart/rugpui?rev=be7216883e71d635e6106a6786f1d46dbd00eaa4#be7216883e71d635e6106a6786f1d46dbd00eaa4"
+source = "git+https://github.com/xcomart/rugpui?rev=0b8ddee147ffcb7a0ee8bb05a908ee99bd34321a#0b8ddee147ffcb7a0ee8bb05a908ee99bd34321a"
 dependencies = [
  "gpui",
  "log",
@@ -5747,7 +5747,7 @@ dependencies = [
 [[package]]
 name = "rugpui-grid"
 version = "0.1.12"
-source = "git+https://github.com/xcomart/rugpui?rev=be7216883e71d635e6106a6786f1d46dbd00eaa4#be7216883e71d635e6106a6786f1d46dbd00eaa4"
+source = "git+https://github.com/xcomart/rugpui?rev=0b8ddee147ffcb7a0ee8bb05a908ee99bd34321a#0b8ddee147ffcb7a0ee8bb05a908ee99bd34321a"
 dependencies = [
  "gpui",
  "rugpui",
@@ -5757,7 +5757,7 @@ dependencies = [
 [[package]]
 name = "rugpui-shell"
 version = "0.1.12"
-source = "git+https://github.com/xcomart/rugpui?rev=be7216883e71d635e6106a6786f1d46dbd00eaa4#be7216883e71d635e6106a6786f1d46dbd00eaa4"
+source = "git+https://github.com/xcomart/rugpui?rev=0b8ddee147ffcb7a0ee8bb05a908ee99bd34321a#0b8ddee147ffcb7a0ee8bb05a908ee99bd34321a"
 dependencies = [
  "anyhow",
  "futures",

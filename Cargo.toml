@@ -53,7 +53,7 @@ gpui_macos = { git = "https://github.com/xcomart/rugpui", rev = "7d40de94279536d
 gpui_windows = { git = "https://github.com/xcomart/rugpui", rev = "7d40de94279536d0e54d25febc978dea9b334e1f" }
 
 [workspace.package]
-version = "0.2.3"
+version = "0.2.4"
 edition = "2024"
 license = "MIT"
 authors = ["rudbgen contributors"]

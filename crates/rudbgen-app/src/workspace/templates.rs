@@ -93,6 +93,51 @@ impl Workspace {
         .detach();
     }
 
+    /// Asks the platform where a new template should go, creates it empty and
+    /// opens it.
+    ///
+    /// The dialog starts in the configuration directory's `templates/`, where a
+    /// template is stored relative to it and so travels with the rest of the
+    /// configuration. Like the open prompt, nothing waits on it.
+    pub(super) fn create_template(&mut self, cx: &mut Context<Self>) {
+        let directory = match rudbgen_core::templates_dir() {
+            Ok(dir) => dir,
+            Err(error) => {
+                log::warn!("no template directory to start the save dialog in: {error:#}");
+                PathBuf::new()
+            }
+        };
+        let prompt = cx.prompt_for_new_path(&directory, Some(NEW_TEMPLATE_NAME));
+        cx.spawn(async move |this, cx| {
+            let file = match prompt.await {
+                Ok(Ok(Some(file))) => file,
+                Ok(Ok(None)) | Err(_) => return,
+                Ok(Err(error)) => {
+                    log::warn!("the save dialog could not be opened: {error:#}");
+                    return;
+                }
+            };
+            let created = create_empty(&file);
+            this.update(cx, |workspace, cx| {
+                workspace.open_template(file.clone(), cx);
+                if let Err(error) = created {
+                    log::error!("could not create {}: {error}", file.display());
+                    let message = ts!(
+                        "template.create_failed",
+                        file = file.display().to_string(),
+                        reason = error.to_string()
+                    );
+                    if let Some(at) = workspace.template_index(&file, cx) {
+                        workspace.templates[at]
+                            .update(cx, |pane, cx| pane.show_failure(message, cx));
+                    }
+                }
+            })
+            .ok();
+        })
+        .detach();
+    }
+
     /// Copies every buffer's dirty flag onto its tab.
     pub(super) fn retitle_templates(&mut self, cx: &mut Context<Self>) {
         let mut changed = false;
@@ -596,5 +641,27 @@ impl Workspace {
         // [`Workspace::meta_context`], which reads that state.
         self.reset_panels(cx);
         cx.notify();
+    }
+}
+
+/// The name the save dialog offers for a new template. It has no extension on
+/// purpose: the extension picks the highlighting, and only the user knows what
+/// the template will write.
+const NEW_TEMPLATE_NAME: &str = "new_template";
+
+/// Creates `file` empty, unless it is already there.
+///
+/// A file that exists is left exactly as it is, even though the save dialog
+/// asked whether to replace it: a new template is never a reason to lose one,
+/// and the tab that opens on it shows what is in it.
+pub(super) fn create_empty(file: &Path) -> std::io::Result<()> {
+    match std::fs::OpenOptions::new()
+        .write(true)
+        .create_new(true)
+        .open(file)
+    {
+        Ok(_) => Ok(()),
+        Err(error) if error.kind() == std::io::ErrorKind::AlreadyExists => Ok(()),
+        Err(error) => Err(error),
     }
 }

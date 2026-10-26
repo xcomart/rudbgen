@@ -220,6 +220,7 @@ menu:
   connection: Conexión
   view: Ver
   template: Plantilla
+  new_template: Nueva plantilla…
   open_template: Abrir plantilla…
   save_template: Guardar plantilla
   toggle_live_preview: Vista previa en vivo
@@ -273,6 +274,8 @@ generate:
   delete_set: Eliminar conjunto
   delete_set_confirm: "¿Eliminar el conjunto de plantillas «%{name}»?"
   set_name: Nombre
+  overwrite_set: Sobrescribir
+  overwrite_set_note: "Sustituye el conjunto de plantillas «%{name}» por la lista actual."
   templates: Plantillas
   no_templates: "Aún no hay plantillas: añada una y la ejecución tendrá algo que escribir."
   add_template: Añadir plantilla…
@@ -484,11 +487,14 @@ template:
   tip_preview: Mostrar u ocultar la vista previa en vivo
   show_preview: Mostrar vista previa
   hide_preview: Ocultar vista previa
+  tab_width: "Ancho de tabulación: %{width}"
+  tip_tab_width: Cuántas columnas ocupa una tabulación en este archivo
   preview_table: Tabla
   preview_no_connection: Abra una conexión para ver esta plantilla aplicada a una tabla.
   preview_no_table: Marque una tabla en el explorador para ver esta plantilla aplicada.
   preview_parse_error: La plantilla no se puede analizar; lo que falla está listado abajo.
   read_failed: "No se pudo abrir %{file}: %{reason}"
+  create_failed: "No se pudo crear %{file}: %{reason}"
   write_failed: "No se pudo escribir %{file}: %{reason}"
   not_utf8: "%{file} no es texto UTF-8, así que no se puede editar aquí."
   open_select: Abrir una plantilla

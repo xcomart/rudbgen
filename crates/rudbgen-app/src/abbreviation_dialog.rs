@@ -555,7 +555,11 @@ impl AbbreviationDialog {
                 .chevron_icon(icons::CHEVRON_DOWN)
                 .options(self.tables.clone())
                 .placeholder(ts!("abbr.pick_table"))
-                .width(px(260.))
+                // No width: `Select::width` sizes the trigger as well as the
+                // list, and a trigger wider than its column reaches over the
+                // replacement field. Left alone, the trigger fills the column
+                // and the list drops at Select's default width, which leaves a
+                // long table name room the column does not have.
                 .open(open)
                 .scroll_handle(self.picker_scroll.clone())
                 .on_select(move |_, name, _window, cx| {
@@ -621,9 +625,13 @@ impl AbbreviationDialog {
                             })
                             .child(row.abbreviation.clone()),
                     )
-                    .children(
-                        picker.map(|select| div().w(px(PICKER_WIDTH)).flex_none().child(select)),
-                    ),
+                    .children(picker.map(|select| {
+                        div()
+                            .debug_selector(move || format!("abbr-picker-{index}"))
+                            .w(px(PICKER_WIDTH))
+                            .flex_none()
+                            .child(select)
+                    })),
             )
             .child(div().flex_1().min_w_0().child(row.replacement.clone()))
             .child(
@@ -1046,6 +1054,51 @@ mod tests {
     fn profile_abbreviation_frames(cx: &mut gpui::TestAppContext) {
         let window = populated_window(cx);
         crate::frame_profile::measure("Abbreviations (50 rules)", window, cx);
+    }
+
+    #[gpui::test]
+    fn the_table_picker_stays_inside_its_column(cx: &mut gpui::TestAppContext) {
+        cx.update(rugpui::init);
+        let window = cx.add_window(|_, cx| {
+            let mut dialog = AbbreviationDialog::new(cx);
+            dialog.open(
+                &AbbreviationStore {
+                    rules: vec![rule(true, true, "EMP", "employee")],
+                    ..Default::default()
+                },
+                vec!["T_SAMPLE_EMPLOYEE".into()],
+                cx,
+            );
+            dialog
+        });
+        let mut cx = gpui::VisualTestContext::from_window(window.into(), cx);
+        cx.simulate_resize(gpui::size(px(1000.), px(700.)));
+        cx.run_until_parked();
+        let column = cx
+            .debug_bounds("abbr-picker-0")
+            .expect("a whole-name row has a picker while tables are loaded");
+
+        // The gap between the picker and the replacement field belongs to
+        // neither; a trigger wider than its column reaches over it.
+        let beside = gpui::point(column.right() + px(3.), column.center().y);
+        cx.simulate_click(beside, gpui::Modifiers::none());
+        window
+            .update(&mut cx, |dialog, _, _| {
+                assert_eq!(dialog.picker, None, "the picker reaches past its column");
+            })
+            .unwrap();
+
+        cx.simulate_click(column.center(), gpui::Modifiers::none());
+        window
+            .update(&mut cx, |dialog, _, _| assert_eq!(dialog.picker, Some(0)))
+            .unwrap();
+        cx.run_until_parked();
+        // The list keeps the room a long table name needs, inside the window.
+        let list = cx
+            .debug_bounds("rugpui-select-list")
+            .expect("the list is drawn");
+        assert!(list.size.width > column.size.width, "{list:?}");
+        assert!(list.right() <= px(1000.), "{list:?}");
     }
 
     #[gpui::test]

@@ -40,6 +40,16 @@ const DEFAULT_JVM_HEAP_MB: u32 = 1024;
 /// Smallest heap a JVM plus one JDBC driver can be expected to start in.
 const MIN_JVM_HEAP_MB: u32 = 128;
 
+/// How many columns apart a template's tab stops are when it has no width of
+/// its own — the editor's default, and so what the template editor draws a
+/// file at before anybody has chosen otherwise.
+pub const DEFAULT_TAB_WIDTH: u32 = 4;
+/// Narrowest tab stop a template may be drawn with.
+const MIN_TAB_WIDTH: u32 = 1;
+/// Widest tab stop a template may be drawn with, which is the editor's own
+/// ceiling.
+const MAX_TAB_WIDTH: u32 = 16;
+
 /// Width of the explorer sidebar on a first run, in logical pixels.
 const DEFAULT_EXPLORER_WIDTH: f32 = 260.0;
 
@@ -294,6 +304,17 @@ pub struct AppSettings {
     /// Nothing sanitises it: a bool has no invalid value, and a file written by
     /// an older build simply arrives without the key and takes the default.
     pub editor_word_wrap: bool,
+    /// How many columns apart the tab stops are in each template that has a
+    /// width of its own, keyed by the template file's path.
+    ///
+    /// A template that is not here is drawn at [`DEFAULT_TAB_WIDTH`], which is
+    /// why choosing that width takes a file out of the map rather than writing
+    /// it in: the map holds only what differs. Only the drawing follows it —
+    /// the file keeps its tabs, and a save writes them back as they were. Read
+    /// and written through [`AppSettings::template_tab_width`] and
+    /// [`AppSettings::set_template_tab_width`]; widths are clamped to
+    /// 1 ..= 16 on load.
+    pub template_tab_widths: BTreeMap<String, u32>,
     /// Maximum Java heap in megabytes, passed to the JVM as `-Xmx`.
     ///
     /// The JVM is started once per process and its heap cannot be resized
@@ -371,6 +392,7 @@ impl Default for AppSettings {
             editor_font_family: None,
             editor_font_size: DEFAULT_EDITOR_FONT_SIZE,
             editor_word_wrap: false,
+            template_tab_widths: BTreeMap::new(),
             jvm_heap_mb: DEFAULT_JVM_HEAP_MB,
             jvm_extra_args: Vec::new(),
             overwrite_policy: OverwritePolicy::default(),
@@ -487,7 +509,32 @@ impl AppSettings {
         // A blank tag would match no release and silence nothing, so it is the
         // same thing as having ignored none.
         blank_to_none(&mut self.ignored_update);
+        for width in self.template_tab_widths.values_mut() {
+            *width = (*width).clamp(MIN_TAB_WIDTH, MAX_TAB_WIDTH);
+        }
         self.window.sanitize();
+    }
+
+    /// How many columns apart the tab stops are in the template at `path`.
+    pub fn template_tab_width(&self, path: &str) -> u32 {
+        self.template_tab_widths
+            .get(path)
+            .copied()
+            .unwrap_or(DEFAULT_TAB_WIDTH)
+    }
+
+    /// Draws the template at `path` with tab stops every `width` columns,
+    /// clamped to 1 ..= 16.
+    ///
+    /// [`DEFAULT_TAB_WIDTH`] is recorded by forgetting the path, so a file set
+    /// back to the default leaves nothing behind in `settings.json`.
+    pub fn set_template_tab_width(&mut self, path: &str, width: u32) {
+        let width = width.clamp(MIN_TAB_WIDTH, MAX_TAB_WIDTH);
+        if width == DEFAULT_TAB_WIDTH {
+            self.template_tab_widths.remove(path);
+        } else {
+            self.template_tab_widths.insert(path.to_owned(), width);
+        }
     }
 }
 
@@ -507,6 +554,7 @@ mod tests {
         assert_eq!(settings.editor_font_family, None);
         assert_eq!(settings.editor_font_size, 14.0);
         assert!(!settings.editor_word_wrap);
+        assert!(settings.template_tab_widths.is_empty());
         assert_eq!(settings.jvm_heap_mb, 1024);
         assert!(settings.jvm_extra_args.is_empty());
         assert_eq!(settings.overwrite_policy, OverwritePolicy::Ask);
@@ -613,6 +661,53 @@ mod tests {
                 .expect("reload")
                 .editor_word_wrap
         );
+    }
+
+    #[test]
+    fn a_template_keeps_its_own_tab_width() {
+        let dir = tempfile::tempdir().expect("tempdir");
+        let path = dir.path().join("settings.json");
+        let mut settings = AppSettings::default();
+        assert_eq!(
+            settings.template_tab_width("/t/model.java"),
+            DEFAULT_TAB_WIDTH
+        );
+
+        settings.set_template_tab_width("/t/model.java", 2);
+        settings.set_template_tab_width("/t/mapper.xml", 8);
+        settings.save_to(&path).expect("save");
+        let mut settings = AppSettings::load_from(&path).expect("load");
+        assert_eq!(settings.template_tab_width("/t/model.java"), 2);
+        assert_eq!(settings.template_tab_width("/t/mapper.xml"), 8);
+        assert_eq!(settings.template_tab_width("/t/php.php"), DEFAULT_TAB_WIDTH);
+
+        // The default is kept by forgetting the file, not by writing it down.
+        settings.set_template_tab_width("/t/model.java", DEFAULT_TAB_WIDTH);
+        assert_eq!(
+            settings.template_tab_widths.keys().collect::<Vec<_>>(),
+            ["/t/mapper.xml"]
+        );
+
+        settings.set_template_tab_width("/t/narrow", 0);
+        settings.set_template_tab_width("/t/wide", 99);
+        assert_eq!(settings.template_tab_width("/t/narrow"), MIN_TAB_WIDTH);
+        assert_eq!(settings.template_tab_width("/t/wide"), MAX_TAB_WIDTH);
+    }
+
+    #[test]
+    fn a_hand_edited_tab_width_is_held_in_range() {
+        let dir = tempfile::tempdir().expect("tempdir");
+        let path = dir.path().join("settings.json");
+        fs::write(
+            &path,
+            br#"{"template_tab_widths": {"a.java": 0, "b.java": 40, "c.java": 3}}"#,
+        )
+        .expect("write");
+
+        let settings = AppSettings::load_from(&path).expect("load");
+        assert_eq!(settings.template_tab_width("a.java"), 1);
+        assert_eq!(settings.template_tab_width("b.java"), 16);
+        assert_eq!(settings.template_tab_width("c.java"), 3);
     }
 
     #[test]

@@ -219,6 +219,7 @@ menu:
   connection: 연결
   view: 보기
   template: 템플릿
+  new_template: 새 템플릿…
   open_template: 템플릿 열기…
   save_template: 템플릿 저장
   toggle_live_preview: 실시간 미리보기
@@ -271,6 +272,8 @@ generate:
   delete_set: 세트 삭제
   delete_set_confirm: "템플릿 세트 “%{name}”을(를) 삭제할까요?"
   set_name: 이름
+  overwrite_set: 덮어쓰기
+  overwrite_set_note: "템플릿 세트 “%{name}”을(를) 현재 목록으로 바꿉니다."
   templates: 템플릿
   no_templates: 아직 템플릿이 없습니다. 하나 추가하면 실행이 쓸 것이 생깁니다.
   add_template: 템플릿 추가…
@@ -482,11 +485,14 @@ template:
   tip_preview: 실시간 미리보기를 켜거나 끕니다
   show_preview: 미리보기 표시
   hide_preview: 미리보기 숨기기
+  tab_width: "탭 폭: %{width}"
+  tip_tab_width: 이 파일에서 탭 하나를 몇 칸 폭으로 그릴지 정합니다
   preview_table: 테이블
   preview_no_connection: 연결을 열면 이 템플릿을 테이블에 적용한 결과를 보여 줍니다.
   preview_no_table: 탐색기에서 테이블을 고르면 이 템플릿을 적용한 결과를 보여 줍니다.
   preview_parse_error: 템플릿을 해석할 수 없습니다. 무엇이 잘못됐는지는 아래에 있습니다.
   read_failed: "%{file}을(를) 열지 못했습니다: %{reason}"
+  create_failed: "%{file}을(를) 만들지 못했습니다: %{reason}"
   write_failed: "%{file}을(를) 쓰지 못했습니다: %{reason}"
   not_utf8: "%{file}은(는) UTF-8 텍스트가 아니어서 여기서 편집할 수 없습니다."
   open_select: 템플릿 열기

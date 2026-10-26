@@ -220,6 +220,7 @@ menu:
   connection: Verbindung
   view: Ansicht
   template: Vorlage
+  new_template: Neue Vorlage…
   open_template: Vorlage öffnen…
   save_template: Vorlage speichern
   toggle_live_preview: Live-Vorschau
@@ -273,6 +274,8 @@ generate:
   delete_set: Satz löschen
   delete_set_confirm: "Den Vorlagensatz „%{name}“ löschen?"
   set_name: Name
+  overwrite_set: Überschreiben
+  overwrite_set_note: "Ersetzt den Vorlagensatz „%{name}“ durch die aktuelle Liste."
   templates: Vorlagen
   no_templates: Noch keine Vorlagen — fügen Sie eine hinzu, damit der Lauf etwas zu schreiben hat.
   add_template: Vorlage hinzufügen…
@@ -484,11 +487,14 @@ template:
   tip_preview: Live-Vorschau ein- und ausblenden
   show_preview: Vorschau zeigen
   hide_preview: Vorschau ausblenden
+  tab_width: "Tabbreite: %{width}"
+  tip_tab_width: Wie viele Spalten breit ein Tab in dieser Datei dargestellt wird
   preview_table: Tabelle
   preview_no_connection: Öffnen Sie eine Verbindung, um diese Vorlage auf eine Tabelle angewandt zu sehen.
   preview_no_table: Haken Sie im Explorer eine Tabelle an, um diese Vorlage angewandt zu sehen.
   preview_parse_error: Die Vorlage lässt sich nicht lesen; was daran fehlt, steht unten.
   read_failed: "%{file} ließ sich nicht öffnen: %{reason}"
+  create_failed: "%{file} ließ sich nicht anlegen: %{reason}"
   write_failed: "%{file} ließ sich nicht schreiben: %{reason}"
   not_utf8: "%{file} ist kein UTF-8-Text und kann hier nicht bearbeitet werden."
   open_select: Vorlage öffnen

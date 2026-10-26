@@ -197,7 +197,10 @@ written.
 
 - **Template set** — the saved sets, plus `Custom` as soon as the list matches
   none of them. Two sets ship: *Java + MyBatis* and *PHP CodeIgniter*.
-  **Save as set…** stores the current list under a name.
+  **Save as set…** stores the current list under a name. It opens on the name
+  of the set the list came from: keep that name and the button reads
+  **Overwrite**, which replaces that set with the list as it now stands — same
+  place in the selector — while any other name is saved as a new set.
 - **The template list** — one row per template: a tick, its name, its file, the
   **output name template** that names the file it writes, and buttons to edit or
   remove it. *Add template…* opens a file picker.
@@ -291,6 +294,14 @@ the right, and the [variable palette](#the-inspector) in place of the inspector.
 where the caret is: the statement names at the start of one, the option names
 inside it, and the fields of the current model. Each entry carries the same
 one-line description the palette shows.
+
+**New template…** in the menu starts one from nothing: the save dialog opens in
+the `templates/` folder of the [configuration
+directory](installation.md#where-rudbgen-keeps-your-data), and the file you name
+there is created empty and opened. Give it the extension of what it will
+write — `dto.java`, or `dto.java.tpl` — since that picks the highlighting. A
+file that is already there is opened as it is, never emptied. To generate from
+the new template, add it with *Add template…* on the Generate tab.
 
 ## Preview and dry run
 

@@ -220,6 +220,7 @@ menu:
   connection: Подключение
   view: Вид
   template: Шаблон
+  new_template: Новый шаблон…
   open_template: Открыть шаблон…
   save_template: Сохранить шаблон
   toggle_live_preview: Живой просмотр
@@ -273,6 +274,8 @@ generate:
   delete_set: Удалить набор
   delete_set_confirm: "Удалить набор шаблонов «%{name}»?"
   set_name: Имя
+  overwrite_set: Заменить
+  overwrite_set_note: "Набор шаблонов «%{name}» будет заменён текущим списком."
   templates: Шаблоны
   no_templates: Шаблонов пока нет — добавьте один, и запуску будет что писать.
   add_template: Добавить шаблон…
@@ -484,11 +487,14 @@ template:
   tip_preview: Показать или скрыть живой просмотр
   show_preview: Показать просмотр
   hide_preview: Скрыть просмотр
+  tab_width: "Ширина табуляции: %{width}"
+  tip_tab_width: Сколько столбцов занимает табуляция в этом файле
   preview_table: Таблица
   preview_no_connection: Откройте соединение, чтобы увидеть этот шаблон применённым к таблице.
   preview_no_table: Отметьте таблицу в обозревателе, чтобы увидеть этот шаблон применённым.
   preview_parse_error: Шаблон не разбирается; что именно не так, перечислено ниже.
   read_failed: "Не удалось открыть %{file}: %{reason}"
+  create_failed: "Не удалось создать %{file}: %{reason}"
   write_failed: "Не удалось записать %{file}: %{reason}"
   not_utf8: "%{file} — не текст в UTF-8, здесь его редактировать нельзя."
   open_select: Открыть шаблон

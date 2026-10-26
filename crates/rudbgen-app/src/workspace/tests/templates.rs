@@ -763,3 +763,109 @@ fn a_disconnect_closes_the_template_tabs(cx: &mut gpui::TestAppContext) {
     let written = std::fs::read_to_string(&edited).expect("the file is still there");
     assert!(!written.contains("// edit"), "a discarded edit was written");
 }
+
+/// Answers a New template… with `file` and returns the window once the tab it
+/// opens is in place.
+fn create_template_at(cx: &mut gpui::TestAppContext, file: &Path) -> gpui::WindowHandle<Workspace> {
+    cx.update(|cx| {
+        app_settings::init(cx);
+        rugpui::init(cx);
+        rugpui_editor::init(cx);
+    });
+    silence_the_update_check();
+    let window = cx.add_window(|window, cx| Workspace::new(TitlebarStyle::Custom, window, cx));
+    window
+        .update(cx, |workspace, _window, cx| workspace.create_template(cx))
+        .expect("the window is open");
+    let chosen = file.to_path_buf();
+    cx.simulate_new_path_selection(move |directory| {
+        // The dialog starts where the shipped templates are.
+        if let Ok(templates) = rudbgen_core::templates_dir() {
+            assert_eq!(directory, templates);
+        }
+        Some(chosen)
+    });
+    cx.run_until_parked();
+    window
+}
+
+/// New template… makes the file the save dialog names, empty, and opens it in
+/// a tab of its own that is on top and has nothing to save yet.
+#[gpui::test]
+fn a_new_template_is_created_empty_and_opened(cx: &mut gpui::TestAppContext) {
+    let dir = tempfile::tempdir().expect("a temporary directory");
+    let file = dir.path().join("dto.java");
+
+    let window = create_template_at(cx, &file);
+
+    assert_eq!(std::fs::read(&file).expect("the file was created"), b"");
+    window
+        .update(cx, |workspace, _window, cx| {
+            assert!(matches!(
+                workspace.pane.active(),
+                Some(PaneItem::Template { file: open, dirty: false, .. }) if *open == file
+            ));
+            let at = workspace.template_index(&file, cx).expect("the new tab");
+            let pane = workspace.templates[at].read(cx);
+            assert_eq!(pane.failure(), None);
+            assert_eq!(pane.source(cx), "");
+        })
+        .expect("the window is open");
+}
+
+/// Choosing a file that is already there opens it as it is: the dialog's
+/// "replace?" is not taken as leave to empty a template.
+#[gpui::test]
+fn a_new_template_over_an_existing_file_keeps_what_is_in_it(cx: &mut gpui::TestAppContext) {
+    let dir = tempfile::tempdir().expect("a temporary directory");
+    let file = dir.path().join("model.java");
+    std::fs::write(&file, "class ${name.pascal} {}\n").expect("the file");
+
+    let window = create_template_at(cx, &file);
+
+    assert_eq!(
+        std::fs::read_to_string(&file).expect("the file is still there"),
+        "class ${name.pascal} {}\n"
+    );
+    window
+        .update(cx, |workspace, _window, cx| {
+            let at = workspace.template_index(&file, cx).expect("the tab");
+            assert_eq!(
+                workspace.templates[at].read(cx).source(cx),
+                "class ${name.pascal} {}\n"
+            );
+        })
+        .expect("the window is open");
+}
+
+/// A file that cannot be made still gets its tab, and the tab says it could
+/// not be created rather than that it could not be opened.
+#[gpui::test]
+fn a_new_template_that_cannot_be_created_says_why(cx: &mut gpui::TestAppContext) {
+    let dir = tempfile::tempdir().expect("a temporary directory");
+    let file = dir.path().join("missing").join("dto.java");
+
+    let window = create_template_at(cx, &file);
+
+    assert!(!file.exists());
+    window
+        .update(cx, |workspace, _window, cx| {
+            let at = workspace.template_index(&file, cx).expect("the tab");
+            let failure = workspace.templates[at]
+                .read(cx)
+                .failure()
+                .cloned()
+                .expect("the tab says why");
+            let error = super::super::templates::create_empty(&file)
+                .expect_err("there is no directory to create it in");
+            assert_eq!(
+                failure,
+                ts!(
+                    "template.create_failed",
+                    file = file.display().to_string(),
+                    reason = error.to_string()
+                )
+            );
+        })
+        .expect("the window is open");
+}

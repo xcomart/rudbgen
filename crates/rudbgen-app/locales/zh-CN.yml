@@ -219,6 +219,7 @@ menu:
   connection: 连接
   view: 视图
   template: 模板
+  new_template: 新建模板…
   open_template: 打开模板…
   save_template: 保存模板
   toggle_live_preview: 实时预览
@@ -270,6 +271,8 @@ generate:
   delete_set: 删除模板集
   delete_set_confirm: "删除模板集“%{name}”？"
   set_name: 名称
+  overwrite_set: 覆盖
+  overwrite_set_note: "将用当前列表替换模板集“%{name}”。"
   templates: 模板
   no_templates: 还没有模板 —— 添加一个，这次运行才有东西可写。
   add_template: 添加模板…
@@ -481,11 +484,14 @@ template:
   tip_preview: 显示或隐藏实时预览
   show_preview: 显示预览
   hide_preview: 隐藏预览
+  tab_width: "制表符宽度：%{width}"
+  tip_tab_width: 设置此文件中一个制表符显示为几列宽
   preview_table: 表
   preview_no_connection: 打开一个连接，就能看到这个模板套在表上的结果。
   preview_no_table: 在浏览器里勾一张表，就能看到这个模板套上去的结果。
   preview_parse_error: 模板无法解析，问题都列在下面。
   read_failed: "打不开 %{file}: %{reason}"
+  create_failed: "无法创建 %{file}: %{reason}"
   write_failed: "写不了 %{file}: %{reason}"
   not_utf8: "%{file} 不是 UTF-8 文本，无法在这里编辑。"
   open_select: 打开模板

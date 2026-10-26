@@ -219,6 +219,7 @@ menu:
   connection: 接続
   view: 表示
   template: テンプレート
+  new_template: 新しいテンプレート…
   open_template: テンプレートを開く…
   save_template: テンプレートを保存
   toggle_live_preview: ライブプレビュー
@@ -271,6 +272,8 @@ generate:
   delete_set: セットを削除
   delete_set_confirm: "テンプレートセット「%{name}」を削除しますか？"
   set_name: 名前
+  overwrite_set: 上書き
+  overwrite_set_note: "テンプレートセット「%{name}」を現在のリストで置き換えます。"
   templates: テンプレート
   no_templates: テンプレートがまだありません。追加すれば実行が書くものを持てます。
   add_template: テンプレートを追加…
@@ -482,11 +485,14 @@ template:
   tip_preview: ライブプレビューの表示を切り替えます
   show_preview: プレビューを表示
   hide_preview: プレビューを隠す
+  tab_width: "タブ幅: %{width}"
+  tip_tab_width: このファイルでタブを何文字分の幅で表示するかを選びます
   preview_table: テーブル
   preview_no_connection: 接続を開くと、このテンプレートをテーブルに当てた結果が出ます。
   preview_no_table: エクスプローラーでテーブルを選ぶと、当てた結果が出ます。
   preview_parse_error: テンプレートを解析できません。何が悪いかは下に並んでいます。
   read_failed: "%{file} を開けませんでした: %{reason}"
+  create_failed: "%{file} を作成できませんでした: %{reason}"
   write_failed: "%{file} を書けませんでした: %{reason}"
   not_utf8: "%{file} は UTF-8 のテキストではないため、ここでは編集できません。"
   open_select: テンプレートを開く

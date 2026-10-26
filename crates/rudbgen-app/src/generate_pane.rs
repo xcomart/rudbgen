@@ -24,6 +24,11 @@
 //! saved set, which [`matching_set`] decides — an exact, ordered comparison of
 //! every field, ticks included, because a template unticked is a list that no
 //! longer describes the set it came from.
+//!
+//! *Save as set…* under a name a set already has **overwrites** that set in
+//! place, which [`store_set`] decides; the prompt opens on the name of the set
+//! the list came from, so writing an edited list back over its set is one
+//! click.
 
 use std::path::{Path, PathBuf};
 
@@ -57,6 +62,10 @@ const LABEL_WIDTH: f32 = 110.;
 
 /// Width of the template set selector.
 const SET_WIDTH: f32 = 220.;
+
+/// Narrowest the output name field of a template row gets; it grows with the
+/// window beyond this.
+const OUT_MIN_WIDTH: f32 = 200.;
 
 /// Element id of the panel's scrolling box.
 const PANE_SCROLL: &str = "generate-scroll";
@@ -161,6 +170,36 @@ pub fn matching_set(sets: &[TemplateSet], templates: &[TemplateRef]) -> Option<U
     sets.iter()
         .find(|set| set.templates == templates)
         .map(|set| set.id)
+}
+
+/// The saved set called `name`, if there is one.
+///
+/// Compared trimmed and case for case, because that is how a name is saved and
+/// how the selector shows it. A file written before sets could be overwritten
+/// may hold two under one name; the first is the one that answers.
+pub fn set_named(sets: &[TemplateSet], name: &str) -> Option<Uuid> {
+    let name = name.trim();
+    if name.is_empty() {
+        return None;
+    }
+    sets.iter()
+        .find(|set| set.name.trim() == name)
+        .map(|set| set.id)
+}
+
+/// Stores `templates` as the set called `name` and answers its id.
+///
+/// A name that is already a set's overwrites that set — same id, same place in
+/// the list — instead of adding a second one the selector could not tell from
+/// the first. Any other name is a new set at the end.
+pub fn store_set(sets: &mut TemplateSetStore, name: String, templates: Vec<TemplateRef>) -> Uuid {
+    let mut set = TemplateSet::new(name, templates);
+    if let Some(id) = set_named(&sets.sets, &set.name) {
+        set.id = id;
+    }
+    let id = set.id;
+    sets.upsert(set);
+    id
 }
 
 /// The custom variables of a key/value table, as they are saved.
@@ -311,6 +350,13 @@ pub struct GeneratePane {
     naming_set: bool,
     /// The name being typed into that prompt.
     set_name: Entity<TextInput>,
+    /// The set the list was last taken from or saved as, which names the
+    /// "Save as set…" prompt opens on.
+    ///
+    /// Kept apart from [`matching_set`] because that one is lost with the
+    /// first edit, and the edited list is exactly what gets saved back. A set
+    /// deleted since is simply not found, and the prompt opens empty.
+    origin_set: Option<Uuid>,
     /// The set the delete-confirmation prompt is up for, if any.
     deleting_set: Option<Uuid>,
     /// Vertical scroll of the panel.
@@ -335,6 +381,13 @@ impl GeneratePane {
         let subs = vec![
             cx.observe(&output, |pane, _, cx| pane.touch(cx)),
             cx.observe(&author, |pane, _, cx| pane.touch(cx)),
+            // The prompt's button reads Overwrite while the name is a set's,
+            // so the panel redraws as the name is typed.
+            cx.observe(&set_name, |pane, _, cx| {
+                if pane.naming_set {
+                    cx.notify();
+                }
+            }),
         ];
 
         Self {
@@ -352,6 +405,7 @@ impl GeneratePane {
             set_open: false,
             naming_set: false,
             set_name,
+            origin_set: None,
             deleting_set: None,
             scroll: ScrollHandle::new(),
             scrollbar: ScrollbarState::new(),
@@ -389,6 +443,7 @@ impl GeneratePane {
                 (AbbreviationStore::default(), Some(abbr_failed(&error)))
             }
         };
+        self.origin_set = matching_set(&self.sets.sets, &profile.templates);
         self.rebuild(profile, cx);
     }
 
@@ -396,6 +451,7 @@ impl GeneratePane {
     pub fn reset(&mut self, cx: &mut Context<Self>) {
         self.profile_id = None;
         self.saved = GenerationProfile::default();
+        self.origin_set = None;
         self._debounce = None;
         self.rebuild(&GenerationProfile::default(), cx);
     }
@@ -674,26 +730,48 @@ impl GeneratePane {
             let row = self.new_template_row(template, cx);
             self.templates.push(row);
         }
+        self.origin_set = Some(id);
         self.touch(cx);
     }
 
-    /// Saves the current list as a new set under `name`.
+    /// Opens the "Save as set…" prompt on the name of the set the list came
+    /// from, or empty when there is none.
+    fn open_set_prompt(&mut self, cx: &mut Context<Self>) {
+        let name = self
+            .origin_set
+            .and_then(|id| self.sets.get(id))
+            .map(|set| set.name.clone())
+            .unwrap_or_default();
+        self.naming_set = true;
+        set_text(&self.set_name, name, cx);
+        cx.notify();
+    }
+
+    /// Saves the current list as the set called `name`: a new one, or the one
+    /// already called that, overwritten (see [`store_set`]).
     fn save_as_set(&mut self, name: String, cx: &mut Context<Self>) {
         let name = name.trim().to_string();
         if name.is_empty() {
             return;
         }
         let templates = self.collect(cx).templates;
+        let mut stored = None;
         let written = read_modify_write(
             TemplateSetStore::load,
             |sets| {
-                sets.upsert(TemplateSet::new(name, templates));
+                // The name is matched against the file as it is now, not the
+                // copy the prompt was drawn from, so a set another window
+                // added meanwhile is overwritten rather than doubled.
+                stored = Some(store_set(sets, name, templates));
                 // The flag goes with it: a store with a set of the user's own
                 // in it is no longer a first run, whatever it was before.
                 sets.builtins_seeded = true;
             },
             TemplateSetStore::save,
         );
+        if written.is_ok() {
+            self.origin_set = stored;
+        }
         self.keep_sets(written);
         self.naming_set = false;
         cx.notify();
@@ -968,11 +1046,7 @@ impl GeneratePane {
                     .variant(ButtonVariant::Secondary)
                     .disabled(self.templates.is_empty())
                     .on_click(move |_, window, cx| {
-                        naming.update(cx, |pane, cx| {
-                            pane.naming_set = true;
-                            pane.set_name.update(cx, |input, cx| input.clear(cx));
-                            cx.notify();
-                        });
+                        naming.update(cx, |pane, cx| pane.open_set_prompt(cx));
                         let handle = naming.read(cx).set_name.read(cx).focus_handle(cx);
                         window.focus(&handle, cx);
                     }),
@@ -1089,7 +1163,17 @@ impl GeneratePane {
                     })
                     .child(shown.clone()),
             )
-            .child(div().w(px(200.)).flex_none().child(row.out.clone()))
+            .child(
+                // The output name takes two thirds of the room the window gives
+                // the row, the file the rest: a name that writes into a package
+                // tree is the longest thing a row holds, and the one typed in.
+                div()
+                    .debug_selector(move || format!("generate-out-{index}"))
+                    .flex_1()
+                    .flex_grow(2.)
+                    .min_w(px(OUT_MIN_WIDTH))
+                    .child(row.out.clone()),
+            )
             .child(
                 // The way into the template tab (§4.5). The path the event
                 // carries is the profile's, which the shell resolves against
@@ -1201,10 +1285,23 @@ impl GeneratePane {
     }
 
     /// The "Save as set…" prompt.
+    ///
+    /// While the name is a set's, a line under it says that set is replaced
+    /// and the button reads Overwrite. Decided from the copy on screen, which
+    /// is what the selector shows; the save matches against the file again.
     fn render_set_prompt(&self, cx: &mut Context<Self>) -> impl IntoElement + use<> {
         let save = cx.entity();
         let cancel = cx.entity();
         let input = self.set_name.clone();
+        let theme = theme(cx);
+        let overwritten = set_named(&self.sets.sets, &text(&self.set_name, cx))
+            .and_then(|id| self.sets.get(id))
+            .map(|set| set.name.clone());
+        let (label, variant) = if overwritten.is_some() {
+            (ts!("generate.overwrite_set"), ButtonVariant::Danger)
+        } else {
+            (ts!("common.save"), ButtonVariant::Primary)
+        };
         modal(
             "generate-set-name",
             ts!("generate.save_as_set"),
@@ -1214,6 +1311,13 @@ impl GeneratePane {
                 .flex_col()
                 .gap(px(12.))
                 .child(form_row(ts!("generate.set_name"), input.clone()))
+                .children(overwritten.map(|name| {
+                    div()
+                        .debug_selector(|| "generate-set-overwrite".to_string())
+                        .text_size(px(12.))
+                        .text_color(theme.text_muted)
+                        .child(ts!("generate.overwrite_set_note", name = name))
+                }))
                 .child(
                     div()
                         .flex()
@@ -1232,8 +1336,8 @@ impl GeneratePane {
                             }),
                         )
                         .child(
-                            Button::new("generate-set-save", ts!("common.save"))
-                                .variant(ButtonVariant::Primary)
+                            Button::new("generate-set-save", label)
+                                .variant(variant)
                                 .on_click(move |_, _window, cx| {
                                     let name = save.read(cx).set_name.read(cx).content().to_owned();
                                     save.update(cx, |pane, cx| pane.save_as_set(name, cx));
@@ -1656,6 +1760,96 @@ mod tests {
     }
 
     #[test]
+    fn a_set_is_found_by_its_name_as_the_selector_shows_it() {
+        let set = TemplateSet::new("Java + MyBatis", vec![reference("a", true)]);
+        let twin = TemplateSet::new("Java + MyBatis", vec![reference("b", true)]);
+        let sets = vec![set.clone(), twin];
+
+        assert_eq!(set_named(&sets, "Java + MyBatis"), Some(set.id));
+        // Trimmed, as a name is saved; and of two that share a name, which an
+        // older file may hold, the first.
+        assert_eq!(set_named(&sets, "  Java + MyBatis "), Some(set.id));
+        // The case is part of the name, and a blank name is nobody's.
+        assert_eq!(set_named(&sets, "java + mybatis"), None);
+        assert_eq!(set_named(&sets, "   "), None);
+    }
+
+    #[test]
+    fn saving_under_a_set_name_overwrites_that_set_in_place() {
+        let mut store = TemplateSetStore::default();
+        let first = store_set(&mut store, "first".to_string(), vec![reference("a", true)]);
+        let second = store_set(&mut store, "second".to_string(), vec![reference("b", true)]);
+        assert_ne!(first, second);
+
+        let edited = vec![reference("a", false), reference("c", true)];
+        let again = store_set(&mut store, "first".to_string(), edited.clone());
+        // The same set, where it was, now holding the edited list.
+        assert_eq!(again, first);
+        let names: Vec<&str> = store.sets.iter().map(|set| set.name.as_str()).collect();
+        assert_eq!(names, ["first", "second"]);
+        assert_eq!(store.get(first).map(|set| &set.templates), Some(&edited));
+
+        // Any other name is a new set at the end.
+        let third = store_set(&mut store, "third".to_string(), vec![reference("d", true)]);
+        assert_eq!(store.sets.len(), 3);
+        assert_eq!(store.sets[2].id, third);
+    }
+
+    #[gpui::test]
+    fn the_prompt_opens_on_the_set_the_edited_list_came_from(cx: &mut gpui::TestAppContext) {
+        cx.update(|cx| {
+            crate::app_settings::init(cx);
+            rugpui::init(cx);
+        });
+        let set = TemplateSet::new(
+            "Java + MyBatis",
+            vec![reference("a", true), reference("b", true)],
+        );
+        let window = cx.add_window(|_, cx| {
+            let mut pane = GeneratePane::new(cx);
+            pane.sets.upsert(set.clone());
+            pane
+        });
+        let mut cx = gpui::VisualTestContext::from_window(window.into(), cx);
+        window
+            .update(&mut cx, |pane, _, cx| {
+                pane.apply_set(set.id, cx);
+                // An unticked row: the selector says Custom from here on.
+                pane.toggle_template(1, false, cx);
+                let current = pane.collect(cx).templates;
+                assert_eq!(matching_set(&pane.sets.sets, &current), None);
+
+                pane.open_set_prompt(cx);
+                assert_eq!(text(&pane.set_name, cx), "Java + MyBatis");
+            })
+            .unwrap();
+        cx.run_until_parked();
+        assert!(
+            cx.debug_bounds("generate-set-overwrite").is_some(),
+            "the prompt does not say the set is replaced"
+        );
+
+        // A name of its own is a new set, and the note goes as it is typed.
+        window
+            .update(&mut cx, |pane, _, cx| {
+                set_text(&pane.set_name, "Java only", cx)
+            })
+            .unwrap();
+        cx.run_until_parked();
+        assert!(cx.debug_bounds("generate-set-overwrite").is_none());
+
+        // With no set to come from, the prompt opens empty.
+        window
+            .update(&mut cx, |pane, _, cx| {
+                pane.naming_set = false;
+                pane.reset(cx);
+                pane.open_set_prompt(cx);
+                assert_eq!(text(&pane.set_name, cx), "");
+            })
+            .unwrap();
+    }
+
+    #[test]
     fn a_blank_key_is_not_a_variable() {
         let rows = [
             ("package".to_string(), "com.abc".to_string()),
@@ -1827,6 +2021,43 @@ mod tests {
         assert!(
             (scroll.size.height - px(140.)).abs() < px(2.),
             "the form was not bounded above the buttons: {scroll:?}"
+        );
+    }
+
+    #[gpui::test]
+    fn the_output_name_field_grows_with_the_window(cx: &mut gpui::TestAppContext) {
+        cx.update(|cx| {
+            crate::app_settings::init(cx);
+            rugpui::init(cx);
+        });
+        let window = cx.add_window(|_, cx| {
+            let mut pane = GeneratePane::new(cx);
+            pane.rebuild(
+                &GenerationProfile {
+                    templates: vec![reference("first", true)],
+                    ..Default::default()
+                },
+                cx,
+            );
+            pane
+        });
+        let mut cx = gpui::VisualTestContext::from_window(window.into(), cx);
+        let mut widths = Vec::new();
+        for width in [600., 1000., 1400.] {
+            cx.simulate_resize(gpui::size(px(width), px(700.)));
+            cx.run_until_parked();
+            let field = cx
+                .debug_bounds("generate-out-0")
+                .expect("the output name field is drawn");
+            widths.push(field.size.width);
+        }
+        // Never narrower than the fixed width it used to have, and two thirds
+        // of what the window gains on top of that.
+        assert!(widths[0] >= px(OUT_MIN_WIDTH), "{widths:?}");
+        let gained = widths[2] - widths[1];
+        assert!(
+            (gained - px(400. * 2. / 3.)).abs() < px(2.),
+            "the field did not grow with the window: {widths:?}"
         );
     }
 

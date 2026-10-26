@@ -60,6 +60,8 @@ actions!(
         Preview,
         /// Renders every pair into memory, writing nothing.
         DryRun,
+        /// Creates an empty template file where the user says, and opens it.
+        NewTemplate,
         /// Opens a template file in a tab of its own.
         OpenTemplate,
         /// Writes the template tab that is on top back to its file.

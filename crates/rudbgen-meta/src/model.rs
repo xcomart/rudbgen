@@ -326,7 +326,9 @@ pub struct Column {
     pub data_type: i32,
     /// The JDBC name of [`Column::data_type`]; see [`sqltypes::jdbc_type`].
     pub jdbc_type: String,
-    /// The Java type of [`Column::data_type`]; see [`sqltypes::java_type`].
+    /// The Java type of [`Column::data_type`], sized by [`Column::precision`]
+    /// and [`Column::scale`] for an exact numeric type; see
+    /// [`sqltypes::java_type`].
     pub java_type: String,
     /// Whether the database fills this column in by itself (D8).
     pub auto_increment: bool,
@@ -348,18 +350,20 @@ impl Column {
         self.key_seq.is_some()
     }
 
-    /// Fill in the four derived members from the three raw ones.
+    /// Fill in the four derived members from the five raw ones.
     ///
     /// [`Column::type_string`], [`Column::is_char_type`],
     /// [`Column::jdbc_type`] and [`Column::java_type`] are functions of
-    /// [`Column::type_name`], [`Column::length`] and [`Column::data_type`],
-    /// which is why they are derived in one place instead of being set by each
-    /// of the two paths that read a column.
+    /// [`Column::type_name`], [`Column::length`], [`Column::data_type`],
+    /// [`Column::precision`] and [`Column::scale`], which is why they are
+    /// derived in one place instead of being set by each of the two paths that
+    /// read a column.
     pub fn derive(&mut self) {
         self.type_string = sqltypes::type_string(&self.type_name, self.length);
         self.is_char_type = sqltypes::is_char_type(&self.type_name);
         self.jdbc_type = sqltypes::jdbc_type(self.data_type).to_string();
-        self.java_type = sqltypes::java_type(self.data_type).to_string();
+        self.java_type =
+            sqltypes::java_type(self.data_type, self.precision, self.scale).to_string();
     }
 }
 
@@ -720,6 +724,27 @@ mod tests {
             column.type_string, "GEOMETRY",
             "the database type is still usable"
         );
+    }
+
+    #[test]
+    fn an_exact_numeric_column_gets_the_java_type_its_precision_needs() {
+        let derived = |precision: i64, scale: i64| {
+            let mut column = Column {
+                type_name: "NUMERIC".to_string(),
+                data_type: 2,
+                length: precision,
+                precision,
+                scale,
+                ..Column::default()
+            };
+            column.derive();
+            column.java_type
+        };
+
+        assert_eq!(derived(9, 0), "Integer");
+        assert_eq!(derived(12, 0), "Long");
+        assert_eq!(derived(18, 2), "BigDecimal", "a fraction is never cut off");
+        assert_eq!(derived(30, 0), "BigDecimal", "more digits than a long");
     }
 
     #[test]

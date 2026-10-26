@@ -555,7 +555,7 @@ palette:
     defVal: 既定値
     dataType: ドライバーが返した java.sql.Types の値
     jdbcType: その値が表す JDBC 型の名前
-    javaType: その値に対応する Java 型の名前
+    javaType: その値に対応する Java 型の名前。DECIMAL と NUMERIC は precision と scale で決まる
     autoIncrement: データベースが自分で値を埋めるかどうか
     keySeq: 主キーの中での位置。1 から
     fk: 外部キーがちょうど一つこの列を使うとき、その指す先

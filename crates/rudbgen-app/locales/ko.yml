@@ -555,7 +555,7 @@ palette:
     defVal: 기본값
     dataType: 드라이버가 알려 준 java.sql.Types 코드
     jdbcType: 그 코드가 뜻하는 JDBC 타입 이름
-    javaType: 그 코드가 대응하는 자바 타입 이름
+    javaType: 그 코드가 대응하는 자바 타입 이름. DECIMAL·NUMERIC은 precision과 scale에 맞춰 정해짐
     autoIncrement: 데이터베이스가 값을 스스로 채우는지
     keySeq: 기본 키 안에서의 자리. 1부터
     fk: 외래 키 하나만 이 열을 쓸 때, 그 열이 가리키는 곳

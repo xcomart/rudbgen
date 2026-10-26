@@ -557,7 +557,7 @@ palette:
     defVal: Der Vorgabewert
     dataType: Der rohe java.sql.Types-Code des Treibers
     jdbcType: Der JDBC-Typname zu diesem Code
-    javaType: Der Java-Typname zu diesem Code
+    javaType: Der Java-Typname zu diesem Code, bei DECIMAL und NUMERIC nach precision und scale bemessen
     autoIncrement: Ob die Datenbank die Spalte selbst füllt
     keySeq: Die Stelle der Spalte im Primärschlüssel, ab 1
     fk: Worauf die Spalte zeigt, wenn genau ein Fremdschlüssel sie verwendet

@@ -554,7 +554,7 @@ palette:
     defVal: 默认值
     dataType: 驱动报告的 java.sql.Types 原始代码
     jdbcType: 该代码对应的 JDBC 类型名
-    javaType: 该代码映射到的 Java 类型名
+    javaType: 该代码映射到的 Java 类型名；DECIMAL 和 NUMERIC 按 precision 与 scale 决定
     autoIncrement: 数据库是否自己填这一列
     keySeq: 在主键里的位次，从 1 起
     fk: 只有一个外键用到这一列时，它指向的地方

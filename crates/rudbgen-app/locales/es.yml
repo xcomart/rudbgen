@@ -557,7 +557,7 @@ palette:
     defVal: El valor por omisión
     dataType: El código java.sql.Types en bruto que informó el controlador
     jdbcType: El nombre de tipo JDBC de ese código
-    javaType: El nombre de tipo Java al que corresponde ese código
+    javaType: El nombre de tipo Java al que corresponde ese código, elegido según precision y scale en DECIMAL y NUMERIC
     autoIncrement: Si la base de datos rellena la columna por sí sola
     keySeq: El puesto de la columna dentro de la clave primaria, desde 1
     fk: A qué apunta la columna, cuando la usa exactamente una clave externa

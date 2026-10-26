@@ -775,7 +775,7 @@ palette:
     defVal: The default value
     dataType: The raw java.sql.Types code the driver reported
     jdbcType: The JDBC type name that code stands for
-    javaType: The Java type name that code maps to
+    javaType: The Java type that code maps to, sized by precision and scale for DECIMAL and NUMERIC
     autoIncrement: Whether the database fills the column in by itself
     keySeq: Where the column comes in the primary key, from 1
     fk: What the column points at, when exactly one foreign key uses it

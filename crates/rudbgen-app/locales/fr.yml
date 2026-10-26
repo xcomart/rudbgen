@@ -557,7 +557,7 @@ palette:
     defVal: La valeur par défaut
     dataType: Le code java.sql.Types brut rapporté par le pilote
     jdbcType: Le nom de type JDBC de ce code
-    javaType: Le nom de type Java auquel ce code correspond
+    javaType: Le nom de type Java auquel ce code correspond, choisi selon precision et scale pour DECIMAL et NUMERIC
     autoIncrement: Si la base remplit la colonne elle-même
     keySeq: Le rang de la colonne dans la clé primaire, à partir de 1
     fk: Ce que la colonne désigne, quand une seule clé étrangère l'utilise

@@ -596,7 +596,8 @@ impl CustomQuery {
 /// * [`columns`](CustomQueries::columns) — one row per column, read by label:
 ///   `TABLE_CAT`, `TABLE_SCHEM`, `TABLE_NAME`, `COLUMN_NAME`, `DATA_TYPE`,
 ///   `TYPE_NAME`, `COLUMN_SIZE`, `NULLABLE`, `REMARKS`, `COLUMN_DEF`,
-///   `IS_KEY`.
+///   `IS_KEY`, and an optional `DECIMAL_DIGITS` that is read when it is there
+///   but never required.
 /// * [`table_comments`](CustomQueries::table_comments) — read
 ///   **positionally**: the table name, then the comment.
 /// * [`column_comments`](CustomQueries::column_comments) — run once per

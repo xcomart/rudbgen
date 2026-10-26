@@ -484,6 +484,8 @@ template:
   tip_preview: 显示或隐藏实时预览
   show_preview: 显示预览
   hide_preview: 隐藏预览
+  tab_width: "制表符宽度：%{width}"
+  tip_tab_width: 设置此文件中一个制表符显示为几列宽
   preview_table: 表
   preview_no_connection: 打开一个连接，就能看到这个模板套在表上的结果。
   preview_no_table: 在浏览器里勾一张表，就能看到这个模板套上去的结果。

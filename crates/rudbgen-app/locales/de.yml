@@ -487,6 +487,8 @@ template:
   tip_preview: Live-Vorschau ein- und ausblenden
   show_preview: Vorschau zeigen
   hide_preview: Vorschau ausblenden
+  tab_width: "Tabbreite: %{width}"
+  tip_tab_width: Wie viele Spalten breit ein Tab in dieser Datei dargestellt wird
   preview_table: Tabelle
   preview_no_connection: Öffnen Sie eine Verbindung, um diese Vorlage auf eine Tabelle angewandt zu sehen.
   preview_no_table: Haken Sie im Explorer eine Tabelle an, um diese Vorlage angewandt zu sehen.

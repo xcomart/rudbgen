@@ -487,6 +487,8 @@ template:
   tip_preview: Afficher ou masquer l'aperçu en direct
   show_preview: Afficher l'aperçu
   hide_preview: Masquer l'aperçu
+  tab_width: "Largeur de tabulation : %{width}"
+  tip_tab_width: Nombre de colonnes sur lesquelles une tabulation s'affiche dans ce fichier
   preview_table: Table
   preview_no_connection: Ouvrez une connexion pour voir ce modèle appliqué à une table.
   preview_no_table: Cochez une table dans l'explorateur pour voir ce modèle appliqué.

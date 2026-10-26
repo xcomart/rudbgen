@@ -487,6 +487,8 @@ template:
   tip_preview: Mostrar u ocultar la vista previa en vivo
   show_preview: Mostrar vista previa
   hide_preview: Ocultar vista previa
+  tab_width: "Ancho de tabulación: %{width}"
+  tip_tab_width: Cuántas columnas ocupa una tabulación en este archivo
   preview_table: Tabla
   preview_no_connection: Abra una conexión para ver esta plantilla aplicada a una tabla.
   preview_no_table: Marque una tabla en el explorador para ver esta plantilla aplicada.

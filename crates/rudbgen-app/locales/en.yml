@@ -682,6 +682,11 @@ template:
   tip_preview: Show or hide the live preview
   show_preview: Show preview
   hide_preview: Hide preview
+  # The header's control for how wide this file's tabs are drawn, and the
+  # tooltip over it. `%{width}` is a number of columns; the file itself keeps
+  # its tabs.
+  tab_width: "Tab width: %{width}"
+  tip_tab_width: How many columns a tab is drawn across in this file
   # Placeholder of the dropdown that picks which table the preview is of.
   preview_table: Table
   # What stands in the preview's place when it cannot be rendered. The first

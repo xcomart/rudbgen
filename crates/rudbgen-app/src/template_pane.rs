@@ -87,6 +87,15 @@ const POPUP_ROW_HEIGHT: f32 = 20.;
 /// Width of the preview header's table selector.
 const CHOICE_WIDTH: f32 = 190.;
 
+/// The widest tab stop the header's tab width menu offers. The editor takes up
+/// to sixteen, which a hand-edited `settings.json` can still ask for.
+const MENU_TAB_WIDTHS: usize = 8;
+
+/// What a file is known by in `settings.json`'s per-template settings.
+fn settings_key(path: &Path) -> String {
+    path.to_string_lossy().into_owned()
+}
+
 /// What a file's lines end with.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum LineEnding {
@@ -326,6 +335,8 @@ pub struct TemplatePane {
     completion: Option<Completion>,
     /// Pointer position of the source editor's context menu.
     context_menu: Option<Point<Pixels>>,
+    /// Where the header's tab width menu hangs from, while it is up.
+    tab_menu: Option<Point<Pixels>>,
     /// Whether the buffer should take the keyboard on the next frame.
     ///
     /// A tab that has just been opened or brought to the front is a document
@@ -350,8 +361,19 @@ impl TemplatePane {
     pub fn open(path: PathBuf, cx: &mut Context<Self>) -> Self {
         let highlighter = crate::template_syntax::template_highlighter_for_path(&path);
         let wrap = app_settings::effective(cx).editor_word_wrap;
-        let editor = cx.new(|cx| EditorView::new(cx).highlighter(highlighter).word_wrap(wrap));
-        let preview = cx.new(|cx| EditorView::new(cx).read_only(true).word_wrap(wrap));
+        // The preview draws the tabs the template copies into it as wide as the
+        // template's own, so the two halves line up.
+        let tabs = app_settings::current(cx).template_tab_width(&settings_key(&path)) as usize;
+        let editor = cx.new(|cx| {
+            let mut editor = EditorView::new(cx).highlighter(highlighter).word_wrap(wrap);
+            editor.set_tab_width(tabs, cx);
+            editor
+        });
+        let preview = cx.new(|cx| {
+            let mut preview = EditorView::new(cx).read_only(true).word_wrap(wrap);
+            preview.set_tab_width(tabs, cx);
+            preview
+        });
         let editor_events = cx.subscribe(&editor, |pane, _editor, event, cx| match event {
             EditorEvent::Changed => pane.changed(cx),
             EditorEvent::SelectionChanged => pane.moved(cx),
@@ -359,6 +381,7 @@ impl TemplatePane {
             EditorEvent::ContextMenu { position } => {
                 pane.close_completion(cx);
                 pane.choice_open = false;
+                pane.tab_menu = None;
                 pane.context_menu = Some(*position);
                 cx.notify();
             }
@@ -406,6 +429,7 @@ impl TemplatePane {
             items: Vec::new(),
             completion: None,
             context_menu: None,
+            tab_menu: None,
             pending_focus: true,
             _debounce: None,
             _editor_events: editor_events,
@@ -539,13 +563,84 @@ impl TemplatePane {
         window.focus(&handle, cx);
     }
 
-    /// Dismisses the menu when a shell command changes the active surface.
+    /// Dismisses the menus when a shell command changes the active surface.
     pub fn close_context_menu(&mut self, cx: &mut Context<Self>) -> bool {
-        let closed = self.context_menu.take().is_some();
+        let closed = self.context_menu.take().is_some() | self.tab_menu.take().is_some();
         if closed {
             cx.notify();
         }
         closed
+    }
+
+    /// How many columns apart this file's tab stops are drawn.
+    pub fn tab_width(&self, cx: &App) -> usize {
+        self.editor.read(cx).tab_width()
+    }
+
+    /// Draws this file's tabs reaching a stop every `width` columns, in both
+    /// halves, and remembers the width for the file in the settings global.
+    ///
+    /// Only the drawing changes: the buffer keeps its tabs and is no dirtier
+    /// than it was. The settings are recorded but not written — the menu that
+    /// calls this writes them, and [`app_settings::save`] takes them to disk at
+    /// shutdown in any case.
+    pub fn set_tab_width(&mut self, width: usize, cx: &mut Context<Self>) {
+        for editor in [&self.editor, &self.preview] {
+            editor.update(cx, |editor, cx| editor.set_tab_width(width, cx));
+        }
+        let width = self.tab_width(cx);
+        let key = settings_key(&self.path);
+        let mut settings = app_settings::current(cx);
+        if settings.template_tab_width(&key) as usize != width {
+            settings.set_template_tab_width(&key, width as u32);
+            app_settings::replace(settings, cx);
+        }
+        cx.notify();
+    }
+
+    /// Puts the tab width menu up at `position`, putting away everything else
+    /// that floats over the pane.
+    fn open_tab_menu(&mut self, position: Point<Pixels>, cx: &mut Context<Self>) {
+        self.close_completion(cx);
+        self.choice_open = false;
+        self.context_menu = None;
+        self.tab_menu = Some(position);
+        cx.notify();
+    }
+
+    /// The tab width menu's rows: one per width, the one in force ticked.
+    fn tab_width_rows(&self, cx: &Context<Self>) -> Vec<MenuRow> {
+        let current = self.tab_width(cx);
+        (1..=MENU_TAB_WIDTHS)
+            .map(|width| {
+                let this = cx.entity();
+                MenuRow::new(width.to_string())
+                    .checked(width == current)
+                    .on_activate(move |_window, cx| {
+                        this.update(cx, |pane, cx| pane.set_tab_width(width, cx));
+                        // Written through at once, as a choice made in a menu
+                        // is everywhere else: it should survive a crash the way
+                        // a saved setting does.
+                        app_settings::save(cx);
+                    })
+            })
+            .collect()
+    }
+
+    fn render_tab_menu(&self, cx: &mut Context<Self>) -> Option<ContextMenu> {
+        let position = self.tab_menu?;
+        let this = cx.entity();
+        Some(
+            ContextMenu::new("template-tab-width")
+                .position(position)
+                .entries(menu_rows::entries(self.tab_width_rows(cx)))
+                .on_dismiss(move |_window, cx| {
+                    this.update(cx, |pane, cx| {
+                        pane.tab_menu = None;
+                        cx.notify();
+                    });
+                }),
+        )
     }
 
     fn editor_rows(&self, cx: &Context<Self>) -> Vec<MenuRow> {
@@ -1008,7 +1103,9 @@ impl TemplatePane {
         let dirty = self.is_dirty(cx);
         let save = cx.entity();
         let toggle = cx.entity();
+        let tabs = cx.entity();
         let open = self.preview_open;
+        let tab_menu_open = self.tab_menu.is_some();
 
         div()
             .flex()
@@ -1038,6 +1135,36 @@ impl TemplatePane {
                     .text_color(theme.accent)
                     .child(ts!("template.unsaved"))
             }))
+            .child(
+                div()
+                    .id("template-tab-width")
+                    .debug_selector(|| "template-tab-width".to_string())
+                    .flex()
+                    .flex_none()
+                    .items_center()
+                    .justify_center()
+                    .h(px(20.))
+                    .px(px(8.))
+                    .rounded_md()
+                    .text_size(px(11.))
+                    .text_color(if tab_menu_open {
+                        theme.text
+                    } else {
+                        theme.text_muted
+                    })
+                    .when(tab_menu_open, |this| this.bg(theme.surface_active))
+                    .cursor_pointer()
+                    .hover(|style| style.bg(theme.surface_hover))
+                    .tooltip(tooltip_label(ts!("template.tip_tab_width")))
+                    .on_click(move |event, _window, cx| {
+                        let position = event.position();
+                        tabs.update(cx, |pane, cx| pane.open_tab_menu(position, cx));
+                    })
+                    .child(ts!(
+                        "template.tab_width",
+                        width = self.tab_width(cx).to_string()
+                    )),
+            )
             .child(
                 Button::new("template-save", ts!("common.save"))
                     .variant(ButtonVariant::Secondary)
@@ -1479,6 +1606,7 @@ impl Render for TemplatePane {
             .children((!self.diagnostics.is_empty()).then(|| self.render_diagnostics(cx)))
             .children(self.render_completion(cx))
             .children(self.render_context_menu(cx))
+            .children(self.render_tab_menu(cx))
             .into_any_element()
     }
 }
@@ -1810,6 +1938,73 @@ mod tests {
             std::fs::read_to_string(dir.path().join("model.java")).unwrap(),
             "class  {}\n"
         );
+    }
+
+    /// The width a file's tabs are drawn at is the file's: both halves take
+    /// it, the buffer keeps its tabs, and the next pane over the same file
+    /// opens at it. The menu's own write to disk is left out — a test has no
+    /// business in the real `settings.json` — so the rows are read rather than
+    /// run.
+    #[gpui::test]
+    fn a_file_keeps_the_tab_width_chosen_for_it(cx: &mut TestAppContext) {
+        let source = "class Album {\n\tString title;\n}\n";
+        let (dir, pane, mut cx) = open_pane(source, cx);
+        let checked = |pane: &Entity<TemplatePane>, cx: &mut VisualTestContext| {
+            cx.update(|_window, cx| {
+                pane.update(cx, |pane, cx| {
+                    let rows = pane.tab_width_rows(cx);
+                    assert_eq!(
+                        menu_rows::labels(&rows),
+                        ["1", "2", "3", "4", "5", "6", "7", "8"]
+                    );
+                    rows.iter()
+                        .filter(|row| row.is_checked())
+                        .map(|row| row.label().to_owned())
+                        .collect::<Vec<_>>()
+                })
+            })
+        };
+        assert_eq!(checked(&pane, &mut cx), ["4"], "four until told otherwise");
+
+        // The header names the width in force and puts the menu up.
+        cx.run_until_parked();
+        let header = cx
+            .debug_bounds("template-tab-width")
+            .expect("the tab width control is drawn");
+        cx.simulate_click(header.center(), gpui::Modifiers::none());
+        cx.update(|_window, cx| assert!(pane.read(cx).tab_menu.is_some()));
+        cx.simulate_keystrokes("escape");
+        cx.update(|_window, cx| assert!(pane.read(cx).tab_menu.is_none()));
+
+        cx.update(|_window, cx| pane.update(cx, |pane, cx| pane.set_tab_width(2, cx)));
+        cx.update(|_window, cx| {
+            let pane = pane.read(cx);
+            assert_eq!(pane.editor.read(cx).tab_width(), 2);
+            assert_eq!(pane.preview.read(cx).tab_width(), 2);
+            assert_eq!(pane.source(cx), source, "the tab is still a tab");
+            assert!(!pane.is_dirty(cx));
+            let key = settings_key(pane.path());
+            assert_eq!(app_settings::current(cx).template_tab_width(&key), 2);
+        });
+        assert_eq!(checked(&pane, &mut cx), ["2"]);
+
+        // Opened again, the file comes back at its own width; another file
+        // does not.
+        let file = dir.path().join("model.java");
+        let other = dir.path().join("mapper.xml");
+        std::fs::write(&other, "<mapper/>\n").expect("the other template is written");
+        cx.update(|_window, cx| {
+            let again = cx.new(|cx| TemplatePane::open(file, cx));
+            assert_eq!(again.read(cx).tab_width(cx), 2);
+            let elsewhere = cx.new(|cx| TemplatePane::open(other, cx));
+            assert_eq!(elsewhere.read(cx).tab_width(cx), 4);
+        });
+
+        // And back to the default leaves nothing behind for the file.
+        cx.update(|_window, cx| pane.update(cx, |pane, cx| pane.set_tab_width(4, cx)));
+        cx.update(|_window, cx| {
+            assert!(app_settings::current(cx).template_tab_widths.is_empty());
+        });
     }
 
     #[test]

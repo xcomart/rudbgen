@@ -485,6 +485,8 @@ template:
   tip_preview: ライブプレビューの表示を切り替えます
   show_preview: プレビューを表示
   hide_preview: プレビューを隠す
+  tab_width: "タブ幅: %{width}"
+  tip_tab_width: このファイルでタブを何文字分の幅で表示するかを選びます
   preview_table: テーブル
   preview_no_connection: 接続を開くと、このテンプレートをテーブルに当てた結果が出ます。
   preview_no_table: エクスプローラーでテーブルを選ぶと、当てた結果が出ます。

@@ -485,6 +485,8 @@ template:
   tip_preview: 실시간 미리보기를 켜거나 끕니다
   show_preview: 미리보기 표시
   hide_preview: 미리보기 숨기기
+  tab_width: "탭 폭: %{width}"
+  tip_tab_width: 이 파일에서 탭 하나를 몇 칸 폭으로 그릴지 정합니다
   preview_table: 테이블
   preview_no_connection: 연결을 열면 이 템플릿을 테이블에 적용한 결과를 보여 줍니다.
   preview_no_table: 탐색기에서 테이블을 고르면 이 템플릿을 적용한 결과를 보여 줍니다.

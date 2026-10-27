@@ -1200,8 +1200,6 @@ mod tests {
     use std::rc::Rc;
 
     use gpui::{TestAppContext, VisualTestContext};
-    // rugpui spells it the British way.
-    use rugpui_shell::menu_rows::greyed as grayed_rows;
 
     use super::*;
 
@@ -1638,7 +1636,7 @@ mod tests {
         // half of the rule and not an accident of this menu.
         let grayed = cx.update(|_, cx| {
             explorer.update(cx, |explorer, cx| {
-                grayed_rows(&explorer.menu_rows(&NodeId::Schema(public()), cx))
+                menu_rows::grayed(&explorer.menu_rows(&NodeId::Schema(public()), cx))
             })
         });
         assert_eq!(
@@ -1651,7 +1649,7 @@ mod tests {
         // On a table row the inspector command is live.
         let grayed = cx.update(|_, cx| {
             explorer.update(cx, |explorer, cx| {
-                grayed_rows(&explorer.menu_rows(&NodeId::Table(key("T_ALBUM")), cx))
+                menu_rows::grayed(&explorer.menu_rows(&NodeId::Table(key("T_ALBUM")), cx))
             })
         });
         assert_eq!(grayed, vec![ts!("explorer.menu_clear").to_string()]);

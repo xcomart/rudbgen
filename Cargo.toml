@@ -214,7 +214,7 @@ jni = { version = "0.22", features = ["invocation"] }
 # --- the widget kit ---
 # `rugpui` is the gpui widget kit these three applications share — rulogman,
 # rudbman and rudbgen — extracted so that a fix made once is a fix everywhere.
-# `rugpui-grid` is the virtualised result grid and `rugpui-editor` the code editor.
+# `rugpui-grid` is the virtualized result grid and `rugpui-editor` the code editor.
 #
 # `rugpui-shell` is the layer *above* the widgets, and it is here for the same
 # reason the kit is: the window that draws its own title bar, the self-updater,

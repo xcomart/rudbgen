@@ -38,7 +38,7 @@ const ICON_TABLE: &str = "fa:TABLE";
 /// The icon locator of a view.
 const ICON_VIEW: &str = "fa:EYE";
 
-/// Normalise whatever a driver calls a table type into `TABLE` or `VIEW`.
+/// Normalize whatever a driver calls a table type into `TABLE` or `VIEW`.
 ///
 /// jdbgen's `DBTable` rule, kept whole because the explorer and the generator
 /// both filter on the result:

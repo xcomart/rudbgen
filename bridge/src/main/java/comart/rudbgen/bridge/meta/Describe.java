@@ -29,12 +29,12 @@ import java.util.List;
  * <p>rudbman also answered {@code ddl}, {@code procedures}, {@code functions}
  * and {@code sequences}; those are gone (architecture.md D3). A code generator
  * writes files from tables, views, columns, keys and indexes, and the three
- * kinds that needed hand-written vendor catalogue queries were also the three
+ * kinds that needed hand-written vendor catalog queries were also the three
  * with the most per-product code to keep alive.
  *
  * <p>Two kinds reach past {@link DatabaseMetaData}:
  * {@code tables} and {@code columns} stay pure JDBC reads, but their
- * {@code remarks} are then reconciled against the vendor catalogue on the
+ * {@code remarks} are then reconciled against the vendor catalog on the
  * products whose drivers report comments badly ({@link Comments}): topped up
  * where a driver reports none, and cleared where one reports a placeholder
  * instead. The top-up happens only where the driver left a hole, and silently

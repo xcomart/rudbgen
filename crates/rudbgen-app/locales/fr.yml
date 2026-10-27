@@ -88,7 +88,7 @@ connect:
   add_prop: Ajouter une propriété
 
   section:
-    behaviour: Comportement
+    behavior: Comportement
     tunnel: Tunnel SSH
 
   keep_alive: Maintenir la connexion par une requête périodique
@@ -169,7 +169,7 @@ driver:
   downloading: "Téléchargement de %{file}…"
   downloading_percent: "Téléchargement de %{file} — %{percent} %"
   downloaded: "%{file} a été téléchargé et ajouté."
-  download_cancelled: Le téléchargement a été annulé.
+  download_canceled: Le téléchargement a été annulé.
   bad_coordinate: "« %{coordinate} » n’est pas une coordonnée group:artifact:version."
   not_found: "Maven Central n’a rien à %{url}."
   network_failed: "Le téléchargement a échoué : %{error}"
@@ -326,14 +326,14 @@ progress:
   skipped: "%{path} conservé"
   failed: "échec de %{path} : %{reason}"
   conflict: "%{path} existe déjà"
-  cancelling: annulation…
+  canceling: annulation…
   count: "%{done} sur %{total}"
 
 summary:
   title: Résultat
   done: Tout ce que l’exécution demandait a été écrit.
   with_failures: L’exécution s’est terminée avec des échecs.
-  cancelled: L’exécution a été annulée ; ce qui avait été écrit figure ci-dessous.
+  canceled: L’exécution a été annulée ; ce qui avait été écrit figure ci-dessous.
   counts: "%{written} écrits · %{skipped} ignorés · %{failed} échecs · %{warnings} avertissements"
   written: Écrits
   skipped: Ignorés

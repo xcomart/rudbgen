@@ -124,7 +124,7 @@ pub enum Ctx {
 /// One entry of the palette.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct PaletteItem {
-    /// What the row is labelled, and what the filter matches on.
+    /// What the row is labeled, and what the filter matches on.
     pub name: SharedString,
     /// What a click on the row inserts at the caret — the whole `${…}` form.
     pub click: SharedString,

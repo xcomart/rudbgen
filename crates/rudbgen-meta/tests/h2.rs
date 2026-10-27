@@ -69,7 +69,7 @@ fn find_in_gradle_cache() -> Option<PathBuf> {
     let mut newest: Option<(String, PathBuf)> = None;
     for version in std::fs::read_dir(&root).ok()?.flatten() {
         let number = version.file_name().to_string_lossy().into_owned();
-        // Only the binary artefact: the same directory holds the javadoc and
+        // Only the binary artifact: the same directory holds the javadoc and
         // sources archives, and loading one of those gets a class loader with
         // no driver in it.
         let wanted = format!("h2-{number}.jar");
@@ -434,7 +434,7 @@ fn the_stock_h2_table_query_is_used_instead_of_the_driver_list() {
         .iter()
         .find(|entry| entry.name == "T_ALBUM")
         .expect("T_ALBUM");
-    assert_eq!(album.kind, "TABLE", "BASE TABLE has to normalise to TABLE");
+    assert_eq!(album.kind, "TABLE", "BASE TABLE has to normalize to TABLE");
     assert_eq!(album.remarks, "an album");
     assert!(!album.catalog.is_empty() && album.schema == "PUBLIC");
     assert_eq!(

@@ -1,6 +1,6 @@
 //! Response bodies: what the bridge answers with.
 //!
-//! The bridge serialises nulls explicitly, so a member the driver had nothing
+//! The bridge serializes nulls explicitly, so a member the driver had nothing
 //! to say about arrives as JSON `null` rather than missing. That is why the
 //! `Option` fields here need no `#[serde(default)]` — an absent member would be
 //! a protocol change, not a driver quirk, and should fail loudly.
@@ -117,11 +117,13 @@ pub struct SessionInfo {
 
 /// `CANCEL` (`0x24`).
 #[derive(Clone, Debug, Deserialize)]
-pub struct Cancelled {
+pub struct Canceled {
     /// How many running statements a cancel was issued for.
     ///
     /// Zero on an idle session, which is not an error: nothing was running.
-    pub cancelled: u32,
+    /// Older bridge JARs spell the key the British way.
+    #[serde(alias = "cancelled")]
+    pub canceled: u32,
 }
 
 /// `PROBE_DRIVER` (`0x50`): the JDBC drivers a set of JARs offers.
@@ -141,7 +143,7 @@ pub struct Cancelled {
 ///
 /// [`DriverProbe::recommended`] applies that preference.
 ///
-/// The scan never runs a static initialiser (`Class.forName(…, false, …)`): a
+/// The scan never runs a static initializer (`Class.forName(…, false, …)`): a
 /// driver's can open sockets or load native libraries, and looking at a file
 /// must not do either.
 #[derive(Clone, Debug, Deserialize)]
@@ -295,7 +297,7 @@ impl ExecuteResult {
 ///
 /// Item shapes differ per kind and are documented in `bridge/README.md`. They
 /// are left as JSON objects here on purpose: the explorer tree maps the two or
-/// three members it needs per kind, and modelling nine metadata shapes in
+/// three members it needs per kind, and modeling nine metadata shapes in
 /// Rust would be a second copy of the same table to keep in step.
 #[derive(Clone, Debug, Deserialize)]
 pub struct DescribeResult {

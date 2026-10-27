@@ -1396,7 +1396,7 @@ impl Render for ImportDialog {
 ///
 /// Named by the driver definition rather than by jdbgen's entry, and marked
 /// when the definition is one rudbgen already ships — which is what
-/// `rudbgen_import::map` produces for a stock driver it recognised: the
+/// `rudbgen_import::map` produces for a stock driver it recognized: the
 /// built-in's own id, carrying jdbgen's JAR, SQL overrides and properties.
 ///
 /// The list is the one [`Selection::drivers`] indexes into, and that is the

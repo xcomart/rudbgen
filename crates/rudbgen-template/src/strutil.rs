@@ -1,7 +1,7 @@
 //! The parts of jdbgen's `StrUtils` the template language is defined by.
 //!
 //! These are not general purpose helpers: every one of them reproduces a Java
-//! method the engine's observable behaviour depends on, quirks included. The
+//! method the engine's observable behavior depends on, quirks included. The
 //! quirk that matters most is [`trim`], which strips one enclosing pair of
 //! quotes along with the white space - that is how a quoted attribute value
 //! loses its quotes, so it is load bearing rather than cosmetic.

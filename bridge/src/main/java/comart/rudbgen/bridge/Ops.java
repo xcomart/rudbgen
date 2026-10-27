@@ -29,7 +29,7 @@ public final class Ops {
     public static final int CLOSE_CURSOR = 0x23;
     /** {@code handle} session. Arrives on a thread other than the worker. */
     public static final int CANCEL = 0x24;
-    // 0x25 LOB_READ is retired: rudbgen reads catalogue metadata, never row
+    // 0x25 LOB_READ is retired: rudbgen reads catalog metadata, never row
     // payloads, so no batch it decodes carries a LOB reference. The number stays
     // spent so that this table and rudbman's stay comparable line for line.
     /** {@code handle} session, {@code arg} 0 or 1. */

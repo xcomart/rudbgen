@@ -1,6 +1,6 @@
 # The five servers the opt-in container tests run against.
 #
-# `crates/rudbgen-jdbc/tests/containers.rs` reads the catalogue of a real
+# `crates/rudbgen-jdbc/tests/containers.rs` reads the catalog of a real
 # PostgreSQL, MySQL, MariaDB, SQL Server and Oracle through the bridge's
 # DESCRIBE, which is the one thing about this layer that H2 cannot answer: a
 # driver's metadata habits are per product. Nothing in the workspace needs these

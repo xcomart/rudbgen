@@ -86,7 +86,7 @@ pub enum CodecError {
     UnknownKind {
         /// Zero-based column index.
         column: usize,
-        /// The unrecognised kind byte.
+        /// The unrecognized kind byte.
         kind: u8,
     },
 
@@ -227,7 +227,7 @@ pub enum Value<'a> {
     /// Text. Also carries `DECIMAL`, the date and time types, `UUID`,
     /// `INTERVAL`, arrays and vendor types, as the driver rendered them.
     Str(&'a str),
-    /// Raw bytes. Also carries a `BLOB`, which this bridge materialises.
+    /// Raw bytes. Also carries a `BLOB`, which this bridge materializes.
     Bin(&'a [u8]),
 }
 
@@ -546,7 +546,7 @@ fn decode_var(
         .collect();
 
     // Monotonic, starting at 0 and ending exactly at the end of the data area:
-    // anything else and a row would borrow bytes from its neighbour.
+    // anything else and a row would borrow bytes from its neighbor.
     let mut previous = 0u32;
     for (index, offset) in offsets.iter().copied().enumerate() {
         if offset < previous || offset as usize > data.len() {

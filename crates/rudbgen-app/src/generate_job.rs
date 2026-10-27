@@ -10,8 +10,8 @@
 //!   already blocked on — the dialog answers it, and the run carries on;
 //! * the end, which is a [`Outcome`] and turns the dialog into the summary.
 //!
-//! Cancelling sets the [`CancelToken`] the run checks at every file boundary,
-//! so a cancelled run never leaves a half-written file behind. The dialog stays
+//! Canceling sets the [`CancelToken`] the run checks at every file boundary,
+//! so a canceled run never leaves a half-written file behind. The dialog stays
 //! up afterwards to show what it did manage to write, because a run that was
 //! stopped half way is exactly the one whose list of files matters.
 
@@ -345,7 +345,7 @@ impl GenerationJob {
         {
             reply.send(Decision::Cancel).ok();
         }
-        self.note(ts!("progress.cancelling"), cx);
+        self.note(ts!("progress.canceling"), cx);
     }
 
     /// Answers the overwrite question and lets the run go on.
@@ -591,8 +591,8 @@ impl GenerationJob {
             })
             .collect();
 
-        let headline = if outcome.cancelled {
-            ts!("summary.cancelled")
+        let headline = if outcome.canceled {
+            ts!("summary.canceled")
         } else if outcome.failed.is_empty() {
             ts!("summary.done")
         } else {

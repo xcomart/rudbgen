@@ -88,7 +88,7 @@ connect:
   add_prop: Eigenschaft hinzufügen
 
   section:
-    behaviour: Verhalten
+    behavior: Verhalten
     tunnel: SSH-Tunnel
 
   keep_alive: Verbindung mit einer regelmäßigen Abfrage offen halten
@@ -169,7 +169,7 @@ driver:
   downloading: "%{file} wird heruntergeladen…"
   downloading_percent: "%{file} wird heruntergeladen — %{percent} %"
   downloaded: "%{file} wurde heruntergeladen und hinzugefügt."
-  download_cancelled: Der Download wurde abgebrochen.
+  download_canceled: Der Download wurde abgebrochen.
   bad_coordinate: "„%{coordinate}“ ist keine Koordinate der Form group:artifact:version."
   not_found: "Maven Central hat nichts unter %{url}."
   network_failed: "Der Download ist fehlgeschlagen: %{error}"
@@ -326,14 +326,14 @@ progress:
   skipped: "%{path} behalten"
   failed: "%{path} fehlgeschlagen: %{reason}"
   conflict: "%{path} ist bereits vorhanden"
-  cancelling: wird abgebrochen…
+  canceling: wird abgebrochen…
   count: "%{done} von %{total}"
 
 summary:
   title: Ergebnis
   done: Alle angeforderten Dateien wurden geschrieben.
   with_failures: Der Lauf endete mit Fehlern.
-  cancelled: Der Lauf wurde abgebrochen; was bereits geschrieben war, steht unten.
+  canceled: Der Lauf wurde abgebrochen; was bereits geschrieben war, steht unten.
   counts: "%{written} geschrieben · %{skipped} übersprungen · %{failed} fehlgeschlagen · %{warnings} Warnungen"
   written: Geschrieben
   skipped: Übersprungen

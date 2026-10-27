@@ -138,7 +138,7 @@ connect:
   add_prop: Add a property
 
   section:
-    behaviour: Behavior
+    behavior: Behavior
     tunnel: SSH tunnel
 
   keep_alive: Keep the connection alive with a periodic query
@@ -240,7 +240,7 @@ driver:
   downloading: "Downloading %{file}…"
   downloading_percent: "Downloading %{file} — %{percent}%"
   downloaded: "%{file} was downloaded and added."
-  download_cancelled: The download was canceled.
+  download_canceled: The download was canceled.
   bad_coordinate: "“%{coordinate}” is not a group:artifact:version coordinate."
   not_found: "Maven Central has nothing at %{url}."
   network_failed: "The download failed: %{error}"
@@ -463,7 +463,7 @@ progress:
   skipped: "kept %{path}"
   failed: "%{path} failed: %{reason}"
   conflict: "%{path} is already there"
-  cancelling: canceling…
+  canceling: canceling…
   count: "%{done} of %{total}"
 
 # The result summary, and the overwrite question a run under the *ask* policy
@@ -472,7 +472,7 @@ summary:
   title: Result
   done: Everything the run asked for was written.
   with_failures: The run finished with failures.
-  cancelled: The run was canceled; what it had written is below.
+  canceled: The run was canceled; what it had written is below.
   counts: "%{written} written · %{skipped} skipped · %{failed} failed · %{warnings} warnings"
   written: Written
   skipped: Skipped

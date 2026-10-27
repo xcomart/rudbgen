@@ -214,8 +214,8 @@ class FetchRoundTripTest {
     }
 
     @Test
-    void characterLobsAreMaterialisedAsText() {
-        // rudbgen's only statements are the four custom catalogue queries, whose
+    void characterLobsAreMaterializedAsText() {
+        // rudbgen's only statements are the four custom catalog queries, whose
         // values are names and comments -- and Oracle hands a comment back as a
         // CLOB. There is no LOB_READ left to resolve a reference with, so the
         // text has to be in the batch.

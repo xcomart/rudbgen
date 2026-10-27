@@ -301,7 +301,7 @@ pub struct TemplatePane {
     focus_handle: FocusHandle,
     /// The file, resolved: this is what a save writes to.
     path: PathBuf,
-    /// What the tab is labelled.
+    /// What the tab is labeled.
     title: SharedString,
     /// The buffer.
     editor: Entity<EditorView>,
@@ -344,7 +344,7 @@ pub struct TemplatePane {
     /// itself: the focus handle belongs to an element that has not been drawn
     /// yet. The flag is consumed by the first render after it is set.
     pending_focus: bool,
-    /// The debounce in flight, dropped — and so cancelled — by the next edit.
+    /// The debounce in flight, dropped — and so canceled — by the next edit.
     _debounce: Option<Task<()>>,
     /// Keeps the editor's subscription alive.
     _editor_events: Subscription,
@@ -826,7 +826,7 @@ impl TemplatePane {
             } => {
                 self.preview_note = None;
                 self.preview_path = Some(SharedString::from(path.display().to_string()));
-                // The preview is the *output* file, so it is coloured by the
+                // The preview is the *output* file, so it is colored by the
                 // output file's language rather than by the template's.
                 let highlighter = path.extension().and_then(|ext| {
                     rugpui_editor::highlighter_for_extension(&ext.to_string_lossy())
@@ -1303,7 +1303,7 @@ impl TemplatePane {
     /// The list under both halves, when there is anything in it.
     fn render_diagnostics(&self, cx: &mut Context<Self>) -> impl IntoElement + use<> {
         let theme = theme(cx);
-        // The chrome palette has no "looks wrong" colour — the editor's does,
+        // The chrome palette has no "looks wrong" color — the editor's does,
         // and it is the one the gutter marks are painted in, so the list and
         // the marks agree.
         let warning = editor_theme(cx).warning;

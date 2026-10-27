@@ -323,13 +323,13 @@ mod tests {
     }
 
     #[test]
-    fn the_type_is_recognised_whatever_case_the_driver_reports_it_in() {
+    fn the_type_is_recognized_whatever_case_the_driver_reports_it_in() {
         assert!(is_char_type("nVarChar"));
         assert_eq!(type_string("nVarChar", 10), "NVARCHAR(10)");
     }
 
     #[test]
-    fn every_text_type_is_recognised_as_a_character_type() {
+    fn every_text_type_is_recognized_as_a_character_type() {
         for name in [
             "CHAR",
             "VARCHAR",

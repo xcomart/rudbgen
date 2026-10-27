@@ -626,7 +626,7 @@ fn cancel_from_the_question_stops_the_run() {
     let (fx, outcome, asked) = ask_run(vec![Decision::Overwrite, Decision::Cancel]);
 
     assert_eq!(asked.len(), 2);
-    assert!(outcome.cancelled);
+    assert!(outcome.canceled);
     assert!(!outcome.is_ok());
     assert_eq!(
         outcome.written,
@@ -680,10 +680,10 @@ fn the_saved_policy_is_what_the_run_uses() {
     assert_eq!(read(&fx.out, "T_ONE.java"), "hand written");
 }
 
-// --- rule 6: cancelling ---------------------------------------------------
+// --- rule 6: canceling ---------------------------------------------------
 
 #[test]
-fn a_cancelled_run_stops_at_a_file_boundary_and_keeps_what_it_wrote() {
+fn a_canceled_run_stops_at_a_file_boundary_and_keeps_what_it_wrote() {
     let fx = Fixture::new();
     let plan = plan(
         vec![table("T_ONE"), table("T_TWO"), table("T_THREE")],
@@ -705,13 +705,13 @@ fn a_cancelled_run_stops_at_a_file_boundary_and_keeps_what_it_wrote() {
         }
     });
 
-    assert!(outcome.cancelled);
+    assert!(outcome.canceled);
     assert_eq!(outcome.written, vec![at(&fx.out, "T_ONE.java")]);
     assert_eq!(tree(&fx.out), ["T_ONE.java"], "no half-written second file");
 }
 
 #[test]
-fn a_token_that_is_already_cancelled_writes_nothing() {
+fn a_token_that_is_already_canceled_writes_nothing() {
     let fx = Fixture::new();
     let plan = plan(
         vec![table("T_ONE")],
@@ -728,7 +728,7 @@ fn a_token_that_is_already_cancelled_writes_nothing() {
     cancel.cancel();
     let outcome = generate(&plan, Overwrite::Overwrite, &cancel, &quiet);
 
-    assert!(outcome.cancelled);
+    assert!(outcome.canceled);
     assert!(outcome.written.is_empty());
     assert!(!fx.out.exists());
 }
@@ -1023,7 +1023,7 @@ fn a_dry_run_of_a_broken_template_writes_nothing_either() {
 }
 
 #[test]
-fn a_dry_run_can_be_cancelled_too() {
+fn a_dry_run_can_be_canceled_too() {
     let fx = Fixture::new();
     let plan = plan(
         vec![table("T_ONE"), table("T_TWO")],
@@ -1040,7 +1040,7 @@ fn a_dry_run_can_be_cancelled_too() {
     cancel.cancel();
     let result = dry_run(&plan, &cancel, &quiet);
 
-    assert!(result.cancelled);
+    assert!(result.canceled);
     assert!(result.files.is_empty());
 }
 

@@ -27,7 +27,7 @@ import java.util.logging.Logger;
  * {@link Driver#connect}, the connection lock and the keep-alive scheduler all
  * come from there.
  *
- * <p>The connection lock is kept even though the Rust side already serialises
+ * <p>The connection lock is kept even though the Rust side already serializes
  * commands per session: the keep-alive timer still runs concurrently with
  * whatever the worker is doing, and a JDBC connection is not thread safe.
  */
@@ -77,7 +77,7 @@ public final class Session implements AutoCloseable {
     /**
      * Opens a session from an {@code OPEN_SESSION} request body.
      *
-     * <p>Recognised members: {@code url} (required), {@code driver_class}
+     * <p>Recognized members: {@code url} (required), {@code driver_class}
      * (required), {@code jars[]}, {@code username}, {@code password},
      * {@code props{}}, {@code read_only}, {@code auto_commit},
      * {@code login_timeout_s}, {@code keep_alive{enabled, interval_s, query}},
@@ -362,7 +362,7 @@ public final class Session implements AutoCloseable {
     @Override
     public void close() {
         closed = true;
-        // rudbman cancelled the session's background jobs here, before taking
+        // rudbman canceled the session's background jobs here, before taking
         // any lock, because a streaming extract held the connection lock and
         // only a statement cancel would make it let go. With job/ gone
         // (architecture.md D3) nothing but the caller's own thread can be inside

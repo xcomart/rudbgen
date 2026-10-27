@@ -20,7 +20,7 @@
 //! [`DriverManager::detect_class`] asks the bridge which `java.sql.Driver`
 //! implementations the registered JARs hold ([`Jvm::probe_drivers`][probe]), so
 //! the user does not have to find a fully qualified class name in a vendor's
-//! documentation. The scan never runs a static initialiser, so looking at a file
+//! documentation. The scan never runs a static initializer, so looking at a file
 //! opens no socket and loads no native library.
 //!
 //! [probe]: rudbgen_jdbc::Jvm::probe_drivers
@@ -50,7 +50,7 @@
 //! # The download does not block the window
 //!
 //! [`maven::download`] is synchronous and runs on a background task; progress
-//! arrives on a channel that a `cx.spawn` drains into the view. Cancelling sets
+//! arrives on a channel that a `cx.spawn` drains into the view. Canceling sets
 //! a flag the download checks once per chunk, so the button takes effect within
 //! one read rather than at the end of the transfer.
 
@@ -166,7 +166,7 @@ enum Probe {
     /// The scan is running. The task is held rather than detached so that
     /// closing the manager abandons it.
     Running {
-        /// Dropped, and so cancelled, with the manager.
+        /// Dropped, and so canceled, with the manager.
         _task: Task<()>,
     },
     /// Several drivers were found and the user has to say which.
@@ -264,7 +264,7 @@ pub struct TestTarget {
 /// The test is about the *shape* of the result, not its contents: the labels
 /// are known from the first row's metadata and the count is only there to say
 /// that something came back. A cap keeps a `select *` over a million-row
-/// catalogue from being fetched into a dialog nobody asked to fill.
+/// catalog from being fetched into a dialog nobody asked to fill.
 const TEST_ROW_LIMIT: u32 = 200;
 
 /// How the four custom-query rows are numbered, in
@@ -464,12 +464,12 @@ pub struct DriverManager {
     /// The four custom-query statements, in [`CustomQueryKind::ALL`] order.
     ///
     /// SQL-highlighted rather than a plain field, since a driver's table list
-    /// or comment query is exactly the kind of `select` a colour hint on
+    /// or comment query is exactly the kind of `select` a color hint on
     /// `${schema}` and its keywords is worth having. Read-only whenever the
     /// row's tick is off: a statement that would not run is not a statement
     /// to be typing over by mistake.
     query_editors: [Entity<EditorView>; 4],
-    /// Catalogue the test substitutes for `${catalog}`; blank leaves the hole.
+    /// Catalog the test substitutes for `${catalog}`; blank leaves the hole.
     test_catalog_input: Entity<TextInput>,
     /// Schema the test substitutes for `${schema}`.
     test_schema_input: Entity<TextInput>,
@@ -906,10 +906,10 @@ impl DriverManager {
                 self.install_jars(vec![path], cx);
                 self.report(ts!("driver.downloaded", file = name), false, cx);
             }
-            // A cancelled download is a thing the user did, not a failure, so it
-            // is reported in the neutral colour.
-            Err(DownloadError::Cancelled) => {
-                self.report(ts!("driver.download_cancelled"), false, cx);
+            // A canceled download is a thing the user did, not a failure, so it
+            // is reported in the neutral color.
+            Err(DownloadError::Canceled) => {
+                self.report(ts!("driver.download_canceled"), false, cx);
             }
             Err(error) => {
                 let message = match error {
@@ -925,7 +925,7 @@ impl DriverManager {
                         )
                     }
                     DownloadError::Io(message) => ts!("driver.save_failed", error = message),
-                    DownloadError::Cancelled => unreachable!("handled above"),
+                    DownloadError::Canceled => unreachable!("handled above"),
                 };
                 self.report(message, true, cx);
             }
@@ -2654,7 +2654,7 @@ mod tests {
             ts!("driver.downloading", file = "x.jar"),
             ts!("driver.downloading_percent", file = "x.jar", percent = 40),
             ts!("driver.downloaded", file = "x.jar"),
-            ts!("driver.download_cancelled"),
+            ts!("driver.download_canceled"),
             ts!("driver.bad_coordinate", coordinate = "x"),
             ts!("driver.not_found", url = "u"),
             ts!("driver.network_failed", error = "e"),

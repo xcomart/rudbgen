@@ -39,7 +39,7 @@ rudbgen-jdbc.workspace = true
 # background task holding a `SessionHandle`.
 rudbgen-meta.workspace = true
 # The inspector's Columns tab. The grid is the one widget in the tree that
-# already lays a header, resizable columns and a virtualised body out, and a
+# already lays a header, resizable columns and a virtualized body out, and a
 # column list is exactly what it draws.
 rugpui-grid.workspace = true
 # The generation job behind the Generate tab: `Plan`, `generate`, `dry_run` and
@@ -70,7 +70,7 @@ rudbgen-ssh.workspace = true
 rugpui.workspace = true
 # The layer above the widgets, and the reason this crate no longer carries a
 # `caption.rs`, an `update.rs` or a theme editor of its own: the window chrome,
-# the self-updater and its dialog, the about box, the palette catalogues and
+# the self-updater and its dialog, the about box, the palette catalogs and
 # their editor, the split-pane tree, the context-menu rows and the pieces a
 # settings form is built out of. Everything it needs to know about rudbgen — the
 # name, the version, the release endpoints, the words and where the ignored
@@ -123,7 +123,7 @@ ureq.workspace = true
 zeroize.workspace = true
 
 [dev-dependencies]
-# gpui's headless test platform, for the behaviour that only exists once an
+# gpui's headless test platform, for the behavior that only exists once an
 # element tree has been laid out. Test-only: the binary links gpui without it.
 gpui = { workspace = true, features = ["test-support"] }
 # The window-geometry round trip writes a real `settings.json` and reads it

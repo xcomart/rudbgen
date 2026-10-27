@@ -96,7 +96,7 @@ impl Abbreviations {
     /// separators stay where they were.
     ///
     /// Word rules match **ignoring case** - decision D10 of the architecture
-    /// document, and the one deliberate behavioural break from jdbgen, whose
+    /// document, and the one deliberate behavioral break from jdbgen, whose
     /// word lookup used the raw segment against a lower cased map and
     /// therefore never fired on `TB_USR`.
     pub fn apply(&self, item: &str) -> String {

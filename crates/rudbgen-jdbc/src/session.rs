@@ -9,7 +9,7 @@
 //! every command for that connection is handed to it and executed in order.
 //! Two callers can hold a [`Session`] and neither can interleave with the other.
 //!
-//! Staying attached is not an optimisation detail. Attaching per command makes
+//! Staying attached is not an optimization detail. Attaching per command makes
 //! the JVM build a thread structure every time, and the fetch path runs once
 //! per screenful of scrolling.
 //!
@@ -18,7 +18,7 @@
 //! [`Session::cancel`] deliberately does **not** go through the queue. It is
 //! called precisely when the worker is blocked inside the statement it is meant
 //! to interrupt, so queueing it behind that statement would mean waiting for
-//! the thing being cancelled. It attaches the calling thread for the duration
+//! the thing being canceled. It attaches the calling thread for the duration
 //! of the call and detaches again — expensive, and rare.
 //!
 //! [`Canceller`] is the `Send + Sync` handle for that, so the cancel button can
@@ -49,7 +49,7 @@ use crate::codec::Batch;
 use crate::error::{Error, Result};
 use crate::jvm::Jvm;
 use crate::protocol::{Op, parse_json, take_payload};
-use crate::response::{Cancelled, ColumnInfo, DescribeResult, ExecuteResult, Ping, SessionInfo};
+use crate::response::{Canceled, ColumnInfo, DescribeResult, ExecuteResult, Ping, SessionInfo};
 use crate::spec::{ConnectionSpec, DescribeRequest, StatementSpec};
 
 /// The `OPEN_SESSION` response body.
@@ -184,7 +184,7 @@ impl Session {
     /// Invokes an operation and hands back its raw OK payload.
     ///
     /// The escape hatch for a response this crate has no typed accessor for.
-    /// Goes through the worker like every other command, so it stays serialised
+    /// Goes through the worker like every other command, so it stays serialized
     /// against the connection, and an ERROR envelope still becomes an
     /// [`Error`] rather than reaching the caller as bytes.
     pub fn call_raw(
@@ -253,8 +253,8 @@ impl Canceller {
     pub fn cancel(&self) -> Result<u32> {
         let response = self.jvm.call_detached(Op::Cancel, self.session, 0, None)?;
         let payload = take_payload(response)?;
-        let cancelled: Cancelled = parse_json(&payload)?;
-        Ok(cancelled.cancelled)
+        let canceled: Canceled = parse_json(&payload)?;
+        Ok(canceled.canceled)
     }
 
     /// The session this handle cancels.
@@ -380,7 +380,7 @@ struct Worker {
     ///
     /// The mutex is what makes an `Arc<Worker>` usable from several threads —
     /// an `mpsc::Sender` is `Send` but not `Sync` — and holding it across the
-    /// reply is deliberate: commands for one connection are serialised at the
+    /// reply is deliberate: commands for one connection are serialized at the
     /// door rather than piling up in a queue whose depth nobody bounds.
     sender: Mutex<Option<Sender<Command>>>,
     thread: Mutex<Option<JoinHandle<()>>>,

@@ -88,7 +88,7 @@ connect:
   add_prop: 添加属性
 
   section:
-    behaviour: 行为
+    behavior: 行为
     tunnel: SSH 隧道
 
   keep_alive: 用定期查询保持连接
@@ -168,7 +168,7 @@ driver:
   downloading: "正在下载 %{file}…"
   downloading_percent: "正在下载 %{file} — %{percent}%"
   downloaded: "已下载并添加 %{file}。"
-  download_cancelled: 下载已取消。
+  download_canceled: 下载已取消。
   bad_coordinate: "“%{coordinate}”不是 group:artifact:version 形式的坐标。"
   not_found: "Maven Central 的 %{url} 上没有这个文件。"
   network_failed: "下载失败：%{error}"
@@ -323,14 +323,14 @@ progress:
   skipped: "已保留 %{path}"
   failed: "%{path} 失败：%{reason}"
   conflict: "%{path} 已存在"
-  cancelling: 正在取消…
+  canceling: 正在取消…
   count: "%{done} / %{total}"
 
 summary:
   title: 结果
   done: 本次运行要求的内容均已写入。
   with_failures: 运行已结束，但有部分失败。
-  cancelled: 运行已取消；下面是已经写入的内容。
+  canceled: 运行已取消；下面是已经写入的内容。
   counts: "写入 %{written} · 跳过 %{skipped} · 失败 %{failed} · 警告 %{warnings}"
   written: 已写入
   skipped: 已跳过

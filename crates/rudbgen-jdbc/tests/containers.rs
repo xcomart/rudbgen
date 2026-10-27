@@ -12,7 +12,7 @@
 //! visible from H2.
 //!
 //! So each test here creates a small fixture — a parent, a child that
-//! references it, a unique index — and **reads the catalogue back** through
+//! references it, a unique index — and **reads the catalog back** through
 //! `DescribeRequest`. Nothing is written by a planner and nothing is asserted
 //! against a string somebody reasoned out; the assertions are about what the
 //! server says it holds.
@@ -141,7 +141,7 @@ fn find_in_gradle_cache(group: &str, artifact: &str) -> Option<PathBuf> {
     let mut newest: Option<(String, PathBuf)> = None;
     for version in std::fs::read_dir(&root).ok()?.flatten() {
         let number = version.file_name().to_string_lossy().into_owned();
-        // Only the binary artefact. The same directory also holds
+        // Only the binary artifact. The same directory also holds
         // `-javadoc.jar` and `-sources.jar`, and picking one of those gets a
         // class loader with no classes in it — a ClassNotFoundException a long
         // way from its cause.
@@ -294,7 +294,7 @@ impl Server {
         let session = connect(product, &url);
 
         // Asked of the server rather than parsed out of the URL: the URL may
-        // leave the database to the driver's default, and a catalogue request
+        // leave the database to the driver's default, and a catalog request
         // has to name the one the session really landed in.
         let (catalog, schema) = match product {
             Product::Postgres => (None, Some(scalar(&session, "select current_schema()"))),
@@ -348,7 +348,7 @@ impl Server {
         name
     }
 
-    /// A name in the case this product's catalogue will hold it.
+    /// A name in the case this product's catalog will hold it.
     ///
     /// Everything this file writes is unquoted, so on a folding product the
     /// server stores the upper-case spelling and `getColumns` answers it. The
@@ -421,7 +421,7 @@ impl Server {
             .clone()
     }
 
-    /// One table's columns, as the catalogue holds them, in ordinal order.
+    /// One table's columns, as the catalog holds them, in ordinal order.
     fn columns(&self, table: &str) -> Vec<CatalogColumn> {
         let mut columns: Vec<CatalogColumn> = self
             .describe_table("columns", table)
@@ -509,7 +509,7 @@ fn connect(product: Product, url: &str) -> Session {
     })
 }
 
-/// A column as the catalogue reports it, which is the only reading these tests
+/// A column as the catalog reports it, which is the only reading these tests
 /// trust.
 #[derive(Debug, Clone, PartialEq, Eq)]
 struct CatalogColumn {

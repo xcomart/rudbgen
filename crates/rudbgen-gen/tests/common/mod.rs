@@ -63,7 +63,7 @@ pub fn plan(tables: Vec<Table>, templates: Vec<TemplateSpec>, out: &Path) -> Pla
     )
 }
 
-/// A token that is not cancelled.
+/// A token that is not canceled.
 pub fn live() -> CancelToken {
     CancelToken::new()
 }

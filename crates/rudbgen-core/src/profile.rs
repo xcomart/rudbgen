@@ -741,7 +741,7 @@ pub struct DriverDef {
     /// Empty for every built-in definition as it stands here: almost none of
     /// these JARs are redistributable, so the user either downloads them from
     /// [`DriverDef::maven`] or points at copies they already have. H2 is the
-    /// exception — its licence allows it, the release bundles the JAR, and a
+    /// exception — its license allows it, the release bundles the JAR, and a
     /// first run fills this field in for `h2-embedded` so the sample connection
     /// opens offline.
     pub jars: Vec<PathBuf>,
@@ -756,7 +756,7 @@ pub struct DriverDef {
     ///
     /// Picks the keyword set, identifier quoting rules, DDL generator, and
     /// paging syntax used by the SQL layer, so an unknown value degrades to
-    /// generic behaviour rather than failing.
+    /// generic behavior rather than failing.
     pub dialect: String,
     /// Whether this product has no user and no password to ask for.
     ///

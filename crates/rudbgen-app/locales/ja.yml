@@ -88,7 +88,7 @@ connect:
   add_prop: プロパティを追加
 
   section:
-    behaviour: 動作
+    behavior: 動作
     tunnel: SSH トンネル
 
   keep_alive: 定期的なクエリで接続を維持する
@@ -168,7 +168,7 @@ driver:
   downloading: "%{file} をダウンロードしています…"
   downloading_percent: "%{file} をダウンロード中 — %{percent}%"
   downloaded: "%{file} をダウンロードして追加しました。"
-  download_cancelled: ダウンロードをキャンセルしました。
+  download_canceled: ダウンロードをキャンセルしました。
   bad_coordinate: "「%{coordinate}」は group:artifact:version 形式の座標ではありません。"
   not_found: "Maven Central の %{url} には何もありません。"
   network_failed: "ダウンロードに失敗しました: %{error}"
@@ -324,14 +324,14 @@ progress:
   skipped: "%{path} を保持"
   failed: "%{path} が失敗: %{reason}"
   conflict: "%{path} はすでに存在します"
-  cancelling: キャンセル中…
+  canceling: キャンセル中…
   count: "%{total} 件中 %{done} 件"
 
 summary:
   title: 結果
   done: 実行が求めたものはすべて書き込まれました。
   with_failures: 実行は完了しましたが、一部が失敗しました。
-  cancelled: 実行はキャンセルされました。書き込み済みのファイルは以下のとおりです。
+  canceled: 実行はキャンセルされました。書き込み済みのファイルは以下のとおりです。
   counts: "書き込み %{written} · スキップ %{skipped} · 失敗 %{failed} · 警告 %{warnings}"
   written: 書き込み
   skipped: スキップ

@@ -10,12 +10,12 @@ use std::sync::atomic::{AtomicBool, Ordering};
 /// of the *same* flag, never a second one.
 ///
 /// The token is not reset by a finished run: a token is one run's, and reusing
-/// a cancelled one would start a job that stops at its first file.
+/// a canceled one would start a job that stops at its first file.
 #[derive(Clone, Debug, Default)]
 pub struct CancelToken(Arc<AtomicBool>);
 
 impl CancelToken {
-    /// A token that has not been cancelled.
+    /// A token that has not been canceled.
     pub fn new() -> Self {
         CancelToken::default()
     }
@@ -26,21 +26,21 @@ impl CancelToken {
     }
 
     /// Whether the run has been asked to stop.
-    pub fn is_cancelled(&self) -> bool {
+    pub fn is_canceled(&self) -> bool {
         self.0.load(Ordering::SeqCst)
     }
 
     /// A handle that can only cancel, for the side that owns the button.
     ///
     /// The distinction is a documentation one — the flag is the same — but it
-    /// keeps `is_cancelled` out of the UI, where the answer would be stale by
+    /// keeps `is_canceled` out of the UI, where the answer would be stale by
     /// the time it is painted anyway.
     pub fn handle(&self) -> CancelHandle {
         CancelHandle(Arc::clone(&self.0))
     }
 }
 
-/// The cancelling half of a [`CancelToken`].
+/// The canceling half of a [`CancelToken`].
 #[derive(Clone, Debug)]
 pub struct CancelHandle(Arc<AtomicBool>);
 
@@ -59,11 +59,11 @@ mod tests {
     fn a_handle_cancels_the_token_it_came_from() {
         let token = CancelToken::new();
         let handle = token.handle();
-        assert!(!token.is_cancelled());
+        assert!(!token.is_canceled());
 
         // The point of the split: another thread holds the handle.
         std::thread::spawn(move || handle.cancel()).join().unwrap();
-        assert!(token.is_cancelled());
+        assert!(token.is_canceled());
     }
 
     #[test]
@@ -71,6 +71,6 @@ mod tests {
         let token = CancelToken::new();
         let clone = token.clone();
         clone.cancel();
-        assert!(token.is_cancelled());
+        assert!(token.is_canceled());
     }
 }

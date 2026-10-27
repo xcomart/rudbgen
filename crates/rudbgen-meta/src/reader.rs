@@ -172,7 +172,7 @@ impl<'a> MetaReader<'a> {
     /// query returns** — see the note in architecture.md §6 on why jdbgen's
     /// blanking of the others is not reproduced.
     ///
-    /// Anything whose type normalises to neither `TABLE` nor `VIEW` is
+    /// Anything whose type normalizes to neither `TABLE` nor `VIEW` is
     /// dropped, which is what keeps sequences and system aliases out of a list
     /// whose every row is a file to generate.
     pub fn tables(&self, schema: &Schema, include_views: bool) -> Result<Vec<TableRef>> {
@@ -194,7 +194,7 @@ impl<'a> MetaReader<'a> {
             }
         }
 
-        // jdbgen's filter: a kind that normalised to neither is not shown at
+        // jdbgen's filter: a kind that normalized to neither is not shown at
         // all, and a view only when it was asked for.
         tables.retain(|table| {
             table.kind == crate::model::KIND_TABLE || (include_views && table.is_view())

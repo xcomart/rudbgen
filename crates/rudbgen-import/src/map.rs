@@ -86,7 +86,7 @@ impl MapOptions {
 /// A jdbgen configuration whose three encrypted fields have been opened.
 ///
 /// Holds plain text — a database password among it — so it lives for as long as
-/// the wizard is on screen and no longer. Nothing in this crate serialises it,
+/// the wizard is on screen and no longer. Nothing in this crate serializes it,
 /// and the [`Debug`] impl of [`Secret`] is what keeps the password out of a log
 /// line written by whoever is debugging the wizard.
 #[derive(Debug, Clone, PartialEq)]
@@ -104,7 +104,7 @@ pub struct Decrypted {
 /// rudbgen's [`ConnectionProfile`] deliberately has no password field: the
 /// secret goes to
 /// [`SecretSlot::Connection`](rudbgen_core::SecretSlot::Connection) under the
-/// profile's id, and a value that never reaches a struct that is serialised can
+/// profile's id, and a value that never reaches a struct that is serialized can
 /// never be written to a file by accident.
 #[derive(Clone, PartialEq, Eq)]
 pub struct Secret {
@@ -161,7 +161,7 @@ pub struct Mapped {
 pub fn map(dec: &Decrypted, opts: &MapOptions) -> Mapped {
     let mut notes = Vec::new();
 
-    // The one note that does not depend on the file: the behavioural break is
+    // The one note that does not depend on the file: the behavioral break is
     // announced whether or not this configuration holds a rule today.
     notes.push(Note::AbbreviationCaseRule);
     if dec.legacy {
@@ -610,7 +610,7 @@ fn lift_port(template: String) -> (String, Option<u16>) {
 ///
 /// `stock:h2.png` is the only form with an equivalent here — `assets/drivers/`
 /// holds jdbgen's eleven icons under those very stems. A file path, a Font
-/// Awesome glyph, a colour swatch or a URL comes across as no icon and is
+/// Awesome glyph, a color swatch or a URL comes across as no icon and is
 /// returned as the second half of the pair so the caller can note it.
 fn icon_stem(locator: Option<&str>) -> (Option<String>, Option<String>) {
     let Some(locator) = non_empty(locator).map(str::trim) else {
@@ -631,7 +631,7 @@ fn icon_stem(locator: Option<&str>) -> (Option<String>, Option<String>) {
 /// The dialect id for a product, read off its class and then its URL scheme.
 ///
 /// Only the seven the SQL layer knows are named; everything else is `generic`,
-/// which degrades to standard behaviour rather than failing. The class is asked
+/// which degrades to standard behavior rather than failing. The class is asked
 /// first because a URL template can be edited into anything, while a class that
 /// is wrong does not load at all.
 fn dialect_of(class: &str, url_template: &str) -> &'static str {
@@ -812,7 +812,7 @@ mod tests {
     }
 
     #[test]
-    fn a_driver_type_is_found_however_it_is_capitalised() {
+    fn a_driver_type_is_found_however_it_is_capitalized() {
         let mut by_name = BTreeMap::new();
         by_name.insert("H2 Embedded".to_string(), "h2-embedded".to_string());
         assert_eq!(

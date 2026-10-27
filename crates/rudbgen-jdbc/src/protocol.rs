@@ -47,7 +47,7 @@ pub enum Op {
     /// Cancel whatever is running on a session. Handle: session.
     ///
     /// The one operation that arrives on a thread other than the session
-    /// worker — the worker is blocked inside the statement being cancelled.
+    /// worker — the worker is blocked inside the statement being canceled.
     Cancel,
     /// Set auto-commit. Handle: session. `arg`: 0 or 1.
     SetAutoCommit,
@@ -55,7 +55,7 @@ pub enum Op {
     Commit,
     /// Roll back. Handle: session.
     Rollback,
-    /// Inspect driver JARs without initialising anything in them.
+    /// Inspect driver JARs without initializing anything in them.
     ProbeDriver,
 }
 

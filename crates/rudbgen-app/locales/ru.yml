@@ -88,7 +88,7 @@ connect:
   add_prop: Добавить свойство
 
   section:
-    behaviour: Поведение
+    behavior: Поведение
     tunnel: SSH-туннель
 
   keep_alive: Поддерживать подключение периодическим запросом
@@ -169,7 +169,7 @@ driver:
   downloading: "Скачивание %{file}…"
   downloading_percent: "Скачивание %{file} — %{percent} %"
   downloaded: "Файл %{file} скачан и добавлен."
-  download_cancelled: Скачивание отменено.
+  download_canceled: Скачивание отменено.
   bad_coordinate: "«%{coordinate}» — это не координата вида group:artifact:version."
   not_found: "На Maven Central по адресу %{url} ничего нет."
   network_failed: "Скачивание не удалось: %{error}"
@@ -326,14 +326,14 @@ progress:
   skipped: "оставлен %{path}"
   failed: "%{path} — ошибка: %{reason}"
   conflict: "%{path} уже существует"
-  cancelling: отмена…
+  canceling: отмена…
   count: "%{done} из %{total}"
 
 summary:
   title: Итог
   done: Всё, о чём просил запуск, записано.
   with_failures: Запуск завершился с ошибками.
-  cancelled: Запуск отменён; ниже то, что успело записаться.
+  canceled: Запуск отменён; ниже то, что успело записаться.
   counts: "записано: %{written} · пропущено: %{skipped} · с ошибкой: %{failed} · предупреждений: %{warnings}"
   written: Записано
   skipped: Пропущено

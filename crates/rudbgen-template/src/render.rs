@@ -377,7 +377,7 @@ impl<'a> Renderer<'a> {
         Ok(())
     }
 
-    /// Write the `inStr` separator, normalising its line breaks to the line
+    /// Write the `inStr` separator, normalizing its line breaks to the line
     /// end of the template and indenting every following fragment.
     fn separator(&mut self, separator: &str, prepend: &str) {
         let mut parts = separator.split('\n');

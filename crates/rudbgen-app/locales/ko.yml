@@ -88,7 +88,7 @@ connect:
   add_prop: 속성 추가
 
   section:
-    behaviour: 동작
+    behavior: 동작
     tunnel: SSH 터널
 
   keep_alive: 주기적인 쿼리로 연결 유지
@@ -168,7 +168,7 @@ driver:
   downloading: "%{file} 다운로드 중…"
   downloading_percent: "%{file} 다운로드 중 — %{percent}%"
   downloaded: "%{file}을(를) 다운로드해 추가했습니다."
-  download_cancelled: 다운로드를 취소했습니다.
+  download_canceled: 다운로드를 취소했습니다.
   bad_coordinate: "“%{coordinate}”은(는) group:artifact:version 형식의 좌표가 아닙니다."
   not_found: "메이븐 센트럴의 %{url}에 아무것도 없습니다."
   network_failed: "다운로드하지 못했습니다: %{error}"
@@ -324,14 +324,14 @@ progress:
   skipped: "%{path} 유지"
   failed: "%{path} 실패: %{reason}"
   conflict: "%{path}이(가) 이미 있습니다"
-  cancelling: 취소하는 중…
+  canceling: 취소하는 중…
   count: "%{total}개 중 %{done}개"
 
 summary:
   title: 결과
   done: 실행이 요구한 것을 모두 썼습니다.
   with_failures: 일부 항목이 실패한 채로 실행이 끝났습니다.
-  cancelled: 실행이 취소되었습니다. 그때까지 쓴 것은 아래와 같습니다.
+  canceled: 실행이 취소되었습니다. 그때까지 쓴 것은 아래와 같습니다.
   counts: "작성 %{written} · 건너뜀 %{skipped} · 실패 %{failed} · 경고 %{warnings}"
   written: 작성됨
   skipped: 건너뜀

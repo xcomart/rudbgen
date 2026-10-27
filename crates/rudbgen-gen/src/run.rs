@@ -99,8 +99,8 @@ pub fn generate(
     {
         // Rule 6: cancellation is checked at file boundaries, so a file is
         // never half written and never written twice.
-        if cancel.is_cancelled() {
-            outcome.cancelled = true;
+        if cancel.is_canceled() {
+            outcome.canceled = true;
             break 'run;
         }
         index += 1;
@@ -160,7 +160,7 @@ pub fn generate(
                             false
                         }
                         Decision::Cancel => {
-                            outcome.cancelled = true;
+                            outcome.canceled = true;
                             break 'run;
                         }
                     }
@@ -283,8 +283,8 @@ pub fn dry_run(plan: &Plan, cancel: &CancelToken, progress: &dyn Fn(Progress)) -
         diagnostics,
     } in slots
     {
-        if cancel.is_cancelled() {
-            result.cancelled = true;
+        if cancel.is_canceled() {
+            result.canceled = true;
             break 'run;
         }
         index += 1;
@@ -334,7 +334,7 @@ pub fn dry_run(plan: &Plan, cancel: &CancelToken, progress: &dyn Fn(Progress)) -
 ///
 /// The indices are into [`Plan::tables`] and [`Plan::templates`]. Unlike the
 /// two whole-run entry points this answers with a `Result`: one pair has one
-/// answer, and a preview that cannot be rendered has nothing to summarise.
+/// answer, and a preview that cannot be rendered has nothing to summarize.
 ///
 /// # Errors
 ///
@@ -636,7 +636,7 @@ fn collect(
 ///
 /// The check is on the name, not on what the filesystem makes of it: a symlink
 /// already inside the output directory can still lead out of it, and catching
-/// that would mean canonicalising a path that does not exist yet.
+/// that would mean canonicalizing a path that does not exist yet.
 ///
 /// Every component must also be a name Windows can hold ([`windows_unsafe`]),
 /// on every platform: generated sources are committed and checked out
@@ -822,7 +822,7 @@ fn as_outcome(result: &DryRun) -> Outcome {
         written: result.files.iter().map(|file| file.path.clone()).collect(),
         skipped: Vec::new(),
         failed: result.failed.clone(),
-        cancelled: result.cancelled,
+        canceled: result.canceled,
         diagnostics: result.diagnostics.clone(),
     }
 }

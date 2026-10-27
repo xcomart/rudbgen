@@ -35,7 +35,7 @@ fn following_the_ui_prefers_the_chrome_themes_namesake() {
 #[test]
 fn following_the_ui_keeps_the_configured_pick_when_the_chrome_has_no_namesake() {
     // A chrome theme of the user's own, which no editor theme is named
-    // after: there is no pair to honour, so the configured editor theme
+    // after: there is no pair to honor, so the configured editor theme
     // stands as long as its cast fits the window.
     assert_eq!(
         editor_theme_for("tokyo-night", true, "my-chrome", true, &entries()),
@@ -165,11 +165,11 @@ fn every_word_the_shell_draws_is_translated() {
         ts!("progress.skipped", path = "/out/a"),
         ts!("progress.failed", path = "/out/a", reason = "why"),
         ts!("progress.conflict", path = "/out/a"),
-        ts!("progress.cancelling"),
+        ts!("progress.canceling"),
         ts!("summary.title"),
         ts!("summary.done"),
         ts!("summary.with_failures"),
-        ts!("summary.cancelled"),
+        ts!("summary.canceled"),
         ts!(
             "summary.counts",
             written = 4,

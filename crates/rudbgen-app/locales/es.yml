@@ -88,7 +88,7 @@ connect:
   add_prop: Añadir una propiedad
 
   section:
-    behaviour: Comportamiento
+    behavior: Comportamiento
     tunnel: Túnel SSH
 
   keep_alive: Mantener la conexión viva con una consulta periódica
@@ -169,7 +169,7 @@ driver:
   downloading: "Descargando %{file}…"
   downloading_percent: "Descargando %{file} — %{percent} %"
   downloaded: "Se descargó y añadió %{file}."
-  download_cancelled: Se canceló la descarga.
+  download_canceled: Se canceló la descarga.
   bad_coordinate: "«%{coordinate}» no es una coordenada group:artifact:version."
   not_found: "Maven Central no tiene nada en %{url}."
   network_failed: "La descarga falló: %{error}"
@@ -326,14 +326,14 @@ progress:
   skipped: "conservado %{path}"
   failed: "%{path} falló: %{reason}"
   conflict: "%{path} ya existe"
-  cancelling: cancelando…
+  canceling: cancelando…
   count: "%{done} de %{total}"
 
 summary:
   title: Resultado
   done: Se escribió todo lo que la ejecución pedía.
   with_failures: La ejecución terminó con fallos.
-  cancelled: La ejecución se canceló; lo que había escrito está abajo.
+  canceled: La ejecución se canceló; lo que había escrito está abajo.
   counts: "%{written} escritos · %{skipped} omitidos · %{failed} fallidos · %{warnings} advertencias"
   written: Escritos
   skipped: Omitidos

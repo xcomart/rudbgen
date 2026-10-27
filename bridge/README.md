@@ -73,7 +73,7 @@ the Rust side drop `ExceptionCheck` from the normal path.
 | `0x21` | `FETCH` | cursor | max rows | — | binary `RDB1` batch |
 | `0x22` | `MORE_RESULTS` | cursor | — | — | JSON, same shape as `EXECUTE` |
 | `0x23` | `CLOSE_CURSOR` | cursor | — | — | — |
-| `0x24` | `CANCEL` | session | — | — | JSON `{cancelled}` |
+| `0x24` | `CANCEL` | session | — | — | JSON `{canceled}` |
 | `0x30` | `SET_AUTOCOMMIT` | session | 0/1 | — | — |
 | `0x31` | `COMMIT` | session | — | — | — |
 | `0x32` | `ROLLBACK` | session | — | — | — |

@@ -19,7 +19,7 @@
 //! is what the window is drawn from. They differ only while the settings dialog
 //! is showing unsaved edits — a palette being tried on, a font being compared —
 //! which it publishes through [`set_preview`]. Keeping the preview *beside* the
-//! persisted settings rather than writing it into them is what makes cancelling
+//! persisted settings rather than writing it into them is what makes canceling
 //! free: dropping the override is the revert, and a window closed mid-dialog
 //! still saves the settings the user last committed to.
 //!
@@ -63,7 +63,7 @@ pub fn editor_font(cx: &App) -> SharedString {
 /// reason those renders read [`editor_font`]: a saved settings file has to
 /// reach editors that already exist, and a repaint is the one thing every
 /// settings change is guaranteed to cause. The comparison is not an
-/// optimisation — [`EditorView::set_word_wrap`] re-measures the buffer, and
+/// optimization — [`EditorView::set_word_wrap`] re-measures the buffer, and
 /// calling it unconditionally from a render would do that on every frame.
 ///
 /// Reads [`effective`], so an editor created while the settings dialog is open
@@ -96,7 +96,7 @@ impl Global for PreviewSettings {}
 /// The saved placement in `state`, or `None` when it carries no position.
 ///
 /// `None` is a first run, or a window that was never moved: the platform picks
-/// the placement then, and the caller centres the saved *size* on the active
+/// the placement then, and the caller centers the saved *size* on the active
 /// display rather than guessing at coordinates.
 pub fn saved_geometry(state: &WindowState) -> Option<WindowGeometry> {
     WindowGeometry::saved(state.x, state.y, state.width, state.height, state.maximized)
@@ -179,7 +179,7 @@ pub fn theme_dirs() -> Result<ThemeDirs> {
 /// configuration directory at all.
 ///
 /// [`theme_dirs`] is the fallible answer, and every caller that is about to
-/// *write* wants it. This is for the two catalogues the settings dialog builds
+/// *write* wants it. This is for the two catalogs the settings dialog builds
 /// at construction, which have to exist before anyone asks them for anything:
 /// the default holds no palettes and refuses every write, which is the same
 /// outcome as the error, reported at the moment the user can see it rather than
@@ -372,7 +372,7 @@ mod tests {
     #[test]
     fn a_state_without_a_position_has_no_saved_placement() {
         // A first run: the size is known, the coordinates are not, and the
-        // caller has to centre rather than place.
+        // caller has to center rather than place.
         let state = WindowState::default();
         assert_eq!(state.x, None);
         assert_eq!(saved_geometry(&state), None);
@@ -449,7 +449,7 @@ mod tests {
             assert_eq!(current(cx).theme, "one-dark");
             assert_eq!(current(cx).ui_font_size, 14.0);
 
-            // Cancelling is the absence of the override, not a second copy.
+            // Canceling is the absence of the override, not a second copy.
             clear_preview(cx);
             assert_eq!(effective(cx).theme, "one-dark");
             assert_eq!(effective(cx).ui_font_size, 14.0);

@@ -19,7 +19,7 @@ use std::fmt;
 pub enum Note {
     /// Word-level abbreviation rules now match case-insensitively (D10).
     ///
-    /// The one deliberate behavioural break from jdbgen, and the reason it is
+    /// The one deliberate behavioral break from jdbgen, and the reason it is
     /// emitted **always**, whether or not the configuration holds a single
     /// rule: a user who adds one later still needs to have been told, and the
     /// architecture document names the import wizard as one of the two places
@@ -33,7 +33,7 @@ pub enum Note {
     /// there is nothing for the user to do beyond knowing that the file is old.
     LegacyEncryption,
 
-    /// A stock driver was recognised and rudbgen's own definition is used.
+    /// A stock driver was recognized and rudbgen's own definition is used.
     ///
     /// The JAR paths, the four SQL overrides and the properties come across
     /// from jdbgen; the id, the URL template and the dialect are rudbgen's, so
@@ -97,7 +97,7 @@ pub enum Note {
     /// An icon locator has no rudbgen equivalent.
     ///
     /// rudbgen names an icon by asset stem; jdbgen also allows a file path, a
-    /// Font Awesome glyph, a colour swatch and a URL. Those come across as *no
+    /// Font Awesome glyph, a color swatch and a URL. Those come across as *no
     /// icon*, which is what the driver picker draws for a driver the user
     /// added.
     IconDropped {

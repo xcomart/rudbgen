@@ -363,7 +363,7 @@ pub struct GeneratePane {
     scroll: ScrollHandle,
     /// Whether the panel's overlay scroll indicator is on screen.
     scrollbar: ScrollbarState,
-    /// The debounce behind the save; dropped — and so cancelled — by the next
+    /// The debounce behind the save; dropped — and so canceled — by the next
     /// edit.
     _debounce: Option<Task<()>>,
     /// Keeps the two fixed fields' observers alive.
@@ -1489,9 +1489,9 @@ impl Render for GeneratePane {
                     .w_full()
                     .min_w_0()
                     .child(heading(ts!("generate.options")))
-                    .child(labelled(ts!("generate.output_dir"), output))
-                    .child(labelled(ts!("generate.author"), self.author.clone()))
-                    .child(labelled(ts!("generate.variables"), self.render_vars()))
+                    .child(labeled(ts!("generate.output_dir"), output))
+                    .child(labeled(ts!("generate.author"), self.author.clone()))
+                    .child(labeled(ts!("generate.variables"), self.render_vars()))
                     .child(self.render_abbreviations(cx))
                     .children(
                         self.abbr_error
@@ -1563,12 +1563,12 @@ fn abbr_failed(error: &anyhow::Error) -> SharedString {
     ts!("generate.abbr_failed", error = format!("{error:#}"))
 }
 
-/// A labelled row of the options block.
+/// A labeled row of the options block.
 ///
 /// [`rugpui::form_row`]'s label column is sized for a dialog; the options
 /// here sit beside a template list and need a wider one, so the shape is
-/// repeated rather than the widget parameterised for one caller.
-fn labelled(label: SharedString, control: impl IntoElement) -> impl IntoElement {
+/// repeated rather than the widget parameterized for one caller.
+fn labeled(label: SharedString, control: impl IntoElement) -> impl IntoElement {
     div()
         .flex()
         .flex_row()

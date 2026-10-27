@@ -298,7 +298,7 @@ It ships the base lexers — `SqlHighlighter` (keywords, strings, comments, `${p
 2. Parse every ticked template and every output-name template once; a parse error aborts **before** any file is written.
 3. For each table × template: render the name and resolve it against the output dir (and refuse anything that escapes it, and any name Windows cannot hold — a reserved device name, `<>:"|?*` or a control character, a trailing dot or space — on every platform). Two pairs that resolve to one file abort **before** any file is written.
 4. For each table × template: apply the policy to the resolved path, then render the body, then write atomically — a skipped file is never rendered.
-5. `Outcome { written, skipped, failed: Vec<Failure>, cancelled, diagnostics }` — a failure names the table, the template, the path when there is one and the reason; `diagnostics` the unknown-field warnings per table × template.
+5. `Outcome { written, skipped, failed: Vec<Failure>, canceled, diagnostics }` — a failure names the table, the template, the path when there is one and the reason; `diagnostics` the unknown-field warnings per table × template.
 
 Dry run is `dry_run`, which renders the same way into memory with no policy. Preview is `preview`, which renders exactly one pair.
 

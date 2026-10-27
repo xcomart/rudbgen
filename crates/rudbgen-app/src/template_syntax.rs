@@ -16,8 +16,8 @@
 //! (`Template::spans`). It is the wrong thing to draw with, for one reason: it
 //! either parses the whole document or fails. A template halfway through being
 //! typed does not parse — an `${if:` with no `${endif}` yet is a
-//! `ParseError` — and an editor whose colours disappear on every other
-//! keystroke is worse than one with no colours at all. So the editor knows the
+//! `ParseError` — and an editor whose colors disappear on every other
+//! keystroke is worse than one with no colors at all. So the editor knows the
 //! grammar twice: once in the engine, which decides what a template *means*,
 //! and once here, which decides what it *looks like*, line by line and never
 //! failing. The engine is next door and is still not asked: the whole point of
@@ -60,7 +60,7 @@
 //! Two things the architecture document's §8 lists are deliberately **not**
 //! painted as errors here. A `}` in the text between statements is not one: a
 //! Java or XML template is full of braces that close nothing, and lighting all
-//! of them up would make the colour useless. An `${` that has not been closed
+//! of them up would make the color useless. An `${` that has not been closed
 //! yet is not one either: the state simply carries to the next line, because
 //! the closing brace of a statement being typed arrives one keystroke later and
 //! a highlighter that reddens the rest of the file in between is unusable.
@@ -207,7 +207,7 @@ impl State {
     }
 }
 
-/// jdbgen's template language, as much of it as a colour needs.
+/// jdbgen's template language, as much of it as a color needs.
 ///
 /// A unit struct: there is nothing to configure, and one `Arc` of it can be
 /// shared by every template tab.
@@ -913,7 +913,7 @@ mod tests {
                 (name, Token::Keyword),
                 "{name} in lower case is the block end"
             );
-            for written in [name.to_uppercase(), capitalised(name)] {
+            for written in [name.to_uppercase(), capitalized(name)] {
                 let line = format!("${{{written}}}");
                 let (spans, _) = lex(&line, LineState::START);
                 assert_eq!(
@@ -948,7 +948,7 @@ mod tests {
     }
 
     /// `endif` → `Endif`.
-    fn capitalised(name: &str) -> String {
+    fn capitalized(name: &str) -> String {
         let mut chars = name.chars();
         let first = chars.next().expect("a name").to_ascii_uppercase();
         std::iter::once(first).chain(chars).collect()

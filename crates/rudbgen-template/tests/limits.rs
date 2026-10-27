@@ -53,7 +53,7 @@ fn nested(depth: usize, stride: usize) -> String {
 
 #[test]
 fn statements_nested_up_to_the_limit_parse_and_render() {
-    // on the test thread's default stack, in the unoptimised build: the case
+    // on the test thread's default stack, in the unoptimized build: the case
     // the limit is measured against
     for stride in [1, 2, usize::MAX] {
         let template =
@@ -118,7 +118,7 @@ fn an_else_before_an_elif_still_loses_its_body() {
 }
 
 #[test]
-fn a_width_up_to_the_limit_is_honoured() {
+fn a_width_up_to_the_limit_is_honored() {
     let padded = render("[${item:key=name, padSize=4096}]", &model());
     assert_eq!(padded.len(), 4096 + 2);
     assert_eq!(

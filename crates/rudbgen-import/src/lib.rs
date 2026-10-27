@@ -94,7 +94,7 @@ const CONFIG_NAME: &str = "config.json";
 /// macOS, `$XDG_CONFIG_HOME/jdbgen` or `~/.config/jdbgen` elsewhere. `None`
 /// only when the platform has no home directory to speak of.
 ///
-/// jdbgen also honours a `jdbgen.dataDir` system property, which is a JVM
+/// jdbgen also honors a `jdbgen.dataDir` system property, which is a JVM
 /// notion and has no equivalent here; a user who moved their configuration
 /// points the wizard's file chooser at it instead.
 pub fn data_dir() -> Option<PathBuf> {

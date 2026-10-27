@@ -6,7 +6,7 @@
 //! inside a quoted attribute value; and a trailing `${` at the very end of a
 //! template is dropped without a word.
 //!
-//! One accident is deliberately not reproduced: jdbgen recognised `endif`,
+//! One accident is deliberately not reproduced: jdbgen recognized `endif`,
 //! `endfor`, `else` and `elif:` in lower case only, so `${ELSE}` silently
 //! became a member lookup. Here they are case insensitive like every other
 //! statement name - see [`is_keyword`] and [`elif_options`].
@@ -22,7 +22,7 @@ use crate::strutil;
 /// per level, so without a limit a template of nothing but tens of thousands
 /// of unclosed `${if:...}` overflows the stack and takes the application down,
 /// even from the editor's live preview while it is typed. The limit is set by the
-/// unoptimised build, whose frames are the largest: an `if` costs the parser
+/// unoptimized build, whose frames are the largest: an `if` costs the parser
 /// and the renderer several kilobytes of stack per level there, and sixty-four
 /// levels of it still fit a thread's default two megabytes with room to
 /// spare. No real template comes near it; the shipped ones nest two deep.

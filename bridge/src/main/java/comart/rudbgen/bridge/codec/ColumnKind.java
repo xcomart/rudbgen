@@ -73,9 +73,9 @@ public final class ColumnKind {
             case Types.BLOB:
                 // rudbman handed back a reference and let the UI pull the bytes
                 // on demand. rudbgen has no LOB_READ to pull with, and the only
-                // statements it runs are the four custom catalogue queries
+                // statements it runs are the four custom catalog queries
                 // (architecture.md D9), whose values are names and comments. So
-                // a LOB is materialised like any other value of its shape.
+                // a LOB is materialized like any other value of its shape.
                 return BIN;
             case Types.CLOB:
             case Types.NCLOB:

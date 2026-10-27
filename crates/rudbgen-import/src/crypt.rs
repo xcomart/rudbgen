@@ -19,7 +19,7 @@
 //!
 //! **Superseded form**, with no prefix: plain Base64 of an AES-128/CBC/PKCS#5
 //! ciphertext whose key is the first half of SHA-256(master) and whose
-//! initialisation vector is the second. It has no authentication tag, so a
+//! initialization vector is the second. It has no authentication tag, so a
 //! wrong password is detected only by what it decrypts to — which is why
 //! [`Decryptor::decrypt`] answers [`Error::WrongPassword`] to a padding
 //! failure, to a plaintext that is not UTF-8, and to one that is not text a
@@ -52,7 +52,7 @@ const PBKDF2_ITERATIONS: u32 = 210_000;
 const KEY_LEN: usize = 32;
 /// Length of the salt carried by a v2 value, in bytes.
 const SALT_LEN: usize = 16;
-/// Length of the GCM initialisation vector, in bytes.
+/// Length of the GCM initialization vector, in bytes.
 const GCM_IV_LEN: usize = 12;
 /// Length of the GCM authentication tag, in bytes.
 const GCM_TAG_LEN: usize = 16;
@@ -70,11 +70,11 @@ pub struct Decryptor {
     /// Derived keys by salt, jdbgen's `KEY_CACHE`.
     ///
     /// A `RefCell` rather than a `&mut self` on the decrypt path: the cache is
-    /// an optimisation and not a fact about the value being read, and a caller
+    /// an optimization and not a fact about the value being read, and a caller
     /// holding the decryptor immutably while walking a configuration is the
     /// natural shape.
     keys: RefCell<HashMap<[u8; SALT_LEN], [u8; KEY_LEN]>>,
-    /// Key and initialisation vector of the superseded scheme, derived once.
+    /// Key and initialization vector of the superseded scheme, derived once.
     legacy: RefCell<Option<([u8; 16], [u8; 16])>>,
 }
 
@@ -121,7 +121,7 @@ impl Decryptor {
         !value.trim().is_empty() && !value.starts_with(ENC_V2_PREFIX)
     }
 
-    /// The current format: salt and initialisation vector travel with the
+    /// The current format: salt and initialization vector travel with the
     /// value, and the tag says whether the key was right.
     fn decrypt_v2(&self, payload: &str, field: &'static str) -> Result<String> {
         let raw = BASE64
@@ -206,7 +206,7 @@ impl Decryptor {
         key
     }
 
-    /// Key and initialisation vector of the superseded scheme: the two halves
+    /// Key and initialization vector of the superseded scheme: the two halves
     /// of SHA-256(master).
     fn legacy_key(&self) -> ([u8; 16], [u8; 16]) {
         if let Some(pair) = *self.legacy.borrow() {

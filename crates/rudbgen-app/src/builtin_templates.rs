@@ -4,7 +4,7 @@
 //! document, §2.2). They are compiled into the binary with
 //! [`include_bytes!`] — bytes and not `str`, because their CRLF line endings
 //! are load bearing: the engine takes a template's line ending from its first
-//! newline, so a copy normalised to LF would silently change the line endings
+//! newline, so a copy normalized to LF would silently change the line endings
 //! of every file generated from it.
 //!
 //! Two rules run through everything here, and both are about not arguing with
@@ -66,7 +66,7 @@ pub const BUILTINS: [Builtin; 3] = [
 /// Identifier of the built-in "Java + MyBatis" set.
 ///
 /// Fixed rather than generated, so that a store seeded by one build and read by
-/// the next recognises the same set — and so that a user who has renamed it
+/// the next recognizes the same set — and so that a user who has renamed it
 /// still has the set they renamed rather than a duplicate beside it.
 pub const JAVA_MYBATIS: Uuid = uuid!("2f0d2f5e-6c1a-4c2e-9a1f-3d3f5b7c9e01");
 
@@ -170,7 +170,7 @@ mod tests {
     #[test]
     fn the_shipped_templates_keep_their_line_endings() {
         // The engine reads a template's line ending from its first newline, so
-        // a copy normalised to LF would change every file generated from it.
+        // a copy normalized to LF would change every file generated from it.
         // `.gitattributes` marks `templates/**` as binary for this reason;
         // this is the assertion that says so out loud.
         for builtin in &BUILTINS {

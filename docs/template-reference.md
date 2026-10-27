@@ -12,7 +12,7 @@ for case, and the three shipped templates rendered against jdbgen's own fixture
 must come out byte for byte identical. Where this page differs from jdbgen's
 documentation it is because the *code* differed from it — jdbgen's engine is the
 specification, not its manual. Everything corrected that way is marked
-**Corrected**; the deliberate behaviour changes are marked **Changed**.
+**Corrected**; the deliberate behavior changes are marked **Changed**.
 
 [← Documentation index](README.md)
 
@@ -182,7 +182,7 @@ A statement without a `:` is shorthand for `item:key=`, so `${name.camel}` and
 > only bites a template that was relying on the accident.
 
 > **Changed — D15: the block keywords match ignoring case.**
-> jdbgen recognised `endif`, `endfor`, `else` and `elif:` in lower case only:
+> jdbgen recognized `endif`, `endfor`, `else` and `elif:` in lower case only:
 > `${ENDIF}` and `${ENDFOR}` left the statement open, so parsing failed with
 > `if statements not closed` / `for statements not closed`, and `${ELSE}` was
 > silently an `item` statement for a field named `ELSE` — both branches ended
@@ -728,7 +728,7 @@ are part of `inStr`.
 
 - Line breaks *inside the loop body* are emitted exactly as they appear in the
   template. No indentation is added and none is removed.
-- Each line break *inside `inStr`* is normalised to the template's own line
+- Each line break *inside `inStr`* is normalized to the template's own line
   ending — rudbgen decides between `\r\n` and `\n` by looking at the **first**
   line break in the template file, so a CRLF template keeps producing CRLF — and
   the fragment after it is indented to
@@ -852,7 +852,7 @@ All three accept [decorations](#decorations):
 > The pattern letters are reproduced; the locale is not. `MMMM` renders
 > `August` whatever the machine's language and whatever the interface language
 > is set to, where Java followed the default locale. Every shipped template uses
-> numeric fields only, where the two agree exactly. If a localised month name
+> numeric fields only, where the two agree exactly. If a localized month name
 > matters, put it in a custom variable.
 
 ### Text escape
@@ -977,7 +977,7 @@ which the editor refuses to save — the later one wins.
 
 ## Error handling
 
-| Situation | Behaviour |
+| Situation | Behavior |
 |:---|:---|
 | Unknown field or variable | Warning with a line number, expands to an empty string — not an error |
 | Unknown processor | Parse error listing the valid processors |

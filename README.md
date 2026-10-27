@@ -73,7 +73,7 @@ Written against jdbgen, because that is what most of this is for:
   ![The overwrite question, mid-run](docs/screenshots/overwrite.png)
 - **Any JDBC driver.** Drivers are downloaded from Maven Central by coordinate
   or picked from disk, the driver class is detected from the JAR without running
-  a static initialiser, and each set of driver JARs gets its own isolated class
+  a static initializer, and each set of driver JARs gets its own isolated class
   loader.
 - **jdbgen's four custom queries, with a Test button.** For a driver whose
   `DatabaseMetaData` is wrong or missing, supply your own SQL for the table list,
@@ -97,7 +97,7 @@ Written against jdbgen, because that is what most of this is for:
 - **An abbreviation rules editor.** The four-column table jdbgen kept in its
   configuration window, with a trailing empty row, a table-name picker for
   whole-name rules, and a refusal to save two rules that would silently become
-  one. Word rules now match **whatever the case**, a deliberate behavioural
+  one. Word rules now match **whatever the case**, a deliberate behavioral
   break from jdbgen — where they only ever matched lower-case segments and so
   never fired on `TB_USR`.
   ![The abbreviation rules editor](docs/screenshots/abbreviations.png)
@@ -244,13 +244,13 @@ job and the milestone plan — lives in
 tracked in [docs/status.md](docs/status.md).
 
 Everything rudbgen draws with comes from **rugpui** — the gpui widget kit, the
-virtualised grid, the code editor and **rugpui-shell**, the layer above them,
+virtualized grid, the code editor and **rugpui-shell**, the layer above them,
 extracted so that the three applications that had been carrying byte-identical
 copies of them ([rulogman](https://github.com/xcomart/rulogman),
 [rudbman](https://github.com/xcomart/rudbman) and this one) share one copy and
 one fix. `rugpui-shell` is the application-shaped half of that: the window that
 draws its own title bar, the self-updater, the about and update dialogs, the
-palette catalogues and their editor, the split-pane tree and the pieces a
+palette catalogs and their editor, the split-pane tree and the pieces a
 settings form is built out of. It knows nothing about rudbgen — the name, the
 version, the release endpoints, the words and the ignored-release tag are
 injected at start-up. rugpui also vendors the gpui these widgets are written

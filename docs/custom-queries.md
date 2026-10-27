@@ -90,7 +90,7 @@ They ship switched **off**, because the bridge already reads SQL Server's
 comments (its `MS_Description` extended properties) by itself; tick them only
 if your server disagrees with what the bridge finds.
 
-One combination changes behaviour rather than just the data source:
+One combination changes behavior rather than just the data source:
 
 - **Without** a custom column list query, primary keys come from
   `getPrimaryKeys()`, and so does the key *order*.
@@ -148,7 +148,7 @@ comments are: column 1 is the column name, column 2 is the comment.
 > rudbgen applies a comment **only to the names the query returns**, which is
 > what the table-comment path always did. A partial query is now safe, and the
 > two comment queries behave the same way as each other. This is the second of
-> the two deliberate behaviour changes listed in the architecture document §7.2.
+> the two deliberate behavior changes listed in the architecture document §7.2.
 
 | Position | Type | Description |
 |:---:|:---:|:---|
@@ -184,7 +184,7 @@ first occurrence.
 
 ### How `TABLE_TYPE` is interpreted
 
-It is normalised before use:
+It is normalized before use:
 
 1. A null or empty value is treated as `TABLE`.
 2. `TABLE` and `VIEW` are used as they are.
@@ -421,7 +421,7 @@ because the reader takes the first two and ignores the rest.
 6. **Return `0`/`1` for `IS_KEY`**, never `'Y'`/`'N'`, and cast rather than pad.
 7. **Order the column list** explicitly; the row order is the column order and
    the key order.
-8. **Normalise `TABLE_TYPE` yourself** for anything that is not literally `TABLE`
+8. **Normalize `TABLE_TYPE` yourself** for anything that is not literally `TABLE`
    or `VIEW` and that you still want to see.
 9. **Match letter case.** The comment queries join on names, and the join is
    case-sensitive.

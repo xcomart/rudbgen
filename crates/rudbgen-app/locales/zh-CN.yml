@@ -16,13 +16,13 @@ input:
   menu_select_all: 全选
 
 explorer:
-  title: 浏览器
+  title: 资源管理器
   filter_placeholder: 筛选表
   show_views: 显示视图
   loading: 正在加载…
   load_failed_unknown: 无法加载。
   menu_select_shown: 全选当前显示
-  menu_clear: 清除选择
+  menu_clear: 取消选择
   menu_invert: 反选
   menu_inspect: 在检查器中打开
   menu_refresh: 刷新
@@ -33,7 +33,7 @@ inspector:
   tab_keys: 键
   tab_foreign_keys: 外键
   tab_indexes: 索引
-  empty: 选择一个表即可查看它的构成。
+  empty: 选择一张表即可查看它的构成。
   loading: 正在加载…
   refresh: 刷新
   nothing_here: 无
@@ -58,10 +58,10 @@ connect:
   title: 连接
   new: 新建
   new_name: 新建连接
-  duplicate: 复制
+  duplicate: 创建副本
   delete: 删除
-  delete_confirm: "删除连接“%{name}”及其保存的密码？"
-  unnamed: "(未命名)"
+  delete_confirm: "要删除连接“%{name}”及其保存的密码吗？"
+  unnamed: "（未命名）"
   copy_name: "%{name}（副本）"
 
   name: 名称
@@ -77,7 +77,7 @@ connect:
   database: 数据库
   url: URL
   url_hint: 由上面的字段拼装而成。直接编辑将保留你输入的内容。
-  url_overridden: 手动输入的 URL；上面的字段不再改动它。
+  url_overridden: 手动输入的 URL；上面的字段不再更改它。
   url_reset: 重新拼装
 
   username: 用户
@@ -96,7 +96,7 @@ connect:
   tunnel_enabled: 通过 SSH 堡垒机连接
   tunnel_host: 堡垒机
   tunnel_user: 堡垒机用户
-  tunnel_auth: 认证
+  tunnel_auth: 认证方式
   tunnel_auth_agent: SSH 代理
   tunnel_auth_key: 私钥
   tunnel_auth_password: 密码
@@ -115,12 +115,12 @@ connect:
   connect: 连接
   saved: 已保存。
 
-  name_required: 请为该连接取个名字。
+  name_required: 请为该连接命名。
   url_required: 该连接没有 URL。
   no_driver: "没有名为“%{driver}”的驱动定义。"
   load_failed: "无法读取已保存的连接，在修复或移走该文件之前无法保存或删除：%{error}"
   save_failed: "无法保存连接：%{error}"
-  keychain_failed: "无法把密码保存到密钥链：%{error}"
+  keychain_failed: "无法把密码保存到钥匙串：%{error}"
 
   hint_auth: 请检查用户名和密码
   hint_driver: 请检查驱动 JAR 和驱动类
@@ -147,7 +147,7 @@ driver:
   probe_found: "找到了 %{class}。"
   probe_choose: 该驱动包含多个类。请选择用于连接的那一个。
   probe_recommended: 推荐
-  probe_none: 这些文件里没有 JDBC 驱动。源码包或 javadoc 包就是这样；请确认选对了文件。
+  probe_none: 这些文件中没有 JDBC 驱动。选中源码包或 javadoc 包时会出现这种情况；请确认选择了正确的文件。
   probe_damaged: "文件已损坏，无法读完；请重新下载。（%{error}）"
   probe_missing: "找不到 JAR 文件：%{error}"
   probe_jvm_failed: "无法启动 Java 运行时：%{error}"
@@ -178,7 +178,7 @@ driver:
   new: 新建
   new_name: 新建驱动
   delete: 删除
-  delete_confirm: "删除驱动定义“%{name}”？"
+  delete_confirm: "要删除驱动定义“%{name}”吗？"
   none_selected: 请选择一个驱动，或新建一个。
 
   # 即 jdbgen 的 noAuth。连接表单会直接不显示这两行凭据，而不是把它们变灰：这里没有需要回答的问题。
@@ -188,15 +188,15 @@ driver:
 # 结果形状的「测试」按钮。
 custom_query:
   section: 自定义查询
-  section_hint: 用来补上此驱动答得不好、甚至根本不答的内容的 SQL。沿用自 jdbgen；只有勾选时才会发送。
+  section_hint: 用于补充此驱动报告不全或无法报告的信息的 SQL。沿用自 jdbgen；仅在勾选时发送对应语句。
   test_values: "测试用值"
   tables: 表清单
   columns: 列清单
   table_comments: 表注释
   column_comments: 列注释
   test: 测试
-  testing: 执行中…
-  ok: "成功 — %{rows} 行，需要的列都在。"
+  testing: 正在执行…
+  ok: "成功 — %{rows} 行，读取所需的列均已返回。"
   missing: "缺少的列：%{labels}"
   wrong_columns: "读取前 %{expected} 列，但只返回了 %{actual} 列。"
   failed: "语句执行失败：%{error}"
@@ -239,12 +239,12 @@ titlebar:
   no_connection: 无连接
   # 用于断开而非打开会话的那一行，以及会话正在打开时触发按钮上的文字。
   disconnect: 断开连接
-  connecting: "%{name} — 连接中…"
+  connecting: "%{name} — 正在连接…"
   tip_menu: 菜单
 
 welcome:
   tagline: 指向一个数据库，选择表和模板，它就会生成代码。
-  hint: 按 %{shortcut} 即可打开新连接。
+  hint: 按 %{shortcut} 即可新建连接。
   new_connection: 新建连接…
   import_jdbgen: 从 jdbgen 导入…
   open_template: 打开模板…
@@ -269,12 +269,12 @@ generate:
   set_custom: 自定义
   save_as_set: 另存为模板集…
   delete_set: 删除模板集
-  delete_set_confirm: "删除模板集“%{name}”？"
+  delete_set_confirm: "要删除模板集“%{name}”吗？"
   set_name: 名称
   overwrite_set: 覆盖
   overwrite_set_note: "将用当前列表替换模板集“%{name}”。"
   templates: 模板
-  no_templates: 还没有模板 —— 添加一个，这次运行才有东西可写。
+  no_templates: 还没有模板。添加模板后，运行才有内容可生成。
   add_template: 添加模板…
   add_template_select: 选择模板文件
   template_name: 名称
@@ -284,7 +284,7 @@ generate:
   tip_remove: 从列表中移除
   options: 选项
   output_dir: 输出
-  output_placeholder: 生成的文件放到哪里
+  output_placeholder: 生成文件的存放位置
   output_select: 选择输出目录
   browse: "…"
   author: 作者
@@ -303,7 +303,7 @@ generate:
   preview_template: 模板
   preview_empty: 尚未渲染任何内容。
   dry_exists: 将覆盖
-  dry_new: 新建
+  dry_new: 将新建
   dry_bytes: "%{bytes} B"
   diagnostics: "%{count} 条警告"
   at_line: "第 %{line} 行"
@@ -324,12 +324,12 @@ progress:
   failed: "%{path} 失败：%{reason}"
   conflict: "%{path} 已存在"
   cancelling: 正在取消…
-  count: "%{total} 中的 %{done}"
+  count: "%{done} / %{total}"
 
 summary:
   title: 结果
-  done: 这次运行要求的内容都已写入。
-  with_failures: 这次运行以失败告终。
+  done: 本次运行要求的内容均已写入。
+  with_failures: 运行已结束，但有部分失败。
   cancelled: 运行已取消；下面是已经写入的内容。
   counts: "写入 %{written} · 跳过 %{skipped} · 失败 %{failed} · 警告 %{warnings}"
   written: 已写入
@@ -337,7 +337,7 @@ summary:
   failed: 失败
   open_output: 打开输出目录
   conflict_title: 文件已存在
-  conflict_body: 替换它、保留它，或者一次性决定这次运行的其余部分。
+  conflict_body: 替换、保留，或一次性为本次运行中的其余文件作出选择。
   overwrite: 覆盖
   skip: 跳过
   overwrite_all: 全部覆盖
@@ -369,7 +369,7 @@ settings:
   ui_font_size: 界面字号
   editor_font: 编辑器字体
   editor_font_size: 编辑器字号
-  editor_word_wrap: 在编辑器中自动换行长行
+  editor_word_wrap: 在编辑器中自动换行
   font_size_hint: 6 – 32 pt
 
   opacity: 不透明度
@@ -386,7 +386,7 @@ settings:
   overwrite_overwrite: 覆盖
   overwrite_skip: 跳过
   overwrite_ask: 询问
-  overwrite_hint: 每次运行的起点；“生成”标签页仍可为单次运行另作选择。
+  overwrite_hint: 每次运行的默认选择；“生成”标签页仍可为单次运行另作选择。
 
   jvm_heap: Java 堆
   jvm_heap_hint: MB — 驱动运行时的 -Xmx
@@ -394,7 +394,7 @@ settings:
   jvm_hint: 堆是 JDBC 驱动和元数据读取运行的空间。两项设置都在 rudbgen 下次启动时生效。附加参数以空格分隔。
 
   manage:
-    duplicate: 复制…
+    duplicate: 创建副本…
     edit: 编辑…
     delete: 删除
     import: 导入…
@@ -403,7 +403,7 @@ settings:
     import_unreadable: "无法读取“%{file}”：%{error}"
     import_not_a_theme: "“%{file}”是编辑器主题。请在“编辑器主题”中导入。"
     import_not_an_editor_theme: "“%{file}”是界面主题。请在“界面主题”中导入。"
-    import_bad_color: "“%{file}”中%{slot}的颜色无法使用。"
+    import_bad_color: "“%{file}”中“%{slot}”的颜色无法使用。"
     import_skipped: "已跳过 %{count} 个文件。"
     copy_name: "%{name}（副本）"
     delete_theme_confirm: "要删除主题“%{name}”吗？"
@@ -487,20 +487,20 @@ template:
   tab_width: "制表符宽度：%{width}"
   tip_tab_width: 设置此文件中一个制表符显示为几列宽
   preview_table: 表
-  preview_no_connection: 打开一个连接，就能看到这个模板套在表上的结果。
-  preview_no_table: 在浏览器里勾一张表，就能看到这个模板套上去的结果。
+  preview_no_connection: 打开一个连接，即可查看此模板应用于表后的渲染结果。
+  preview_no_table: 在资源管理器中勾选一张表，即可查看此模板的渲染结果。
   preview_parse_error: 模板无法解析，问题都列在下面。
-  read_failed: "打不开 %{file}: %{reason}"
-  create_failed: "无法创建 %{file}: %{reason}"
-  write_failed: "写不了 %{file}: %{reason}"
+  read_failed: "无法打开 %{file}：%{reason}"
+  create_failed: "无法创建 %{file}：%{reason}"
+  write_failed: "无法写入 %{file}：%{reason}"
   not_utf8: "%{file} 不是 UTF-8 文本，无法在这里编辑。"
   open_select: 打开模板
-  close_title: 尚未保存的改动
-  close_question: "%{file} 里还有没保存的改动。"
+  close_title: 未保存的更改
+  close_question: "%{file} 有尚未保存的更改。"
   discard: 不保存
 
 diagnostics:
-  title: 问题 (%{count})
+  title: 问题（%{count}）
   at: "%{line}:%{column}"
 
 completion:
@@ -511,9 +511,9 @@ palette:
   title: 变量
   search: 筛选变量
   no_match: 没有匹配的条目。
-  custom_var: 来自生成标签页变量表的变量。
+  custom_var: 来自“生成”标签页变量表的变量。
   section_table: 表字段
-  section_column: 列字段（在 for 里）
+  section_column: 列字段（在 for 中）
   section_fk: 外键字段
   section_index: 索引字段
   section_statement: 语句
@@ -521,8 +521,8 @@ palette:
   section_condition: 条件
   section_custom: 自定义变量
   table:
-    catalog: 这张表所在的数据库目录
-    schema: 这张表所在的数据库模式
+    catalog: 表所在的数据库目录
+    schema: 表所在的数据库模式
     name: 表名
     table: name 的别名
     title: name 的别名
@@ -531,101 +531,101 @@ palette:
     columns: 按数据库给出的顺序排列的全部列
     keys: 按键序排列的主键列
     notKeys: 不属于主键的全部列
-    imports: 这张表自己声明的外键
-    exports: 别的表指向这张表的外键
-    indexes: 这张表的索引
-    icon: 表列表在旁边画的图标
-    position: 在读取到的列表里的位次
+    imports: 本表声明的外键
+    exports: 其他表指向本表的外键
+    indexes: 本表的索引
+    icon: 表列表中显示在表旁边的图标
+    position: 表在读取到的列表中的位置
   column:
-    catalog: 这一列所在的数据库目录
-    schema: 这一列所在的数据库模式
-    table: 这一列所属的表
+    catalog: 该列所在的数据库目录
+    schema: 该列所在的数据库模式
+    table: 该列所属的表
     name: 列名
     column: name 的别名
     typeName: 驱动报告的类型名，如 VARCHAR、INT
-    typeString: DDL 写法的类型，带长度，如 VARCHAR(256)
-    isKey: 这一列是否属于主键
+    typeString: DDL 中的类型写法（含长度），如 VARCHAR(256)
+    isKey: 该列是否属于主键
     isCharType: 类型是否属于 CHAR、CLOB、TEXT 一类
-    length: 列的大小：字符型算字符数，数值型算位数
-    precision: 数值列一共有多少位
-    scale: 其中小数点后有多少位
+    length: 列的大小：文本类型为字符数，数值类型为位数
+    precision: 数值列的总位数
+    scale: 其中小数点后的位数
     nullable: NOT NULL 时为 0，可为空时为 1
     remarks: 列注释
     defVal: 默认值
     dataType: 驱动报告的 java.sql.Types 原始代码
     jdbcType: 该代码对应的 JDBC 类型名
     javaType: 该代码映射到的 Java 类型名；DECIMAL 和 NUMERIC 按 precision 与 scale 决定
-    autoIncrement: 数据库是否自己填这一列
-    keySeq: 在主键里的位次，从 1 起
-    fk: 只有一个外键用到这一列时，它指向的地方
-    position: 在循环里的位次，从 1 起
+    autoIncrement: 该列是否由数据库自动填充
+    keySeq: 在主键中的位置，从 1 开始
+    fk: 恰好只有一个外键使用该列时，该列指向的目标
+    position: 在循环中的位置，从 1 开始
   fk:
     name: 约束名
-    columns: 构成这个键的、本表的列
+    columns: 构成该键的本表列
     refCatalog: 另一端表的目录
     refSchema: 另一端表的模式
     refTable: 另一端的表
-    refColumns: 与本表这边同序排列的另一端的列
-    onUpdate: 另一端的行被改动时的动作
-    onDelete: 另一端的行被删除时的动作
-    position: 在键列表里的位次，从 1 起
-    catalog: 在列的 fk 里 — 它指向的表的目录
-    schema: 在列的 fk 里 — 它指向的表的模式
-    table: 在列的 fk 里 — 它指向的表
-    column: 在列的 fk 里 — 它指向的列
+    refColumns: 另一端表的列，顺序与本表的列一致
+    onUpdate: 另一端的行被更新时执行的动作
+    onDelete: 另一端的行被删除时执行的动作
+    position: 在键列表中的位置，从 1 开始
+    catalog: 在列的 fk 中 — 所指向表的目录
+    schema: 在列的 fk 中 — 所指向表的模式
+    table: 在列的 fk 中 — 所指向的表
+    column: 在列的 fk 中 — 所指向的列
   index:
     name: 索引名
-    unique: 是否是唯一索引
+    unique: 是否为唯一索引
     columns: 按索引顺序排列的列
-    position: 在索引列表里的位次，从 1 起
+    position: 在索引列表中的位置，从 1 开始
   stmt:
-    item: 写出模型的一个字段，连修饰符一起
-    super: 在 for 循环里够到外层的表
-    if: 条件成立时写出主体；要有 endif
-    elif: 上面那个 if 的另一个分支
-    else: 所有分支都不成立时写的东西
+    item: 输出模型的一个字段，并应用其修饰符
+    super: 在 for 循环内引用外层的表
+    if: 条件成立时输出主体；需要以 endif 结束
+    elif: 上方 if 的另一个分支
+    else: 所有分支都不成立时输出的内容
     endif: 结束一个 if
-    for: 集合里每有一个元素就写一遍主体
+    for: 对集合中的每个元素输出一次主体
     endfor: 结束一个 for
-    date: 按 format 说的样子写出的今天
+    date: 按 format 指定的格式输出今天的日期
     user: 运行生成器的账号
-    author: 生成标签页里的作者一栏
-    inStr: 写在两次循环之间的文字；第一次之前和最后一次之后都不写
-    indent: 给 inStr 写的东西添的缩进空格，可以是负数
-    skipList: 要跳过的元素名，用逗号分开，大小写也要对上
+    author: “生成”标签页中的“作者”字段
+    inStr: 在两次迭代之间输出的文本；第一次之前和最后一次之后不输出
+    indent: 为 inStr 输出的内容添加的缩进空格数，可以为负数
+    skipList: 要跳过的元素名，以逗号分隔，须完全匹配（区分大小写）
   dec:
-    abbr: 把缩写规则套到值上
-    suffix: 丢掉第一个下划线之前的部分，T_SAMPLE_ALBUM 变成 SAMPLE_ALBUM
-    prefix: 丢掉最后一个下划线之后的部分，SAMPLE_ALBUM_T 变成 SAMPLE_ALBUM
-    camel: 小驼峰，SAMPLE_ALBUM 变成 sampleAlbum
-    pascal: 大驼峰，SAMPLE_ALBUM 变成 SampleAlbum
-    snake: 蛇形，SAMPLE_ALBUM 变成 sample_album
-    screaming: 大写蛇形，sampleAlbum 变成 SAMPLE_ALBUM
-    skewer: 串形，SAMPLE_ALBUM 变成 sample-album
+    abbr: 对值应用缩写规则
+    suffix: 去掉第一个下划线及其之前的部分，例如 T_SAMPLE_ALBUM 变为 SAMPLE_ALBUM
+    prefix: 去掉最后一个下划线及其之后的部分，例如 SAMPLE_ALBUM_T 变为 SAMPLE_ALBUM
+    camel: 小驼峰命名，例如 SAMPLE_ALBUM 变为 sampleAlbum
+    pascal: 大驼峰命名，例如 SAMPLE_ALBUM 变为 SampleAlbum
+    snake: 蛇形命名，例如 SAMPLE_ALBUM 变为 sample_album
+    screaming: 大写蛇形命名，例如 sampleAlbum 变为 SAMPLE_ALBUM
+    skewer: 串形命名，例如 SAMPLE_ALBUM 变为 sample-album
     kebab: skewer 的别名
     lower: 小写
     upper: 大写
-    replace: replace('from','to') 把出现的地方都换掉
-    padSize: 用空格把值补到这个宽度
-    padDir: 空格补在哪一边，left 或 right，默认 right
-    quote: 用这段文字把值两头包起来
-    prepend: 在值前面写上这段文字
-    postpend: 在值后面写上这段文字
+    replace: replace('from','to') 替换所有出现之处
+    padSize: 用空格将值填充到此宽度
+    padDir: 填充的方向，left 或 right，默认为 right
+    quote: 用此文本包裹值的两端
+    prepend: 在值前面添加此文本
+    postpend: 在值后面添加此文本
   cond:
-    equals: 不分大小写，值等于它就成立
-    notEquals: 值不是它就成立
-    startsWith: 不分大小写，值以它开头就成立
-    notStartsWith: 值不以它开头就成立
-    endsWith: 不分大小写，值以它结尾就成立
-    notEndsWith: 值不以它结尾就成立
-    contains: 集合里有叫这个名字的元素，或逗号分隔的列表里有这个值，就成立
-    notContains: 两样都没有就成立
-    matches: 整个值匹配这个正则就成立；这里分大小写
-    notMatches: 整个值匹配不上这个正则就成立
+    equals: 值等于此内容时成立（不区分大小写）
+    notEquals: 值不等于此内容时成立
+    startsWith: 值以此内容开头时成立（不区分大小写）
+    notStartsWith: 值不以此内容开头时成立
+    endsWith: 值以此内容结尾时成立（不区分大小写）
+    notEndsWith: 值不以此内容结尾时成立
+    contains: 集合中有此名称的元素，或逗号分隔的列表中包含此值时成立
+    notContains: 以上两种情况都不满足时成立
+    matches: 整个值匹配此正则表达式时成立（区分大小写）
+    notMatches: 整个值不匹配此正则表达式时成立
   opt:
-    key: 这条语句要写的字段，连修饰符一起
+    key: 此语句输出的字段，包括修饰符
     item: key 的别名
-    format: 日期怎么写，用 Java 的模式字母，如 yyyy-MM-dd
+    format: 日期格式，使用 Java 的模式字母，如 yyyy-MM-dd
 
 abbr:
   title: 缩写规则
@@ -637,16 +637,16 @@ abbr:
   abbreviation_placeholder: 要查找的内容
   replacement_placeholder: 要替换成的内容
   pick_table: 表…
-  tip_remove: 删除此规则
+  tip_remove: 移除此规则
   duplicate: "%{abbreviation}：有两条已启用的规则查找它，最终只有一条能生效。"
   load_failed: "无法读取 abbreviations.json，因此无法编辑规则：%{error}。请修复或移走该文件后重新打开。"
   save_failed: "未能保存规则：%{error}"
 
 import:
   title: 从 jdbgen 导入
-  password_hint: jdbgen 用一个主密码加密连接 URL、用户名和密码。rudbgen 只在这里问一次，之后把密码交给操作系统本来就在看守的钥匙串。
+  password_hint: jdbgen 用一个主密码加密连接 URL、用户名和密码。rudbgen 只在此处询问一次，之后将密码保存到操作系统的钥匙串中。
   master_password: 主密码
-  password_placeholder: jdbgen 启动时索取的那个密码
+  password_placeholder: jdbgen 启动时要求输入的密码
   other_file: 其他文件…
   choose_file: 选择 jdbgen 的 config.json
   opening: 正在打开配置…
@@ -659,7 +659,7 @@ import:
   section_rules: 缩写规则
   section_settings: 设置
   section_conflicts: 已被占用的名称
-  section_notes: 值得一提
+  section_notes: 注意事项
   nothing_here: 此文件中没有。
   rules_count: "导入 %{count} 条规则"
   apply_abbr: 把规则用在生成的名称上
@@ -669,8 +669,8 @@ import:
   system_language: 系统语言
   theme_dark: 深色
   theme_light: 浅色
-  conflict_rename: 名称被占用时两者都留
-  conflict_rename_hint: 来自 jdbgen 的一份会在名称后加上 "(imported)"。
+  conflict_rename: 名称被占用时保留两者
+  conflict_rename_hint: 来自 jdbgen 的条目会在名称后加上“(imported)”。
   conflict_skip_hint: 保留这里已有的，jdbgen 中的条目不导入。
   written: "已导入 %{connections} 个连接、%{drivers} 个驱动、%{sets} 个模板集和 %{rules} 条缩写规则。"
   nothing_written: 没有导入任何内容。
@@ -679,14 +679,14 @@ import:
   load_failed: "无法读取导入要写入的文件，因此没有导入任何内容：%{error}。请修复或移走该文件后重新导入。"
   not_saved: "无法写入文件，以下内容未保存：%{errors}"
   wrong_password: 这不是该配置的主密码。
-  malformed: 该配置已损坏：其中一个加密值根本不是一个值。
+  malformed: 该配置已损坏：其中一个加密值无效。
   unreadable: 无法读取该文件。
   not_jdbgen: 该文件不是 jdbgen 的配置。
   note_case_rule: 词级规则现在不区分大小写。jdbgen 只匹配小写片段，因此在那里从不生效的规则，在这里可能开始生效。
-  note_legacy: 有些值使用的是 jdbgen 较旧的加密格式。它们照样被读出，您的 jdbgen 配置保持原样。
-  note_stock_matched: "%{driver}：使用 rudbgen 自带的 %{builtin} 定义，并沿用您的 JAR、SQL 覆盖和属性。"
+  note_legacy: 有些值使用的是 jdbgen 较旧的加密格式。这些值已正常读取，你的 jdbgen 配置保持原样。
+  note_stock_matched: "%{driver}：使用 rudbgen 自带的 %{builtin} 定义，并沿用你的 JAR、SQL 覆盖和属性。"
   note_stock_unknown: "%{driver}（%{class}）与 rudbgen 的任何定义都不匹配，作为独立驱动导入。"
-  note_unknown_driver: "%{connection} 指向驱动 %{driver}，而此配置并未定义它。连接前请先选一个。"
+  note_unknown_driver: "%{connection} 指向驱动 %{driver}，而此配置并未定义它。连接前请先选择驱动。"
   note_keep_alive: "%{connection} 的保活间隔为 %{value}，不是秒数。该探测以关闭状态导入。"
   note_unresolved_path: "%{owner} 的%{kind} %{path} 在 jdbgen 的两个目录中都找不到，按原样导入。"
   note_icon: "%{owner} 的图标 %{icon} 在这里没有对应项，已舍弃。"

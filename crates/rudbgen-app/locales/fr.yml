@@ -609,6 +609,7 @@ palette:
     lower: Minuscules
     upper: Majuscules
     replace: replace('de','vers') remplace chaque occurrence
+    clamp: clamp(min, max) ramène un nombre entier entre les deux bornes, le reste passe tel quel
     padSize: Complète la valeur par des espaces jusqu’à cette largeur
     padDir: De quel côté vont les espaces, left ou right ; à droite par défaut
     quote: Entoure la valeur de ce texte des deux côtés
@@ -625,6 +626,10 @@ palette:
     notContains: Vrai quand ni l’un ni l’autre
     matches: Vrai quand la valeur entière correspond à cette expression régulière ; ici la casse compte
     notMatches: Vrai quand la valeur entière n’y correspond pas
+    gt: Vrai quand la valeur est un entier supérieur à celui-ci
+    ge: Vrai quand la valeur est un entier supérieur ou égal à celui-ci
+    lt: Vrai quand la valeur est un entier inférieur à celui-ci
+    le: Vrai quand la valeur est un entier inférieur ou égal à celui-ci
   opt:
     key: Le champ qu’écrit cette instruction, décorateurs compris
     item: Un autre nom pour key

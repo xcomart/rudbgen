@@ -607,6 +607,7 @@ palette:
     lower: 小文字
     upper: 大文字
     replace: replace('from','to') は出てくるたびに置き換えます
+    clamp: clamp(min, max) は整数を二つの境界の内側に収めます。数でなければそのまま
     padSize: この幅になるまで値を空白で埋めます
     padDir: 空白を付ける側。left か right で、既定は right
     quote: 値の両端をこの文字で包みます
@@ -623,6 +624,10 @@ palette:
     notContains: どちらでもなければ真
     matches: 値の全体がこの正規表現に合えば真。ここは大文字小文字を区別します
     notMatches: 値の全体がこの正規表現に合わなければ真
+    gt: 値がこの数より大きい整数なら真
+    ge: 値がこの数以上の整数なら真
+    lt: 値がこの数より小さい整数なら真
+    le: 値がこの数以下の整数なら真
   opt:
     key: この文が書く項目。デコレーターまで含みます
     item: key の別名

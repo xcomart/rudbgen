@@ -251,6 +251,7 @@ right, each one receiving the previous one's result.
 | `.lower` | Lower case |
 | `.upper` | Upper case |
 | `.replace(<find>, <replacement>)` | Replace every occurrence of `<find>` with `<replacement>` |
+| `.clamp(<min>, <max>)` | Hold a whole number between `<min>` and `<max>` (D17, new) |
 
 `.suffix` and `.prefix` return the value **unchanged** when it contains no `_`,
 so `${type.suffix}` on a `TABLE` type yields `TABLE`.
@@ -258,6 +259,15 @@ so `${type.suffix}` on a `TABLE` type yields `TABLE`.
 `.replace` takes its two arguments quoted, unquoted or mixed:
 `${name.replace('SAMPLE','TEST')}`, `${name.replace(_, -)}` and
 `${name.replace(ghi, 'xyz')}` all work.
+
+`.clamp` (D17, new) is for the numeric fields — `length`, `precision`, `scale`,
+`keySeq`, `no` and the like. A value below `<min>` becomes `<min>`, one above
+`<max>` becomes `<max>`, and one in between is written exactly as it was. A
+value that is not a whole number — the empty `keySeq` of a column outside the
+key, a decimal such as `1.5`, a text field — passes **unchanged**. Both bounds
+must be whole numbers with `<min>` ≤ `<max>`, quoted or not; anything else is a
+parse error. `${length.clamp(1, 4000)}` writes `4000` for a `CLOB` whose driver
+reports a length of `2147483647`, and `1` for a column that reports `0`.
 
 Any processor may be repeated and combined with any other — the chain is a plain
 pipeline with no restrictions. `${name.upper.lower}` and
@@ -597,6 +607,10 @@ repeated, `else` is optional, and `endif` is mandatory.
 | `notContains=<value>` | the negation of `contains` |
 | `matches=<regex>` | matches the regular expression `<regex>` **entirely** |
 | `notMatches=<regex>` | does not match `<regex>` entirely |
+| `gt=<n>` | is a whole number greater than `<n>` (D17, new) |
+| `ge=<n>` | is a whole number greater than or equal to `<n>` (D17, new) |
+| `lt=<n>` | is a whole number less than `<n>` (D17, new) |
+| `le=<n>` | is a whole number less than or equal to `<n>` (D17, new) |
 
 #### Case sensitivity of conditions
 
@@ -607,6 +621,7 @@ repeated, `else` is optional, and `endif` is mandatory.
 | `endsWith`, `notEndsWith` | **ignored** | suffix |
 | `contains`, `notContains` | **ignored** | collection: each element's `name`; string: each `,`-separated token, compared whole |
 | `matches`, `notMatches` | **respected** | whole value, anchored at both ends |
+| `gt`, `ge`, `lt`, `le` | — | whole number, compared by value |
 | `skipList` of [`for`](#for-statement) | **respected** | exact, whole element name |
 
 > **Note**
@@ -624,6 +639,17 @@ repeated, `else` is optional, and `endif` is mandatory.
 For a string value, `contains` reads as *"is one of"*:
 `${if:item=type, contains='TABLE,VIEW'}` is true when `type` is exactly `TABLE`
 or exactly `VIEW`. Tokens are trimmed, so `'TABLE, VIEW'` works too.
+
+The numeric conditions `gt`, `ge`, `lt` and `le` (D17, new) compare by value,
+so `lt=5` does not hold for `40` the way a text comparison would. They are
+meant for the numeric fields, but a text that is a whole number — a custom
+variable such as `version=3` — compares just as well. A value that is not a
+whole number — the empty `keySeq` of a column outside the key, a decimal such as
+`1.5`, a text field — fails **all four**, as a comparison with `NULL` does in
+SQL: `gt=0` and `le=0` are then both false, and the `${else}` branch is taken.
+Two of them make a range, `${if:item=length, ge=1, le=4000}`, and the key may
+carry processors like any other: `${if:item=length.clamp(1, 4000), equals=4000}`.
+The bound must be a whole number, quoted or not; `gt='4k'` is a parse error.
 
 #### Multiple conditions
 
@@ -656,6 +682,8 @@ ${if:item=type, weird='x'}A${endif}
 | `${if:item=columns, contains='album_id'}HAS${else}NO${endif}` | `HAS` |
 | `${if:item=name, matches='SAMPLE'}FULL${else}NOTFULL${endif}` | `NOTFULL` |
 | `${if:item=name, matches='.*SAMPLE.*'}M${else}N${endif}` | `M` |
+| `${if:item=length, gt=4000}CLOB${else}VARCHAR(${length})${endif}` | `VARCHAR(40)` on a column of length 40 |
+| `${if:item=keySeq, ge=1}KEY${else}-${endif}` | `-` on a column outside the key |
 
 ### `for` statement
 
@@ -982,7 +1010,9 @@ which the editor refuses to save — the later one wins.
 | Unknown field or variable | Warning with a line number, expands to an empty string — not an error |
 | Unknown processor | Parse error listing the valid processors |
 | `replace` with fewer than 2 arguments | Parse error |
+| `clamp` without exactly 2 whole numbers, or with `<min>` above `<max>` | Parse error |
 | Unknown condition name in `if` | Parse error |
+| `gt`/`ge`/`lt`/`le` whose bound is not a whole number | Parse error |
 | Missing `key`/`item` | Parse error |
 | `for` over a field that does not exist | Render error: `Model has no 'x' member` |
 | `for` over a field that is not a list | Render error: `'x' is not a collection` |

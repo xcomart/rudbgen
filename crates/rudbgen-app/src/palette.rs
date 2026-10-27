@@ -364,6 +364,7 @@ const SPECS: &[Spec] = &[
     decorator("lower", "palette.dec.lower"),
     decorator("upper", "palette.dec.upper"),
     decorator("replace", "palette.dec.replace"),
+    decorator("clamp", "palette.dec.clamp"),
     extra("padSize", "palette.dec.padSize"),
     extra("padDir", "palette.dec.padDir"),
     extra("quote", "palette.dec.quote"),
@@ -380,6 +381,10 @@ const SPECS: &[Spec] = &[
     condition("notContains", "palette.cond.notContains"),
     condition("matches", "palette.cond.matches"),
     condition("notMatches", "palette.cond.notMatches"),
+    condition("gt", "palette.cond.gt"),
+    condition("ge", "palette.cond.ge"),
+    condition("lt", "palette.cond.lt"),
+    condition("le", "palette.cond.le"),
 ];
 
 /// The `key=` option every statement that reads a value takes.
@@ -874,6 +879,9 @@ mod tests {
         );
         let names: Vec<&str> = conditions.iter().map(|item| item.name.as_ref()).collect();
         assert!(names.contains(&"matches"), "{names:?}");
+        for numeric in ["gt", "ge", "lt", "le"] {
+            assert!(names.contains(&numeric), "{numeric}: {names:?}");
+        }
         assert!(!names.contains(&"inStr"), "an elif takes no separator");
     }
 

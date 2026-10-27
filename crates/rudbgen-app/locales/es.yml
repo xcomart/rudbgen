@@ -609,6 +609,7 @@ palette:
     lower: Minúsculas
     upper: Mayúsculas
     replace: replace('de','a') sustituye cada aparición
+    clamp: clamp(min, max) deja un número entero entre los dos límites; lo demás pasa sin cambios
     padSize: Rellena el valor con espacios hasta este ancho
     padDir: De qué lado van los espacios, left o right; a la derecha de forma predeterminada
     quote: Envuelve el valor en este texto por ambos lados
@@ -625,6 +626,10 @@ palette:
     notContains: Se cumple cuando no ocurre ninguna de las dos cosas
     matches: Se cumple cuando el valor entero encaja en esta expresión regular; aquí sí se distinguen mayúsculas y minúsculas
     notMatches: Se cumple cuando el valor entero no encaja en ella
+    gt: Se cumple cuando el valor es un entero mayor que este
+    ge: Se cumple cuando el valor es un entero mayor o igual que este
+    lt: Se cumple cuando el valor es un entero menor que este
+    le: Se cumple cuando el valor es un entero menor o igual que este
   opt:
     key: El campo que escribe esta sentencia, decoradores incluidos
     item: Otro nombre para key

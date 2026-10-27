@@ -607,6 +607,7 @@ palette:
     lower: 소문자
     upper: 대문자
     replace: replace('from','to')는 나오는 곳마다 바꿉니다
+    clamp: clamp(min, max)는 정수를 두 경계 안으로 맞춥니다. 숫자가 아니면 그대로 둡니다
     padSize: 이 너비가 되도록 값을 공백으로 채웁니다
     padDir: 공백을 붙일 쪽. left 또는 right이며 기본은 right
     quote: 값의 양쪽을 이 문자열로 감쌉니다
@@ -623,6 +624,10 @@ palette:
     notContains: 둘 다 아니면 참
     matches: 값 전체가 이 정규식과 맞으면 참. 여기서는 대소문자를 가립니다
     notMatches: 값 전체가 이 정규식과 맞지 않으면 참
+    gt: 값이 이 수보다 큰 정수면 참
+    ge: 값이 이 수 이상인 정수면 참
+    lt: 값이 이 수보다 작은 정수면 참
+    le: 값이 이 수 이하인 정수면 참
   opt:
     key: 이 구문이 쓸 필드. 데코레이터까지
     item: key의 다른 이름

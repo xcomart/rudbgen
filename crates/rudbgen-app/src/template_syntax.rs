@@ -90,11 +90,12 @@ const BLOCK_ENDS: &[&str] = &["else", "endfor", "endif"];
 
 /// The processors a key chain may be built out of, sorted.
 ///
-/// The same twelve `rudbgen-template`'s `keys::PROCESSORS` lists, matched
+/// The same thirteen `rudbgen-template`'s `keys::PROCESSORS` lists, matched
 /// ignoring case as the engine matches them.
 const PROCESSORS: &[&str] = &[
     "abbr",
     "camel",
+    "clamp",
     "kebab",
     "lower",
     "pascal",
@@ -835,6 +836,29 @@ mod tests {
                 (")", Token::Punctuation),
                 (".", Token::Operator),
                 ("pascal", Token::Function),
+                ("}", Token::Punctuation),
+            ]
+        );
+    }
+
+    #[test]
+    fn clamp_is_a_processor_and_its_bounds_are_numbers() {
+        assert_eq!(
+            spans("${item:key=length.clamp(1, 4000)}"),
+            vec![
+                ("${", Token::Punctuation),
+                ("item", Token::Keyword),
+                (":", Token::Operator),
+                ("key", Token::Type),
+                ("=", Token::Operator),
+                ("length", Token::Identifier),
+                (".", Token::Operator),
+                ("clamp", Token::Function),
+                ("(", Token::Punctuation),
+                ("1", Token::Number),
+                (",", Token::Operator),
+                ("4000", Token::Number),
+                (")", Token::Punctuation),
                 ("}", Token::Punctuation),
             ]
         );

@@ -9,8 +9,8 @@ use crate::error::RenderError;
 use crate::strutil;
 
 /// The processor names a chain may use, in the order jdbgen lists them in its
-/// error message.
-const PROCESSORS: [&str; 12] = [
+/// error message and rudbgen's own `clamp` behind.
+const PROCESSORS: [&str; 13] = [
     "prefix",
     "suffix",
     "camel",
@@ -23,6 +23,7 @@ const PROCESSORS: [&str; 12] = [
     "upper",
     "replace",
     "abbr",
+    "clamp",
 ];
 
 /// One step of a key chain: a member name in the first step, a processor name
@@ -129,6 +130,9 @@ impl KeyChain {
             if proc == "replace" && step.params.len() < 2 {
                 return Err(replace_arity(&step.params));
             }
+            if proc == "clamp" {
+                clamp_bounds(&step.params)?;
+            }
         }
         Ok(())
     }
@@ -177,6 +181,18 @@ pub(crate) fn apply(
             value.replace(params[0].as_str(), params[1].as_str())
         }
         "abbr" => abbr.apply(value),
+        "clamp" => {
+            let (min, max) = clamp_bounds(params).map_err(RenderError::new)?;
+            // Only a value past a bound is rewritten, so that a number in
+            // range keeps the very text it came with. A value that is no
+            // whole number is not the processor's to judge - the `keySeq` of
+            // a column outside the key renders empty - and passes unchanged.
+            match strutil::parse_int(value) {
+                Some(number) if number < min => min.to_string(),
+                Some(number) if number > max => max.to_string(),
+                _ => value.to_string(),
+            }
+        }
         _ => return Err(RenderError::new(unknown_processor(&proc))),
     })
 }
@@ -196,6 +212,28 @@ fn replace_arity(params: &[String]) -> String {
         params.len(),
         params
     )
+}
+
+/// The two bounds of a `clamp(min, max)`, or the message a pair that is not
+/// two whole numbers in order fails with.
+fn clamp_bounds(params: &[String]) -> Result<(i64, i64), String> {
+    let bounds = match params {
+        [min, max] => strutil::parse_int(min).zip(strutil::parse_int(max)),
+        _ => None,
+    };
+    let Some((min, max)) = bounds else {
+        return Err(format!(
+            "'clamp' processor requires 2 whole numbers - clamp(min, max), but got {}: {:?}",
+            params.len(),
+            params
+        ));
+    };
+    if min > max {
+        return Err(format!(
+            "'clamp' processor requires min <= max, but got clamp({min}, {max})"
+        ));
+    }
+    Ok((min, max))
 }
 
 #[cfg(test)]
@@ -243,6 +281,47 @@ mod tests {
         let error = KeyChain::parse("name.replace(a)").check().unwrap_err();
         assert!(error.contains("requires 2 arguments"), "{error}");
         assert!(KeyChain::parse("name.replace(a, b)").check().is_ok());
+    }
+
+    #[test]
+    fn a_clamp_is_checked_for_two_whole_numbers_in_order() {
+        assert!(KeyChain::parse("length.clamp(1, 4000)").check().is_ok());
+        assert!(KeyChain::parse("length.clamp('-5', '5')").check().is_ok());
+        assert!(KeyChain::parse("length.clamp(7, 7)").check().is_ok());
+        for bad in [
+            "length.clamp",
+            "length.clamp(1)",
+            "length.clamp(1, 2, 3)",
+            "length.clamp(a, 10)",
+            "length.clamp('1.5', 10)",
+        ] {
+            let error = KeyChain::parse(bad).check().unwrap_err();
+            assert!(error.contains("requires 2 whole numbers"), "{bad}: {error}");
+        }
+        let error = KeyChain::parse("length.clamp(10, 1)").check().unwrap_err();
+        assert!(error.contains("min <= max"), "{error}");
+    }
+
+    #[test]
+    fn a_clamp_rewrites_only_a_number_past_a_bound() {
+        let abbr = Abbreviations::default();
+        let clamp = |value: &str| {
+            apply(
+                "clamp",
+                value,
+                &["1".to_string(), "4000".to_string()],
+                &abbr,
+            )
+            .unwrap()
+        };
+        assert_eq!(clamp("0"), "1");
+        assert_eq!(clamp("-20"), "1");
+        assert_eq!(clamp("40"), "40");
+        assert_eq!(clamp(" 40 "), " 40 ", "a number in range keeps its text");
+        assert_eq!(clamp("2147483647"), "4000");
+        assert_eq!(clamp(""), "");
+        assert_eq!(clamp("VARCHAR"), "VARCHAR");
+        assert_eq!(clamp("1.5"), "1.5", "only whole numbers are numbers here");
     }
 
     #[test]

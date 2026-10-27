@@ -45,6 +45,14 @@ pub(crate) fn trim(input: &str) -> &str {
     cut
 }
 
+/// A whole number as a template or a model writes one, white space around it
+/// ignored. This is no part of jdbgen: the numeric conditions and `clamp` are
+/// rudbgen's own, and the numeric fields of a model - `length`, `scale`,
+/// `keySeq`, `no` and their kind - are all whole numbers.
+pub(crate) fn parse_int(s: &str) -> Option<i64> {
+    s.trim().parse().ok()
+}
+
 /// `StrUtils.split(src, delim, true)`: split and trim every element.
 ///
 /// jdbgen appends the delimiter before splitting, which is exactly what Rust's

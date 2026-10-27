@@ -609,6 +609,7 @@ palette:
     lower: Kleinbuchstaben
     upper: Großbuchstaben
     replace: replace('von','nach') ersetzt jedes Vorkommen
+    clamp: clamp(min, max) hält eine ganze Zahl zwischen den beiden Grenzen; alles andere bleibt unverändert
     padSize: Füllt den Wert mit Leerzeichen bis auf diese Breite
     padDir: Auf welcher Seite gefüllt wird, left oder right; rechts als Vorgabe
     quote: Umschließt den Wert an beiden Enden mit diesem Text
@@ -625,6 +626,10 @@ palette:
     notContains: Gilt, wenn weder das eine noch das andere zutrifft
     matches: Gilt, wenn der ganze Wert auf diesen regulären Ausdruck passt; hier zählt Groß und Klein
     notMatches: Gilt, wenn der ganze Wert nicht darauf passt
+    gt: Gilt, wenn der Wert eine ganze Zahl größer als diese ist
+    ge: Gilt, wenn der Wert eine ganze Zahl größer oder gleich dieser ist
+    lt: Gilt, wenn der Wert eine ganze Zahl kleiner als diese ist
+    le: Gilt, wenn der Wert eine ganze Zahl kleiner oder gleich dieser ist
   opt:
     key: Das Feld, das diese Anweisung schreibt, mitsamt Dekoratoren
     item: Ein anderer Name für key

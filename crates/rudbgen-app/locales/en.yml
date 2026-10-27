@@ -827,6 +827,7 @@ palette:
     lower: Lower case
     upper: Upper case
     replace: replace('from','to') rewrites every occurrence
+    clamp: clamp(min, max) keeps a whole number between the two bounds; anything else passes unchanged
     padSize: Pads the value with spaces up to this width
     padDir: Which side the padding goes on, left or right; right by default
     quote: Wraps the value in this text at both ends
@@ -843,6 +844,10 @@ palette:
     notContains: Holds when neither does
     matches: Holds when the whole value matches this regular expression; case matters here
     notMatches: Holds when the whole value does not match it
+    gt: Holds when the value is a whole number greater than this
+    ge: Holds when the value is a whole number greater than or equal to this
+    lt: Holds when the value is a whole number less than this
+    le: Holds when the value is a whole number less than or equal to this
   opt:
     key: The field this statement writes, decorators and all
     item: Another name for key

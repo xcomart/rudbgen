@@ -40,8 +40,9 @@
 //! A key may be followed by a chain of processors - `${name.suffix.camel}` -
 //! applied left to right. `${a.b}` is such a chain and **never** a nested
 //! path. The processors are `abbr`, `prefix`, `suffix`, `camel`, `pascal`,
-//! `snake`, `screaming`, `skewer`/`kebab`, `lower`, `upper` and
-//! `replace(find, replacement)`.
+//! `snake`, `screaming`, `skewer`/`kebab`, `lower`, `upper`,
+//! `replace(find, replacement)` and `clamp(min, max)`, which holds a whole
+//! number between its bounds and leaves any other value alone.
 //!
 //! Every rendered value then passes the same decorations: `prepend` and
 //! `postpend` - both defaulting to `quote` - surround it, and `padSize`
@@ -52,11 +53,13 @@
 //! width character takes the two columns it occupies in a fixed width font,
 //! and a value wider than the padding is never cut off.
 //!
-//! The ten conditions of an `if` are `equals`/`value`, `notEquals`,
+//! The fourteen conditions of an `if` are `equals`/`value`, `notEquals`,
 //! `contains`, `notContains`, `startsWith`, `notStartsWith`, `endsWith`,
-//! `notEndsWith`, `matches` and `notMatches`. All of them are combined with
-//! AND and compare ignoring case, except `matches`, which is a regular
-//! expression the whole value has to match.
+//! `notEndsWith`, `matches`, `notMatches`, `gt`, `ge`, `lt` and `le`. All of
+//! them are combined with AND. The first ten compare text ignoring case,
+//! except `matches`, which is a regular expression the whole value has to
+//! match; the last four compare whole numbers, and a value that is no whole
+//! number fails every one of them.
 //!
 //! `if`s and `for`s nest up to 64 deep; a template nested deeper is a
 //! [`ParseError`] rather than a stack overflow. An `elif` is no level of its
@@ -74,6 +77,10 @@
 //! enclosing pair of quotes while `(...)` keeps its parentheses, and `${''}`
 //! standing for no text at all. jdbgen's three engine test classes are ported
 //! case for case and are the canary for all of it.
+//!
+//! The numeric conditions `gt`, `ge`, `lt` and `le` and the `clamp` processor
+//! are rudbgen's own. jdbgen refused all five names, so they change the output
+//! of no template it rendered.
 //!
 //! Five differences are deliberate:
 //!

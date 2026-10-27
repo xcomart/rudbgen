@@ -606,6 +606,7 @@ palette:
     lower: 小写
     upper: 大写
     replace: replace('from','to') 替换所有出现之处
+    clamp: clamp(min, max) 把整数限制在两个边界之间；不是数字则保持原样
     padSize: 用空格将值填充到此宽度
     padDir: 填充的方向，left 或 right，默认为 right
     quote: 用此文本包裹值的两端
@@ -622,6 +623,10 @@ palette:
     notContains: 以上两种情况都不满足时成立
     matches: 整个值匹配此正则表达式时成立（区分大小写）
     notMatches: 整个值不匹配此正则表达式时成立
+    gt: 值是大于此数的整数时成立
+    ge: 值是大于或等于此数的整数时成立
+    lt: 值是小于此数的整数时成立
+    le: 值是小于或等于此数的整数时成立
   opt:
     key: 此语句输出的字段，包括修饰符
     item: key 的别名

@@ -664,3 +664,99 @@ fn the_date_format_may_also_be_written_as_an_attribute() {
         "[2024]"
     );
 }
+
+// ------------------------------------------------- numbers (rudbgen's own)
+
+#[test]
+fn the_numeric_conditions_compare_whole_numbers() {
+    let model = Fixture::named("tb_user").with_int("length", 40);
+    let holds = |cond: &str| render(&format!("${{if:key=length, {cond}}}x${{endif}}"), &model);
+    assert_eq!(holds("gt=39"), "x");
+    assert_eq!(holds("gt=40"), "");
+    assert_eq!(holds("ge=40"), "x");
+    assert_eq!(holds("ge=41"), "");
+    assert_eq!(holds("lt=41"), "x");
+    assert_eq!(holds("lt=40"), "");
+    assert_eq!(holds("le=40"), "x");
+    assert_eq!(holds("le=39"), "");
+    // quoted, upper case and negative bounds read the same
+    assert_eq!(holds("GT='-1'"), "x");
+    // numerically, not as text: "40" sorts before "5" but is not less
+    assert_eq!(holds("lt=5"), "");
+    assert_eq!(holds("gt=5"), "x");
+}
+
+#[test]
+fn numeric_conditions_combine_into_a_range() {
+    let model = Fixture::named("tb_user").with_int("length", 40);
+    assert_eq!(
+        render("${if:key=length, ge=1, le=100}in${else}out${endif}", &model),
+        "in"
+    );
+    assert_eq!(
+        render(
+            "${if:key=length, gt=4000}clob${elif:key=length, gt=0}varchar${endif}",
+            &model
+        ),
+        "varchar"
+    );
+}
+
+#[test]
+fn a_numeric_condition_reads_a_number_written_as_text() {
+    // a custom variable is always text
+    let ctx = customs().with_var("version", "3");
+    let model = Fixture::named("tb_user");
+    assert_eq!(
+        render_with("${if:key=version, ge=2}new${endif}", &model, &ctx),
+        "new"
+    );
+}
+
+#[test]
+fn a_value_that_is_no_number_fails_every_numeric_condition() {
+    let model = Fixture::named("tb_user")
+        .with_null("keySeq")
+        .with("defVal", "1.5");
+    for cond in ["gt=0", "ge=0", "lt=0", "le=0"] {
+        for key in ["keySeq", "name", "defVal", "missing"] {
+            assert_eq!(
+                render(&format!("${{if:key={key}, {cond}}}x${{endif}}"), &model),
+                "",
+                "{key} {cond}"
+            );
+        }
+    }
+}
+
+#[test]
+fn clamp_holds_a_number_between_its_bounds() {
+    let model = Fixture::named("tb_user")
+        .with_int("length", 2147483647)
+        .with_int("scale", 0)
+        .with_int("precision", 10);
+    assert_eq!(render("${length.clamp(1, 4000)}", &model), "4000");
+    assert_eq!(render("${scale.clamp(1, 4000)}", &model), "1");
+    assert_eq!(render("${precision.clamp(1, 4000)}", &model), "10");
+    assert_eq!(
+        render(
+            "${item:key=length.clamp('1','4000'), padSize=6, padDir=left}",
+            &model
+        ),
+        "  4000"
+    );
+    assert_eq!(
+        render(
+            "${if:key=length.clamp(1, 4000), equals=4000}max${endif}",
+            &model
+        ),
+        "max"
+    );
+}
+
+#[test]
+fn clamp_leaves_a_value_that_is_no_number_alone() {
+    let model = Fixture::named("tb_user").with_null("keySeq");
+    assert_eq!(render("${keySeq.clamp(1, 9)}", &model), "");
+    assert_eq!(render("${name.clamp(1, 9)}", &model), "tb_user");
+}

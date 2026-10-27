@@ -615,7 +615,9 @@ palette:
     postpend: 값 뒤에 이 문자열을 씁니다
   cond:
     equals: 대소문자를 가리지 않고 값이 이것과 같으면 참
+    eq: equals의 다른 이름
     notEquals: 값이 이것이 아니면 참
+    ne: notEquals의 다른 이름
     startsWith: 대소문자를 가리지 않고 값이 이것으로 시작하면 참
     notStartsWith: 값이 이것으로 시작하지 않으면 참
     endsWith: 대소문자를 가리지 않고 값이 이것으로 끝나면 참

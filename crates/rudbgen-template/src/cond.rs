@@ -3,6 +3,8 @@
 //! The ten jdbgen has compare text, every one of them ignoring case except
 //! `matches`, which is a regular expression the **whole** value has to match.
 //! The four rudbgen adds - `gt`, `ge`, `lt` and `le` - compare whole numbers.
+//! rudbgen also reads `eq` and `ne` as short names of `equals` and
+//! `notEquals`, in keeping with the numeric four.
 
 use crate::error::RenderError;
 use crate::model::Value;
@@ -10,9 +12,9 @@ use crate::strutil;
 use regex::Regex;
 
 /// The condition attributes an `if` accepts, in the order jdbgen registers
-/// them and rudbgen's numeric ones behind. `value` is a second name of
-/// `equals`.
-pub(crate) const COND_NAMES: [&str; 15] = [
+/// them and rudbgen's own behind. `value` and `eq` are second names of
+/// `equals`, `ne` one of `notequals`.
+pub(crate) const COND_NAMES: [&str; 17] = [
     "equals",
     "value",
     "notequals",
@@ -24,6 +26,8 @@ pub(crate) const COND_NAMES: [&str; 15] = [
     "notendswith",
     "matches",
     "notmatches",
+    "eq",
+    "ne",
     "gt",
     "ge",
     "lt",
@@ -54,8 +58,8 @@ impl CondKind {
     /// attribute parser.
     pub(crate) fn from_name(name: &str) -> Option<CondKind> {
         Some(match name {
-            "equals" | "value" => CondKind::Equals,
-            "notequals" => CondKind::NotEquals,
+            "equals" | "value" | "eq" => CondKind::Equals,
+            "notequals" | "ne" => CondKind::NotEquals,
             "contains" => CondKind::Contains,
             "notcontains" => CondKind::NotContains,
             "startswith" => CondKind::StartsWith,

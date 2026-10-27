@@ -617,7 +617,9 @@ palette:
     postpend: Escribe este texto detrás del valor
   cond:
     equals: Se cumple cuando el valor es este, sin distinguir mayúsculas
+    eq: Otro nombre para equals
     notEquals: Se cumple cuando el valor es cualquier otro
+    ne: Otro nombre para notEquals
     startsWith: Se cumple cuando el valor empieza por esto, sin distinguir mayúsculas
     notStartsWith: Se cumple cuando el valor no empieza por esto
     endsWith: Se cumple cuando el valor acaba en esto, sin distinguir mayúsculas

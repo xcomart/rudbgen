@@ -614,7 +614,9 @@ palette:
     postpend: 在值后面添加此文本
   cond:
     equals: 值等于此内容时成立（不区分大小写）
+    eq: equals 的别名
     notEquals: 值不等于此内容时成立
+    ne: notEquals 的别名
     startsWith: 值以此内容开头时成立（不区分大小写）
     notStartsWith: 值不以此内容开头时成立
     endsWith: 值以此内容结尾时成立（不区分大小写）

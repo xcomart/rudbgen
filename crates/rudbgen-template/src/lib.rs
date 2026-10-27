@@ -53,10 +53,10 @@
 //! width character takes the two columns it occupies in a fixed width font,
 //! and a value wider than the padding is never cut off.
 //!
-//! The fourteen conditions of an `if` are `equals`/`value`, `notEquals`,
-//! `contains`, `notContains`, `startsWith`, `notStartsWith`, `endsWith`,
-//! `notEndsWith`, `matches`, `notMatches`, `gt`, `ge`, `lt` and `le`. All of
-//! them are combined with AND. The first ten compare text ignoring case,
+//! The fourteen conditions of an `if` are `equals`/`value`/`eq`,
+//! `notEquals`/`ne`, `contains`, `notContains`, `startsWith`,
+//! `notStartsWith`, `endsWith`, `notEndsWith`, `matches`, `notMatches`, `gt`,
+//! `ge`, `lt` and `le`. All of them are combined with AND. The first ten compare text ignoring case,
 //! except `matches`, which is a regular expression the whole value has to
 //! match; the last four compare whole numbers, and a value that is no whole
 //! number fails every one of them.
@@ -78,9 +78,10 @@
 //! standing for no text at all. jdbgen's three engine test classes are ported
 //! case for case and are the canary for all of it.
 //!
-//! The numeric conditions `gt`, `ge`, `lt` and `le` and the `clamp` processor
-//! are rudbgen's own. jdbgen refused all five names, so they change the output
-//! of no template it rendered.
+//! The numeric conditions `gt`, `ge`, `lt` and `le`, the short names `eq` and
+//! `ne` of `equals` and `notEquals`, and the `clamp` processor are rudbgen's
+//! own. jdbgen refused all seven names, so they change the output of no
+//! template it rendered.
 //!
 //! Five differences are deliberate:
 //!

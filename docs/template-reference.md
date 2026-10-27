@@ -597,8 +597,8 @@ repeated, `else` is optional, and `endif` is mandatory.
 
 | Condition | True when the value … |
 |:---|:---|
-| `equals=<value>` / `value=<value>` | equals `<value>` |
-| `notEquals=<value>` | does not equal `<value>` |
+| `equals=<value>` / `value=<value>` / `eq=<value>` | equals `<value>` (`eq`: D17, new) |
+| `notEquals=<value>` / `ne=<value>` | does not equal `<value>` (`ne`: D17, new) |
 | `startsWith=<prefix>` | starts with `<prefix>` |
 | `notStartsWith=<prefix>` | does **not** start with `<prefix>` |
 | `endsWith=<suffix>` | ends with `<suffix>` |
@@ -616,7 +616,7 @@ repeated, `else` is optional, and `endif` is mandatory.
 
 | Condition | Case | Matching |
 |:---|:---|:---|
-| `equals`, `value`, `notEquals` | **ignored** | whole value |
+| `equals`, `value`, `eq`, `notEquals`, `ne` | **ignored** | whole value |
 | `startsWith`, `notStartsWith` | **ignored** | prefix |
 | `endsWith`, `notEndsWith` | **ignored** | suffix |
 | `contains`, `notContains` | **ignored** | collection: each element's `name`; string: each `,`-separated token, compared whole |
@@ -640,6 +640,12 @@ For a string value, `contains` reads as *"is one of"*:
 `${if:item=type, contains='TABLE,VIEW'}` is true when `type` is exactly `TABLE`
 or exactly `VIEW`. Tokens are trimmed, so `'TABLE, VIEW'` works too.
 
+`eq` and `ne` (D17, new) are short names of `equals` and `notEquals`, written
+to sit beside the numeric four: `eq` compares text exactly as `equals` does, so
+`eq='table'` holds for `TABLE` and `eq=40` holds for a length of `40` — but,
+being a text comparison, `eq=040` does not; write `ge=40, le=40` to compare
+by value.
+
 The numeric conditions `gt`, `ge`, `lt` and `le` (D17, new) compare by value,
 so `lt=5` does not hold for `40` the way a text comparison would. They are
 meant for the numeric fields, but a text that is a whole number — a custom
@@ -661,7 +667,8 @@ ${if:item=type, equals='VIEW', equals='TABLE'}A${else}B${endif}
 ```
 
 evaluates only `equals='TABLE'` and prints `A` for a table. Use `elif` or
-`contains='VIEW,TABLE'` when you mean "or".
+`contains='VIEW,TABLE'` when you mean "or". A second *name* of a condition is a
+name of its own, so `equals='VIEW', eq='TABLE'` keeps both, and both must hold.
 
 Any attribute name that is neither a condition, `key` nor `item` is rejected
 while parsing — `if` accepts no [decorations](#decorations):

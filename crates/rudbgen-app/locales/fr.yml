@@ -617,7 +617,9 @@ palette:
     postpend: Écrit ce texte derrière la valeur
   cond:
     equals: Vrai quand la valeur est celle-ci, sans regarder la casse
+    eq: Un autre nom pour equals
     notEquals: Vrai quand la valeur est tout sauf celle-ci
+    ne: Un autre nom pour notEquals
     startsWith: Vrai quand la valeur commence par ceci, sans regarder la casse
     notStartsWith: Vrai quand la valeur ne commence pas par ceci
     endsWith: Vrai quand la valeur finit par ceci, sans regarder la casse

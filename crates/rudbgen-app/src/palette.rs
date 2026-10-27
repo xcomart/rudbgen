@@ -372,7 +372,9 @@ const SPECS: &[Spec] = &[
     extra("postpend", "palette.dec.postpend"),
     // --- conditions ---
     condition("equals", "palette.cond.equals"),
+    condition("eq", "palette.cond.eq"),
     condition("notEquals", "palette.cond.notEquals"),
+    condition("ne", "palette.cond.ne"),
     condition("startsWith", "palette.cond.startsWith"),
     condition("notStartsWith", "palette.cond.notStartsWith"),
     condition("endsWith", "palette.cond.endsWith"),
@@ -879,7 +881,7 @@ mod tests {
         );
         let names: Vec<&str> = conditions.iter().map(|item| item.name.as_ref()).collect();
         assert!(names.contains(&"matches"), "{names:?}");
-        for numeric in ["gt", "ge", "lt", "le"] {
+        for numeric in ["eq", "ne", "gt", "ge", "lt", "le"] {
             assert!(names.contains(&numeric), "{numeric}: {names:?}");
         }
         assert!(!names.contains(&"inStr"), "an elif takes no separator");

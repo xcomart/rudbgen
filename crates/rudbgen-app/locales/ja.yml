@@ -615,7 +615,9 @@ palette:
     postpend: 値の後ろにこの文字を書きます
   cond:
     equals: 大文字小文字を問わず値がこれと同じなら真
+    eq: equals の別名
     notEquals: 値がこれ以外なら真
+    ne: notEquals の別名
     startsWith: 大文字小文字を問わず値がこれで始まるなら真
     notStartsWith: 値がこれで始まらないなら真
     endsWith: 大文字小文字を問わず値がこれで終わるなら真

@@ -835,7 +835,9 @@ palette:
     postpend: Writes this text after the value
   cond:
     equals: Holds when the value is this, whatever the case
+    eq: Another name for equals
     notEquals: Holds when the value is anything but this
+    ne: Another name for notEquals
     startsWith: Holds when the value starts with this, whatever the case
     notStartsWith: Holds when the value does not start with this
     endsWith: Holds when the value ends with this, whatever the case

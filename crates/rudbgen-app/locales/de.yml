@@ -617,7 +617,9 @@ palette:
     postpend: Schreibt diesen Text hinter den Wert
   cond:
     equals: Gilt, wenn der Wert dies ist, ohne auf Groß und Klein zu achten
+    eq: Ein anderer Name für equals
     notEquals: Gilt, wenn der Wert alles andere als dies ist
+    ne: Ein anderer Name für notEquals
     startsWith: Gilt, wenn der Wert damit beginnt, ohne auf Groß und Klein zu achten
     notStartsWith: Gilt, wenn der Wert nicht damit beginnt
     endsWith: Gilt, wenn der Wert damit endet, ohne auf Groß und Klein zu achten

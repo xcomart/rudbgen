@@ -387,6 +387,36 @@ fn value_is_another_name_of_the_equals_condition() {
 }
 
 #[test]
+fn eq_and_ne_are_other_names_of_equals_and_not_equals() {
+    let model = row("abc", "TABLE");
+    assert_eq!(render("${if:key=type, eq='TABLE'}x${endif}", &model), "x");
+    assert_eq!(render("${if:key=type, EQ=table}x${endif}", &model), "x");
+    assert_eq!(render("${if:key=type, eq='VIEW'}x${endif}", &model), "");
+    assert_eq!(render("${if:key=type, ne='VIEW'}x${endif}", &model), "x");
+    assert_eq!(render("${if:key=type, Ne='table'}x${endif}", &model), "");
+    assert_eq!(
+        render(
+            "${if:key=type, eq='VIEW'}V${elif:key=type, ne='VIEW'}T${endif}",
+            &model
+        ),
+        "T"
+    );
+    // a second name is a name of its own: both are kept, and both must hold
+    assert_eq!(
+        render("${if:key=type, equals='VIEW', eq='TABLE'}x${endif}", &model),
+        ""
+    );
+}
+
+#[test]
+fn eq_compares_a_number_as_text() {
+    let model = Fixture::named("tb_user").with_int("length", 40);
+    assert_eq!(render("${if:key=length, eq=40}x${endif}", &model), "x");
+    assert_eq!(render("${if:key=length, eq=040}x${endif}", &model), "");
+    assert_eq!(render("${if:key=length, ne=41}x${endif}", &model), "x");
+}
+
+#[test]
 fn every_condition_but_matches_ignores_the_case() {
     let model = Fixture::named("TB_User");
     assert_eq!(

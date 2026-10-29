@@ -630,7 +630,7 @@ fn icon_stem(locator: Option<&str>) -> (Option<String>, Option<String>) {
 
 /// The dialect id for a product, read off its class and then its URL scheme.
 ///
-/// Only the seven the SQL layer knows are named; everything else is `generic`,
+/// Only the eight the SQL layer knows are named; everything else is `generic`,
 /// which degrades to standard behavior rather than failing. The class is asked
 /// first because a URL template can be edited into anything, while a class that
 /// is wrong does not load at all.
@@ -643,6 +643,7 @@ fn dialect_of(class: &str, url_template: &str) -> &'static str {
         ("org.sqlite", "sqlite"),
         ("org.h2", "h2"),
         ("com.microsoft.sqlserver", "mssql"),
+        ("com.ibm.db2", "db2"),
     ];
     const BY_SCHEME: &[(&str, &str)] = &[
         ("oracle", "oracle"),
@@ -652,6 +653,7 @@ fn dialect_of(class: &str, url_template: &str) -> &'static str {
         ("sqlite", "sqlite"),
         ("h2", "h2"),
         ("sqlserver", "mssql"),
+        ("db2", "db2"),
     ];
     let class = class.trim();
     for (prefix, dialect) in BY_CLASS {
@@ -796,6 +798,10 @@ mod tests {
             "mssql"
         );
         assert_eq!(dialect_of("", "jdbc:postgresql://x/y"), "postgres");
+        // jdbgen shipped no Db2 entry, so an imported one is always the user's
+        // own, and read this way rather than matched to the built-in.
+        assert_eq!(dialect_of("com.ibm.db2.jcc.DB2Driver", ""), "db2");
+        assert_eq!(dialect_of("", "jdbc:db2://x:50000/y"), "db2");
         assert_eq!(
             dialect_of("com.example.Driver", "jdbc:example://x"),
             "generic"

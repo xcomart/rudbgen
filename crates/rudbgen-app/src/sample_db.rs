@@ -215,9 +215,10 @@ pub fn seed(config_dir: &Path, connections_file: &Path, source: Option<&Path>) -
 /// with two JARs carrying one class, the first on the path wins.
 ///
 /// Writing `drivers.json` freezes the built-in list as it stands today, since
-/// [`DriverStore::load_from`] takes an existing file at its word. That is
-/// already what the first download through the driver manager does, and the
-/// alternative here is a seeded connection that cannot open.
+/// [`DriverStore::load_from`] takes an existing file at its word — gaining only
+/// a built-in released after it, which the file records it was never offered.
+/// That is already what the first download through the driver manager does,
+/// and the alternative here is a seeded connection that cannot open.
 ///
 /// # Errors
 ///

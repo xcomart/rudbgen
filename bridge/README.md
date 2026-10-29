@@ -148,6 +148,11 @@ jlink image, or H2 on the test classpath, is reached.
 global mutable state this bridge stays away from. A caller that knows its driver
 should set the real property in `props`.
 
+A `driver_class` in IBM's `com.ibm.db2.jcc` package also gets
+`retrieveMessagesFromServerOnGetMessage=true` unless `props` says otherwise:
+without it JCC reports a failed statement as `SQLCODE=…, SQLSTATE=…` and
+nothing a person reads.
+
 Two further optional members, `table_comments_sql` and `column_comments_sql`,
 are accepted and held on the session: where one is set, `DESCRIBE` `tables` /
 `columns` top up empty `REMARKS` from it instead of from `meta/Comments.java`'s

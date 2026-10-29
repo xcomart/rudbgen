@@ -226,6 +226,28 @@ fn a_regular_expression_that_does_not_compile_is_reported() {
 }
 
 #[test]
+fn a_numeric_condition_without_a_whole_number_is_reported() {
+    for cond in ["gt=wide", "ge='4k'", "lt='1.5'", "le=0x10"] {
+        let error = parse_failure(&format!("${{if:key=no, {cond}}}a${{endif}}"));
+        assert!(
+            error.message.contains("requires a whole number"),
+            "{cond}: {error}"
+        );
+    }
+}
+
+#[test]
+fn a_clamp_without_two_ordered_whole_numbers_is_reported() {
+    let error = parse_failure("${no.clamp(1)}");
+    assert!(
+        error.message.contains("requires 2 whole numbers"),
+        "{error}"
+    );
+    let error = parse_failure("${if:key=no.clamp(9, 1), gt=0}a${endif}");
+    assert!(error.message.contains("min <= max"), "{error}");
+}
+
+#[test]
 fn a_mistake_is_found_in_a_branch_no_model_reaches() {
     // the branch is never rendered against the model, and the parse refuses
     // the template anyway

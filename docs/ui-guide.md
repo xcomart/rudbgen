@@ -96,7 +96,7 @@ handed to every connection that uses it.
   a progress bar and a Cancel) or from disk.
 - **The driver class is detected** from the JARs with **Detect** rather than
   typed: rudbgen asks the bridge which `java.sql.Driver` implementations they
-  hold, without running a single static initialiser. Picking a sources or
+  hold, without running a single static initializer. Picking a sources or
   javadoc JAR by mistake says so in those words.
 - **Custom queries** is the section at the bottom: four rows — table list,
   column list, table comments, column comments — each a tick, a SQL field, the
@@ -246,9 +246,9 @@ Each row is a rule:
 **How a name is rewritten.** A whole-name rule replaces the entire identifier
 and ends there. Otherwise the name is split at `_` and `-`, and each word is
 looked up on its own, separators kept where they were. Both kinds match
-**whatever the case** — this is the one deliberate behavioural difference from
-jdbgen, whose word rules only ever matched lower-case segments and therefore
-never fired on `TB_USR`. So `album` → `Disc` turns `T_SAMPLE_ALBUM` into
+**whatever the case** — a deliberate behavioral difference from jdbgen, whose
+word rules only ever matched lower-case segments and therefore never fired on
+`TB_USR`. So `album` → `Disc` turns `T_SAMPLE_ALBUM` into
 `T_SAMPLE_Disc`.
 
 The last row is always empty and becomes a real one the moment you type in it;
@@ -382,7 +382,9 @@ abbreviation rules each have a tick, and under them:
   a driver the file does not define, a keep-alive interval that is not a number,
   a template file found in neither of jdbgen's directories. The note about
   abbreviation rules matching whatever the case is always among them, because it
-  is the one behaviour that changes underneath you.
+  changes what a rule you already have does. (A template's `javaType` for a
+  `DECIMAL`, `NUMERIC` or `FLOAT` column changes as well — see the template
+  reference.)
 
 The last step reports what was written. A machine with no usable keychain is not
 a failed import: those connections are saved without their password and named

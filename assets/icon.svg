@@ -37,11 +37,11 @@
     the accent blue is the widest step available in this palette, wider than
     the gold it replaces, and it holds when the icon is four pixels of page
     and three of cylinder. It is also, plainly, what a document looks like:
-    the gold was a family argument (rudbman's two colours swapped) rather than
+    the gold was a family argument (rudbman's two colors swapped) rather than
     a drawing of anything, and once a real database sits behind the sheet the
-    sheet no longer has to carry the identity by being coloured — it carries
-    it by being a sheet. The greys are the interface's own foreground ramp,
-    `text` in rugpui's `crates/rugpui/src/theme.rs`, so the stock is a colour
+    sheet no longer has to carry the identity by being colored — it carries
+    it by being a sheet. The grays are the interface's own foreground ramp,
+    `text` in rugpui's `crates/rugpui/src/theme.rs`, so the stock is a color
     the application already owns.
 
     That leaves one saturated hue on the tile, and it is the store's. rudbman
@@ -54,7 +54,7 @@
 
     Not red and not green, though both are in the palette: `theme.rs` binds
     green to `success` and red to `danger`. They already mean "that worked"
-    and "that failed" everywhere in the UI, and a colour cannot be both a
+    and "that failed" everywhere in the UI, and a color cannot be both a
     transient state and the application's name.
 
     The ink. `</>` is the only glyph that means "source code" without a
@@ -70,19 +70,19 @@
 
     Why a folded corner. A plain rectangle at 16 px is a rectangle; the fold
     is the one detail that says "sheet of paper" at every size, and it is
-    geometry rather than shading, so it survives where the modelling below
+    geometry rather than shading, so it survives where the modeling below
     does not. It is cut *out* of the silhouette — the flap is a separate,
     darker plane turned away from the light — so the outline itself carries
     the reading even in a pure alpha mask.
 
-    The modelling. One light, above and a little to the left, as in the
+    The modeling. One light, above and a little to the left, as in the
     sibling marks. Page and barrel are both shaded across their width — dark
     near edge, highlight about a fifth of the way across, falling away on the
     far side — which is what makes a flat panel read as a lit surface and a
     rectangle read as a turned solid; a top-to-bottom fade only ever reads as
     a gradient. Two of the values are tuned to the stock rather than inherited.
     The sheet's highlight stop is pulled in to #f2f5f9, because a near-white
-    page has almost no headroom above its local colour and the modelling has
+    page has almost no headroom above its local color and the modeling has
     to be carried by the two darker stops instead; and the specular streak
     drops to 0.12, because at the weight the gold sheet took it flared and ate
     the across-the-sheet shading it was meant to sit on top of. The barrel's
@@ -95,7 +95,7 @@
     lip crescent stays, because it falls inside the visible band and is what
     keeps the top face from reading as a flat blue ellipse.
 
-    The separation is drawn, not left to the colours. The sheet casts a
+    The separation is drawn, not left to the colors. The sheet casts a
     blurred pool across the barrel and onto the plate, and it is the only
     thing keeping the overlap from reading as a single flat cut-out once the
     render is small enough to lose the edges. Every overlay here is a
@@ -105,11 +105,11 @@
 
     The plate. Byte for byte the siblings', and deliberately: the tile is the
     family, the subject is the program. The tile's gradient is steep enough to
-    be seen as one — One Dark greys, a clear step from lit top to dark base.
+    be seen as one — One Dark grays, a clear step from lit top to dark base.
     Its border is drawn twice: a dark crease at the very edge that cuts the
-    tile out of whatever it sits on, and a mid-grey ring inside it that stays
+    tile out of whatever it sits on, and a mid-gray ring inside it that stays
     legible on both light and dark backdrops. The emboss lives in that ring
-    itself: its gradient runs from lit grey at the top to shadowed grey at the
+    itself: its gradient runs from lit gray at the top to shadowed gray at the
     base — the same overhead light that models the sheet catching the plate's
     frame — so the tile reads as a raised plate while the ring keeps one
     geometric width all the way round. It matters more with a pale subject
@@ -117,7 +117,7 @@
     has instead of an outline.
 
     Master file. `assets/icon-128.png`, `icon-256.png`, `icon.ico` and
-    `icon.icns` are all rasterised from this one by `assets/render.py`, each
+    `icon.icns` are all rasterized from this one by `assets/render.py`, each
     size drawn from the vector rather than scaled down from a larger bitmap.
     Edit this, then re-run that script; do not edit the raster files.
   -->
@@ -133,9 +133,9 @@
       <stop offset="0.5" stop-color="#5b6474"/>
       <stop offset="1" stop-color="#343a44"/>
     </linearGradient>
-    <!-- across the sheet: edge, highlight, local colour, far edge. The
+    <!-- across the sheet: edge, highlight, local color, far edge. The
          highlight is held back from white — pale stock has no headroom, and
-         the two dark stops do the modelling. -->
+         the two dark stops do the modeling. -->
     <linearGradient id="page" x1="0" y1="0" x2="1" y2="0">
       <stop offset="0" stop-color="#9aa2b1"/>
       <stop offset="0.20" stop-color="#f2f5f9"/>
@@ -199,7 +199,7 @@
   <g clip-path="url(#body)">
     <path d="M 42 54 L 42 158 A 50 18 0 0 0 142 158 L 142 54 Z"
           fill="url(#depth)"/>
-    <!-- the lip's crescent: the one piece of modelling inside the visible
+    <!-- the lip's crescent: the one piece of modeling inside the visible
          band, and what keeps the top face from reading as a flat ellipse -->
     <path d="M 42 54 A 50 18 0 0 0 142 54 A 50 27 0 0 1 42 54 Z"
           fill="#1b1f24" opacity="0.30"/>

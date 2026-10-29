@@ -69,7 +69,7 @@ fn find_in_gradle_cache() -> Option<PathBuf> {
     let mut newest: Option<(String, PathBuf)> = None;
     for version in std::fs::read_dir(&root).ok()?.flatten() {
         let number = version.file_name().to_string_lossy().into_owned();
-        // Only the binary artefact: the same directory holds the javadoc and
+        // Only the binary artifact: the same directory holds the javadoc and
         // sources archives, and loading one of those gets a class loader with
         // no driver in it.
         let wanted = format!("h2-{number}.jar");
@@ -294,6 +294,31 @@ fn the_columns_arrive_in_order_numbered_and_with_their_types_derived() {
 }
 
 #[test]
+fn an_exact_numeric_column_gets_the_java_type_its_precision_needs() {
+    // D16: jdbgen answered Integer for every one of these.
+    let session = fixture();
+    exec(
+        &session,
+        "create table T_PRICE (\
+           QTY numeric(5),\
+           TOTAL numeric(12),\
+           AMOUNT decimal(10,2),\
+           HUGE numeric(30))",
+    );
+    let driver = DriverDef::default();
+    let reader = MetaReader::new(&session, &driver);
+    let price = table(&reader, "T_PRICE");
+    let column = |name: &str| price.column(name).unwrap_or_else(|| panic!("{name}"));
+
+    assert_eq!(column("QTY").java_type, "Integer");
+    assert_eq!(column("TOTAL").java_type, "Long");
+    assert_eq!(column("HUGE").java_type, "BigDecimal");
+    let amount = column("AMOUNT");
+    assert_eq!((amount.precision, amount.scale), (10, 2));
+    assert_eq!(amount.java_type, "BigDecimal");
+}
+
+#[test]
 fn a_composite_key_keeps_the_order_it_was_declared_in() {
     let session = fixture();
     let driver = DriverDef::default();
@@ -409,7 +434,7 @@ fn the_stock_h2_table_query_is_used_instead_of_the_driver_list() {
         .iter()
         .find(|entry| entry.name == "T_ALBUM")
         .expect("T_ALBUM");
-    assert_eq!(album.kind, "TABLE", "BASE TABLE has to normalise to TABLE");
+    assert_eq!(album.kind, "TABLE", "BASE TABLE has to normalize to TABLE");
     assert_eq!(album.remarks, "an album");
     assert!(!album.catalog.is_empty() && album.schema == "PUBLIC");
     assert_eq!(
@@ -466,6 +491,51 @@ fn a_custom_column_query_reports_the_key_itself_in_the_order_it_answers() {
     assert!(!name.is_key());
     assert_eq!(track.columns.len(), 4);
     assert_eq!(track.column("ALBUM_ID").expect("ALBUM_ID").no, 1);
+}
+
+/// A column list over a table of decimals, answering `DECIMAL` for every
+/// column and `{SCALE}` in place of the scale.
+const H2_DECIMAL_COLUMNS_SQL: &str = "select TABLE_CATALOG as \"TABLE_CAT\", \
+     TABLE_SCHEMA as \"TABLE_SCHEM\", TABLE_NAME, COLUMN_NAME, \
+     3 as \"DATA_TYPE\", DATA_TYPE as \"TYPE_NAME\", \
+     NUMERIC_PRECISION as \"COLUMN_SIZE\", {SCALE}\
+     1 as \"NULLABLE\", REMARKS, COLUMN_DEFAULT as \"COLUMN_DEF\", 0 as \"IS_KEY\" \
+     from INFORMATION_SCHEMA.COLUMNS \
+     where TABLE_CATALOG = '${catalog}' and TABLE_SCHEMA = '${schema}' \
+       and TABLE_NAME = '${table}' order by ORDINAL_POSITION";
+
+#[test]
+fn a_custom_column_query_may_answer_the_scale_a_decimal_is_sized_by() {
+    let session = fixture();
+    exec(
+        &session,
+        "create table T_PRICE (TOTAL numeric(12), AMOUNT decimal(10,2))",
+    );
+
+    let answered = with_query(|driver, query| driver.custom_queries.columns = query)(
+        &H2_DECIMAL_COLUMNS_SQL.replace("{SCALE}", "NUMERIC_SCALE as \"DECIMAL_DIGITS\", "),
+    );
+    let reader = MetaReader::new(&session, &answered);
+    let price = table(&reader, "T_PRICE");
+    assert_eq!(price.column("TOTAL").expect("TOTAL").java_type, "Long");
+    let amount = price.column("AMOUNT").expect("AMOUNT");
+    assert_eq!(amount.scale, 2, "DECIMAL_DIGITS reached the model");
+    assert_eq!(amount.java_type, "BigDecimal");
+
+    // jdbgen's contract has no scale. Without one a whole number cannot be
+    // told from a fraction, so neither column is narrowed to a Long.
+    let unanswered = with_query(|driver, query| driver.custom_queries.columns = query)(
+        &H2_DECIMAL_COLUMNS_SQL.replace("{SCALE}", ""),
+    );
+    let reader = MetaReader::new(&session, &unanswered);
+    let price = table(&reader, "T_PRICE");
+    assert_eq!(
+        price.column("TOTAL").expect("TOTAL").java_type,
+        "BigDecimal"
+    );
+    let amount = price.column("AMOUNT").expect("AMOUNT");
+    assert_eq!(amount.scale, 0);
+    assert_eq!(amount.java_type, "BigDecimal");
 }
 
 #[test]

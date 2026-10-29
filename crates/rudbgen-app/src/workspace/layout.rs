@@ -246,7 +246,7 @@ impl Workspace {
         // them has to reach the drag area underneath and move the window.
         let title = custom.then(|| {
             // Use the shipped PNG so the title bar preserves the icon's
-            // colours on every platform instead of tinting its alpha mask.
+            // colors on every platform instead of tinting its alpha mask.
             let icon = (!cfg!(target_os = "macos")).then(|| {
                 let icon = img(icons::APP_ICON).size(px(16.)).flex_none();
                 if !titlebar_active {

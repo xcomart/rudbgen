@@ -11,7 +11,7 @@
 //! `rugpui-shell` is the layer above the widgets, and a good deal of what used to
 //! be here is now there: the window frame a self-decorated window has to draw
 //! for itself, the self-updater and its dialog, the about box, the palette
-//! catalogues and their colour editor, the split-pane tree, the context-menu
+//! catalogs and their color editor, the split-pane tree, the context-menu
 //! rows and the pieces a settings form is built out of. It knows nothing about
 //! rudbgen, so [`run`] hands it three things before the first window opens —
 //! [`IDENTITY`], [`AppStrings`] and [`IgnoredUpdate`] — and takes back the one
@@ -153,7 +153,7 @@ const STATUS_BAR_HEIGHT: f32 = 24.;
 /// traffic lights, in the custom title bar style.
 ///
 /// The buttons are 14 pt tall, so half the difference to [`TOOLBAR_HEIGHT`]
-/// centres them in the title bar band.
+/// centers them in the title bar band.
 const TRAFFIC_LIGHT_ORIGIN: Point<Pixels> = Point {
     x: px(12.),
     y: px(11.),
@@ -218,7 +218,7 @@ const PAYLOAD: &[&str] = &["rudbgen", "lib", "runtime"];
 /// * and the shell's updater is what finds the entry again by it, to correct
 ///   the `DisplayVersion` after a self-update.
 ///
-/// Move any one corner without the other two and winget stops recognising an
+/// Move any one corner without the other two and winget stops recognizing an
 /// installed rudbgen: `winget list` finds nothing, `winget upgrade` offers a
 /// fresh install to sit beside the existing one, and `winget uninstall` has
 /// nothing to remove — all silently, because a key that is not there is
@@ -334,7 +334,7 @@ const STATUS_DOT: f32 = 8.;
 /// Width of the welcome screen's column, in logical pixels.
 ///
 /// Fixed rather than fluid: wide enough for a profile's name beside its driver,
-/// narrow enough to read as one card in a maximised window rather than a
+/// narrow enough to read as one card in a maximized window rather than a
 /// screen-wide smear of rows.
 const WELCOME_WIDTH: f32 = 340.;
 
@@ -362,7 +362,7 @@ const WELCOME_FIRST_TAB: isize = 1;
 /// Debug selector of the welcome screen's "new connection" button.
 ///
 /// Compiled away outside a test build; it saves a test working the button's
-/// position out from the centred column's layout.
+/// position out from the centered column's layout.
 const WELCOME_NEW_SELECTOR: &str = "welcome-new";
 
 /// Debug selector of the welcome screen's "import from jdbgen" button.
@@ -452,9 +452,9 @@ impl ConnectionState {
         }
     }
 
-    /// The colour of the dot in front of the connection selector.
+    /// The color of the dot in front of the connection selector.
     ///
-    /// The three states are three colours because they are three different
+    /// The three states are three colors because they are three different
     /// situations: a session that is still opening and one that died are told
     /// apart without opening anything (architecture document, §4.2).
     fn dot(&self, theme: &Theme) -> Hsla {

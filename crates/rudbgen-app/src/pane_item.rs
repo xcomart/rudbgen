@@ -22,7 +22,7 @@
 //!
 //! Nothing here carries a view. A variant carries the tab's *identity* instead
 //! — which is what the lookups below match on and what a reopened tab is
-//! recognised by — and the window keeps the views beside the strip. That is
+//! recognized by — and the window keeps the views beside the strip. That is
 //! what lets a template tab outlive a reconnection: the strip is rebuilt when
 //! the connection changes and the buffers are not.
 
@@ -48,7 +48,7 @@ pub enum PaneItem {
     Template {
         /// The file on disk, as the template list named it.
         file: PathBuf,
-        /// What the tab is labelled — the template's name, not its path.
+        /// What the tab is labeled — the template's name, not its path.
         title: SharedString,
         /// Whether the buffer has edits `Ctrl+S` has not written yet.
         ///
@@ -58,7 +58,7 @@ pub enum PaneItem {
     },
     /// A dry run of one table × template pair, rendered to memory (§9).
     Preview {
-        /// What the tab is labelled: the file the pair would have written.
+        /// What the tab is labeled: the file the pair would have written.
         title: SharedString,
     },
 }

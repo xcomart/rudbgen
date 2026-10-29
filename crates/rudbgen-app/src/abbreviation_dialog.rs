@@ -13,7 +13,7 @@
 //! writes them into the file as it is then (see [`AbbreviationDialog::write_draft`])
 //! and reports the store it wrote so that the Generate tab can adopt it without
 //! re-reading the disk. A file that could not be read is never saved over: the
-//! dialog opens over nothing with the reason showing and **Save** greyed out. `Cancel`, `Escape` and a click on the
+//! dialog opens over nothing with the reason showing and **Save** grayed out. `Cancel`, `Escape` and a click on the
 //! backdrop throw the draft away, the freshly typed rule included.
 //!
 //! # The `apply` switch is the Generate tab's
@@ -108,7 +108,7 @@ pub struct AbbreviationDialog {
     /// Whether the dialog was opened over a file that could not be read.
     ///
     /// The draft is then empty rather than the user's rules, and saving it
-    /// would replace them all, so **Save** stays greyed out until the dialog is
+    /// would replace them all, so **Save** stays grayed out until the dialog is
     /// opened again over a file that reads.
     unreadable: bool,
     /// Why the rules could not be read or written, shown above the buttons.
@@ -181,7 +181,7 @@ impl AbbreviationDialog {
 
     /// Shows the dialog over a rules file that could not be read.
     ///
-    /// Opened empty, with `error` showing and **Save** greyed out: the rules
+    /// Opened empty, with `error` showing and **Save** grayed out: the rules
     /// are still in the file, and the empty draft must never replace them.
     pub fn open_unreadable(
         &mut self,

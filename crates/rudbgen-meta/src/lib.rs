@@ -37,11 +37,17 @@
 //! differently**: `type`, `notKeys`, `isKey`, `typeName`, `typeString`,
 //! `defVal`, `dataType`, `jdbcType`, `javaType`. So are the derivations behind
 //! them, including the ones that look like mistakes — `TIMESTAMP` maps to
-//! `String`, `DECIMAL` to `Integer`, a `CLOB` gets no length, and `IS_KEY` is
-//! read as a *number*, so a custom query answering `'Y'` marks no key. See
-//! [`sqltypes`] and [`query::to_int`] for why each one stays.
+//! `String`, a `CLOB` gets no length, and `IS_KEY` is read as a *number*, so a
+//! custom query answering `'Y'` marks no key. See [`sqltypes`] and
+//! [`query::to_int`] for why each one stays.
 //!
-//! Two things are deliberately not jdbgen's:
+//! Three things are deliberately not jdbgen's:
+//!
+//! * **`javaType` follows the precision** (architecture.md D16) where jdbgen's
+//!   type could not hold the column's values: a `DECIMAL` or `NUMERIC` is an
+//!   `Integer`, a `Long` or a `BigDecimal` by its precision and scale instead of
+//!   always an `Integer`, and a `FLOAT` is a `Double`. A custom column query
+//!   may answer an optional `DECIMAL_DIGITS` for the scale.
 //!
 //! * **The model is richer** (architecture.md D8). `imports`, `exports`,
 //!   `indexes`, `precision`, `scale`, `autoIncrement` and a column's `fk` are

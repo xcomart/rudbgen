@@ -109,7 +109,7 @@ pub(super) fn min_window_size() -> gpui::Size<Pixels> {
 /// rudbgen's title bar setting, as the shell spells it.
 ///
 /// The two enums are the same two variants with the same `snake_case`
-/// serialisation, and they are two enums because [`rudbgen_core`] is
+/// serialization, and they are two enums because [`rudbgen_core`] is
 /// deliberately free of gpui: the shell's copy is what
 /// [`chrome::draws_own_titlebar`] and the window options branch on, and the
 /// settings file is `rudbgen-core`'s. This is the one line between them.

@@ -1,5 +1,5 @@
-//! Opt-in metadata tests against real PostgreSQL, MySQL, MariaDB, SQL Server
-//! and Oracle servers.
+//! Opt-in metadata tests against real PostgreSQL, MySQL, MariaDB, SQL Server,
+//! Oracle and Db2 servers.
 //!
 //! `tests/h2.rs` proves that Rust reads what Java wrote. It cannot prove the
 //! other half of what rudbgen depends on: that `DESCRIBE` answers the *same
@@ -12,13 +12,13 @@
 //! visible from H2.
 //!
 //! So each test here creates a small fixture — a parent, a child that
-//! references it, a unique index — and **reads the catalogue back** through
+//! references it, a unique index — and **reads the catalog back** through
 //! `DescribeRequest`. Nothing is written by a planner and nothing is asserted
 //! against a string somebody reasoned out; the assertions are about what the
 //! server says it holds.
 //!
 //! rudbman's version of this file drove its DDL and transfer planners against
-//! the same five servers. Those planners are not in rudbgen (architecture.md
+//! the same servers. Those planners are not in rudbgen (architecture.md
 //! D3), so what is left is the reading — which is all this application ever
 //! does to a database anyway.
 //!
@@ -29,8 +29,8 @@
 //! a dependency the repository guarantees, so a missing H2 is a broken
 //! checkout and a panic; a database server is a container the developer chose
 //! to start. `cargo test --workspace` must stay green on a machine with no
-//! Docker — and a developer who started one container out of five gets that
-//! container's tests and four skips.
+//! Docker — and a developer who started one container out of six gets that
+//! container's tests and five skips.
 //!
 //! ```text
 //! docker compose -f docker/compose.yml up -d      # then wait for "healthy"
@@ -39,13 +39,14 @@
 //! export RUDBGEN_TEST_MARIADB_URL='jdbc:mariadb://127.0.0.1:53306/rudbgen'
 //! export RUDBGEN_TEST_MSSQL_URL='jdbc:sqlserver://127.0.0.1:51433;encrypt=false'
 //! export RUDBGEN_TEST_ORACLE_URL='jdbc:oracle:thin:@//127.0.0.1:51521/FREEPDB1'
+//! export RUDBGEN_TEST_DB2_URL='jdbc:db2://127.0.0.1:55000/RUDBGEN'
 //! cargo test -p rudbgen-jdbc --test containers
 //! ```
 //!
 //! The user and password default to `rudbgen`/`rudbgen`, which is what
-//! `docker/compose.yml` sets up for four of the five; `RUDBGEN_TEST_PG_USER`,
-//! `RUDBGEN_TEST_PG_PASSWORD` and their `MYSQL`, `MARIADB`, `MSSQL` and
-//! `ORACLE` counterparts override them. SQL Server is the exception, and not by
+//! `docker/compose.yml` sets up for five of the six; `RUDBGEN_TEST_PG_USER`,
+//! `RUDBGEN_TEST_PG_PASSWORD` and their `MYSQL`, `MARIADB`, `MSSQL`, `ORACLE`
+//! and `DB2` counterparts override them. SQL Server is the exception, and not by
 //! choice: its `sa` password has a complexity rule that `rudbgen` fails, so the
 //! default there is `sa`/`Rudbgen!Passw0rd` and the URL names no database at
 //! all — the image ships none but `master`, and every table here is named
@@ -56,9 +57,9 @@
 //! Found the way `tests/h2.rs` finds H2's, and for the same reason — the
 //! Gradle cache is already the one place in this checkout where a driver
 //! lives. What fills it is `cd bridge && ./gradlew drivers`, a task whose only
-//! job is to resolve the five drivers; they are *not* `testImplementation`,
+//! job is to resolve the six drivers; they are *not* `testImplementation`,
 //! because no Java test in this project loads any of them.
-//! `RUDBGEN_TEST_PG_JAR` and its four counterparts override the search.
+//! `RUDBGEN_TEST_PG_JAR` and its five counterparts override the search.
 //!
 //! A missing JAR **is** a panic, unlike a missing server: by the time one is
 //! looked for the developer has already set a URL and asked for the test to
@@ -71,7 +72,7 @@
 //! unquoted names to upper case stores them shouted and answers `getColumns`
 //! shouted. [`Server::name`] applies that fold to the names the test then
 //! looks for, which keeps the assertions about the metadata rather than about
-//! Oracle's case rules.
+//! Oracle's and Db2's case rules.
 //!
 //! # Cleaning up
 //!
@@ -141,7 +142,7 @@ fn find_in_gradle_cache(group: &str, artifact: &str) -> Option<PathBuf> {
     let mut newest: Option<(String, PathBuf)> = None;
     for version in std::fs::read_dir(&root).ok()?.flatten() {
         let number = version.file_name().to_string_lossy().into_owned();
-        // Only the binary artefact. The same directory also holds
+        // Only the binary artifact. The same directory also holds
         // `-javadoc.jar` and `-sources.jar`, and picking one of those gets a
         // class loader with no classes in it — a ClassNotFoundException a long
         // way from its cause.
@@ -161,7 +162,7 @@ fn find_in_gradle_cache(group: &str, artifact: &str) -> Option<PathBuf> {
     newest.map(|(_, path)| path)
 }
 
-// --- the five products -----------------------------------------------------
+// --- the six products ------------------------------------------------------
 
 /// Which server a test wants.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -171,6 +172,8 @@ enum Product {
     MariaDb,
     MsSql,
     Oracle,
+    /// Db2 for Linux, UNIX and Windows, through IBM's JCC.
+    Db2,
 }
 
 impl Product {
@@ -183,6 +186,7 @@ impl Product {
             Product::MariaDb => "RUDBGEN_TEST_MARIADB_URL",
             Product::MsSql => "RUDBGEN_TEST_MSSQL_URL",
             Product::Oracle => "RUDBGEN_TEST_ORACLE_URL",
+            Product::Db2 => "RUDBGEN_TEST_DB2_URL",
         }
     }
 
@@ -193,6 +197,7 @@ impl Product {
             Product::MariaDb => "org.mariadb.jdbc.Driver",
             Product::MsSql => "com.microsoft.sqlserver.jdbc.SQLServerDriver",
             Product::Oracle => "oracle.jdbc.OracleDriver",
+            Product::Db2 => "com.ibm.db2.jcc.DB2Driver",
         }
     }
 
@@ -217,12 +222,13 @@ impl Product {
                 "com.oracle.database.jdbc",
                 "ojdbc11",
             ),
+            Product::Db2 => driver_jar("RUDBGEN_TEST_DB2_JAR", "com.ibm.db2", "jcc"),
         }
     }
 
     /// Whether this product folds an unquoted identifier to upper case.
     fn folds_upper(self) -> bool {
-        self == Product::Oracle
+        matches!(self, Product::Oracle | Product::Db2)
     }
 
     /// `(user, password)`, from the environment or the compose file's defaults.
@@ -233,6 +239,7 @@ impl Product {
             Product::MariaDb => ("RUDBGEN_TEST_MARIADB_USER", "RUDBGEN_TEST_MARIADB_PASSWORD"),
             Product::MsSql => ("RUDBGEN_TEST_MSSQL_USER", "RUDBGEN_TEST_MSSQL_PASSWORD"),
             Product::Oracle => ("RUDBGEN_TEST_ORACLE_USER", "RUDBGEN_TEST_ORACLE_PASSWORD"),
+            Product::Db2 => ("RUDBGEN_TEST_DB2_USER", "RUDBGEN_TEST_DB2_PASSWORD"),
         };
         // SQL Server's `sa` password has a complexity rule `rudbgen` fails, so
         // that one image gets a login of its own; `docker/compose.yml` says the
@@ -254,7 +261,7 @@ impl Product {
 /// The products disagree about which of the two a database even is. PostgreSQL
 /// and SQL Server put a table in a *schema* of a catalog; MySQL's and
 /// MariaDB's drivers report the database as the *catalog* and no schema at all;
-/// Oracle has no catalog and calls the owning user the schema. Every describe
+/// Oracle and Db2 have no catalog and call the owning user the schema. Every describe
 /// below goes through [`Server::describe`] so that difference is written once.
 struct Server {
     product: Product,
@@ -294,7 +301,7 @@ impl Server {
         let session = connect(product, &url);
 
         // Asked of the server rather than parsed out of the URL: the URL may
-        // leave the database to the driver's default, and a catalogue request
+        // leave the database to the driver's default, and a catalog request
         // has to name the one the session really landed in.
         let (catalog, schema) = match product {
             Product::Postgres => (None, Some(scalar(&session, "select current_schema()"))),
@@ -317,6 +324,18 @@ impl Server {
                     &session,
                     "select sys_context('userenv', 'current_schema') from dual",
                 )),
+            ),
+            // Db2's JCC reports no catalog, and the schema is the session's
+            // `CURRENT SCHEMA` — the connecting user's name until a
+            // `SET SCHEMA` moves it. The register is fixed-width on the wire
+            // for a schema Db2 created implicitly, hence the trim.
+            Product::Db2 => (
+                None,
+                Some(
+                    scalar(&session, "values current schema")
+                        .trim_end()
+                        .to_string(),
+                ),
             ),
         };
         Some(Server {
@@ -348,7 +367,7 @@ impl Server {
         name
     }
 
-    /// A name in the case this product's catalogue will hold it.
+    /// A name in the case this product's catalog will hold it.
     ///
     /// Everything this file writes is unquoted, so on a folding product the
     /// server stores the upper-case spelling and `getColumns` answers it. The
@@ -421,7 +440,7 @@ impl Server {
             .clone()
     }
 
-    /// One table's columns, as the catalogue holds them, in ordinal order.
+    /// One table's columns, as the catalog holds them, in ordinal order.
     fn columns(&self, table: &str) -> Vec<CatalogColumn> {
         let mut columns: Vec<CatalogColumn> = self
             .describe_table("columns", table)
@@ -509,7 +528,7 @@ fn connect(product: Product, url: &str) -> Session {
     })
 }
 
-/// A column as the catalogue reports it, which is the only reading these tests
+/// A column as the catalog reports it, which is the only reading these tests
 /// trust.
 #[derive(Debug, Clone, PartialEq, Eq)]
 struct CatalogColumn {
@@ -518,7 +537,7 @@ struct CatalogColumn {
     /// is the driver's habit rather than anything worth asserting.
     type_name: String,
     /// `IS_NULLABLE`, as JDBC's tri-state. `None` is "the driver does not
-    /// know", which none of these five ever answers.
+    /// know", which none of these six ever answers.
     nullable: Option<bool>,
     /// `ORDINAL_POSITION`. The template model numbers columns by it, so a
     /// driver that answered them out of order would reorder a generated class.
@@ -570,13 +589,13 @@ macro_rules! server {
 // --- the fixture -----------------------------------------------------------
 
 /// A parent, a child that references it, and a unique index — spelled in the
-/// subset of SQL all five products accept unchanged.
+/// subset of SQL all six products accept unchanged.
 ///
 /// `integer` and `varchar(n)` are synonyms every one of them takes, and the key
 /// and reference clauses are written out as table constraints rather than
 /// inline: MySQL parses a column-level `REFERENCES` and then silently ignores
 /// it, which would make [`imported_keys_carry_both_ends_of_the_reference`] pass
-/// against nothing at all on two of the five.
+/// against nothing at all on two of the six.
 fn create_fixture(server: &Server) -> (String, String, String) {
     let parent = server.table("parent");
     let child = server.table("child");
@@ -740,4 +759,67 @@ fn mssql_answers_every_metadata_kind_the_model_needs() {
 fn oracle_answers_every_metadata_kind_the_model_needs() {
     let server = server!(Product::Oracle);
     metadata_round_trip(&server);
+}
+
+#[test]
+fn db2_answers_every_metadata_kind_the_model_needs() {
+    let server = server!(Product::Db2);
+    metadata_round_trip(&server);
+}
+
+/// Db2's comments reach the model through the driver alone.
+///
+/// The bridge's comment repair asks a vendor catalog only for the products
+/// whose drivers hide what the server holds, and Db2 is not one of them: JCC
+/// reads `REMARKS` out of `SYSCAT.TABLES` and `SYSCAT.COLUMNS` itself. This is
+/// what keeps it off that list — a `COMMENT ON` read back through
+/// `describe tables` and `describe columns` with nothing else asked.
+#[test]
+fn db2_comments_come_back_as_remarks() {
+    let server = server!(Product::Db2);
+    let t = server.table("comment");
+    server.exec(&format!(
+        "create table {t} (id integer not null, note varchar(40))"
+    ));
+    server.exec(&format!("comment on table {t} is 'A commented table'"));
+    server.exec(&format!(
+        "comment on column {t}.note is 'A commented column'"
+    ));
+
+    let item = server.table_item(&t);
+    assert_eq!(
+        item.get("remarks").and_then(serde_json::Value::as_str),
+        Some("A commented table"),
+        "{item:?}"
+    );
+    let note = server.name("note");
+    let columns = server.describe_table("columns", &t);
+    let column = columns
+        .iter()
+        .find(|item| string(item, "name") == note)
+        .unwrap_or_else(|| panic!("no {note} in {columns:?}"));
+    assert_eq!(
+        column.get("remarks").and_then(serde_json::Value::as_str),
+        Some("A commented column"),
+        "{column:?}"
+    );
+}
+
+/// A refused statement says what was wrong in words, not only in codes.
+///
+/// IBM's JCC answers `getMessage` with `SQLCODE=-204, SQLSTATE=42704,
+/// SQLERRMC=...` and nothing a person reads, unless the connection asks it to
+/// fetch the server's own text; the bridge asks on every JCC session that has
+/// not said otherwise. A custom query with a typo in it is where a rudbgen user
+/// meets this.
+#[test]
+fn db2_errors_carry_the_servers_own_message() {
+    let server = server!(Product::Db2);
+    let error = server
+        .session
+        .execute(&StatementSpec::new("select * from rb_no_such_table"))
+        .expect_err("there is no such table");
+    let text = error.to_string();
+    assert!(text.contains("42704"), "{text}");
+    assert!(text.contains("is an undefined name"), "{text}");
 }

@@ -16,10 +16,10 @@
 //!   `Session::start_job` / `start_transfer` / `start_backup`, `ExtractSpec`,
 //!   `TransferSpec`, `BackupSpec`, `JobProgress` and `JobState` — extract,
 //!   backup and transfer have no caller here;
-//! * `Op::LobRead`. With no LOB reference path left, the bridge materialises a
+//! * `Op::LobRead`. With no LOB reference path left, the bridge materializes a
 //!   `BLOB` as [`ColumnKind::Bin`] and a `CLOB` as [`ColumnKind::Str`]. That is
 //!   safe because the only statements rudbgen executes are the four custom
-//!   catalogue queries of architecture.md D9, whose values are names and
+//!   catalog queries of architecture.md D9, whose values are names and
 //!   comments — and Oracle hands a comment back as a `CLOB`;
 //! * `DescribeRequest`'s `ddl`, `procedures`, `functions` and `sequences`
 //!   kinds, with `Session::describe_ddl`, `DdlSource` and `DdlResult`. A code
@@ -74,7 +74,7 @@
 //!   caches the single `jmethodID` the whole protocol goes through. It also
 //!   carries [`Jvm::probe_drivers`], the one question that has to be answerable
 //!   before any connection exists: what driver does this JAR contain?
-//! * [`Session`] owns a connection and the worker thread that serialises every
+//! * [`Session`] owns a connection and the worker thread that serializes every
 //!   command for it. [`Canceller`] is the one path that does not queue.
 //! * [`Cursor`] executes and fetches; [`Batch`] decodes what comes back.
 //! * Requests are [`ConnectionSpec`], [`StatementSpec`] and
@@ -106,7 +106,7 @@
 //!
 //! # Building the bridge JAR
 //!
-//! The Java side is a separate artefact:
+//! The Java side is a separate artifact:
 //!
 //! ```text
 //! cd bridge && ./gradlew jar
@@ -130,7 +130,7 @@ pub use error::{BridgeError, BridgeErrorKind, Error, Result};
 pub use jvm::{BRIDGE_JAR_ENV, JAVA_HOME_ENV, Jvm, JvmConfig, default_bridge_jar};
 pub use protocol::Op;
 pub use response::{
-    Cancelled, ColumnInfo, DescribeResult, DriverProbe, ExecuteResult, Ping, SQL_TYPE_REAL,
+    Canceled, ColumnInfo, DescribeResult, DriverProbe, ExecuteResult, Ping, SQL_TYPE_REAL,
     SessionInfo,
 };
 pub use session::{Canceller, Cursor, Session};

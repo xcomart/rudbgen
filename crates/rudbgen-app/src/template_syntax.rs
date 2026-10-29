@@ -16,8 +16,8 @@
 //! (`Template::spans`). It is the wrong thing to draw with, for one reason: it
 //! either parses the whole document or fails. A template halfway through being
 //! typed does not parse — an `${if:` with no `${endif}` yet is a
-//! `ParseError` — and an editor whose colours disappear on every other
-//! keystroke is worse than one with no colours at all. So the editor knows the
+//! `ParseError` — and an editor whose colors disappear on every other
+//! keystroke is worse than one with no colors at all. So the editor knows the
 //! grammar twice: once in the engine, which decides what a template *means*,
 //! and once here, which decides what it *looks like*, line by line and never
 //! failing. The engine is next door and is still not asked: the whole point of
@@ -31,10 +31,11 @@
 //!   ends at the quoted brace, and the `'}` after it is text.
 //! * `${'...'}` is a **literal**: its content is copied out, and a `}` inside
 //!   it does not close it. It is the only way to write a `${` into the output.
-//! * `endif`, `endfor`, `else` and `elif:` are matched in **lower case only**;
-//!   every other statement name is case insensitive. `${ENDIF}` is not the end
-//!   of an `if` — it is an item lookup for a field called `ENDIF` — and it is
-//!   painted as a warning for that reason (architecture document, appendix A).
+//! * `endif`, `endfor`, `else` and `elif:` are case insensitive, like every
+//!   other statement name: `${ENDIF}` ends an `if` and is painted as a keyword.
+//!   jdbgen matched these four in lower case only; rudbgen does not reproduce
+//!   that (architecture document, D15). An `${elif}` with no `:` is still an
+//!   item lookup for a field called `elif`, and is painted as a warning.
 //! * A statement with no `:` in it is an item: `${name}` means
 //!   `${item:key=name}`, and `${name.camel}` is a key with a processor chain,
 //!   not a nested path.
@@ -53,13 +54,13 @@
 //! | `'...'`, `"..."`, and the whole of a `${'...'}` literal | string |
 //! | a numeric option value | number |
 //! | a known processor: `.camel`, `.replace(…)` … | function |
-//! | an unknown processor, and `${ENDIF}` and its kind | warning |
+//! | an unknown processor, and an `${elif}` with no `:` | warning |
 //! | an unknown statement name: the `foo` of `${foo:x}` | error |
 //!
 //! Two things the architecture document's §8 lists are deliberately **not**
 //! painted as errors here. A `}` in the text between statements is not one: a
 //! Java or XML template is full of braces that close nothing, and lighting all
-//! of them up would make the colour useless. An `${` that has not been closed
+//! of them up would make the color useless. An `${` that has not been closed
 //! yet is not one either: the state simply carries to the next line, because
 //! the closing brace of a statement being typed arrives one keystroke later and
 //! a highlighter that reddens the rest of the file in between is unusable.
@@ -80,7 +81,8 @@ use rugpui_editor::{
 /// exactly as `parse_one` lower-cases the name before it dispatches.
 const STATEMENTS: &[&str] = &["author", "date", "for", "if", "item", "super", "user"];
 
-/// The block-structure names, which are matched in lower case **only**.
+/// The block-structure names, sorted, matched ignoring case like every other
+/// statement name.
 ///
 /// `elif` is one of them too, but it carries a `:` and options, so it is
 /// checked where a statement name is checked rather than here.
@@ -88,11 +90,12 @@ const BLOCK_ENDS: &[&str] = &["else", "endfor", "endif"];
 
 /// The processors a key chain may be built out of, sorted.
 ///
-/// The same twelve `rudbgen-template`'s `keys::PROCESSORS` lists, matched
+/// The same thirteen `rudbgen-template`'s `keys::PROCESSORS` lists, matched
 /// ignoring case as the engine matches them.
 const PROCESSORS: &[&str] = &[
     "abbr",
     "camel",
+    "clamp",
     "kebab",
     "lower",
     "pascal",
@@ -205,7 +208,7 @@ impl State {
     }
 }
 
-/// jdbgen's template language, as much of it as a colour needs.
+/// jdbgen's template language, as much of it as a color needs.
 ///
 /// A unit struct: there is nothing to configure, and one `Arc` of it can be
 /// shared by every template tab.
@@ -458,15 +461,10 @@ impl Lexer<'_> {
             return;
         };
         let name = &self.text[from..to];
-        let token = if contains(STATEMENTS, name) {
+        // `elif` is no entry of `STATEMENTS`, because there it would make a bare
+        // `${elif}` a keyword too; with a `:` it is one in any case.
+        let token = if contains(STATEMENTS, name) || name.eq_ignore_ascii_case("elif") {
             Token::Keyword
-        } else if name.eq_ignore_ascii_case("elif") {
-            // `elif:` is one of the four the engine matches in lower case only.
-            if name == "elif" {
-                Token::Keyword
-            } else {
-                Token::Warning
-            }
         } else {
             Token::Error
         };
@@ -475,17 +473,17 @@ impl Lexer<'_> {
 
     /// Paints a statement with no `:` in it.
     ///
-    /// Four shapes: a block end (`${endif}`), a block end written in the wrong
-    /// case (`${ENDIF}`, which the engine reads as an item lookup), a bare
+    /// Four shapes: a block end (`${endif}`, in any case), an `${elif}` that
+    /// lost its `:` (which the engine reads as an item lookup), a bare
     /// `${user}`/`${date}`/`${author}`, and everything else — a key chain.
     fn colonless_body(&mut self, start: usize, end: usize) {
         let Some((from, to)) = self.trimmed(start, end) else {
             return;
         };
         let body = &self.text[from..to];
-        if BLOCK_ENDS.binary_search(&body).is_ok() {
+        if contains(BLOCK_ENDS, body) {
             self.push(from, to, Token::Keyword);
-        } else if contains(BLOCK_ENDS, body) || body.eq_ignore_ascii_case("elif") {
+        } else if body.eq_ignore_ascii_case("elif") {
             self.push(from, to, Token::Warning);
         } else if contains(STATEMENTS, body) {
             self.push(from, to, Token::Keyword);
@@ -844,6 +842,29 @@ mod tests {
     }
 
     #[test]
+    fn clamp_is_a_processor_and_its_bounds_are_numbers() {
+        assert_eq!(
+            spans("${item:key=length.clamp(1, 4000)}"),
+            vec![
+                ("${", Token::Punctuation),
+                ("item", Token::Keyword),
+                (":", Token::Operator),
+                ("key", Token::Type),
+                ("=", Token::Operator),
+                ("length", Token::Identifier),
+                (".", Token::Operator),
+                ("clamp", Token::Function),
+                ("(", Token::Punctuation),
+                ("1", Token::Number),
+                (",", Token::Operator),
+                ("4000", Token::Number),
+                (")", Token::Punctuation),
+                ("}", Token::Punctuation),
+            ]
+        );
+    }
+
+    #[test]
     fn option_names_and_values_are_told_apart() {
         assert_eq!(
             spans("${if:key=type,equals=VARCHAR}"),
@@ -909,31 +930,52 @@ mod tests {
     }
 
     #[test]
-    fn block_ends_are_lower_case_only() {
+    fn block_ends_are_keywords_in_any_case() {
         for name in ["endif", "endfor", "else"] {
             assert_eq!(
                 spans(&format!("${{{name}}}"))[1],
                 (name, Token::Keyword),
                 "{name} in lower case is the block end"
             );
-            let shouted = name.to_uppercase();
-            let line = format!("${{{shouted}}}");
-            let (spans, _) = lex(&line, LineState::START);
-            assert_eq!(
-                spans[1],
-                (shouted.as_str(), Token::Warning),
-                "{shouted} is an item lookup, not a block end"
-            );
+            for written in [name.to_uppercase(), capitalized(name)] {
+                let line = format!("${{{written}}}");
+                let (spans, _) = lex(&line, LineState::START);
+                assert_eq!(
+                    spans[1],
+                    (written.as_str(), Token::Keyword),
+                    "{written} is the block end too"
+                );
+            }
         }
     }
 
     #[test]
-    fn elif_is_lower_case_only_too() {
+    fn elif_is_a_keyword_in_any_case_too() {
         assert_eq!(spans("${elif:key=a}")[1], ("elif", Token::Keyword));
         assert_eq!(
             lex("${ELIF:key=a}", LineState::START).0[1],
-            ("ELIF", Token::Warning)
+            ("ELIF", Token::Keyword)
         );
+        assert_eq!(
+            lex("${Elif:key=a}", LineState::START).0[1],
+            ("Elif", Token::Keyword)
+        );
+    }
+
+    #[test]
+    fn an_elif_without_its_colon_is_a_warning() {
+        // The engine reads it as `${item:key=elif}`, a field nobody has.
+        for line in ["${elif}", "${ELIF}"] {
+            let (spans, _) = lex(line, LineState::START);
+            assert_eq!(spans[1].1, Token::Warning, "in {line:?}");
+        }
+    }
+
+    /// `endif` → `Endif`.
+    fn capitalized(name: &str) -> String {
+        let mut chars = name.chars();
+        let first = chars.next().expect("a name").to_ascii_uppercase();
+        std::iter::once(first).chain(chars).collect()
     }
 
     #[test]

@@ -1,7 +1,7 @@
 //! The shape of jdbgen's `config.json`, field for field.
 //!
 //! These are transcriptions of `comart.tools.jdbgen.types.JDBGenConfig` and its
-//! neighbours, with jdbgen's spelling kept in the `serde` attributes and Rust's
+//! neighbors, with jdbgen's spelling kept in the `serde` attributes and Rust's
 //! in the field names. Nothing here interprets a value: `connection_url`,
 //! `user_name` and `user_password` still hold ciphertext after [`read`], a
 //! `jdbc_jar` is still whatever string the file carried, and `keep_alive_sec`

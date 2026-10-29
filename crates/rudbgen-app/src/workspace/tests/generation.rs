@@ -331,7 +331,7 @@ fn a_real_database_writes_the_files_the_status_bar_promised(cx: &mut gpui::TestA
     // user does: by watching the dialog. `run_until_parked` alone would only
     // drain the tasks that already exist.
     let outcome = wait_for_outcome(cx, &window);
-    assert!(!outcome.cancelled, "the run cancelled itself");
+    assert!(!outcome.canceled, "the run canceled itself");
     assert!(outcome.failed.is_empty(), "failures: {:?}", outcome.failed);
     assert_eq!(outcome.written.len(), 2, "written: {:?}", outcome.written);
 

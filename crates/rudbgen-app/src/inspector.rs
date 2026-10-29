@@ -11,7 +11,7 @@
 //!
 //! Columns is the table. Keys is the *order* of the primary key, which is the
 //! one thing a generated `where` clause has to get right and the one thing a
-//! column list cannot show. Foreign keys are both directions, labelled by what
+//! column list cannot show. Foreign keys are both directions, labeled by what
 //! they mean rather than by JDBC's "imported" and "exported" — which do not say
 //! which way the key points. Indexes are last because they are the only tab a
 //! template does not read.
@@ -644,7 +644,7 @@ impl Inspector {
                 &key_rows(&table),
                 chrome,
             ),
-            // Two sections, labelled by direction rather than by JDBC's
+            // Two sections, labeled by direction rather than by JDBC's
             // "imported" and "exported": which way a key points is the one thing
             // a reader has to get right, and the JDBC words do not say it.
             Tab::ForeignKeys => div()

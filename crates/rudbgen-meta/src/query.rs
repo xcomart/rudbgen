@@ -31,7 +31,7 @@ const NUM_SIGNS: [char; 2] = ['+', '-'];
 /// alone.
 ///
 /// A hole with no value is **left in the statement verbatim**, which is
-/// jdbgen's behaviour and looks like a mistake until you see what the
+/// jdbgen's behavior and looks like a mistake until you see what the
 /// alternative does: a `where TABLE_SCHEMA = '${schema}'` against a product
 /// with no schemas would silently become `= ''` and answer nothing, where the
 /// unsubstituted form fails loudly with the placeholder in the error message.
@@ -208,7 +208,7 @@ impl Rows {
         self.rows.len()
     }
 
-    /// The value of a labelled column, `""` for a NULL and for a label the
+    /// The value of a labeled column, `""` for a NULL and for a label the
     /// result set does not carry.
     ///
     /// A label that is not there can only happen where the contract does not
@@ -220,7 +220,7 @@ impl Rows {
         }
     }
 
-    /// Whether a labelled column carried a SQL NULL.
+    /// Whether a labeled column carried a SQL NULL.
     ///
     /// The one place a null and an empty string differ: jdbgen reads a null
     /// `TABLE_TYPE` as `TABLE`, and a driver that says nothing about a type is

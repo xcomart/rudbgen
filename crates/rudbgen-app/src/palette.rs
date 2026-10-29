@@ -124,7 +124,7 @@ pub enum Ctx {
 /// One entry of the palette.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct PaletteItem {
-    /// What the row is labelled, and what the filter matches on.
+    /// What the row is labeled, and what the filter matches on.
     pub name: SharedString,
     /// What a click on the row inserts at the caret — the whole `${…}` form.
     pub click: SharedString,
@@ -364,6 +364,7 @@ const SPECS: &[Spec] = &[
     decorator("lower", "palette.dec.lower"),
     decorator("upper", "palette.dec.upper"),
     decorator("replace", "palette.dec.replace"),
+    decorator("clamp", "palette.dec.clamp"),
     extra("padSize", "palette.dec.padSize"),
     extra("padDir", "palette.dec.padDir"),
     extra("quote", "palette.dec.quote"),
@@ -371,7 +372,9 @@ const SPECS: &[Spec] = &[
     extra("postpend", "palette.dec.postpend"),
     // --- conditions ---
     condition("equals", "palette.cond.equals"),
+    condition("eq", "palette.cond.eq"),
     condition("notEquals", "palette.cond.notEquals"),
+    condition("ne", "palette.cond.ne"),
     condition("startsWith", "palette.cond.startsWith"),
     condition("notStartsWith", "palette.cond.notStartsWith"),
     condition("endsWith", "palette.cond.endsWith"),
@@ -380,6 +383,10 @@ const SPECS: &[Spec] = &[
     condition("notContains", "palette.cond.notContains"),
     condition("matches", "palette.cond.matches"),
     condition("notMatches", "palette.cond.notMatches"),
+    condition("gt", "palette.cond.gt"),
+    condition("ge", "palette.cond.ge"),
+    condition("lt", "palette.cond.lt"),
+    condition("le", "palette.cond.le"),
 ];
 
 /// The `key=` option every statement that reads a value takes.
@@ -655,8 +662,8 @@ fn trailing_word(line: &str) -> String {
 /// Ranked rather than merely filtered: an entry whose name *starts* with what
 /// was typed comes before one that merely contains it, and a shorter name
 /// before a longer one, so typing `na` offers `name` before `typeName` and
-/// `nullable`. The comparison is case-insensitive because everything in the
-/// language but `endif` and its three companions is.
+/// `nullable`. The comparison is case-insensitive because every statement,
+/// attribute, processor and condition name in the language is.
 pub fn matching<'a>(items: &'a [PaletteItem], request: &CompletionRequest) -> Vec<&'a PaletteItem> {
     let query = request.prefix.to_ascii_lowercase();
     let mut found: Vec<(u8, usize, &PaletteItem)> = items
@@ -874,6 +881,9 @@ mod tests {
         );
         let names: Vec<&str> = conditions.iter().map(|item| item.name.as_ref()).collect();
         assert!(names.contains(&"matches"), "{names:?}");
+        for numeric in ["eq", "ne", "gt", "ge", "lt", "le"] {
+            assert!(names.contains(&numeric), "{numeric}: {names:?}");
+        }
         assert!(!names.contains(&"inStr"), "an elif takes no separator");
     }
 

@@ -61,7 +61,7 @@ const MIN_EXPLORER_WIDTH: f32 = 140.0;
 
 /// Widest the explorer may be dragged.
 ///
-/// Not a taste judgement — a sidebar wider than this on a small display leaves
+/// Not a taste judgment — a sidebar wider than this on a small display leaves
 /// no work area at all, and the drag has no other floor to stop at.
 const MAX_EXPLORER_WIDTH: f32 = 720.0;
 
@@ -301,7 +301,7 @@ pub struct AppSettings {
     /// nothing runs off to the right — which is what reading a generated file,
     /// or a query someone else wrote on one long line, wants instead.
     ///
-    /// Nothing sanitises it: a bool has no invalid value, and a file written by
+    /// Nothing sanitizes it: a bool has no invalid value, and a file written by
     /// an older build simply arrives without the key and takes the default.
     pub editor_word_wrap: bool,
     /// How many columns apart the tab stops are in each template that has a
@@ -367,7 +367,7 @@ pub struct AppSettings {
     ///
     /// Stored as the tag rather than as a parsed version because the tag is what
     /// GitHub answers with and what the comparison already has in hand; nothing
-    /// here validates it, since an unrecognisable value can only ever fail to
+    /// here validates it, since an unrecognizable value can only ever fail to
     /// match a real tag, which is the harmless direction.
     pub ignored_update: Option<String>,
     /// Top-level keys this build does not know, kept verbatim.
@@ -645,7 +645,7 @@ mod tests {
     fn a_settings_file_written_before_word_wrap_existed_still_loads() {
         // The switch was added after the first releases, so every settings file
         // already on disk is missing the key. Such a file has to load with word
-        // wrap off — the behaviour those users have — rather than fail, and the
+        // wrap off — the behavior those users have — rather than fail, and the
         // very next save has to write the key out so the round trip closes.
         let dir = tempfile::tempdir().expect("tempdir");
         let path = dir.path().join("settings.json");

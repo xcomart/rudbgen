@@ -19,13 +19,13 @@ explorer:
   title: Explorer
   filter_placeholder: Tabellen filtern
   show_views: Sichten anzeigen
-  loading: wird geladen …
+  loading: wird geladen…
   load_failed_unknown: Das konnte nicht geladen werden.
   menu_select_shown: Alle angezeigten auswählen
   menu_clear: Auswahl aufheben
   menu_invert: Auswahl umkehren
   menu_inspect: Im Inspektor öffnen
-  menu_refresh: Neu laden
+  menu_refresh: Aktualisieren
 
 inspector:
   title: Inspektor
@@ -34,8 +34,8 @@ inspector:
   tab_foreign_keys: Fremdschlüssel
   tab_indexes: Indizes
   empty: Wählen Sie eine Tabelle, um ihren Aufbau zu sehen.
-  loading: wird geladen …
-  refresh: Neu laden
+  loading: wird geladen…
+  refresh: Aktualisieren
   nothing_here: nichts vorhanden
   column: Spalte
   columns: Spalten
@@ -70,15 +70,15 @@ connect:
   driver: Treiber
   pick_driver: Treiber wählen
   manage_drivers: Treiber…
-  driver_has_no_jar: Dieser Treiber hat noch kein JAR. Unter „Treiber“ eines hinzufügen oder herunterladen.
+  driver_has_no_jar: Dieser Treiber hat noch kein JAR. Fügen Sie unter „Treiber“ eines hinzu oder laden Sie eines herunter.
 
   host: Host
   port: Port
   database: Datenbank
   url: URL
-  url_hint: Wird aus den Feldern darüber zusammengesetzt. Wer sie direkt bearbeitet, behält das Getippte.
+  url_hint: Wird aus den Feldern darüber zusammengesetzt. Wenn Sie die URL direkt bearbeiten, bleibt Ihre Eingabe erhalten.
   url_overridden: Von Hand eingetragen; die Felder darüber ändern sie nicht mehr.
-  url_reset: Neu aufbauen
+  url_reset: Neu zusammensetzen
 
   username: Benutzer
   password: Passwort
@@ -88,26 +88,26 @@ connect:
   add_prop: Eigenschaft hinzufügen
 
   section:
-    behaviour: Verhalten
+    behavior: Verhalten
     tunnel: SSH-Tunnel
 
   keep_alive: Verbindung mit einer regelmäßigen Abfrage offen halten
 
   tunnel_enabled: Über einen SSH-Bastion-Host verbinden
-  tunnel_host: Bastion
-  tunnel_user: Bastion-Benutzer
+  tunnel_host: Bastion-Host
+  tunnel_user: Benutzer des Bastion-Hosts
   tunnel_auth: Authentifizierung
   tunnel_auth_agent: SSH-Agent
   tunnel_auth_key: Privater Schlüssel
   tunnel_auth_password: Passwort
   tunnel_key: Schlüsseldatei
-  tunnel_password: Bastion-Passwort
+  tunnel_password: Passwort des Bastion-Hosts
   tunnel_passphrase: Passphrase des Schlüssels
   tunnel_remote: Datenbank
   tunnel_hint: Die Datenbank wird so benannt, wie der Bastion-Host sie sieht. rudbgen bindet einen freien lokalen Port und verbindet den Treiber damit.
 
   test: Testen
-  testing: Verbinde …
+  testing: Verbindung wird hergestellt…
   test_ok: "Mit %{product} verbunden."
   test_ok_unnamed: Die Verbindung funktioniert.
   test_failed: "Verbindung nicht möglich: %{error}"
@@ -115,7 +115,7 @@ connect:
   connect: Verbinden
   saved: Gespeichert.
 
-  name_required: Der Verbindung einen Namen geben.
+  name_required: Geben Sie der Verbindung einen Namen.
   url_required: Die Verbindung hat keine URL.
   no_driver: "Keine Treiberdefinition namens „%{driver}“."
   load_failed: "Die gespeicherten Verbindungen konnten nicht gelesen werden; bis die Datei repariert oder verschoben ist, kann nichts gespeichert oder gelöscht werden: %{error}"
@@ -130,7 +130,7 @@ connect:
 
   host_key_question: "%{host} hat einen unbekannten %{algorithm}-Schlüssel vorgelegt: %{fingerprint}"
   trust_host_key: Diesem Schlüssel vertrauen
-  host_key_trusted: Der Hostschlüssel wurde als vertrauenswürdig eingetragen. Bitte erneut verbinden.
+  host_key_trusted: Der Hostschlüssel wurde als vertrauenswürdig eingetragen. Versuchen Sie erneut, sich zu verbinden.
 
   # Was der Willkommensbildschirm und die Statusleiste sagen, wenn ein
   # Versuch nicht durchkam. Der Grund darunter stammt vom Treiber, vom Bastion
@@ -144,7 +144,7 @@ driver:
   class: Treiberklasse
   class_hint: Der voll qualifizierte Klassenname, wie ihn die Dokumentation des Treibers angibt — zum Beispiel org.postgresql.Driver.
   detect: Ermitteln
-  detecting: Die JAR-Dateien werden durchgesehen …
+  detecting: Die JAR-Dateien werden durchgesehen…
   probe_found: "%{class} gefunden."
   probe_choose: Dieser Treiber bringt mehrere Klassen mit. Wählen Sie die aus, mit der verbunden werden soll.
   probe_recommended: empfohlen
@@ -166,10 +166,10 @@ driver:
   no_jar_hint: Ein Treiber braucht mindestens ein JAR, bevor eine Verbindung ihn nutzen kann.
   jar_count: "%{count} JAR(s)"
   download: Herunterladen
-  downloading: "%{file} wird geladen …"
-  downloading_percent: "%{file} wird geladen — %{percent} %"
-  downloaded: "%{file} wurde geladen und hinzugefügt."
-  download_cancelled: Der Download wurde abgebrochen.
+  downloading: "%{file} wird heruntergeladen…"
+  downloading_percent: "%{file} wird heruntergeladen — %{percent} %"
+  downloaded: "%{file} wurde heruntergeladen und hinzugefügt."
+  download_canceled: Der Download wurde abgebrochen.
   bad_coordinate: "„%{coordinate}“ ist keine Koordinate der Form group:artifact:version."
   not_found: "Maven Central hat nichts unter %{url}."
   network_failed: "Der Download ist fehlgeschlagen: %{error}"
@@ -180,7 +180,7 @@ driver:
   new_name: Neuer Treiber
   delete: Löschen
   delete_confirm: "Die Treiberdefinition „%{name}“ löschen?"
-  none_selected: Einen Treiber auswählen oder einen neuen anlegen.
+  none_selected: Wählen Sie einen Treiber aus oder legen Sie einen neuen an.
 
   # jdbgen nennt es noAuth. Das Verbindungsformular lässt die beiden Anmeldezeilen dann ganz weg, statt sie auszugrauen — es gibt nichts zu beantworten.
   no_auth: Dieses Produkt hat weder Benutzer noch Passwort
@@ -202,7 +202,7 @@ custom_query:
   wrong_columns: "Die ersten %{expected} Spalten werden gelesen; nur %{actual} kamen zurück."
   failed: "Die Anweisung ist fehlgeschlagen: %{error}"
   empty: Es gibt keine Anweisung zum Testen.
-  no_session: Verbinden Sie sich zuerst mit einer Datenbank, die diesen Treiber benutzt — der Test führt die Anweisung in dieser Sitzung aus.
+  no_session: Verbinden Sie sich zuerst mit einer Datenbank, die diesen Treiber benutzt — der Test führt die Anweisung über diese Verbindung aus.
   contract_labels: "Muss diese Spalten liefern, nach Namen: %{labels}"
   contract_positional: "Die ersten %{columns} Spalten werden gelesen, in dieser Reihenfolge: %{names}"
   pair_table: Tabellenname, Kommentar
@@ -241,7 +241,7 @@ titlebar:
   # Die Zeile, die die Sitzung schließt statt eine zu öffnen, und was der
   # Auslöser anzeigt, während eine Sitzung noch geöffnet wird.
   disconnect: Trennen
-  connecting: "%{name} — verbinden…"
+  connecting: "%{name} — Verbindung wird hergestellt…"
   tip_menu: Menü
 
 welcome:
@@ -261,7 +261,7 @@ statusbar:
   run_nowhere: "%{tables} Tabellen · %{templates} Vorlagen → %{files} Dateien, noch kein Zielordner"
   # Die drei Zustände der linken Zelle, sobald eine Verbindung angefordert
   # wurde. `%{product}` ist ein Wert, kein Wort.
-  connecting: "verbinde mit %{name}…"
+  connecting: "Verbindung mit %{name} wird hergestellt…"
   connected: "%{name} · %{product}"
   failed: "%{name} — nicht verbunden"
   unknown_product: unbekanntes Produkt
@@ -269,7 +269,7 @@ statusbar:
 generate:
   tab: Erzeugen
   template_set: Vorlagensatz
-  set_custom: Eigene
+  set_custom: Benutzerdefiniert
   save_as_set: Als Satz speichern…
   delete_set: Satz löschen
   delete_set_confirm: "Den Vorlagensatz „%{name}“ löschen?"
@@ -312,35 +312,35 @@ generate:
   at_line: "Zeile %{line}"
   read_failed: "%{table} konnte nicht gelesen werden: %{reason}"
   blocked_connection: Öffnen Sie zuerst eine Verbindung.
-  blocked_tables: Wählen Sie mindestens eine Tabelle im Explorer.
-  blocked_templates: Wählen Sie mindestens eine Vorlage.
+  blocked_tables: Haken Sie mindestens eine Tabelle im Explorer an.
+  blocked_templates: Haken Sie mindestens eine Vorlage an.
   blocked_output: Wählen Sie zuerst einen Zielordner.
   blocked_running: Ein Lauf läuft bereits.
 
 progress:
   title: Wird erzeugt…
-  started: "beginne mit %{count} Dateien"
-  parsed: "%{count} Vorlagen gelesen"
+  started: "Erzeugung von %{count} Dateien beginnt"
+  parsed: "%{count} Vorlagen geparst"
   read_table: "%{table} gelesen"
   written: "%{path} geschrieben"
   skipped: "%{path} behalten"
   failed: "%{path} fehlgeschlagen: %{reason}"
   conflict: "%{path} ist bereits vorhanden"
-  cancelling: wird abgebrochen…
+  canceling: wird abgebrochen…
   count: "%{done} von %{total}"
 
 summary:
   title: Ergebnis
-  done: Alles, worum der Lauf gebeten wurde, ist geschrieben.
+  done: Alle angeforderten Dateien wurden geschrieben.
   with_failures: Der Lauf endete mit Fehlern.
-  cancelled: Der Lauf wurde abgebrochen; was bereits geschrieben war, steht unten.
+  canceled: Der Lauf wurde abgebrochen; was bereits geschrieben war, steht unten.
   counts: "%{written} geschrieben · %{skipped} übersprungen · %{failed} fehlgeschlagen · %{warnings} Warnungen"
   written: Geschrieben
   skipped: Übersprungen
   failed: Fehlgeschlagen
   open_output: Zielordner öffnen
   conflict_title: Die Datei ist bereits vorhanden
-  conflict_body: Ersetzen, behalten — oder den Rest des Laufs auf einmal beantworten.
+  conflict_body: Ersetzen Sie die Datei, behalten Sie sie, oder entscheiden Sie für den Rest des Laufs auf einmal.
   overwrite: Überschreiben
   skip: Überspringen
   overwrite_all: Alle überschreiben
@@ -366,9 +366,9 @@ settings:
     generation: Erzeugung
     jvm: Java-VM
 
-  ui_theme: Oberflächen-Thema
-  editor_theme: Editor-Thema
-  editor_follows_ui: Editor-Thema an das Oberflächen-Thema anpassen
+  ui_theme: Oberflächendesign
+  editor_theme: Editor-Design
+  editor_follows_ui: Editor-Design an das Oberflächendesign anpassen
   ui_font_size: Schriftgröße der Oberfläche
   editor_font: Editor-Schriftart
   editor_font_size: Schriftgröße im Editor
@@ -376,8 +376,8 @@ settings:
   font_size_hint: 6 – 32 pt
 
   opacity: Deckkraft
-  opacity_hint: "% — unter 100 scheint der Schreibtisch durch"
-  blur: Hintergrund hinter dem Fenster weichzeichnen
+  opacity_hint: "% — unter 100 scheint der Desktop durch"
+  blur: Desktop hinter dem Fenster weichzeichnen
   titlebar: Titelleiste
   titlebar_custom: Von rudbgen gezeichnet
   titlebar_system: Vom System gezeichnet
@@ -389,7 +389,7 @@ settings:
   overwrite_overwrite: Überschreiben
   overwrite_skip: Überspringen
   overwrite_ask: Nachfragen
-  overwrite_hint: Der Ausgangswert eines Laufs; der Reiter „Erzeugen“ kann für einen Lauf anders wählen.
+  overwrite_hint: Der Ausgangswert eines Laufs; im Tab „Erzeugen“ kann für einen Lauf anders gewählt werden.
 
   jvm_heap: Java-Heap
   jvm_heap_hint: MB — das -Xmx, unter dem ein Treiber läuft
@@ -404,30 +404,30 @@ settings:
     export: Exportieren…
     import_select: Importieren
     import_unreadable: "„%{file}“ konnte nicht gelesen werden: %{error}"
-    import_not_a_theme: "„%{file}“ ist ein Editor-Thema. Importieren Sie es unter „Editor-Thema“."
-    import_not_an_editor_theme: "„%{file}“ ist ein Oberflächen-Thema. Importieren Sie es unter „Oberflächen-Thema“."
+    import_not_a_theme: "„%{file}“ ist ein Editor-Design. Importieren Sie es unter „Editor-Design“."
+    import_not_an_editor_theme: "„%{file}“ ist ein Oberflächendesign. Importieren Sie es unter „Oberflächendesign“."
     import_bad_color: "„%{file}“ hat keine brauchbare Farbe für %{slot}."
     import_skipped: "%{count} Dateien wurden übersprungen."
     copy_name: "%{name} (Kopie)"
-    delete_theme_confirm: "Thema „%{name}“ löschen?"
-    delete_editor_theme_confirm: "Editor-Thema „%{name}“ löschen?"
+    delete_theme_confirm: "Design „%{name}“ löschen?"
+    delete_editor_theme_confirm: "Editor-Design „%{name}“ löschen?"
     write_failed: "Die Datei konnte nicht geschrieben werden: %{error}"
     delete_failed: "Die Datei konnte nicht entfernt werden: %{error}"
 
   editor:
-    theme_title: Oberflächen-Thema bearbeiten
-    editor_theme_title: Editor-Thema bearbeiten
+    theme_title: Oberflächendesign bearbeiten
+    editor_theme_title: Editor-Design bearbeiten
     name: Name
     dark: Dies ist eine dunkle Palette
     invalid: "Jede Farbe muss als #RRGGBB geschrieben werden."
-    grid_group: Ergebnisraster — ohne angegebene Farbe bleibt es aus der Datei heraus
+    grid_group: Ergebnisraster — wird nur mit angegebener Farbe in die Datei geschrieben
     automatic: Automatisch
     automatic_slot: "%{name} (automatisch)"
 
     slot:
       background: Fenster
-      surface: Bereiche
-      surface_hover: Überfahren
+      surface: Flächen
+      surface_hover: Hover
       surface_active: Gedrückt
       border: Trennlinien
       text: Text
@@ -468,7 +468,7 @@ update:
   title: Update verfügbar
   available: "%{app} %{version} ist verfügbar."
   installed: "Sie verwenden derzeit %{version}."
-  update: Aktualisieren
+  update: Update installieren
   ignore: Diese Version ignorieren
   checking: Suche nach Updates…
   up_to_date: Sie verwenden die neueste Version.
@@ -483,22 +483,22 @@ template:
   menu_redo: Wiederholen
   menu_find: Suchen…
   menu_replace: Ersetzen…
-  unsaved: ungespeichert
+  unsaved: nicht gespeichert
   tip_preview: Live-Vorschau ein- und ausblenden
   show_preview: Vorschau zeigen
   hide_preview: Vorschau ausblenden
-  tab_width: "Tabbreite: %{width}"
-  tip_tab_width: Wie viele Spalten breit ein Tab in dieser Datei dargestellt wird
+  tab_width: "Tabulatorbreite: %{width}"
+  tip_tab_width: Wie viele Spalten breit ein Tabulator in dieser Datei dargestellt wird
   preview_table: Tabelle
   preview_no_connection: Öffnen Sie eine Verbindung, um diese Vorlage auf eine Tabelle angewandt zu sehen.
   preview_no_table: Haken Sie im Explorer eine Tabelle an, um diese Vorlage angewandt zu sehen.
-  preview_parse_error: Die Vorlage lässt sich nicht lesen; was daran fehlt, steht unten.
+  preview_parse_error: Die Vorlage lässt sich nicht parsen; die Fehler stehen unten.
   read_failed: "%{file} ließ sich nicht öffnen: %{reason}"
   create_failed: "%{file} ließ sich nicht anlegen: %{reason}"
   write_failed: "%{file} ließ sich nicht schreiben: %{reason}"
   not_utf8: "%{file} ist kein UTF-8-Text und kann hier nicht bearbeitet werden."
   open_select: Vorlage öffnen
-  close_title: Ungespeicherte Änderungen
+  close_title: Nicht gespeicherte Änderungen
   close_question: "%{file} hat Änderungen, die noch nicht gespeichert sind."
   discard: Nicht speichern
 
@@ -514,7 +514,7 @@ palette:
   title: Variablen
   search: Variablen filtern
   no_match: Nichts passt dazu.
-  custom_var: Eine Variable aus der Tabelle des Generieren-Tabs.
+  custom_var: Eine Variable aus der Variablenliste im Tab „Erzeugen“.
   section_table: Tabellenfelder
   section_column: Spaltenfelder (innerhalb eines for)
   section_fk: Fremdschlüsselfelder
@@ -534,8 +534,8 @@ palette:
     columns: Alle Spalten, in der Reihenfolge der Datenbank
     keys: Die Spalten des Primärschlüssels, in Schlüsselreihenfolge
     notKeys: Alle Spalten, die nicht zum Primärschlüssel gehören
-    imports: Die Fremdschlüssel, die diese Tabelle erklärt
-    exports: Die Fremdschlüssel, die andere Tabellen auf diese erklären
+    imports: Die Fremdschlüssel, die diese Tabelle definiert
+    exports: Die Fremdschlüssel, die andere Tabellen auf diese definieren
     indexes: Die Indizes dieser Tabelle
     icon: Das Symbol, das die Tabellenliste daneben zeichnet
     position: Die Stelle in der gelesenen Liste
@@ -557,13 +557,13 @@ palette:
     defVal: Der Vorgabewert
     dataType: Der rohe java.sql.Types-Code des Treibers
     jdbcType: Der JDBC-Typname zu diesem Code
-    javaType: Der Java-Typname zu diesem Code
+    javaType: Der Java-Typname zu diesem Code, bei DECIMAL und NUMERIC nach precision und scale bemessen
     autoIncrement: Ob die Datenbank die Spalte selbst füllt
     keySeq: Die Stelle der Spalte im Primärschlüssel, ab 1
     fk: Worauf die Spalte zeigt, wenn genau ein Fremdschlüssel sie verwendet
     position: Die Stelle der Spalte in der Schleife, ab 1
   fk:
-    name: Der Name der Bedingung
+    name: Der Name des Constraints
     columns: Die Spalten dieser Tabelle, aus denen der Schlüssel besteht
     refCatalog: Der Katalog der Tabelle am anderen Ende
     refSchema: Das Schema der Tabelle am anderen Ende
@@ -592,7 +592,7 @@ palette:
     endfor: Beendet ein for
     date: Heute, geschrieben so, wie format es sagt
     user: Das Konto, unter dem der Generator läuft
-    author: Das Feld Autor im Generieren-Tab
+    author: Das Feld „Autor“ im Tab „Erzeugen“
     inStr: Text zwischen zwei Durchläufen, nie vor dem ersten oder nach dem letzten
     indent: Leerzeichen, die zur Einrückung von inStr hinzukommen; darf negativ sein
     skipList: Namen zu überspringender Elemente, durch Kommas getrennt und genau verglichen
@@ -609,6 +609,7 @@ palette:
     lower: Kleinbuchstaben
     upper: Großbuchstaben
     replace: replace('von','nach') ersetzt jedes Vorkommen
+    clamp: clamp(min, max) hält eine ganze Zahl zwischen den beiden Grenzen; alles andere bleibt unverändert
     padSize: Füllt den Wert mit Leerzeichen bis auf diese Breite
     padDir: Auf welcher Seite gefüllt wird, left oder right; rechts als Vorgabe
     quote: Umschließt den Wert an beiden Enden mit diesem Text
@@ -616,7 +617,9 @@ palette:
     postpend: Schreibt diesen Text hinter den Wert
   cond:
     equals: Gilt, wenn der Wert dies ist, ohne auf Groß und Klein zu achten
+    eq: Ein anderer Name für equals
     notEquals: Gilt, wenn der Wert alles andere als dies ist
+    ne: Ein anderer Name für notEquals
     startsWith: Gilt, wenn der Wert damit beginnt, ohne auf Groß und Klein zu achten
     notStartsWith: Gilt, wenn der Wert nicht damit beginnt
     endsWith: Gilt, wenn der Wert damit endet, ohne auf Groß und Klein zu achten
@@ -625,6 +628,10 @@ palette:
     notContains: Gilt, wenn weder das eine noch das andere zutrifft
     matches: Gilt, wenn der ganze Wert auf diesen regulären Ausdruck passt; hier zählt Groß und Klein
     notMatches: Gilt, wenn der ganze Wert nicht darauf passt
+    gt: Gilt, wenn der Wert eine ganze Zahl größer als diese ist
+    ge: Gilt, wenn der Wert eine ganze Zahl größer oder gleich dieser ist
+    lt: Gilt, wenn der Wert eine ganze Zahl kleiner als diese ist
+    le: Gilt, wenn der Wert eine ganze Zahl kleiner oder gleich dieser ist
   opt:
     key: Das Feld, das diese Anweisung schreibt, mitsamt Dekoratoren
     item: Ein anderer Name für key
@@ -668,16 +675,16 @@ import:
   apply_abbr: Regeln auf erzeugte Namen anwenden
   set_templates: "%{count} Vorlagen"
   matches_builtin: "nutzt rudbgens eingebautes %{builtin}"
-  adopt_settings: "jdbgens Sprache (%{language}) und sein %{theme} Thema übernehmen"
+  adopt_settings: "jdbgens Sprache (%{language}) und sein %{theme} Design übernehmen"
   system_language: die Systemsprache
   theme_dark: dunkles
   theme_light: helles
   conflict_rename: Bei vergebenem Namen beides behalten
-  conflict_rename_hint: Was aus jdbgen kommt, wird mit "(imported)" hinter dem Namen angelegt.
-  conflict_skip_hint: Was schon da ist, bleibt; der jdbgen-Eintrag wird zurückgelassen.
+  conflict_rename_hint: Was aus jdbgen kommt, wird mit „(imported)“ hinter dem Namen angelegt.
+  conflict_skip_hint: Was schon da ist, bleibt; der jdbgen-Eintrag wird nicht importiert.
   written: "%{connections} Verbindungen, %{drivers} Treiber, %{sets} Vorlagensätze und %{rules} Abkürzungsregeln importiert."
   nothing_written: Es wurde nichts importiert.
-  skipped: "Zurückgelassen, weil der Name vergeben war: %{names}"
+  skipped: "Nicht importiert, weil der Name vergeben war: %{names}"
   no_keychain: "Diese Verbindungen wurden ohne ihr Passwort gespeichert, weil es nicht in den Schlüsselbund gelegt werden konnte: %{names}. Beim Öffnen wird danach gefragt."
   load_failed: "Es wurde nichts importiert, weil eine Datei, in die der Import schreiben würde, nicht gelesen werden konnte: %{error}. Reparieren oder verschieben Sie die Datei und importieren Sie erneut."
   not_saved: "Nicht gespeichert, weil die Datei nicht geschrieben werden konnte: %{errors}"
@@ -690,9 +697,9 @@ import:
   note_stock_matched: "%{driver}: Es wird rudbgens eigene Definition %{builtin} benutzt, mit Ihrer JAR-Datei, Ihren SQL-Überschreibungen und Eigenschaften."
   note_stock_unknown: "%{driver} (%{class}) passt zu keiner Definition von rudbgen und wird als eigener Treiber importiert."
   note_unknown_driver: "%{connection} nennt den Treiber %{driver}, den diese Konfiguration nicht definiert. Wählen Sie vor dem Verbinden einen aus."
-  note_keep_alive: "%{connection} hat ein Keep-Alive-Intervall von %{value}, was keine Sekundenzahl ist. Die Prüfung wird ausgeschaltet importiert."
+  note_keep_alive: "%{connection} hat ein Keepalive-Intervall von %{value}, was keine Sekundenzahl ist. Die Prüfung wird ausgeschaltet importiert."
   note_unresolved_path: "%{kind} %{path} von %{owner} lag in keinem der beiden jdbgen-Verzeichnisse und wird unverändert importiert."
   note_icon: "Das Symbol %{icon} von %{owner} hat hier keine Entsprechung und entfällt."
-  path_jar: Die Treiber-JAR
+  path_jar: Das Treiber-JAR
   path_template: Die Vorlagendatei
-  path_output: Das Ausgabeverzeichnis
+  path_output: Der Zielordner

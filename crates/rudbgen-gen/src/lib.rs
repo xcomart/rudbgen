@@ -94,7 +94,7 @@
 //! * **It does not follow symlinks.** The escape check is on the rendered
 //!   name, not on the path it resolves to, so a symlink already inside the
 //!   output directory can still lead out of it. Guarding that would mean
-//!   canonicalising a path that does not exist yet.
+//!   canonicalizing a path that does not exist yet.
 //! * **It does not cache, load or refresh metadata.** [`Plan::tables`] is
 //!   whatever the caller handed over.
 

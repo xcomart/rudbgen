@@ -155,7 +155,7 @@ impl Workspace {
     /// data directory's path, which its first step reports as unreadable and
     /// offers to replace with a file the user chooses. That is the door for a
     /// configuration copied from another machine, and the reason the command is
-    /// never greyed out.
+    /// never grayed out.
     pub(super) fn open_import(&mut self, window: &mut Window, cx: &mut Context<Self>) {
         self.close_overlays(window, cx);
         let path = self.jdbgen_config.clone().unwrap_or_else(|| {
@@ -357,7 +357,7 @@ impl Workspace {
     ///
     /// The unsaved half of [`Workspace::apply_settings`], and deliberately much
     /// smaller: only the two palettes and the fonts are previewed, so this
-    /// touches no platform state beyond the native caption's colours, which have
+    /// touches no platform state beyond the native caption's colors, which have
     /// to follow the chrome theme or the window would be half repainted.
     ///
     /// Reads [`app_settings::effective`], which answers the preview while one is

@@ -2,7 +2,7 @@
 //! with, and what a metadata query asks for.
 //!
 //! These are the Rust side of the JSON documented in `bridge/README.md`. They
-//! serialise field for field; nothing here is renamed on the way out, so a
+//! serialize field for field; nothing here is renamed on the way out, so a
 //! reader can compare this file with the bridge's `Session.open` and `Params`
 //! and see the same names.
 //!
@@ -326,7 +326,7 @@ pub struct DescribeRequest {
     /// That is the whole set. rudbman also answered `ddl`, `procedures`,
     /// `functions` and `sequences`; a code generator writes files from tables,
     /// views, columns, keys and indexes, so those went with the vendor
-    /// catalogue queries they needed (architecture.md D3). An unknown kind is a
+    /// catalog queries they needed (architecture.md D3). An unknown kind is a
     /// `protocol` error from the bridge, not a silent empty list.
     pub kind: String,
     /// Exact catalog name.
@@ -506,7 +506,7 @@ mod tests {
             Param::Timestamp("2026-08-04 09:30:00".into()),
             Param::Bytes(vec![0xde, 0xad, 0xbe, 0xef]),
         ])
-        .expect("serialises");
+        .expect("serializes");
         assert_eq!(
             json,
             r#"[42,"text",true,null,"#.to_string()
@@ -518,8 +518,8 @@ mod tests {
 
     #[test]
     fn a_whole_numbered_double_stays_a_double() {
-        // Bare, this would serialise as `3` and be bound with setLong.
-        let json = serde_json::to_string(&Param::F64(3.0)).expect("serialises");
+        // Bare, this would serialize as `3` and be bound with setLong.
+        let json = serde_json::to_string(&Param::F64(3.0)).expect("serializes");
         assert_eq!(json, r#"{"type":"f64","value":3.0}"#);
     }
 
@@ -529,7 +529,7 @@ mod tests {
         // null is "any schema", and sending one where the caller said nothing
         // would silently widen the query.
         let json = serde_json::to_string(&DescribeRequest::new("tables").with_schema("APP"))
-            .expect("serialises");
+            .expect("serializes");
         assert_eq!(json, r#"{"kind":"tables","schema":"APP"}"#);
     }
 
@@ -550,14 +550,14 @@ mod tests {
         // answers its own comments" and would take a null as one too, but only
         // absent is what the contract with `Session.open` says.
         let plain = serde_json::to_string(&ConnectionSpec::new("jdbc:h2:mem:t", "org.h2.Driver"))
-            .expect("serialises");
+            .expect("serializes");
         assert!(!plain.contains("table_comments_sql"), "{plain}");
         assert!(!plain.contains("column_comments_sql"), "{plain}");
 
         let mut spec = ConnectionSpec::new("jdbc:h2:mem:t", "org.h2.Driver");
         spec.table_comments_sql = Some("select t, c from meta where s = '${schema}'".into());
         spec.column_comments_sql = Some("select t, c, m from cols".into());
-        let json = serde_json::to_string(&spec).expect("serialises");
+        let json = serde_json::to_string(&spec).expect("serializes");
         // The `${schema}` hole travels untouched: the substitution is the
         // bridge's, and escaping or filling it here would break it.
         assert!(

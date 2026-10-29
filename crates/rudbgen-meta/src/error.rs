@@ -28,7 +28,7 @@ pub enum Error {
     /// like from the outside and it is not a diagnosis. Only the *presence* of
     /// the label is checked: a `TABLE_TYPE` that is there and null is a table
     /// list a custom query is allowed to write (jdbgen reads it as `TABLE`).
-    #[error("the {} query does not return a column labelled {label}", kind_label(*kind))]
+    #[error("the {} query does not return a column labeled {label}", kind_label(*kind))]
     MissingLabel {
         /// Which of the four queries.
         kind: CustomQueryKind,

@@ -21,9 +21,10 @@
 //!
 //! A placeholder is `${type:name=value, ...}`. It ends at the **first** `}`
 //! behind the `${`, even one inside a quoted value. Type names, attribute
-//! names, processor names and condition names are case insensitive; the
-//! keywords `endif`, `endfor`, `else` and `elif:` are matched in lower case
-//! only, so `${ELSE}` is read as a member lookup.
+//! names, processor names, condition names and the block keywords `endif`,
+//! `endfor`, `else` and `elif:` are case insensitive, so `${ENDIF}` closes an
+//! `if` just as `${endif}` does. Member names are not: `${javaType}` is a
+//! field, `${javatype}` an unknown one.
 //!
 //! | Statement | What it does |
 //! |---|---|
@@ -39,8 +40,9 @@
 //! A key may be followed by a chain of processors - `${name.suffix.camel}` -
 //! applied left to right. `${a.b}` is such a chain and **never** a nested
 //! path. The processors are `abbr`, `prefix`, `suffix`, `camel`, `pascal`,
-//! `snake`, `screaming`, `skewer`/`kebab`, `lower`, `upper` and
-//! `replace(find, replacement)`.
+//! `snake`, `screaming`, `skewer`/`kebab`, `lower`, `upper`,
+//! `replace(find, replacement)` and `clamp(min, max)`, which holds a whole
+//! number between its bounds and leaves any other value alone.
 //!
 //! Every rendered value then passes the same decorations: `prepend` and
 //! `postpend` - both defaulting to `quote` - surround it, and `padSize`
@@ -51,11 +53,13 @@
 //! width character takes the two columns it occupies in a fixed width font,
 //! and a value wider than the padding is never cut off.
 //!
-//! The ten conditions of an `if` are `equals`/`value`, `notEquals`,
-//! `contains`, `notContains`, `startsWith`, `notStartsWith`, `endsWith`,
-//! `notEndsWith`, `matches` and `notMatches`. All of them are combined with
-//! AND and compare ignoring case, except `matches`, which is a regular
-//! expression the whole value has to match.
+//! The fourteen conditions of an `if` are `equals`/`value`/`eq`,
+//! `notEquals`/`ne`, `contains`, `notContains`, `startsWith`,
+//! `notStartsWith`, `endsWith`, `notEndsWith`, `matches`, `notMatches`, `gt`,
+//! `ge`, `lt` and `le`. All of them are combined with AND. The first ten compare text ignoring case,
+//! except `matches`, which is a regular expression the whole value has to
+//! match; the last four compare whole numbers, and a value that is no whole
+//! number fails every one of them.
 //!
 //! `if`s and `for`s nest up to 64 deep; a template nested deeper is a
 //! [`ParseError`] rather than a stack overflow. An `elif` is no level of its
@@ -69,13 +73,22 @@
 //!
 //! The template assets of jdbgen have to render byte for byte the same, so the
 //! rules that look like accidents are reproduced on purpose: the first `}`
-//! closing a placeholder, the lower case only keywords, a quoted attribute
-//! value losing exactly one enclosing pair of quotes while `(...)` keeps its
-//! parentheses, and `${''}` standing for no text at all. jdbgen's three engine
-//! test classes are ported case for case and are the canary for all of it.
+//! closing a placeholder, a quoted attribute value losing exactly one
+//! enclosing pair of quotes while `(...)` keeps its parentheses, and `${''}`
+//! standing for no text at all. jdbgen's three engine test classes are ported
+//! case for case and are the canary for all of it.
 //!
-//! Four differences are deliberate:
+//! The numeric conditions `gt`, `ge`, `lt` and `le`, the short names `eq` and
+//! `ne` of `equals` and `notEquals`, and the `clamp` processor are rudbgen's
+//! own. jdbgen refused all seven names, so they change the output of no
+//! template it rendered.
 //!
+//! Five differences are deliberate:
+//!
+//! * The block keywords `endif`, `endfor`, `else` and `elif:` are case
+//!   insensitive like every other statement name. jdbgen matched them in lower
+//!   case only, so `${ENDIF}` left its `if` open and `${ELSE}` was silently a
+//!   lookup of a member called `ELSE` - both branches ended up in the output.
 //! * **D10** - word level abbreviation rules match ignoring case. jdbgen
 //!   looked the raw segment up in a lower cased map, so a word rule never
 //!   fired on an upper case identifier, which is what database identifiers

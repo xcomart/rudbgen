@@ -10,7 +10,7 @@ This is [rudbman](https://github.com/xcomart/rudbman)'s bridge, copied and
 trimmed (architecture.md D3). rudbgen writes files from metadata and never
 ferries row data, so the `job/` layer (extract, backup, transfer), the LOB
 reference path, the `template/` engine (ported to Rust as `rudbgen-template`,
-D4) and the four `DESCRIBE` kinds that needed hand-written vendor catalogue
+D4) and the four `DESCRIBE` kinds that needed hand-written vendor catalog
 queries (`ddl`, `procedures`, `functions`, `sequences`) are gone — about 40% of
 the Java. **Their operation codes are retired, not reused**: `0x25` and
 `0x40`–`0x42` stay spent so this table and rudbman's keep lining up.
@@ -73,7 +73,7 @@ the Rust side drop `ExceptionCheck` from the normal path.
 | `0x21` | `FETCH` | cursor | max rows | — | binary `RDB1` batch |
 | `0x22` | `MORE_RESULTS` | cursor | — | — | JSON, same shape as `EXECUTE` |
 | `0x23` | `CLOSE_CURSOR` | cursor | — | — | — |
-| `0x24` | `CANCEL` | session | — | — | JSON `{cancelled}` |
+| `0x24` | `CANCEL` | session | — | — | JSON `{canceled}` |
 | `0x30` | `SET_AUTOCOMMIT` | session | 0/1 | — | — |
 | `0x31` | `COMMIT` | session | — | — | — |
 | `0x32` | `ROLLBACK` | session | — | — | — |
@@ -147,6 +147,11 @@ jlink image, or H2 on the test classpath, is reached.
 `java.sql.Driver` has no login timeout of its own, and `DriverManager`'s is
 global mutable state this bridge stays away from. A caller that knows its driver
 should set the real property in `props`.
+
+A `driver_class` in IBM's `com.ibm.db2.jcc` package also gets
+`retrieveMessagesFromServerOnGetMessage=true` unless `props` says otherwise:
+without it JCC reports a failed statement as `SQLCODE=…, SQLSTATE=…` and
+nothing a person reads.
 
 Two further optional members, `table_comments_sql` and `column_comments_sql`,
 are accepted and held on the session: where one is set, `DESCRIBE` `tables` /
@@ -273,7 +278,7 @@ Points a decoder has to get right:
 - **`row_count` may be 0.** The bitmap is then 0 bytes, and every column is
   kind 0 with an empty payload. A cursor that produced no result set at all
   yields `col_count: 0` too.
-- The last batch is only recognised as such when the driver runs out of rows. A
+- The last batch is only recognized as such when the driver runs out of rows. A
   batch that filled its row limit exactly reports `flags = 0`; the next `FETCH`
   returns a 0-row batch with bit0 set.
 
@@ -311,11 +316,11 @@ in `columns[]` also carries a `kind` hint: the encoding a full batch would use.
 
 rudbman never inlined a `BLOB`, `CLOB` or `NCLOB`: each cell contributed a
 16-byte `(id, size)` pair and the UI pulled the bytes on demand with `LOB_READ`.
-rudbgen has no `LOB_READ` to pull with, so **LOBs are materialised** — `BLOB` as
+rudbgen has no `LOB_READ` to pull with, so **LOBs are materialized** — `BLOB` as
 `BIN`, `CLOB` and `NCLOB` as `STR`.
 
 That is safe here because of what runs through `EXECUTE`. The only statements
-rudbgen sends are the four custom catalogue queries of architecture.md D9, whose
+rudbgen sends are the four custom catalog queries of architecture.md D9, whose
 values are table names, column names and comments — and Oracle hands a comment
 back as a `CLOB`. Nothing streams a user's row data through this bridge; the
 explorer and the inspector read `DESCRIBE`, which returns JSON.
@@ -327,7 +332,7 @@ across JNI. Do not point one at a document table.
 ## Concurrency
 
 - One JDBC connection per session, one Rust worker thread per session. The worker
-  serialises commands, which is what makes a non-thread-safe `Connection` safe.
+  serializes commands, which is what makes a non-thread-safe `Connection` safe.
 - The session still holds a `ReentrantLock` around every use of the connection,
   because the keep-alive timer runs concurrently with the worker. The timer uses
   `tryLock` and skips its round rather than queueing — a statement already in
@@ -349,14 +354,14 @@ the same URL prefix produce an undefined winner.
 
 Loaders are cached by the JAR path list and reference counted; the loader closes
 when its last session does. A fresh loader per session re-runs the driver's
-static initialisers and leaks everything they loaded.
+static initializers and leaks everything they loaded.
 
 The cache key preserves the caller's JAR order, because classpath order decides
 which JAR wins when two ship the same class — two orderings are genuinely two
 different class paths.
 
 `PROBE_DRIVER` uses a throwaway loader and `Class.forName(cls, false, …)`:
-probing must not run a driver's static initialiser, which may open sockets or
+probing must not run a driver's static initializer, which may open sockets or
 load native libraries, and must not pin a JAR the user is about to replace.
 
 ## Layout
@@ -377,7 +382,7 @@ src/main/java/comart/rudbgen/bridge/
 ├── codec/                 RDB1 encoder
 └── meta/
     ├── Describe.java      DESCRIBE dispatch, the DatabaseMetaData kinds
-    ├── Comments.java      table and column comments from the vendor catalogue
+    ├── Comments.java      table and column comments from the vendor catalog
     ├── Dialect.java       product name → the vendor paths that apply
     ├── Ident.java         identifier quoting, only where it is needed
     ├── Attempt.java       savepoint-fenced query that is allowed to fail
@@ -426,7 +431,7 @@ rudbman's `DdlTest`, `DescribeRoutinesTest`, `ExtractJobTest`, `BackupJobTest`,
 
 ## Known gaps
 
-- **LOBs are materialised, not referenced.** A custom catalogue query that
+- **LOBs are materialized, not referenced.** A custom catalog query that
   selects a large `BLOB` or `CLOB` column carries the whole value across JNI.
   See "LOBs" above for why that is an acceptable trade here and not in rudbman.
 - `LONGVARCHAR` / `LONGVARBINARY` inline too; on MySQL a `LONGTEXT` reaches 4GB

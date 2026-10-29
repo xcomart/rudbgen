@@ -137,7 +137,7 @@ pub fn from_mapped(dec: &Decrypted, mapped: &Mapped) -> Preview {
 /// The same rule `rudbgen-core`'s `MaskedUrl` applies to a log line, applied
 /// here to a screen: the user info before an `@` goes, and so does every
 /// parameter value after the first `?` or `;`. What is left is enough to
-/// recognise which database a row is about, which is the whole job of the
+/// recognize which database a row is about, which is the whole job of the
 /// column. jdbgen encrypted the URL, so a wizard that printed it in full would
 /// be showing more than the file ever did.
 fn mask_url(url: &str) -> String {

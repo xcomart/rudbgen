@@ -22,7 +22,7 @@ explorer:
   loading: cargando…
   load_failed_unknown: No se pudo cargar.
   menu_select_shown: Seleccionar todo lo mostrado
-  menu_clear: Quitar la selección
+  menu_clear: Anular la selección
   menu_invert: Invertir la selección
   menu_inspect: Abrir en el inspector
   menu_refresh: Recargar
@@ -57,7 +57,7 @@ inspector:
 connect:
   title: Conexiones
   new: Nueva
-  new_name: Conexión nueva
+  new_name: Nueva conexión
   duplicate: Duplicar
   delete: Eliminar
   delete_confirm: "¿Eliminar la conexión «%{name}» y la contraseña guardada?"
@@ -72,7 +72,7 @@ connect:
   manage_drivers: Controladores…
   driver_has_no_jar: Este controlador todavía no tiene JAR. Añade o descarga uno en Controladores.
 
-  host: Servidor
+  host: Host
   port: Puerto
   database: Base de datos
   url: URL
@@ -88,7 +88,7 @@ connect:
   add_prop: Añadir una propiedad
 
   section:
-    behaviour: Comportamiento
+    behavior: Comportamiento
     tunnel: Túnel SSH
 
   keep_alive: Mantener la conexión viva con una consulta periódica
@@ -102,7 +102,7 @@ connect:
   tunnel_auth_password: Contraseña
   tunnel_key: Archivo de clave
   tunnel_password: Contraseña del bastión
-  tunnel_passphrase: Frase de la clave
+  tunnel_passphrase: Frase de contraseña de la clave
   tunnel_remote: Base de datos
   tunnel_hint: La base de datos se nombra tal como la ve el bastión. rudbgen abre un puerto local libre y conecta el controlador a ese puerto.
 
@@ -125,7 +125,7 @@ connect:
   hint_auth: revisa el usuario y la contraseña
   hint_driver: revisa el JAR y la clase del controlador
   hint_jvm: rudbgen necesita un entorno Java; define RUDBGEN_JAVA_HOME o JAVA_HOME
-  hint_network: revisa el servidor, el puerto y si la base de datos es alcanzable
+  hint_network: revisa el host, el puerto y si la base de datos es alcanzable
   hint_host_key: la clave de host del bastión aún no es de confianza
 
   host_key_question: "%{host} presentó una clave %{algorithm} desconocida: %{fingerprint}"
@@ -154,14 +154,14 @@ driver:
   probe_jvm_failed: "No se pudo iniciar el entorno de ejecución de Java: %{error}"
   probe_failed: "No se pudieron examinar los archivos JAR: %{error}"
   url_template: Plantilla de URL
-  default_port: Puerto por omisión
+  default_port: Puerto predeterminado
   dialect: Dialecto
   maven: Coordenada Maven
   jars: Archivos JAR
   add_jar: Añadir un JAR…
   add_jar_select: Añadir
   remove_jar: Quitar
-  jar_missing: no está
+  jar_missing: falta
   no_jar: sin JAR
   no_jar_hint: Un controlador necesita al menos un JAR antes de que una conexión pueda usarlo.
   jar_count: "%{count} JAR"
@@ -169,7 +169,7 @@ driver:
   downloading: "Descargando %{file}…"
   downloading_percent: "Descargando %{file} — %{percent} %"
   downloaded: "Se descargó y añadió %{file}."
-  download_cancelled: Se canceló la descarga.
+  download_canceled: Se canceló la descarga.
   bad_coordinate: "«%{coordinate}» no es una coordenada group:artifact:version."
   not_found: "Maven Central no tiene nada en %{url}."
   network_failed: "La descarga falló: %{error}"
@@ -177,7 +177,7 @@ driver:
   load_failed: "No se pudieron leer las definiciones de controlador: %{error}"
   save_failed: "No se pudieron guardar las definiciones de controlador: %{error}"
   new: Nuevo
-  new_name: Controlador nuevo
+  new_name: Nuevo controlador
   delete: Eliminar
   delete_confirm: "¿Eliminar la definición de controlador «%{name}»?"
   none_selected: Elige un controlador o añade uno.
@@ -202,7 +202,7 @@ custom_query:
   wrong_columns: "Se leen las primeras %{expected} columnas; solo llegaron %{actual}."
   failed: "La sentencia falló: %{error}"
   empty: No hay ninguna sentencia que probar.
-  no_session: "Conéctese primero a una base de datos que use este controlador: la prueba ejecuta la sentencia en esa sesión."
+  no_session: "Conéctate primero a una base de datos que use este controlador: la prueba ejecuta la sentencia en esa conexión."
   contract_labels: "Debe devolver estas columnas, por nombre: %{labels}"
   contract_positional: "Se leen las primeras %{columns} columnas, en este orden: %{names}"
   pair_table: nombre de la tabla, comentario
@@ -245,7 +245,7 @@ titlebar:
   tip_menu: Menú
 
 welcome:
-  tagline: Apúntalo a una base de datos, elige tablas y plantillas, y escribirá el código.
+  tagline: Conéctalo a una base de datos, elige tablas y plantillas, y escribirá el código.
   hint: Pulsa %{shortcut} para abrir una nueva conexión.
   new_connection: Nueva conexión…
   import_jdbgen: Importar desde jdbgen…
@@ -258,7 +258,7 @@ statusbar:
   no_selection: nada que generar
   tables_selected: "%{count} tablas seleccionadas"
   run: "%{tables} tablas · %{templates} plantillas → %{files} archivos en %{dir}"
-  run_nowhere: "%{tables} tablas · %{templates} plantillas → %{files} archivos, sin carpeta de destino"
+  run_nowhere: "%{tables} tablas · %{templates} plantillas → %{files} archivos, sin carpeta de salida"
   # Los tres estados de la celda izquierda una vez pedida una conexión.
   # `%{product}` es un valor, no una palabra.
   connecting: "conectando con %{name}…"
@@ -277,18 +277,18 @@ generate:
   overwrite_set: Sobrescribir
   overwrite_set_note: "Sustituye el conjunto de plantillas «%{name}» por la lista actual."
   templates: Plantillas
-  no_templates: "Aún no hay plantillas: añada una y la ejecución tendrá algo que escribir."
+  no_templates: "Aún no hay plantillas: añade una y la ejecución tendrá algo que escribir."
   add_template: Añadir plantilla…
-  add_template_select: Elija archivos de plantilla
+  add_template_select: Elige archivos de plantilla
   template_name: nombre
   out_template: nombre de salida
   tip_edit: Editar la plantilla
-  tip_open: Haga doble clic para abrir la plantilla
+  tip_open: Haz doble clic para abrir la plantilla
   tip_remove: Quitar de la lista
   options: Opciones
   output_dir: Salida
   output_placeholder: adónde van los archivos generados
-  output_select: Elija la carpeta de salida
+  output_select: Elige la carpeta de salida
   browse: "…"
   author: Autor
   author_placeholder: el valor que lee el elemento author de cada plantilla
@@ -311,10 +311,10 @@ generate:
   diagnostics: "%{count} advertencias"
   at_line: "línea %{line}"
   read_failed: "no se pudo leer %{table}: %{reason}"
-  blocked_connection: Abra primero una conexión.
-  blocked_tables: Marque al menos una tabla en el explorador.
-  blocked_templates: Marque al menos una plantilla.
-  blocked_output: Elija primero una carpeta de salida.
+  blocked_connection: Abre primero una conexión.
+  blocked_tables: Marca al menos una tabla en el explorador.
+  blocked_templates: Marca al menos una plantilla.
+  blocked_output: Elige primero una carpeta de salida.
   blocked_running: Ya hay una ejecución en marcha.
 
 progress:
@@ -326,21 +326,21 @@ progress:
   skipped: "conservado %{path}"
   failed: "%{path} falló: %{reason}"
   conflict: "%{path} ya existe"
-  cancelling: cancelando…
+  canceling: cancelando…
   count: "%{done} de %{total}"
 
 summary:
   title: Resultado
   done: Se escribió todo lo que la ejecución pedía.
   with_failures: La ejecución terminó con fallos.
-  cancelled: La ejecución se canceló; lo que había escrito está abajo.
+  canceled: La ejecución se canceló; lo que había escrito está abajo.
   counts: "%{written} escritos · %{skipped} omitidos · %{failed} fallidos · %{warnings} advertencias"
   written: Escritos
   skipped: Omitidos
   failed: Fallidos
   open_output: Abrir carpeta de salida
   conflict_title: El archivo ya existe
-  conflict_body: Reemplácelo, consérvelo o responda de una vez por el resto de la ejecución.
+  conflict_body: Reemplázalo, consérvalo o responde de una vez para el resto de la ejecución.
   overwrite: Sobrescribir
   skip: Omitir
   overwrite_all: Sobrescribir todo
@@ -357,7 +357,7 @@ settings:
   title: Ajustes
   system_default: Usar el ajuste del sistema
   save_failed: "No se pudieron guardar los ajustes: %{error}"
-  load_failed: "No se pueden guardar los ajustes porque no se pudo leer el archivo de ajustes al iniciar rudbgen: %{error}. Repare o mueva ese archivo y reinicie rudbgen."
+  load_failed: "No se pueden guardar los ajustes porque no se pudo leer el archivo de ajustes al iniciar rudbgen: %{error}. Repara o mueve ese archivo y reinicia rudbgen."
 
   section:
     appearance: Apariencia
@@ -389,12 +389,12 @@ settings:
   overwrite_overwrite: Sobrescribir
   overwrite_skip: Omitir
   overwrite_ask: Preguntar
-  overwrite_hint: El punto de partida de cada ejecución; la pestaña Generar puede elegir otra cosa para una sola vez.
+  overwrite_hint: Valor inicial de cada ejecución; en la pestaña Generar se puede elegir otro para una ejecución concreta.
 
   jvm_heap: Montículo de Java
   jvm_heap_hint: MB — el -Xmx con el que corre un controlador
   jvm_args: Argumentos adicionales
-  jvm_hint: El montón es donde se ejecutan el controlador JDBC y la lectura de metadatos. Ambos ajustes se aplican la próxima vez que se inicie rudbgen. Los argumentos adicionales se separan con espacios.
+  jvm_hint: El montículo es donde se ejecutan el controlador JDBC y la lectura de metadatos. Ambos ajustes se aplican la próxima vez que se inicie rudbgen. Los argumentos adicionales se separan con espacios.
 
   manage:
     duplicate: Duplicar…
@@ -462,7 +462,7 @@ settings:
       punctuation: Puntuación
       bracket_match: Paréntesis emparejado
       error: Errores
-      warning: Avisos
+      warning: Advertencias
 
 update:
   title: Actualización disponible
@@ -490,8 +490,8 @@ template:
   tab_width: "Ancho de tabulación: %{width}"
   tip_tab_width: Cuántas columnas ocupa una tabulación en este archivo
   preview_table: Tabla
-  preview_no_connection: Abra una conexión para ver esta plantilla aplicada a una tabla.
-  preview_no_table: Marque una tabla en el explorador para ver esta plantilla aplicada.
+  preview_no_connection: Abre una conexión para ver esta plantilla aplicada a una tabla.
+  preview_no_table: Marca una tabla en el explorador para ver esta plantilla aplicada.
   preview_parse_error: La plantilla no se puede analizar; lo que falla está listado abajo.
   read_failed: "No se pudo abrir %{file}: %{reason}"
   create_failed: "No se pudo crear %{file}: %{reason}"
@@ -514,15 +514,15 @@ palette:
   title: Variables
   search: Filtrar variables
   no_match: No hay nada que coincida.
-  custom_var: Una variable de la tabla de la pestaña Generar.
+  custom_var: Una variable definida en la lista Variables de la pestaña Generar.
   section_table: Campos de la tabla
   section_column: Campos de columna (dentro de un for)
-  section_fk: Campos de clave externa
+  section_fk: Campos de clave ajena
   section_index: Campos de índice
   section_statement: Sentencias
   section_decorator: Decoradores
   section_condition: Condiciones
-  section_custom: Variables propias
+  section_custom: Variables personalizadas
   table:
     catalog: El catálogo de base de datos que contiene la tabla
     schema: El esquema de base de datos que contiene la tabla
@@ -534,8 +534,8 @@ palette:
     columns: Todas las columnas, en el orden que da la base de datos
     keys: Las columnas de la clave primaria, en orden de clave
     notKeys: Todas las columnas que no son de la clave primaria
-    imports: Las claves externas que declara esta tabla
-    exports: Las claves externas que otras tablas declaran hacia esta
+    imports: Las claves ajenas que declara esta tabla
+    exports: Las claves ajenas que otras tablas declaran hacia esta
     indexes: Los índices de esta tabla
     icon: El icono que la lista de tablas dibuja al lado
     position: El puesto en la lista de la que vino
@@ -554,13 +554,13 @@ palette:
     scale: Cuántos de ellos van tras la coma decimal
     nullable: 0 cuando la columna es NOT NULL, 1 cuando admite NULL
     remarks: El comentario de la columna
-    defVal: El valor por omisión
+    defVal: El valor predeterminado
     dataType: El código java.sql.Types en bruto que informó el controlador
     jdbcType: El nombre de tipo JDBC de ese código
-    javaType: El nombre de tipo Java al que corresponde ese código
+    javaType: El nombre de tipo Java al que corresponde ese código, elegido según precision y scale en DECIMAL y NUMERIC
     autoIncrement: Si la base de datos rellena la columna por sí sola
     keySeq: El puesto de la columna dentro de la clave primaria, desde 1
-    fk: A qué apunta la columna, cuando la usa exactamente una clave externa
+    fk: A qué apunta la columna, cuando la usa exactamente una clave ajena
     position: El puesto de la columna en el bucle, desde 1
   fk:
     name: El nombre de la restricción
@@ -570,7 +570,7 @@ palette:
     refTable: La tabla del otro extremo
     refColumns: Sus columnas, en el mismo orden que las de aquí
     onUpdate: Qué ocurre cuando cambia la fila del otro extremo
-    onDelete: Qué ocurre cuando se borra la fila del otro extremo
+    onDelete: Qué ocurre cuando se elimina la fila del otro extremo
     position: El puesto en la lista de claves, desde 1
     catalog: Dentro del fk de una columna — el catálogo de la tabla a la que apunta
     schema: Dentro del fk de una columna — el esquema de la tabla a la que apunta
@@ -609,22 +609,29 @@ palette:
     lower: Minúsculas
     upper: Mayúsculas
     replace: replace('de','a') sustituye cada aparición
+    clamp: clamp(min, max) deja un número entero entre los dos límites; lo demás pasa sin cambios
     padSize: Rellena el valor con espacios hasta este ancho
-    padDir: De qué lado van los espacios, left o right; a la derecha por omisión
+    padDir: De qué lado van los espacios, left o right; a la derecha de forma predeterminada
     quote: Envuelve el valor en este texto por ambos lados
     prepend: Escribe este texto delante del valor
     postpend: Escribe este texto detrás del valor
   cond:
-    equals: Se cumple cuando el valor es este, sin mirar mayúsculas
+    equals: Se cumple cuando el valor es este, sin distinguir mayúsculas
+    eq: Otro nombre para equals
     notEquals: Se cumple cuando el valor es cualquier otro
-    startsWith: Se cumple cuando el valor empieza por esto, sin mirar mayúsculas
+    ne: Otro nombre para notEquals
+    startsWith: Se cumple cuando el valor empieza por esto, sin distinguir mayúsculas
     notStartsWith: Se cumple cuando el valor no empieza por esto
-    endsWith: Se cumple cuando el valor acaba en esto, sin mirar mayúsculas
+    endsWith: Se cumple cuando el valor acaba en esto, sin distinguir mayúsculas
     notEndsWith: Se cumple cuando el valor no acaba en esto
     contains: Se cumple cuando una colección tiene un elemento con este nombre, o una lista con comas tiene este valor
     notContains: Se cumple cuando no ocurre ninguna de las dos cosas
-    matches: Se cumple cuando el valor entero encaja en esta expresión regular; aquí sí importan las mayúsculas
+    matches: Se cumple cuando el valor entero encaja en esta expresión regular; aquí sí se distinguen mayúsculas y minúsculas
     notMatches: Se cumple cuando el valor entero no encaja en ella
+    gt: Se cumple cuando el valor es un entero mayor que este
+    ge: Se cumple cuando el valor es un entero mayor o igual que este
+    lt: Se cumple cuando el valor es un entero menor que este
+    le: Se cumple cuando el valor es un entero menor o igual que este
   opt:
     key: El campo que escribe esta sentencia, decoradores incluidos
     item: Otro nombre para key
@@ -642,7 +649,7 @@ abbr:
   pick_table: Tabla…
   tip_remove: Quitar esta regla
   duplicate: "%{abbreviation}: dos reglas activas buscan esto, y solo una de ellas podría llegar a actuar."
-  load_failed: "No se pueden editar las reglas porque no se pudo leer abbreviations.json: %{error}. Repare o mueva ese archivo y vuelva a abrir esto."
+  load_failed: "No se pueden editar las reglas porque no se pudo leer abbreviations.json: %{error}. Repara o mueve ese archivo y vuelve a abrir esta ventana."
   save_failed: "No se guardaron las reglas: %{error}"
 
 import:
@@ -663,7 +670,7 @@ import:
   section_settings: Ajustes
   section_conflicts: Nombres ya ocupados
   section_notes: Conviene saber
-  nothing_here: Ninguno en este archivo.
+  nothing_here: Nada en este archivo.
   rules_count: "Importar %{count} reglas"
   apply_abbr: Aplicar las reglas a los nombres generados
   set_templates: "%{count} plantillas"
@@ -674,25 +681,25 @@ import:
   theme_light: claro
   conflict_rename: Conservar ambos cuando el nombre esté ocupado
   conflict_rename_hint: Lo que venga de jdbgen se añade con "(imported)" tras el nombre.
-  conflict_skip_hint: Se conserva lo que ya está aquí y se deja atrás la entrada de jdbgen.
+  conflict_skip_hint: Se conserva lo que ya está aquí y no se importa la entrada de jdbgen.
   written: "Importadas %{connections} conexiones, %{drivers} controladores, %{sets} conjuntos de plantillas y %{rules} reglas de abreviatura."
   nothing_written: No se importó nada.
-  skipped: "Dejado atrás porque el nombre estaba ocupado: %{names}"
+  skipped: "Se omitieron porque el nombre ya estaba ocupado: %{names}"
   no_keychain: "Estas conexiones se guardaron sin su contraseña porque no se pudo poner en el llavero: %{names}. Al abrir una, la pedirá."
-  load_failed: "No se importó nada porque no se pudo leer un archivo al que la importación añadiría datos: %{error}. Repare o mueva ese archivo e importe de nuevo."
+  load_failed: "No se importó nada porque no se pudo leer un archivo al que la importación añadiría datos: %{error}. Repara o mueve ese archivo e importa de nuevo."
   not_saved: "No se guardó porque no se pudo escribir el archivo: %{errors}"
   wrong_password: Esa no es la contraseña maestra de esta configuración.
   malformed: "Esta configuración está dañada: uno de los valores cifrados no es un valor."
   unreadable: No se pudo leer ese archivo.
   not_jdbgen: Ese archivo no es una configuración de jdbgen.
   note_case_rule: Las reglas de palabra ahora coinciden sin distinguir mayúsculas. jdbgen solo miraba segmentos en minúscula, así que una regla que allí no hacía nada puede empezar a actuar aquí.
-  note_legacy: Algunos valores estaban en el formato de cifrado antiguo de jdbgen. Se leyeron igualmente, y su configuración de jdbgen queda tal como estaba.
-  note_stock_matched: "%{driver}: se usa la definición propia %{builtin} de rudbgen, con su JAR, sus SQL propios y sus propiedades."
+  note_legacy: Algunos valores estaban en el formato de cifrado antiguo de jdbgen. Se leyeron igualmente, y tu configuración de jdbgen queda tal como estaba.
+  note_stock_matched: "%{driver}: se usa la definición integrada %{builtin} de rudbgen, con tu JAR, tus consultas personalizadas y tus propiedades."
   note_stock_unknown: "%{driver} (%{class}) no coincide con ninguna definición de rudbgen y se importa como controlador propio."
-  note_unknown_driver: "%{connection} nombra el controlador %{driver}, que esta configuración no define. Elija uno antes de conectar."
+  note_unknown_driver: "%{connection} nombra el controlador %{driver}, que esta configuración no define. Elige uno antes de conectar."
   note_keep_alive: "%{connection} tiene un intervalo de keep-alive de %{value}, que no es un número de segundos. El sondeo se importa apagado."
-  note_unresolved_path: "%{kind} %{path} de %{owner} no estaba en ninguno de los dos directorios de jdbgen. Se importa tal cual."
+  note_unresolved_path: "%{kind} %{path} de %{owner} no estaba en ninguna de las dos carpetas de jdbgen. Se importa tal cual."
   note_icon: "El icono %{icon} de %{owner} no tiene equivalente aquí y se descarta."
   path_jar: El JAR del controlador
   path_template: El archivo de plantilla
-  path_output: El directorio de salida
+  path_output: La carpeta de salida

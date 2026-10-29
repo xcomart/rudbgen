@@ -1396,7 +1396,7 @@ impl Render for ImportDialog {
 ///
 /// Named by the driver definition rather than by jdbgen's entry, and marked
 /// when the definition is one rudbgen already ships — which is what
-/// `rudbgen_import::map` produces for a stock driver it recognised: the
+/// `rudbgen_import::map` produces for a stock driver it recognized: the
 /// built-in's own id, carrying jdbgen's JAR, SQL overrides and properties.
 ///
 /// The list is the one [`Selection::drivers`] indexes into, and that is the
@@ -1679,9 +1679,15 @@ mod tests {
     ///
     /// [`DriverStore::default`] is the *built-in* definitions, which is the
     /// right answer for the application and the wrong one for a test about
-    /// which drivers an import added.
+    /// which drivers an import added. Every built-in is deleted from it rather
+    /// than never offered: a store read from `{}` is a file from before Db2,
+    /// and the next load of what it saves would offer Db2 to it.
     fn no_drivers() -> DriverStore {
-        serde_json::from_str("{}").expect("an empty driver store")
+        let mut store = DriverStore::default();
+        for builtin in DriverDef::builtins() {
+            store.remove(&builtin.id);
+        }
+        store
     }
 
     /// The four stores of a fresh installation with no drivers in it.

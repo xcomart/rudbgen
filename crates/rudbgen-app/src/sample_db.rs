@@ -73,7 +73,7 @@ const DRIVERS_DIR: &str = "drivers";
 /// File name of the bundled H2 driver JAR.
 ///
 /// It has to be exactly what the `h2-embedded` coordinate resolves to: the
-/// release workflow fetches that artefact from Maven Central under this name,
+/// release workflow fetches that artifact from Maven Central under this name,
 /// and [`rudbgen_core::drivers_dir`] is also where the in-app downloader would
 /// put it, so a later download finds the file already there rather than
 /// fetching a second copy. `the_bundled_jar_matches_the_builtin_coordinate`
@@ -207,7 +207,7 @@ pub fn seed(config_dir: &Path, connections_file: &Path, source: Option<&Path>) -
 /// what fills the gap. Answers whether `drivers_file` was written.
 ///
 /// The copy is skipped when `drivers_dir` already holds a file of that name,
-/// which is the case where the user downloaded the same artefact earlier: the
+/// which is the case where the user downloaded the same artifact earlier: the
 /// file name carries the version, so the two are the same bytes. A JAR already
 /// on the driver's class path is not added twice, and the order of the ones
 /// that are there is not disturbed — the same rule
@@ -215,9 +215,10 @@ pub fn seed(config_dir: &Path, connections_file: &Path, source: Option<&Path>) -
 /// with two JARs carrying one class, the first on the path wins.
 ///
 /// Writing `drivers.json` freezes the built-in list as it stands today, since
-/// [`DriverStore::load_from`] takes an existing file at its word. That is
-/// already what the first download through the driver manager does, and the
-/// alternative here is a seeded connection that cannot open.
+/// [`DriverStore::load_from`] takes an existing file at its word — gaining only
+/// a built-in released after it, which the file records it was never offered.
+/// That is already what the first download through the driver manager does,
+/// and the alternative here is a seeded connection that cannot open.
 ///
 /// # Errors
 ///
@@ -507,7 +508,7 @@ mod tests {
         let config = dir.path().join("config");
         let drivers = config.join("drivers");
         std::fs::create_dir_all(&drivers).expect("drivers dir");
-        // The same artefact, downloaded through the driver manager earlier.
+        // The same artifact, downloaded through the driver manager earlier.
         let copy = drivers.join(BUNDLED_DRIVER_JAR);
         std::fs::write(&copy, b"downloaded").expect("existing jar");
         let drivers_file = config.join("drivers.json");
@@ -522,7 +523,7 @@ mod tests {
 
     #[test]
     fn the_bundled_jar_matches_the_builtin_coordinate() {
-        // The release workflow fetches the artefact this coordinate names and
+        // The release workflow fetches the artifact this coordinate names and
         // installs it under this file name; a version bump in `profile.rs` that
         // left either behind would ship a JAR nothing looks for.
         let maven = DriverStore::default()

@@ -48,11 +48,11 @@ pub(super) fn profile_row(
         .into_any_element()
 }
 
-/// A box that centres its content while it fits and scrolls it when it does not.
+/// A box that centers its content while it fits and scrolls it when it does not.
 ///
 /// The two halves of that are what the shape is for: `my_auto` on a `flex_none`
-/// column centres it in a box with room to spare, and `overflow_y_scroll` on
-/// the box takes over once there is not — so the column reads as centred until
+/// column centers it in a box with room to spare, and `overflow_y_scroll` on
+/// the box takes over once there is not — so the column reads as centered until
 /// there is more of it than the window, and is scrolled from the top once there
 /// is not.
 pub(super) fn centered_scroll(
@@ -205,7 +205,7 @@ impl Render for Workspace {
                 MouseButton::Left,
                 cx.listener(|workspace, _: &MouseUpEvent, _window, cx| {
                     workspace.release_scrollbars(cx);
-                    // A drag cancelled outside any drop target never reaches
+                    // A drag canceled outside any drop target never reaches
                     // a drop handler; a drop already took the bar, making
                     // this a no-op.
                     workspace.clear_tab_drop(cx);
@@ -215,7 +215,7 @@ impl Render for Workspace {
                 MouseButton::Left,
                 cx.listener(|workspace, _: &MouseUpEvent, _window, cx| {
                     workspace.release_scrollbars(cx);
-                    // A drag cancelled outside any drop target never reaches
+                    // A drag canceled outside any drop target never reaches
                     // a drop handler; a drop already took the bar, making
                     // this a no-op.
                     workspace.clear_tab_drop(cx);
@@ -353,7 +353,7 @@ impl Workspace {
     /// without a native menu bar.
     ///
     /// Every row dispatches the action its keyboard shortcut dispatches, so the
-    /// menu adds a way in rather than a second implementation. A row is greyed
+    /// menu adds a way in rather than a second implementation. A row is grayed
     /// exactly when the action behind it would return without doing anything,
     /// and drawn rather than dropped: a command that is missing tells the reader
     /// nothing about what the application can do.
@@ -366,7 +366,7 @@ impl Workspace {
             MenuEntry::new(ts!("menu.settings"))
                 .shortcut(format!("{}+,", menu_rows::SHORTCUT_MODIFIER))
                 .on_activate(|window, cx| window.dispatch_action(Box::new(OpenSettings), cx)),
-            // Greyed while nothing is connected, which is when the two panels
+            // Grayed while nothing is connected, which is when the two panels
             // are out of the frame altogether and the command would flip a
             // switch with nothing behind it.
             MenuEntry::new(ts!("menu.toggle_explorer"))
@@ -396,7 +396,7 @@ impl Workspace {
                 .on_activate(|window, cx| window.dispatch_action(Box::new(ToggleLivePreview), cx)),
             MenuEntry::separator(),
             // The three run commands, in the order the Generate tab draws them.
-            // Each is greyed exactly when the button is, and for the reason the
+            // Each is grayed exactly when the button is, and for the reason the
             // button's tooltip gives.
             MenuEntry::new(ts!("menu.preview"))
                 .disabled(!self.can_render(cx))
@@ -411,7 +411,7 @@ impl Workspace {
             MenuEntry::new(ts!("menu.abbreviations"))
                 .on_activate(|window, cx| window.dispatch_action(Box::new(EditAbbreviations), cx)),
             MenuEntry::separator(),
-            // The one-time import (D5). Never greyed: a configuration copied
+            // The one-time import (D5). Never grayed: a configuration copied
             // from another machine is chosen from inside the wizard, so the
             // command has something to do even when `locate` finds nothing.
             MenuEntry::new(ts!("menu.import_jdbgen"))
@@ -609,7 +609,7 @@ impl Workspace {
     /// bar down.
     ///
     /// `to` is the gap [`TabBar::on_reorder`] reports — the one the bar stood
-    /// in, or the keyboard reorder's neighbour — so nothing has to be looked
+    /// in, or the keyboard reorder's neighbor — so nothing has to be looked
     /// up here. A foreign strip's tab is not ours: the bar never shows for
     /// it, and the move refuses it. Answers whether the tab moved.
     pub(super) fn drop_tab(
@@ -632,7 +632,7 @@ impl Workspace {
 
     /// Takes down the drop bar, if one is up.
     ///
-    /// A drag cancelled with a release outside any drop target never reaches a
+    /// A drag canceled with a release outside any drop target never reaches a
     /// drop handler, so the root's own release clears whatever is left; a
     /// drop already took it, which makes this a no-op.
     pub(super) fn clear_tab_drop(&mut self, cx: &mut Context<Self>) {

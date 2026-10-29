@@ -68,10 +68,10 @@ into `drivers/` in your configuration directory and put on the **H2 Embedded**
 driver's class path, so the sample connection opens straight away with no
 network. It is the only driver rudbgen ships. Every other one is downloaded from
 Maven Central through **Drivers…** in the connection dialog, because their
-licences do not allow anyone else to redistribute them; H2 is dual licensed
+licenses do not allow anyone else to redistribute them; H2 is dual licensed
 under MPL 2.0 and EPL 1.0, which do. A JAR of the same name already in your configuration — one
 you downloaded yourself — is left alone, and the file name carries the version,
-so it is the same artefact either way.
+so it is the same artifact either way.
 
 To open a second copy by hand, or to open one after deleting the connection:
 driver **H2 Embedded**, URL `jdbc:h2:<path>/sample_h2.db` — the path without the

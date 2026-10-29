@@ -12,8 +12,7 @@ for case, and the three shipped templates rendered against jdbgen's own fixture
 must come out byte for byte identical. Where this page differs from jdbgen's
 documentation it is because the *code* differed from it — jdbgen's engine is the
 specification, not its manual. Everything corrected that way is marked
-**Corrected**; the three deliberate behaviour changes are marked
-**Changed**.
+**Corrected**; the deliberate behavior changes are marked **Changed**.
 
 [← Documentation index](README.md)
 
@@ -172,7 +171,7 @@ A statement without a `:` is shorthand for `item:key=`, so `${name.camel}` and
 | Attribute names (`key`, `item`, `padSize`, `inStr`, `indent`, …) | Ignored |
 | Processor names (`.suffix`, `.pascal`, …) | Ignored — `${name.SUFFIX.PASCAL}` works |
 | Field names (`remarks`, `javaType`, …) | **Respected** (**Corrected**, see below) |
-| `endif`, `endfor`, `else`, `elif:` | **Lower case only** |
+| `endif`, `endfor`, `else`, `elif:` | Ignored — `${ENDIF}`, `${Else}`, `${ELIF:…}` work (**Changed**, see below) |
 
 > **Corrected**
 > jdbgen resolved field names through Java reflection, which made them look
@@ -182,13 +181,18 @@ A statement without a `:` is shorthand for `item:key=`, so `${name.camel}` and
 > every jdbgen template seen in the wild use the documented spelling, so this
 > only bites a template that was relying on the accident.
 
-> **Note**
-> `${ENDIF}` and `${ENDFOR}` are not recognised as terminators, so the statement
-> stays open and parsing fails with `if statements not closed` /
-> `for statements not closed`. `${ELSE}` is worse: it is silently parsed as an
-> `item` statement for a field named `ELSE`, which resolves to an empty string,
-> so the `else` branch simply disappears without an error. Always write these
-> four in lower case.
+> **Changed — D15: the block keywords match ignoring case.**
+> jdbgen recognized `endif`, `endfor`, `else` and `elif:` in lower case only:
+> `${ENDIF}` and `${ENDFOR}` left the statement open, so parsing failed with
+> `if statements not closed` / `for statements not closed`, and `${ELSE}` was
+> silently an `item` statement for a field named `ELSE` — both branches ended
+> up in the output. rudbgen matches them ignoring case, like every other
+> statement name, and an `elif` may have white space before its `:` as `if`
+> always could (`${elif :key=type, …}`). A template written for jdbgen in lower
+> case renders exactly as before.
+>
+> An `${elif}` with no `:` names no condition, so it is still read as the
+> shorthand for a field called `elif`; the editor paints it as a warning.
 
 ### Escaping `${`
 
@@ -247,6 +251,7 @@ right, each one receiving the previous one's result.
 | `.lower` | Lower case |
 | `.upper` | Upper case |
 | `.replace(<find>, <replacement>)` | Replace every occurrence of `<find>` with `<replacement>` |
+| `.clamp(<min>, <max>)` | Hold a whole number between `<min>` and `<max>` (D17, new) |
 
 `.suffix` and `.prefix` return the value **unchanged** when it contains no `_`,
 so `${type.suffix}` on a `TABLE` type yields `TABLE`.
@@ -254,6 +259,15 @@ so `${type.suffix}` on a `TABLE` type yields `TABLE`.
 `.replace` takes its two arguments quoted, unquoted or mixed:
 `${name.replace('SAMPLE','TEST')}`, `${name.replace(_, -)}` and
 `${name.replace(ghi, 'xyz')}` all work.
+
+`.clamp` (D17, new) is for the numeric fields — `length`, `precision`, `scale`,
+`keySeq`, `no` and the like. A value below `<min>` becomes `<min>`, one above
+`<max>` becomes `<max>`, and one in between is written exactly as it was. A
+value that is not a whole number — the empty `keySeq` of a column outside the
+key, a decimal such as `1.5`, a text field — passes **unchanged**. Both bounds
+must be whole numbers with `<min>` ≤ `<max>`, quoted or not; anything else is a
+parse error. `${length.clamp(1, 4000)}` writes `4000` for a `CLOB` whose driver
+reports a length of `2147483647`, and `1` for a column that reports `0`.
 
 Any processor may be repeated and combined with any other — the chain is a plain
 pipeline with no restrictions. `${name.upper.lower}` and
@@ -404,7 +418,7 @@ guide](ui-guide.md#the-template-tab).
 | `defVal` | text | Default value (`COLUMN_DEF`) |
 | `dataType` | int | Raw `java.sql.Types` constant (`4`, `12`, `91`, …) |
 | `jdbcType` | text | JDBC type name derived from `dataType` |
-| `javaType` | text | Java type name derived from `dataType` |
+| `javaType` | text | Java type name derived from `dataType` — and from `precision` and `scale` for `DECIMAL`/`NUMERIC` (D16), see [JDBC and Java type mapping](#jdbc-and-java-type-mapping) |
 | `fk` | list of 0 or 1 reference | What this column points at, when exactly one foreign key uses it (D8, new) |
 | `no` | int | 1-based position, see [`for` statement](#for-statement) |
 | `nvlColName` | text | Declared for jdbgen compatibility — **always empty** |
@@ -477,8 +491,8 @@ nothing for it and needs no guard.
 
 `jdbcType` and `javaType` are looked up from the numeric `DATA_TYPE` the JDBC
 driver reports (`dataType`), *not* from `typeName`. The table is jdbgen's,
-carried over unchanged — including its oddities — because changing it would
-change the output of every template written against it.
+oddities included, except where jdbgen's Java type could not hold the values
+the column does: `DECIMAL`, `NUMERIC` and `FLOAT` (**Changed**, see below).
 
 | `java.sql.Types` | `dataType` | `jdbcType` | `javaType` |
 |:---|---:|:---|:---|
@@ -492,10 +506,10 @@ change the output of every template written against it.
 | `CLOB` | 2005 | `CLOB` | `String` |
 | `DATALINK` | 70 | `DATALINK` | `String` |
 | `DATE` | 91 | `DATE` | `Date` |
-| `DECIMAL` | 3 | `DECIMAL` | `Integer` |
+| `DECIMAL` | 3 | `DECIMAL` | by precision and scale, see below |
 | `DISTINCT` | 2001 | `DISTINCT` | `String` |
 | `DOUBLE` | 8 | `DOUBLE` | `Double` |
-| `FLOAT` | 6 | `FLOAT` | `Float` |
+| `FLOAT` | 6 | `FLOAT` | `Double` (**Changed**) |
 | `INTEGER` | 4 | `INTEGER` | `Integer` |
 | `JAVA_OBJECT` | 2000 | `JAVA_OBJECT` | `String` |
 | `LONGNVARCHAR` | -16 | `LONGNVARCHAR` | `String` |
@@ -504,7 +518,7 @@ change the output of every template written against it.
 | `NCHAR` | -15 | `NCHAR` | `String` |
 | `NCLOB` | 2011 | `NCLOB` | `String` |
 | `NULL` | 0 | `NULL` | `null` |
-| `NUMERIC` | 2 | `NUMERIC` | `Integer` |
+| `NUMERIC` | 2 | `NUMERIC` | by precision and scale, see below |
 | `NVARCHAR` | -9 | `NVARCHAR` | `String` |
 | `OTHER` | 1111 | `OTHER` | `String` |
 | `REAL` | 7 | `REAL` | `Float` |
@@ -519,14 +533,37 @@ change the output of every template written against it.
 | `VARBINARY` | -3 | `VARBINARY` | `byte[]` |
 | `VARCHAR` | 12 | `VARCHAR` | `String` |
 
+`DECIMAL` and `NUMERIC` take the smallest Java type that holds every value
+their `precision` and `scale` allow:
+
+| `precision` | `scale` | `javaType` | Example |
+|---:|---:|:---|:---|
+| 1 – 9 | 0 | `Integer` | `NUMERIC(5)`, Oracle `NUMBER(9)` |
+| 10 – 18 | 0 | `Long` | `NUMERIC(12)`, Oracle `NUMBER(18)` |
+| 19 or more | 0 | `BigDecimal` | `NUMERIC(30)`, Oracle `NUMBER(38)` (`INTEGER`) |
+| any | not 0 | `BigDecimal` | `DECIMAL(10,2)`, Oracle `NUMBER` (scale `-127`) |
+| 0 or unknown | any | `BigDecimal` | a driver that reports no precision |
+
+Nine digits is the limit for `Integer` because `Integer.MAX_VALUE`
+(2,147,483,647) has ten digits but `9,999,999,999` does not fit; eighteen is
+the limit for `Long` for the same reason. `BigDecimal` is written without its
+package, like `Date` and `Time`, so a model needs `import java.math.BigDecimal;`.
+
+> **Changed — D16: `DECIMAL`, `NUMERIC` and `FLOAT` follow their precision.**
+> jdbgen mapped `DECIMAL` and `NUMERIC` to `Integer` whatever their precision
+> and scale, so a `NUMERIC(18,2)` lost its fraction and a `NUMBER(12)`
+> overflowed, and `FLOAT` to `Float`, although JDBC's `FLOAT` is a double
+> precision type. A model generated from a template written for jdbgen changes
+> for exactly those columns — `Integer` becomes `Long` or `BigDecimal`, `Float`
+> becomes `Double` — and for no other. A template that wants jdbgen's names
+> back can branch on `jdbcType`:
+> `${if:item=jdbcType, contains='DECIMAL,NUMERIC'}Integer${else}${javaType}${endif}`.
+
 > **Note**
-> The Java mapping has sharp edges to work around in your templates:
+> The Java mapping still has sharp edges to work around in your templates:
 >
 > - `TIMESTAMP` maps to `String`, not to a date type. `DATE` maps to `Date` and
 >   `TIME` to `Time`, neither qualified with a package.
-> - `DECIMAL` and `NUMERIC` map to `Integer`, ignoring precision and scale, so a
->   `NUMERIC(18,2)` column produces `Integer`. `precision` and `scale` are new
->   fields precisely so a template can do better: branch on `${scale}`.
 > - `TINYINT` maps to `Short`, `ROWID` to `Integer`.
 > - `ARRAY`, `REF`, `STRUCT` and `NULL` map to the lower-case words `array`,
 >   `ref`, `struct` and `null`, which are not Java types at all.
@@ -560,8 +597,8 @@ repeated, `else` is optional, and `endif` is mandatory.
 
 | Condition | True when the value … |
 |:---|:---|
-| `equals=<value>` / `value=<value>` | equals `<value>` |
-| `notEquals=<value>` | does not equal `<value>` |
+| `equals=<value>` / `value=<value>` / `eq=<value>` | equals `<value>` (`eq`: D17, new) |
+| `notEquals=<value>` / `ne=<value>` | does not equal `<value>` (`ne`: D17, new) |
 | `startsWith=<prefix>` | starts with `<prefix>` |
 | `notStartsWith=<prefix>` | does **not** start with `<prefix>` |
 | `endsWith=<suffix>` | ends with `<suffix>` |
@@ -570,16 +607,21 @@ repeated, `else` is optional, and `endif` is mandatory.
 | `notContains=<value>` | the negation of `contains` |
 | `matches=<regex>` | matches the regular expression `<regex>` **entirely** |
 | `notMatches=<regex>` | does not match `<regex>` entirely |
+| `gt=<n>` | is a whole number greater than `<n>` (D17, new) |
+| `ge=<n>` | is a whole number greater than or equal to `<n>` (D17, new) |
+| `lt=<n>` | is a whole number less than `<n>` (D17, new) |
+| `le=<n>` | is a whole number less than or equal to `<n>` (D17, new) |
 
 #### Case sensitivity of conditions
 
 | Condition | Case | Matching |
 |:---|:---|:---|
-| `equals`, `value`, `notEquals` | **ignored** | whole value |
+| `equals`, `value`, `eq`, `notEquals`, `ne` | **ignored** | whole value |
 | `startsWith`, `notStartsWith` | **ignored** | prefix |
 | `endsWith`, `notEndsWith` | **ignored** | suffix |
 | `contains`, `notContains` | **ignored** | collection: each element's `name`; string: each `,`-separated token, compared whole |
 | `matches`, `notMatches` | **respected** | whole value, anchored at both ends |
+| `gt`, `ge`, `lt`, `le` | — | whole number, compared by value |
 | `skipList` of [`for`](#for-statement) | **respected** | exact, whole element name |
 
 > **Note**
@@ -598,6 +640,23 @@ For a string value, `contains` reads as *"is one of"*:
 `${if:item=type, contains='TABLE,VIEW'}` is true when `type` is exactly `TABLE`
 or exactly `VIEW`. Tokens are trimmed, so `'TABLE, VIEW'` works too.
 
+`eq` and `ne` (D17, new) are short names of `equals` and `notEquals`, written
+to sit beside the numeric four: `eq` compares text exactly as `equals` does, so
+`eq='table'` holds for `TABLE` and `eq=40` holds for a length of `40` — but,
+being a text comparison, `eq=040` does not; write `ge=40, le=40` to compare
+by value.
+
+The numeric conditions `gt`, `ge`, `lt` and `le` (D17, new) compare by value,
+so `lt=5` does not hold for `40` the way a text comparison would. They are
+meant for the numeric fields, but a text that is a whole number — a custom
+variable such as `version=3` — compares just as well. A value that is not a
+whole number — the empty `keySeq` of a column outside the key, a decimal such as
+`1.5`, a text field — fails **all four**, as a comparison with `NULL` does in
+SQL: `gt=0` and `le=0` are then both false, and the `${else}` branch is taken.
+Two of them make a range, `${if:item=length, ge=1, le=4000}`, and the key may
+carry processors like any other: `${if:item=length.clamp(1, 4000), equals=4000}`.
+The bound must be a whole number, quoted or not; `gt='4k'` is a parse error.
+
 #### Multiple conditions
 
 Conditions are stored under their name, so **the same condition name twice keeps
@@ -608,7 +667,8 @@ ${if:item=type, equals='VIEW', equals='TABLE'}A${else}B${endif}
 ```
 
 evaluates only `equals='TABLE'` and prints `A` for a table. Use `elif` or
-`contains='VIEW,TABLE'` when you mean "or".
+`contains='VIEW,TABLE'` when you mean "or". A second *name* of a condition is a
+name of its own, so `equals='VIEW', eq='TABLE'` keeps both, and both must hold.
 
 Any attribute name that is neither a condition, `key` nor `item` is rejected
 while parsing — `if` accepts no [decorations](#decorations):
@@ -629,6 +689,8 @@ ${if:item=type, weird='x'}A${endif}
 | `${if:item=columns, contains='album_id'}HAS${else}NO${endif}` | `HAS` |
 | `${if:item=name, matches='SAMPLE'}FULL${else}NOTFULL${endif}` | `NOTFULL` |
 | `${if:item=name, matches='.*SAMPLE.*'}M${else}N${endif}` | `M` |
+| `${if:item=length, gt=4000}CLOB${else}VARCHAR(${length})${endif}` | `VARCHAR(40)` on a column of length 40 |
+| `${if:item=keySeq, ge=1}KEY${else}-${endif}` | `-` on a column outside the key |
 
 ### `for` statement
 
@@ -701,7 +763,7 @@ are part of `inStr`.
 
 - Line breaks *inside the loop body* are emitted exactly as they appear in the
   template. No indentation is added and none is removed.
-- Each line break *inside `inStr`* is normalised to the template's own line
+- Each line break *inside `inStr`* is normalized to the template's own line
   ending — rudbgen decides between `\r\n` and `\n` by looking at the **first**
   line break in the template file, so a CRLF template keeps producing CRLF — and
   the fragment after it is indented to
@@ -825,7 +887,7 @@ All three accept [decorations](#decorations):
 > The pattern letters are reproduced; the locale is not. `MMMM` renders
 > `August` whatever the machine's language and whatever the interface language
 > is set to, where Java followed the default locale. Every shipped template uses
-> numeric fields only, where the two agree exactly. If a localised month name
+> numeric fields only, where the two agree exactly. If a localized month name
 > matters, put it in a custom variable.
 
 ### Text escape
@@ -950,12 +1012,14 @@ which the editor refuses to save — the later one wins.
 
 ## Error handling
 
-| Situation | Behaviour |
+| Situation | Behavior |
 |:---|:---|
 | Unknown field or variable | Warning with a line number, expands to an empty string — not an error |
 | Unknown processor | Parse error listing the valid processors |
 | `replace` with fewer than 2 arguments | Parse error |
+| `clamp` without exactly 2 whole numbers, or with `<min>` above `<max>` | Parse error |
 | Unknown condition name in `if` | Parse error |
+| `gt`/`ge`/`lt`/`le` whose bound is not a whole number | Parse error |
 | Missing `key`/`item` | Parse error |
 | `for` over a field that does not exist | Render error: `Model has no 'x' member` |
 | `for` over a field that is not a list | Render error: `'x' is not a collection` |
@@ -1070,10 +1134,15 @@ column is what you want; see [The `fk` of a column](#the-fk-of-a-column-d8-new).
     ${endif}${endfor}
 ```
 
-### A numeric column that keeps its precision (D8)
+### A numeric column with a fully qualified type (D8)
+
+`javaType` already follows `precision` and `scale` (see
+[JDBC and Java type mapping](#jdbc-and-java-type-mapping)); it writes
+`BigDecimal` without its package. Where a model cannot import it, qualify it in
+the template:
 
 ```java
-    ${if:item=jdbcType, contains='DECIMAL,NUMERIC'}${if:item=scale, equals='0'}Long${else}java.math.BigDecimal${endif}${else}${javaType}${endif}
+    ${if:item=javaType, equals='BigDecimal'}java.math.BigDecimal${else}${javaType}${endif}
 ```
 
 ### A qualified class name from a custom variable

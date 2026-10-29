@@ -102,7 +102,7 @@ pub struct Outcome {
     ///
     /// Set by the cancel token and by [`Decision::Cancel`](crate::Decision).
     /// The files already written stay written — this crate does not roll back.
-    pub cancelled: bool,
+    pub canceled: bool,
     /// Every unknown field the render passes noticed.
     pub diagnostics: Vec<Diagnostic>,
 }
@@ -110,7 +110,7 @@ pub struct Outcome {
 impl Outcome {
     /// Whether the run finished with nothing to report but its files.
     pub fn is_ok(&self) -> bool {
-        self.failed.is_empty() && !self.cancelled
+        self.failed.is_empty() && !self.canceled
     }
 
     /// How many pairs the run accounted for, written, skipped or failed.
@@ -145,7 +145,7 @@ pub struct DryRun {
     /// Everything that would have gone wrong before the write.
     pub failed: Vec<Failure>,
     /// Whether the run stopped early.
-    pub cancelled: bool,
+    pub canceled: bool,
     /// Every unknown field the render passes noticed.
     pub diagnostics: Vec<Diagnostic>,
 }

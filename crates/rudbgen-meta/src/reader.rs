@@ -25,6 +25,7 @@ use serde_json::{Map, Value as Json};
 use crate::error::Result;
 use crate::model::{Column, ForeignKey, ForeignKeyRef, Index, KeyColumn, Schema, Table, TableRef};
 use crate::query::{Rows, substitute, to_int};
+use crate::sqltypes;
 
 /// What a catalog with no name of its own is called, as in jdbgen.
 pub const DEFAULT_CATALOG: &str = "Default Catalog";
@@ -171,7 +172,7 @@ impl<'a> MetaReader<'a> {
     /// query returns** — see the note in architecture.md §6 on why jdbgen's
     /// blanking of the others is not reproduced.
     ///
-    /// Anything whose type normalises to neither `TABLE` nor `VIEW` is
+    /// Anything whose type normalizes to neither `TABLE` nor `VIEW` is
     /// dropped, which is what keeps sequences and system aliases out of a list
     /// whose every row is a file to generate.
     pub fn tables(&self, schema: &Schema, include_views: bool) -> Result<Vec<TableRef>> {
@@ -193,7 +194,7 @@ impl<'a> MetaReader<'a> {
             }
         }
 
-        // jdbgen's filter: a kind that normalised to neither is not shown at
+        // jdbgen's filter: a kind that normalized to neither is not shown at
         // all, and a view only when it was asked for.
         tables.retain(|table| {
             table.kind == crate::model::KIND_TABLE || (include_views && table.is_view())
@@ -390,6 +391,9 @@ impl<'a> MetaReader<'a> {
     /// [`to_int`] — in the order the statement returns, and
     /// `getPrimaryKeys` is not called at all. That is jdbgen's contract: a
     /// definition that overrides the column list overrides the key with it.
+    ///
+    /// One label beyond that contract is read when it is there:
+    /// `DECIMAL_DIGITS`, the scale a `DECIMAL`'s `javaType` is sized by.
     fn columns_by_query(&self, table: &TableRef, sql: &str) -> Result<Vec<Column>> {
         let kind = CustomQueryKind::Columns;
         let sql = substitute(
@@ -407,6 +411,11 @@ impl<'a> MetaReader<'a> {
         let mut keys = 0u32;
         for row in 0..rows.len() {
             let length = i64::from(to_int(rows.label(row, "COLUMN_SIZE")));
+            // No label for the scale in jdbgen's contract, and requiring one
+            // would make a statement written for jdbgen fail here. So it is
+            // read when the statement answers it, and `None` when it does not.
+            let scale = (!rows.is_null(row, "DECIMAL_DIGITS"))
+                .then(|| i64::from(to_int(rows.label(row, "DECIMAL_DIGITS"))));
             let is_key = to_int(rows.label(row, "IS_KEY")) != 0;
             if is_key {
                 keys += 1;
@@ -419,9 +428,7 @@ impl<'a> MetaReader<'a> {
                 type_name: rows.label(row, "TYPE_NAME").to_string(),
                 length,
                 precision: length,
-                // No label for the scale in jdbgen's contract, and adding one
-                // would make a statement written for jdbgen fail here.
-                scale: 0,
+                scale: scale.unwrap_or(0),
                 nullable: i64::from(to_int(rows.label(row, "NULLABLE"))),
                 remarks: rows.label(row, "REMARKS").to_string(),
                 def_val: rows.label(row, "COLUMN_DEF").to_string(),
@@ -432,6 +439,13 @@ impl<'a> MetaReader<'a> {
                 ..Column::default()
             };
             column.derive();
+            if scale.is_none() {
+                // A scale nobody answered cannot tell a whole number from a
+                // fraction, so a DECIMAL is sized as if its precision were
+                // unknown too: a BigDecimal, never a Long that drops the
+                // cents (D16). Every other type ignores both numbers.
+                column.java_type = sqltypes::java_type(column.data_type, 0, 0).to_string();
+            }
             columns.push(column);
         }
         Ok(columns)

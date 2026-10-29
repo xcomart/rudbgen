@@ -47,7 +47,7 @@ pub enum Error {
     ///
     /// Kept apart from [`Error::WrongPassword`] because no password can cause
     /// it: the envelope itself is not Base64, or is shorter than the salt, the
-    /// initialisation vector and the authentication tag it has to carry. The
+    /// initialization vector and the authentication tag it has to carry. The
     /// wizard says *this file is damaged* rather than *try again*.
     #[error("the value of '{field}' is damaged: {reason}")]
     Malformed {

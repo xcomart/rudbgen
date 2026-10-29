@@ -7,7 +7,7 @@
 //! — path, whether something is already there, how big it would be — with the
 //! text of whichever row is selected underneath.
 //!
-//! The text is a read-only [`EditorView`], coloured by the *output* file's
+//! The text is a read-only [`EditorView`], colored by the *output* file's
 //! language — a rendered Java template is Java, whatever the template it came
 //! from was — so a preview scrolls, selects and copies exactly like the editor
 //! a template tab holds. The panel's own scroll handle rides the dry run's file
@@ -131,10 +131,10 @@ impl PreviewPane {
         }
     }
 
-    /// What the tab is labelled.
+    /// What the tab is labeled.
     ///
     /// The file a preview would write, so two previews of different pairs are
-    /// told apart on the strip; a dry run is labelled as one, because it is
+    /// told apart on the strip; a dry run is labeled as one, because it is
     /// every file at once and no single name would do.
     pub fn title(&self) -> SharedString {
         match self.kind {
@@ -213,10 +213,10 @@ impl PreviewPane {
         cx.notify();
     }
 
-    /// Puts the selected file's text in the editor, coloured by what it is.
+    /// Puts the selected file's text in the editor, colored by what it is.
     ///
     /// The highlighter comes from the *output* file's extension: what is on
-    /// screen is the Java, XML or PHP a template rendered to, and colouring it
+    /// screen is the Java, XML or PHP a template rendered to, and coloring it
     /// as a template would paint the one thing it no longer contains.
     fn show_selected(&mut self, cx: &mut Context<Self>) {
         let file = self.files.get(self.selected);

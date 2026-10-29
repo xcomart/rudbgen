@@ -227,7 +227,7 @@ fn a_stock_driver_rudbgen_ships_nothing_for_is_imported_and_reported() {
 }
 
 #[test]
-fn every_stock_driver_that_was_recognised_says_which_built_in_it_became() {
+fn every_stock_driver_that_was_recognized_says_which_built_in_it_became() {
     let mapped = Fixture::new().mapped();
     for (driver, builtin) in [
         ("H2 Embedded", "h2-embedded"),
@@ -260,7 +260,7 @@ fn a_connection_carries_its_url_and_user_and_leaves_its_password_behind() {
     assert_eq!(profile.generation.author, "alice");
 
     // The password is nowhere in the profile, and the profile is what gets
-    // serialised into `connections.json`.
+    // serialized into `connections.json`.
     let json = serde_json::to_string(profile).unwrap();
     assert!(!json.contains("hunter2"), "{json}");
     assert!(!format!("{secret:?}").contains("hunter2"));

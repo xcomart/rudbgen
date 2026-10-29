@@ -55,7 +55,7 @@ inspector:
   references_in: 이 테이블을 참조하는 외래 키
 
 connect:
-  title: 연결
+  title: 연결 관리
   new: 새로 만들기
   new_name: 새 연결
   duplicate: 복제
@@ -70,7 +70,7 @@ connect:
   driver: 드라이버
   pick_driver: 드라이버 선택
   manage_drivers: 드라이버…
-  driver_has_no_jar: 이 드라이버에는 아직 JAR이 없습니다. 드라이버 화면에서 추가하거나 내려받으세요.
+  driver_has_no_jar: 이 드라이버에는 아직 JAR이 없습니다. 드라이버 화면에서 추가하거나 다운로드하세요.
 
   host: 호스트
   port: 포트
@@ -88,10 +88,10 @@ connect:
   add_prop: 속성 추가
 
   section:
-    behaviour: 동작
+    behavior: 동작
     tunnel: SSH 터널
 
-  keep_alive: 주기적인 질의로 연결 유지
+  keep_alive: 주기적인 쿼리로 연결 유지
 
   tunnel_enabled: SSH 배스천을 거쳐 연결
   tunnel_host: 배스천
@@ -102,12 +102,12 @@ connect:
   tunnel_auth_password: 비밀번호
   tunnel_key: 키 파일
   tunnel_password: 배스천 비밀번호
-  tunnel_passphrase: 키 암호구
+  tunnel_passphrase: 키 암호 구절
   tunnel_remote: 데이터베이스
   tunnel_hint: 데이터베이스 주소는 배스천에서 보이는 이름으로 적습니다. rudbgen이 비어 있는 로컬 포트를 잡아 드라이버를 그 포트에 연결합니다.
 
   test: 연결 테스트
-  testing: 연결하는 중…
+  testing: 연결 중…
   test_ok: "%{product}에 연결했습니다."
   test_ok_unnamed: 연결이 정상입니다.
   test_failed: "연결하지 못했습니다: %{error}"
@@ -145,10 +145,10 @@ driver:
   detect: 자동 검출
   detecting: JAR 파일 안을 살펴보는 중…
   probe_found: "%{class}을(를) 찾았습니다."
-  probe_choose: 이 드라이버에는 클래스가 여럿 있습니다. 접속에 쓸 것을 고르세요.
+  probe_choose: 이 드라이버에는 클래스가 여럿 있습니다. 연결에 쓸 클래스를 고르세요.
   probe_recommended: 권장
   probe_none: 이 파일에는 JDBC 드라이버가 없습니다. 소스나 자바독 JAR이 이렇게 보입니다. 올바른 파일을 골랐는지 확인하세요.
-  probe_damaged: "파일이 손상되어 끝까지 읽지 못했습니다. 다시 내려받으세요. (%{error})"
+  probe_damaged: "파일이 손상되어 끝까지 읽지 못했습니다. 다시 다운로드하세요. (%{error})"
   probe_missing: "JAR 파일을 찾을 수 없습니다: %{error}"
   probe_jvm_failed: "자바 런타임을 시작하지 못했습니다: %{error}"
   probe_failed: "JAR 파일을 검사하지 못했습니다: %{error}"
@@ -164,15 +164,15 @@ driver:
   no_jar: JAR 없음
   no_jar_hint: 연결에 쓰려면 드라이버에 JAR이 하나 이상 있어야 합니다.
   jar_count: "JAR %{count}개"
-  download: 내려받기
-  downloading: "%{file} 내려받는 중…"
-  downloading_percent: "%{file} 내려받는 중 — %{percent}%"
-  downloaded: "%{file}을(를) 내려받아 추가했습니다."
-  download_cancelled: 내려받기를 취소했습니다.
+  download: 다운로드
+  downloading: "%{file} 다운로드 중…"
+  downloading_percent: "%{file} 다운로드 중 — %{percent}%"
+  downloaded: "%{file}을(를) 다운로드해 추가했습니다."
+  download_canceled: 다운로드를 취소했습니다.
   bad_coordinate: "“%{coordinate}”은(는) group:artifact:version 형식의 좌표가 아닙니다."
   not_found: "메이븐 센트럴의 %{url}에 아무것도 없습니다."
-  network_failed: "내려받지 못했습니다: %{error}"
-  checksum_failed: "내려받은 파일이 손상됐습니다. SHA-1이 %{expected}여야 하는데 %{actual}입니다."
+  network_failed: "다운로드하지 못했습니다: %{error}"
+  checksum_failed: "다운로드한 파일이 손상됐습니다. SHA-1이 %{expected}여야 하는데 %{actual}입니다."
   load_failed: "드라이버 정의를 읽지 못했습니다: %{error}"
   save_failed: "드라이버 정의를 저장하지 못했습니다: %{error}"
   new: 새로 만들기
@@ -187,25 +187,25 @@ driver:
 # 드라이버 편집기의 드라이버별 SQL 재정의 네 가지(D9), 그리고 그 하나를
 # 실행해 돌아온 결과의 모양을 확인하는 테스트 버튼.
 custom_query:
-  section: 사용자 정의 쿼리
-  section_hint: 이 드라이버가 제대로 답하지 못하거나 아예 답하지 않는 것을 대신하는 SQL입니다. jdbgen에서 이어받았으며, 체크한 동안에만 보냅니다.
+  section: 사용자 지정 쿼리
+  section_hint: 이 드라이버가 제대로 답하지 못하거나 아예 답하지 않는 것을 대신하는 SQL입니다. jdbgen에서 이어받았으며, 체크한 쿼리만 실행합니다.
   test_values: "테스트 값"
   tables: 테이블 목록
-  columns: 컬럼 목록
-  table_comments: 테이블 주석
-  column_comments: 컬럼 주석
+  columns: 열 목록
+  table_comments: 테이블 설명
+  column_comments: 열 설명
   test: 테스트
   testing: 실행 중…
-  ok: "성공 — %{rows}행, 필요한 컬럼이 모두 있습니다."
-  missing: "빠진 컬럼: %{labels}"
-  wrong_columns: "앞의 %{expected}개 컬럼을 읽는데 %{actual}개만 왔습니다."
-  failed: "문 실행에 실패했습니다: %{error}"
-  empty: 테스트할 문이 없습니다.
-  no_session: 이 드라이버를 쓰는 데이터베이스에 먼저 연결하세요. 테스트는 그 세션에서 문을 실행합니다.
-  contract_labels: "다음 컬럼을 이름으로 반환해야 합니다: %{labels}"
-  contract_positional: "앞의 %{columns}개 컬럼을 다음 순서로 읽습니다: %{names}"
-  pair_table: 테이블 이름, 주석
-  pair_column: 컬럼 이름, 주석
+  ok: "성공 — %{rows}행, 필요한 열이 모두 있습니다."
+  missing: "빠진 열: %{labels}"
+  wrong_columns: "앞의 %{expected}개 열을 읽어야 하는데 %{actual}개만 반환됐습니다."
+  failed: "SQL 문 실행에 실패했습니다: %{error}"
+  empty: 테스트할 SQL 문이 없습니다.
+  no_session: 이 드라이버를 쓰는 데이터베이스에 먼저 연결하세요. 테스트는 그 연결에서 SQL 문을 실행합니다.
+  contract_labels: "다음 열을 이름으로 반환해야 합니다: %{labels}"
+  contract_positional: "앞의 %{columns}개 열을 다음 순서로 읽습니다: %{names}"
+  pair_table: 테이블 이름, 설명
+  pair_column: 열 이름, 설명
   placeholders: "실행 전에 채워집니다: %{names}"
 
 menu:
@@ -256,7 +256,7 @@ statusbar:
   no_selection: 생성할 것 없음
   tables_selected: "테이블 %{count}개 선택됨"
   run: "테이블 %{tables} · 템플릿 %{templates} → 파일 %{files}개를 %{dir}에"
-  run_nowhere: "테이블 %{tables} · 템플릿 %{templates} → 파일 %{files}개, 출력 폴더가 아직 없음"
+  run_nowhere: "테이블 %{tables} · 템플릿 %{templates} → 파일 %{files}개, 출력 디렉터리가 아직 없음"
   # 연결을 요청한 뒤 왼쪽 칸이 갖는 세 가지 상태. `%{product}`는 낱말이
   # 아니라 값이다.
   connecting: "%{name}에 연결 중…"
@@ -275,13 +275,13 @@ generate:
   overwrite_set: 덮어쓰기
   overwrite_set_note: "템플릿 세트 “%{name}”을(를) 현재 목록으로 바꿉니다."
   templates: 템플릿
-  no_templates: 아직 템플릿이 없습니다. 하나 추가하면 실행이 쓸 것이 생깁니다.
+  no_templates: 아직 템플릿이 없습니다. 템플릿을 추가하면 생성할 수 있습니다.
   add_template: 템플릿 추가…
   add_template_select: 템플릿 파일 선택
   template_name: 이름
   out_template: 출력 이름
   tip_edit: 템플릿 편집
-  tip_open: 두 번 누르면 템플릿을 엽니다
+  tip_open: 더블클릭하면 템플릿을 엽니다
   tip_remove: 목록에서 제거
   options: 옵션
   output_dir: 출력 위치
@@ -324,14 +324,14 @@ progress:
   skipped: "%{path} 유지"
   failed: "%{path} 실패: %{reason}"
   conflict: "%{path}이(가) 이미 있습니다"
-  cancelling: 취소하는 중…
+  canceling: 취소하는 중…
   count: "%{total}개 중 %{done}개"
 
 summary:
   title: 결과
   done: 실행이 요구한 것을 모두 썼습니다.
-  with_failures: 실행이 실패를 남기고 끝났습니다.
-  cancelled: 실행이 취소되었습니다. 그때까지 쓴 것은 아래와 같습니다.
+  with_failures: 일부 항목이 실패한 채로 실행이 끝났습니다.
+  canceled: 실행이 취소되었습니다. 그때까지 쓴 것은 아래와 같습니다.
   counts: "작성 %{written} · 건너뜀 %{skipped} · 실패 %{failed} · 경고 %{warnings}"
   written: 작성됨
   skipped: 건너뜀
@@ -365,17 +365,17 @@ settings:
     jvm: 자바 가상 머신
 
   ui_theme: 인터페이스 테마
-  editor_theme: 에디터 테마
-  editor_follows_ui: 에디터 테마를 인터페이스 테마에 맞춤
+  editor_theme: 편집기 테마
+  editor_follows_ui: 편집기 테마를 인터페이스 테마에 맞춤
   ui_font_size: 인터페이스 크기
-  editor_font: 에디터 글꼴
-  editor_font_size: 에디터 크기
-  editor_word_wrap: 에디터에서 긴 줄 자동 줄바꿈
+  editor_font: 편집기 글꼴
+  editor_font_size: 편집기 크기
+  editor_word_wrap: 편집기에서 긴 줄 자동 줄바꿈
   font_size_hint: 6 – 32 pt
 
   opacity: 불투명도
   opacity_hint: "% — 100 미만이면 바탕 화면이 비칩니다"
-  blur: 창 뒤의 바탕 화면을 흐리게
+  blur: 창 뒤의 바탕 화면을 흐리게 표시
   titlebar: 제목 표시줄
   titlebar_custom: rudbgen이 그림
   titlebar_system: 시스템이 그림
@@ -387,12 +387,12 @@ settings:
   overwrite_overwrite: 덮어쓰기
   overwrite_skip: 건너뛰기
   overwrite_ask: 물어보기
-  overwrite_hint: 생성을 시작할 때의 기본값입니다. 생성 탭에서 한 번만 다르게 고를 수 있습니다.
+  overwrite_hint: 생성을 시작할 때의 기본값입니다. 생성 탭에서 이번 실행에만 다르게 정할 수도 있습니다.
 
   jvm_heap: 자바 힙
   jvm_heap_hint: MB — 드라이버가 사용하는 -Xmx
   jvm_args: 추가 인수
-  jvm_hint: 힙은 JDBC 드라이버와 메타데이터 조회가 돌아가는 공간입니다. 두 설정 모두 rudbgen을 다시 시작할 때 적용됩니다. 추가 인자는 공백으로 구분합니다.
+  jvm_hint: 힙은 JDBC 드라이버와 메타데이터 조회가 돌아가는 공간입니다. 두 설정 모두 rudbgen을 다시 시작할 때 적용됩니다. 추가 인수는 공백으로 구분합니다.
 
   manage:
     duplicate: 복제…
@@ -402,23 +402,23 @@ settings:
     export: 내보내기…
     import_select: 가져오기
     import_unreadable: "“%{file}”을(를) 읽지 못했습니다: %{error}"
-    import_not_a_theme: "“%{file}”은(는) 에디터 테마입니다. 에디터 테마에서 가져오세요."
+    import_not_a_theme: "“%{file}”은(는) 편집기 테마입니다. 편집기 테마에서 가져오세요."
     import_not_an_editor_theme: "“%{file}”은(는) 인터페이스 테마입니다. 인터페이스 테마에서 가져오세요."
     import_bad_color: "“%{file}”의 %{slot} 색을 쓸 수 없습니다."
-    import_skipped: "%{count}개 파일을 건너뛰었습니다."
+    import_skipped: "파일 %{count}개를 건너뛰었습니다."
     copy_name: "%{name} (복사본)"
     delete_theme_confirm: "테마 “%{name}”을(를) 삭제할까요?"
-    delete_editor_theme_confirm: "에디터 테마 “%{name}”을(를) 삭제할까요?"
+    delete_editor_theme_confirm: "편집기 테마 “%{name}”을(를) 삭제할까요?"
     write_failed: "파일을 쓰지 못했습니다: %{error}"
-    delete_failed: "파일을 지우지 못했습니다: %{error}"
+    delete_failed: "파일을 삭제하지 못했습니다: %{error}"
 
   editor:
     theme_title: 인터페이스 테마 편집
-    editor_theme_title: 에디터 테마 편집
+    editor_theme_title: 편집기 테마 편집
     name: 이름
     dark: 어두운 팔레트입니다
-    invalid: "모든 색은 #RRGGBB 형식으로 써야 합니다."
-    grid_group: 결과 그리드 — 색을 지정하지 않으면 파일에서 생략됩니다
+    invalid: "모든 색은 #RRGGBB 형식으로 입력해야 합니다."
+    grid_group: 결과 그리드 — 색을 지정한 항목만 파일에 저장됩니다
     automatic: 자동
     automatic_slot: "%{name} (자동)"
 
@@ -442,7 +442,7 @@ settings:
 
     code:
       foreground: 텍스트
-      cursor: 캐럿
+      cursor: 커서
       selection: 선택 영역
       line_highlight: 현재 줄
       gutter: 줄 번호
@@ -496,8 +496,8 @@ template:
   write_failed: "%{file}을(를) 쓰지 못했습니다: %{reason}"
   not_utf8: "%{file}은(는) UTF-8 텍스트가 아니어서 여기서 편집할 수 없습니다."
   open_select: 템플릿 열기
-  close_title: 저장하지 않은 변경
-  close_question: "%{file}에 아직 저장하지 않은 변경이 있습니다."
+  close_title: 저장하지 않은 변경 사항
+  close_question: "%{file}에 아직 저장하지 않은 변경 사항이 있습니다."
   discard: 저장 안 함
 
 diagnostics:
@@ -517,10 +517,10 @@ palette:
   section_column: 열 필드 (for 안)
   section_fk: 외래 키 필드
   section_index: 인덱스 필드
-  section_statement: 문장
+  section_statement: 구문
   section_decorator: 데코레이터
   section_condition: 조건
-  section_custom: 사용자 변수
+  section_custom: 사용자 지정 변수
   table:
     catalog: 이 테이블이 속한 데이터베이스 카탈로그
     schema: 이 테이블이 속한 데이터베이스 스키마
@@ -528,7 +528,7 @@ palette:
     table: name의 다른 이름
     title: name의 다른 이름
     type: TABLE 또는 VIEW
-    remarks: 테이블 주석
+    remarks: 테이블 설명
     columns: 데이터베이스가 알려 준 순서대로의 모든 열
     keys: 키 순서대로의 기본 키 열
     notKeys: 기본 키에 속하지 않는 모든 열
@@ -543,19 +543,19 @@ palette:
     table: 이 열이 속한 테이블
     name: 열 이름
     column: name의 다른 이름
-    typeName: 드라이버가 알려 준 타입 이름. VARCHAR, INT 따위
-    typeString: DDL이 쓰는 형태의 타입. 길이까지 붙은 VARCHAR(256) 따위
+    typeName: 드라이버가 알려 준 타입 이름. VARCHAR, INT 등
+    typeString: DDL이 쓰는 형태의 타입. 길이까지 붙은 VARCHAR(256) 등
     isKey: 이 열이 기본 키의 일부인지
     isCharType: 타입이 CHAR, CLOB, TEXT 계열인지
     length: 열 크기. 문자형은 글자 수, 숫자형은 자릿수
     precision: 숫자 열이 담는 전체 자릿수
     scale: 그 가운데 소수점 아래 자릿수
     nullable: NOT NULL이면 0, 널을 받으면 1
-    remarks: 열 주석
+    remarks: 열 설명
     defVal: 기본값
     dataType: 드라이버가 알려 준 java.sql.Types 코드
     jdbcType: 그 코드가 뜻하는 JDBC 타입 이름
-    javaType: 그 코드가 대응하는 자바 타입 이름
+    javaType: 그 코드가 대응하는 자바 타입 이름. DECIMAL·NUMERIC은 precision과 scale에 맞춰 정해짐
     autoIncrement: 데이터베이스가 값을 스스로 채우는지
     keySeq: 기본 키 안에서의 자리. 1부터
     fk: 외래 키 하나만 이 열을 쓸 때, 그 열이 가리키는 곳
@@ -591,7 +591,7 @@ palette:
     date: format이 정한 형태로 쓴 오늘 날짜
     user: 생성기를 돌리고 있는 계정
     author: 생성 탭의 작성자 항목
-    inStr: 반복 사이에 쓰는 글자. 처음 앞과 마지막 뒤에는 쓰지 않습니다
+    inStr: 반복 사이에 쓰는 문자열. 처음 앞과 마지막 뒤에는 쓰지 않습니다
     indent: inStr이 쓰는 것의 들여쓰기에 더할 칸. 음수도 됩니다
     skipList: 건너뛸 원소 이름. 쉼표로 나누며 대소문자까지 그대로 맞춥니다
   dec:
@@ -607,14 +607,17 @@ palette:
     lower: 소문자
     upper: 대문자
     replace: replace('from','to')는 나오는 곳마다 바꿉니다
+    clamp: clamp(min, max)는 정수를 두 경계 안으로 맞춥니다. 숫자가 아니면 그대로 둡니다
     padSize: 이 너비가 되도록 값을 공백으로 채웁니다
     padDir: 공백을 붙일 쪽. left 또는 right이며 기본은 right
-    quote: 값의 양쪽을 이 글자로 감쌉니다
-    prepend: 값 앞에 이 글자를 씁니다
-    postpend: 값 뒤에 이 글자를 씁니다
+    quote: 값의 양쪽을 이 문자열로 감쌉니다
+    prepend: 값 앞에 이 문자열을 씁니다
+    postpend: 값 뒤에 이 문자열을 씁니다
   cond:
     equals: 대소문자를 가리지 않고 값이 이것과 같으면 참
+    eq: equals의 다른 이름
     notEquals: 값이 이것이 아니면 참
+    ne: notEquals의 다른 이름
     startsWith: 대소문자를 가리지 않고 값이 이것으로 시작하면 참
     notStartsWith: 값이 이것으로 시작하지 않으면 참
     endsWith: 대소문자를 가리지 않고 값이 이것으로 끝나면 참
@@ -623,8 +626,12 @@ palette:
     notContains: 둘 다 아니면 참
     matches: 값 전체가 이 정규식과 맞으면 참. 여기서는 대소문자를 가립니다
     notMatches: 값 전체가 이 정규식과 맞지 않으면 참
+    gt: 값이 이 수보다 큰 정수면 참
+    ge: 값이 이 수 이상인 정수면 참
+    lt: 값이 이 수보다 작은 정수면 참
+    le: 값이 이 수 이하인 정수면 참
   opt:
-    key: 이 문장이 쓸 필드. 데코레이터까지
+    key: 이 구문이 쓸 필드. 데코레이터까지
     item: key의 다른 이름
     format: 날짜를 쓰는 형식. yyyy-MM-dd 같은 자바 패턴 문자
 
@@ -638,15 +645,15 @@ abbr:
   abbreviation_placeholder: 찾을 문자열
   replacement_placeholder: 대신 넣을 문자열
   pick_table: 테이블…
-  tip_remove: 이 규칙 삭제
+  tip_remove: 이 규칙 제거
   duplicate: "%{abbreviation}: 켜져 있는 규칙 둘이 같은 것을 찾습니다. 실제로 걸리는 것은 하나뿐입니다."
   load_failed: "abbreviations.json을 읽지 못해 규칙을 편집할 수 없습니다: %{error}. 그 파일을 고치거나 옮긴 뒤 다시 여세요."
   save_failed: "규칙을 저장하지 못했습니다: %{error}"
 
 import:
   title: jdbgen에서 가져오기
-  password_hint: jdbgen은 접속 URL, 사용자 이름, 비밀번호를 마스터 패스워드 뒤에 암호화해 둡니다. rudbgen은 여기서 한 번만 묻고, 그 뒤로 비밀번호는 운영체제가 이미 지키고 있는 키체인에 맡깁니다.
-  master_password: 마스터 패스워드
+  password_hint: jdbgen은 연결 URL, 사용자 이름, 비밀번호를 마스터 비밀번호 하나로 암호화해 둡니다. rudbgen은 여기서 한 번만 묻고, 그 뒤로 비밀번호는 운영체제가 관리하는 키체인에 맡깁니다.
+  master_password: 마스터 비밀번호
   password_placeholder: jdbgen이 시작할 때 묻는 그 비밀번호
   other_file: 다른 파일…
   choose_file: jdbgen의 config.json 고르기
@@ -679,15 +686,15 @@ import:
   no_keychain: "키체인에 넣지 못해 다음 연결은 비밀번호 없이 저장했습니다: %{names}. 열 때 다시 묻습니다."
   load_failed: "가져온 내용을 넣을 파일을 읽지 못해 아무것도 가져오지 않았습니다: %{error}. 그 파일을 고치거나 옮긴 뒤 다시 가져오세요."
   not_saved: "파일을 쓰지 못해 저장되지 않았습니다: %{errors}"
-  wrong_password: 이 설정의 마스터 패스워드가 아닙니다.
-  malformed: 이 설정은 손상되었습니다. 암호화된 값 하나가 값의 꼴이 아닙니다.
+  wrong_password: 이 설정의 마스터 비밀번호가 아닙니다.
+  malformed: 이 설정은 손상되었습니다. 암호화된 값 하나가 올바른 형식이 아닙니다.
   unreadable: 그 파일을 읽지 못했습니다.
   not_jdbgen: 그 파일은 jdbgen 설정이 아닙니다.
   note_case_rule: 단어 규칙이 이제 대소문자를 가리지 않고 걸립니다. jdbgen은 소문자 조각만 봤기 때문에, 거기서 아무 일도 하지 않던 규칙이 여기서는 걸리기 시작할 수 있습니다.
   note_legacy: 일부 값이 jdbgen의 옛 암호화 형식이었습니다. 그래도 읽었고, 쓰시던 jdbgen 설정은 그대로 둡니다.
   note_stock_matched: "%{driver}: rudbgen의 %{builtin} 정의를 쓰고, JAR와 SQL 재정의, 속성은 그대로 가져옵니다."
   note_stock_unknown: "%{driver}(%{class})는 rudbgen의 어느 정의에도 맞지 않아 별도 드라이버로 가져옵니다."
-  note_unknown_driver: "%{connection}이 가리키는 드라이버 %{driver}가 이 설정에 없습니다. 접속하기 전에 하나 고르세요."
+  note_unknown_driver: "%{connection}이 가리키는 드라이버 %{driver}가 이 설정에 없습니다. 연결하기 전에 하나 고르세요."
   note_keep_alive: "%{connection}의 연결 유지 간격 %{value}는 초 단위 숫자가 아닙니다. 이 확인은 꺼진 채로 가져옵니다."
   note_unresolved_path: "%{owner}의 %{kind} %{path}가 jdbgen의 두 디렉터리 어디에도 없었습니다. 적힌 그대로 가져옵니다."
   note_icon: "%{owner}의 아이콘 %{icon}은 여기에 대응하는 것이 없어 뺍니다."

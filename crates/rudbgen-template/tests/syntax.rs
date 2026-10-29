@@ -315,6 +315,39 @@ fn an_elif_chain_without_an_else_renders_nothing_when_no_branch_matches() {
 }
 
 #[test]
+fn the_block_keywords_are_case_insensitive() {
+    // A deliberate break from jdbgen, which matched these four in lower case
+    // only: there ${ELSE} was a lookup of a member called ELSE, so both
+    // branches were written, and ${ENDIF} left the if open.
+    for (elif, otherwise, end) in [
+        ("ELIF", "ELSE", "ENDIF"),
+        ("Elif", "Else", "EndIf"),
+        ("eLiF", "eLsE", "eNdIf"),
+    ] {
+        let tpl = format!(
+            "[${{if:key=type, equals='TABLE'}}T${{{elif}:key=type, equals='VIEW'}}V${{{otherwise}}}?${{{end}}}]"
+        );
+        assert_eq!(render(&tpl, &row("a", "TABLE")), "[T]", "in {tpl}");
+        assert_eq!(render(&tpl, &row("a", "VIEW")), "[V]", "in {tpl}");
+        assert_eq!(render(&tpl, &row("a", "SEQUENCE")), "[?]", "in {tpl}");
+    }
+}
+
+#[test]
+fn an_elif_may_have_white_space_before_its_colon_like_any_statement() {
+    let tpl = "${if:key=type, equals='TABLE'}T${ elif : key=type, equals='VIEW'}V${endif}";
+    assert_eq!(render(tpl, &row("a", "VIEW")), "V");
+}
+
+#[test]
+fn an_elif_without_its_colon_is_still_a_member_lookup() {
+    // `${elif}` names no condition, so it is the shorthand ${item:key=elif}
+    // as it always was - an unknown member, rendered as nothing.
+    let tpl = "${if:key=type, equals='TABLE'}T${ELIF}V${endif}";
+    assert_eq!(render(tpl, &row("a", "TABLE")), "TV");
+}
+
+#[test]
 fn the_negated_conditions_are_the_opposite_of_their_counterparts() {
     let model = Fixture::named("tb_user");
     assert_eq!(
@@ -351,6 +384,36 @@ fn value_is_another_name_of_the_equals_condition() {
         "x"
     );
     assert_eq!(render("${if:key=type, value='VIEW'}x${endif}", &model), "");
+}
+
+#[test]
+fn eq_and_ne_are_other_names_of_equals_and_not_equals() {
+    let model = row("abc", "TABLE");
+    assert_eq!(render("${if:key=type, eq='TABLE'}x${endif}", &model), "x");
+    assert_eq!(render("${if:key=type, EQ=table}x${endif}", &model), "x");
+    assert_eq!(render("${if:key=type, eq='VIEW'}x${endif}", &model), "");
+    assert_eq!(render("${if:key=type, ne='VIEW'}x${endif}", &model), "x");
+    assert_eq!(render("${if:key=type, Ne='table'}x${endif}", &model), "");
+    assert_eq!(
+        render(
+            "${if:key=type, eq='VIEW'}V${elif:key=type, ne='VIEW'}T${endif}",
+            &model
+        ),
+        "T"
+    );
+    // a second name is a name of its own: both are kept, and both must hold
+    assert_eq!(
+        render("${if:key=type, equals='VIEW', eq='TABLE'}x${endif}", &model),
+        ""
+    );
+}
+
+#[test]
+fn eq_compares_a_number_as_text() {
+    let model = Fixture::named("tb_user").with_int("length", 40);
+    assert_eq!(render("${if:key=length, eq=40}x${endif}", &model), "x");
+    assert_eq!(render("${if:key=length, eq=040}x${endif}", &model), "");
+    assert_eq!(render("${if:key=length, ne=41}x${endif}", &model), "x");
 }
 
 #[test]
@@ -556,6 +619,21 @@ fn an_if_inside_a_loop_is_evaluated_per_element() {
 }
 
 #[test]
+fn endfor_closes_a_loop_in_any_case() {
+    let model = Fixture::new().with_list(
+        "rows",
+        vec![row("a", "TABLE"), row("b", "VIEW"), row("c", "TABLE")],
+    );
+    assert_eq!(
+        render(
+            "${FOR:key=rows}${IF:key=type, equals='TABLE'}${name} ${ENDIF}${EndFor}!",
+            &model
+        ),
+        "a c !"
+    );
+}
+
+#[test]
 fn contains_looks_at_the_names_of_a_collection() {
     let model = Fixture::named("parent").with_list(
         "children",
@@ -615,4 +693,100 @@ fn the_date_format_may_also_be_written_as_an_attribute() {
         render("${date:format=yyyy, prepend='[', postpend=']'}", &model),
         "[2024]"
     );
+}
+
+// ------------------------------------------------- numbers (rudbgen's own)
+
+#[test]
+fn the_numeric_conditions_compare_whole_numbers() {
+    let model = Fixture::named("tb_user").with_int("length", 40);
+    let holds = |cond: &str| render(&format!("${{if:key=length, {cond}}}x${{endif}}"), &model);
+    assert_eq!(holds("gt=39"), "x");
+    assert_eq!(holds("gt=40"), "");
+    assert_eq!(holds("ge=40"), "x");
+    assert_eq!(holds("ge=41"), "");
+    assert_eq!(holds("lt=41"), "x");
+    assert_eq!(holds("lt=40"), "");
+    assert_eq!(holds("le=40"), "x");
+    assert_eq!(holds("le=39"), "");
+    // quoted, upper case and negative bounds read the same
+    assert_eq!(holds("GT='-1'"), "x");
+    // numerically, not as text: "40" sorts before "5" but is not less
+    assert_eq!(holds("lt=5"), "");
+    assert_eq!(holds("gt=5"), "x");
+}
+
+#[test]
+fn numeric_conditions_combine_into_a_range() {
+    let model = Fixture::named("tb_user").with_int("length", 40);
+    assert_eq!(
+        render("${if:key=length, ge=1, le=100}in${else}out${endif}", &model),
+        "in"
+    );
+    assert_eq!(
+        render(
+            "${if:key=length, gt=4000}clob${elif:key=length, gt=0}varchar${endif}",
+            &model
+        ),
+        "varchar"
+    );
+}
+
+#[test]
+fn a_numeric_condition_reads_a_number_written_as_text() {
+    // a custom variable is always text
+    let ctx = customs().with_var("version", "3");
+    let model = Fixture::named("tb_user");
+    assert_eq!(
+        render_with("${if:key=version, ge=2}new${endif}", &model, &ctx),
+        "new"
+    );
+}
+
+#[test]
+fn a_value_that_is_no_number_fails_every_numeric_condition() {
+    let model = Fixture::named("tb_user")
+        .with_null("keySeq")
+        .with("defVal", "1.5");
+    for cond in ["gt=0", "ge=0", "lt=0", "le=0"] {
+        for key in ["keySeq", "name", "defVal", "missing"] {
+            assert_eq!(
+                render(&format!("${{if:key={key}, {cond}}}x${{endif}}"), &model),
+                "",
+                "{key} {cond}"
+            );
+        }
+    }
+}
+
+#[test]
+fn clamp_holds_a_number_between_its_bounds() {
+    let model = Fixture::named("tb_user")
+        .with_int("length", 2147483647)
+        .with_int("scale", 0)
+        .with_int("precision", 10);
+    assert_eq!(render("${length.clamp(1, 4000)}", &model), "4000");
+    assert_eq!(render("${scale.clamp(1, 4000)}", &model), "1");
+    assert_eq!(render("${precision.clamp(1, 4000)}", &model), "10");
+    assert_eq!(
+        render(
+            "${item:key=length.clamp('1','4000'), padSize=6, padDir=left}",
+            &model
+        ),
+        "  4000"
+    );
+    assert_eq!(
+        render(
+            "${if:key=length.clamp(1, 4000), equals=4000}max${endif}",
+            &model
+        ),
+        "max"
+    );
+}
+
+#[test]
+fn clamp_leaves_a_value_that_is_no_number_alone() {
+    let model = Fixture::named("tb_user").with_null("keySeq");
+    assert_eq!(render("${keySeq.clamp(1, 9)}", &model), "");
+    assert_eq!(render("${name.clamp(1, 9)}", &model), "tb_user");
 }

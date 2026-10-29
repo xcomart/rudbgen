@@ -76,7 +76,7 @@ fn find_in_gradle_cache() -> Option<PathBuf> {
     let mut newest: Option<(String, PathBuf)> = None;
     for version in std::fs::read_dir(&root).ok()?.flatten() {
         let number = version.file_name().to_string_lossy().into_owned();
-        // Only the binary artefact. The same version directory also holds
+        // Only the binary artifact. The same version directory also holds
         // `h2-<version>-javadoc.jar` and `-sources.jar`, and picking one of
         // those gets a class loader with no classes in it — which surfaces as a
         // ClassNotFoundException for the driver, a long way from the cause.
@@ -172,7 +172,7 @@ fn the_jvm_is_one_per_process_however_often_it_is_asked_for() {
 #[test]
 fn two_sessions_work_at_the_same_time_on_their_own_threads() {
     // One worker thread per connection is the whole thread model; this is what
-    // it buys. Both sessions are used concurrently and neither serialises
+    // it buys. Both sessions are used concurrently and neither serializes
     // against the other.
     std::thread::scope(|scope| {
         let handles: Vec<_> = (0..2)
@@ -267,7 +267,7 @@ fn a_wrong_password_is_a_sql_error_carrying_a_sqlstate() {
     assert_eq!(
         error.sql_state_class(),
         Some("28"),
-        "invalid authorisation specification: {error:?}"
+        "invalid authorization specification: {error:?}"
     );
     assert_ne!(error.vendor_code, 0, "H2 numbers this one: {error:?}");
 
@@ -656,30 +656,30 @@ fn cancel_reaches_a_statement_the_worker_is_blocked_in() {
 
         // The statement has to reach the driver before a cancel can bite, and
         // there is no way to observe that from outside — so keep asking.
-        let mut cancelled = 0;
+        let mut canceled = 0;
         for _ in 0..150 {
             if running.is_finished() {
                 break;
             }
             std::thread::sleep(Duration::from_millis(100));
-            cancelled += canceller.cancel().expect("cancel is answered");
+            canceled += canceller.cancel().expect("cancel is answered");
         }
 
         let result = running.join().expect("the worker thread survived");
-        assert!(cancelled > 0, "no statement was ever reached by a cancel");
+        assert!(canceled > 0, "no statement was ever reached by a cancel");
 
-        let error = result.expect_err("a cancelled statement comes back as an error");
+        let error = result.expect_err("a canceled statement comes back as an error");
         let Error::Bridge(error) = error else {
             panic!("expected an error envelope, got {error:?}")
         };
         assert_eq!(error.kind, BridgeErrorKind::Sql);
         assert!(
             error.sql_state.is_some(),
-            "a cancelled statement still carries a SQLSTATE: {error:?}"
+            "a canceled statement still carries a SQLSTATE: {error:?}"
         );
     });
 
-    // The session is still usable: cancelling aborts a statement, not a
+    // The session is still usable: canceling aborts a statement, not a
     // connection.
     assert!(session.ping().expect("still alive").ok);
     assert_eq!(

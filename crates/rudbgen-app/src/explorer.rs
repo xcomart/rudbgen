@@ -84,7 +84,7 @@ pub struct SchemaKey {
     pub catalog: String,
     /// The schema as the driver reports it, empty for a placeholder.
     pub schema: String,
-    /// What the row is labelled with.
+    /// What the row is labeled with.
     pub name: String,
 }
 
@@ -1013,7 +1013,7 @@ impl Explorer {
 
         rows.push(MenuRow::separator());
 
-        // Greyed on a schema rather than left out: the row is about the panel's
+        // Grayed on a schema rather than left out: the row is about the panel's
         // other half and belongs in every menu the panel draws, so that where
         // it is does not move with what was clicked.
         rows.push({
@@ -1632,27 +1632,27 @@ mod tests {
 
         // "Open in inspector" is the one row that needs a table under the
         // pointer, and it says so rather than doing nothing. "Clear selection"
-        // is greyed too, because nothing is ticked yet — which is the other
+        // is grayed too, because nothing is ticked yet — which is the other
         // half of the rule and not an accident of this menu.
-        let greyed = cx.update(|_, cx| {
+        let grayed = cx.update(|_, cx| {
             explorer.update(cx, |explorer, cx| {
-                menu_rows::greyed(&explorer.menu_rows(&NodeId::Schema(public()), cx))
+                menu_rows::grayed(&explorer.menu_rows(&NodeId::Schema(public()), cx))
             })
         });
         assert_eq!(
-            greyed,
+            grayed,
             vec![
                 ts!("explorer.menu_clear").to_string(),
                 ts!("explorer.menu_inspect").to_string(),
             ]
         );
         // On a table row the inspector command is live.
-        let greyed = cx.update(|_, cx| {
+        let grayed = cx.update(|_, cx| {
             explorer.update(cx, |explorer, cx| {
-                menu_rows::greyed(&explorer.menu_rows(&NodeId::Table(key("T_ALBUM")), cx))
+                menu_rows::grayed(&explorer.menu_rows(&NodeId::Table(key("T_ALBUM")), cx))
             })
         });
-        assert_eq!(greyed, vec![ts!("explorer.menu_clear").to_string()]);
+        assert_eq!(grayed, vec![ts!("explorer.menu_clear").to_string()]);
 
         // Built inside the panel's own update and run outside it, which is the
         // order the shell has: the rows are made while the menu is drawn and

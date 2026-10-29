@@ -18,7 +18,7 @@ fn template(file: &str, dirty: bool) -> PaneItem {
 /// The whole gesture at workspace level: `drag_over_tab` arms the bar while
 /// the pointer is over the strip, and `drop_tab` takes it and moves the item
 /// into the gap the strip reports — the visible tab following along, the
-/// dirty dot travelling with its item, and no close prompt anywhere, because
+/// dirty dot traveling with its item, and no close prompt anywhere, because
 /// a move is not a close.
 #[gpui::test]
 fn work_tabs_reorder_to_the_drop_bar_and_keep_the_visible_tab(cx: &mut gpui::TestAppContext) {
@@ -112,14 +112,14 @@ fn work_tabs_reorder_to_the_drop_bar_and_keep_the_visible_tab(cx: &mut gpui::Tes
         .expect("the window is open");
 }
 
-/// A cancelled drag leaves no bar behind, a drop with no bar still lands in
+/// A canceled drag leaves no bar behind, a drop with no bar still lands in
 /// the gap the strip reports, and a foreign tab is refused.
 ///
-/// The root's own release is what clears a cancelled gesture — the drop
+/// The root's own release is what clears a canceled gesture — the drop
 /// handler never runs for it — while `drop_tab` reads nothing back from the
 /// bar: the strip hands it the gap, and the keyboard reorder has no bar.
 #[gpui::test]
-fn a_cancelled_tab_drag_leaves_no_bar_and_a_bare_drop_lands_in_the_reported_gap(
+fn a_canceled_tab_drag_leaves_no_bar_and_a_bare_drop_lands_in_the_reported_gap(
     cx: &mut gpui::TestAppContext,
 ) {
     cx.update(|cx| {

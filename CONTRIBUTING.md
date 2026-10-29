@@ -127,10 +127,17 @@ docker compose -f docker/compose.yml down
 
 These examples use a POSIX shell; PowerShell environment variables use
 `$env:NAME = 'value'`. See [docker/compose.yml](docker/compose.yml) for the MySQL,
-MariaDB, SQL Server and Oracle URLs and credentials, and
-[CI](.github/workflows/ci.yml) for the complete database matrix. Use disposable
-test databases: the suites create and drop objects. rudbgen and rudbman use the
-same local test ports, so run their Compose environments one at a time.
+MariaDB, SQL Server, Oracle and Db2 URLs and credentials, and
+[CI](.github/workflows/ci.yml) for the complete database matrix. Db2's first
+start creates its database and takes several minutes before it reports healthy;
+its tests are the ones named `db2_*`. Use disposable test databases: the suites
+create and drop objects. rudbgen and rudbman use the same local test ports, so
+run their Compose environments one at a time. Both files also sit in a
+`docker/` directory, which Compose takes as the project name, so `up` in one
+replaces the other's container of the same service rather than failing, and
+hands it the other's anonymous volume: Db2 then finds rudbman's setup already
+done and creates no `RUDBGEN` database. Give this stack a project of its own,
+`docker compose -p rudbgen -f docker/compose.yml ...`, to keep the two apart.
 
 SQLite needs no Docker server. After downloading the drivers, set
 `RUDBGEN_TEST_SQLITE_URL` to `jdbc:sqlite:/absolute/path/to/a/test.db` in a

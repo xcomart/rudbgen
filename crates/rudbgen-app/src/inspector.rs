@@ -28,8 +28,9 @@
 //! `rudbgen-meta` caches nothing on purpose — only the application knows what a
 //! refresh means — so the cache is here, keyed by [`TableKey`]. Walking the
 //! explorer with the arrow keys therefore costs one round trip per table and
-//! not one per keystroke, and **Refresh** drops the entry for the table on
-//! screen and asks again.
+//! not one per keystroke. The panel's own **Refresh** drops the entry for the
+//! table on screen and asks again; the explorer's drops every entry, because
+//! a run reads its tables from here and has to see the database as it is now.
 //!
 //! Like the explorer, the panel fetches nothing itself: it emits
 //! [`InspectorEvent::Load`] and the workspace, which owns the session, answers
@@ -365,6 +366,29 @@ impl Inspector {
         };
         self.cache.remove(&key);
         self.load = Load::Running;
+        cx.emit(InspectorEvent::Load(key));
+        cx.notify();
+    }
+
+    /// Forgets every table described so far, and asks again about the one on
+    /// screen.
+    ///
+    /// What the explorer's **Refresh** means here: the user is asking the
+    /// database again, and the next run, the live previews and the palette all
+    /// read their tables from this cache.
+    ///
+    /// Unlike [`Inspector::refresh`], a table already drawn stays drawn until
+    /// its new description arrives. With nothing ticked, the live previews are
+    /// rendered against the table on screen, and a panel that went blank for
+    /// the length of a round trip would have them all say there is no table.
+    pub fn refresh_all(&mut self, cx: &mut Context<Self>) {
+        self.cache.clear();
+        let Some(key) = self.target.clone() else {
+            return;
+        };
+        if !matches!(self.load, Load::Ready(_)) {
+            self.load = Load::Running;
+        }
         cx.emit(InspectorEvent::Load(key));
         cx.notify();
     }

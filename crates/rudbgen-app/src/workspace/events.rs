@@ -205,6 +205,16 @@ impl Workspace {
                 self.refresh_templates(cx);
                 cx.notify();
             }
+            // The descriptions the inspector holds are from before the
+            // refresh. Dropping them makes the next run read its tables
+            // again, and the live previews rendered from them are redrawn
+            // the same way — `refresh_templates` hands every tab its choices,
+            // which re-renders it, reading as it goes.
+            ExplorerEvent::Refreshed => {
+                self.inspector.update(cx, |panel, cx| panel.refresh_all(cx));
+                self.refresh_templates(cx);
+                cx.notify();
+            }
             ExplorerEvent::Inspect { table, reveal } => {
                 // Only the menu row asks for the panel to be shown. Moving
                 // the tree's cursor must not: an arrow key that reopened a

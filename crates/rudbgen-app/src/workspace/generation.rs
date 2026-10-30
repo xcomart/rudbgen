@@ -9,6 +9,12 @@ impl Workspace {
     /// generation profile, and a run has to use what is on screen rather than
     /// what the debounce has got round to writing.
     pub(super) fn start_run(&mut self, kind: RunKind, cx: &mut Context<Self>) {
+        // The buttons are disabled while a run is going, but the shortcut is
+        // not a button: a second press would start a second run over the first
+        // one's dialog, and Cancel would then reach only the second.
+        if self.job.read(cx).is_busy() {
+            return;
+        }
         self.generate.update(cx, |pane, cx| pane.flush(cx));
 
         // A preview and a dry run write nothing, so a missing output directory
@@ -55,7 +61,8 @@ impl Workspace {
         let Some((handle, driver, epoch)) = self.meta_context() else {
             return;
         };
-        self.job
+        let ticket = self
+            .job
             .update(cx, |job, cx| job.begin_loading(missing, cx));
         cx.spawn(async move |this, cx| {
             let mut tables: Vec<Table> = Vec::with_capacity(cached.len());
@@ -63,6 +70,14 @@ impl Workspace {
                 if let Some(table) = slot {
                     tables.push(table);
                     continue;
+                }
+                // Checked before every read, because a read that has started
+                // cannot be stopped: Cancel saves the ones not yet asked for.
+                let wanted = this
+                    .update(cx, |workspace, cx| workspace.load_wanted(ticket, epoch, cx))
+                    .unwrap_or(false);
+                if !wanted {
+                    return;
                 }
                 let reference = references[index].clone();
                 let key = keys[index].clone();
@@ -79,18 +94,29 @@ impl Workspace {
                 match read {
                     Ok(table) => {
                         let name = table.name.clone();
-                        this.update(cx, |workspace, cx| {
-                            workspace
-                                .inspector
-                                .update(cx, |panel, _cx| panel.remember(key, table.clone()));
-                            workspace.job.update(cx, |job, cx| job.loaded(&name, cx));
-                        })
-                        .ok();
+                        let wanted = this
+                            .update(cx, |workspace, cx| {
+                                if !workspace.load_wanted(ticket, epoch, cx) {
+                                    return false;
+                                }
+                                workspace
+                                    .inspector
+                                    .update(cx, |panel, _cx| panel.remember(key, table.clone()));
+                                workspace.job.update(cx, |job, cx| job.loaded(&name, cx));
+                                true
+                            })
+                            .unwrap_or(false);
+                        if !wanted {
+                            return;
+                        }
                         tables.push(table);
                     }
                     Err(message) => {
                         let table = keys[index].qualified();
                         this.update(cx, |workspace, cx| {
+                            if !workspace.load_wanted(ticket, epoch, cx) {
+                                return;
+                            }
                             workspace.job.update(cx, |job, cx| {
                                 job.refuse(
                                     ts!("generate.read_failed", table = table, reason = message),
@@ -104,17 +130,32 @@ impl Workspace {
                 }
             }
             this.update(cx, |workspace, cx| {
-                // The session went away while the tables were being read; the
-                // answers describe a database the window has already left.
-                if workspace.connection_epoch != epoch {
-                    workspace.job.update(cx, |job, cx| job.finish_loading(cx));
-                    return;
+                if workspace.load_wanted(ticket, epoch, cx) {
+                    workspace.run_with(kind, tables, cx);
                 }
-                workspace.run_with(kind, tables, cx);
             })
             .ok();
         })
         .detach();
+    }
+
+    /// Whether the tables the reading phase `ticket` is fetching are still
+    /// wanted.
+    ///
+    /// They are not once the dialog's Cancel took the phase down or a later
+    /// phase replaced it, and then there is nothing to do. Nor are they once
+    /// the session went away while they were being read — the answers describe
+    /// a database the window has already left — and then the dialog is still
+    /// up, so it is taken down here.
+    fn load_wanted(&mut self, ticket: u64, epoch: u64, cx: &mut Context<Self>) -> bool {
+        if !self.job.read(cx).is_loading(ticket) {
+            return false;
+        }
+        if self.connection_epoch != epoch {
+            self.job.update(cx, |job, cx| job.finish_loading(cx));
+            return false;
+        }
+        true
     }
 
     /// Runs `kind` over tables that are all in hand.

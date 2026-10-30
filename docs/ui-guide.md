@@ -166,6 +166,10 @@ its own press.
 
 The panel on the right shows the table under the cursor — fetched in the
 background, cached per table, so walking the tree costs one round trip each.
+Runs, previews and the variable palette read their tables from the same cache.
+The panel's own refresh button reads the table on screen again; the explorer's
+*refresh* drops every cached table, so after changing the schema it is what
+makes the next run see the new columns.
 Four tabs:
 
 | Tab | What it shows |
@@ -338,7 +342,9 @@ pair listed beside the pairs it collides with.
 
 While it runs, a progress dialog shows a bar, a log and **Cancel** — cancellation
 takes effect at the next file boundary, so a half-written file is never left
-behind. When a file already exists, the default policy asks, with **Overwrite**,
+behind. Ticked tables the inspector has not described yet are read first, in the
+same dialog; **Cancel** during that phase closes it, and nothing is written or
+previewed. When a file already exists, the default policy asks, with **Overwrite**,
 **Skip**, **Overwrite all**, **Skip all** and **Cancel**. The default policy
 itself is a setting (`ask`, `overwrite` or `skip`).
 

@@ -106,6 +106,14 @@ pub struct GenerationJob {
     log: Vec<SharedString>,
     /// Stops the run at the next file boundary.
     cancel: Option<CancelHandle>,
+    /// Which table-reading phase is on screen, counted up by every
+    /// [`GenerationJob::begin_loading`].
+    ///
+    /// The reads are the shell's and nothing here can stop one half way, so
+    /// each one asks [`GenerationJob::is_loading`] with the ticket it was given
+    /// before it goes on. A phase that was canceled — or replaced by a later
+    /// one — answers no, and its reads drop what they found.
+    loading: u64,
     /// Where the files went, for the summary's one button.
     output_dir: Option<PathBuf>,
     /// Vertical scroll of the log, and of the summary's lists.
@@ -121,6 +129,7 @@ impl GenerationJob {
             stage: Stage::Idle,
             log: Vec::new(),
             cancel: None,
+            loading: 0,
             output_dir: None,
             scroll: ScrollHandle::new(),
             _pump: None,
@@ -155,6 +164,15 @@ impl GenerationJob {
         matches!(self.stage, Stage::Asking { .. })
     }
 
+    /// How many tables the reading phase has described, while it is on screen.
+    #[cfg(test)]
+    pub fn tables_read(&self) -> Option<usize> {
+        match self.stage {
+            Stage::Loading { done, .. } => Some(done),
+            _ => None,
+        }
+    }
+
     /// Why the run was refused, if it was.
     #[cfg(test)]
     pub fn refusal(&self) -> Option<&SharedString> {
@@ -171,13 +189,27 @@ impl GenerationJob {
     /// because reading twenty tables over a slow link takes longer than
     /// rendering them, and a dialog that says nothing for ten seconds looks
     /// stuck.
-    pub fn begin_loading(&mut self, total: usize, cx: &mut Context<Self>) {
+    ///
+    /// Returns the phase's ticket, for the reads to check with
+    /// [`GenerationJob::is_loading`].
+    pub fn begin_loading(&mut self, total: usize, cx: &mut Context<Self>) -> u64 {
+        self.loading += 1;
         self.stage = Stage::Loading { done: 0, total };
         self.log.clear();
         self.cancel = None;
         self.output_dir = None;
         self._pump = None;
         cx.notify();
+        self.loading
+    }
+
+    /// Whether the table-reading phase `ticket` is still the one on screen.
+    ///
+    /// No once its Cancel was pressed, and no once a later phase began: either
+    /// way nobody is waiting for its tables any more, and a run started from
+    /// them would be one the user did not ask for.
+    pub fn is_loading(&self, ticket: u64) -> bool {
+        matches!(self.stage, Stage::Loading { .. }) && self.loading == ticket
     }
 
     /// One more table has been described.
@@ -336,14 +368,29 @@ impl GenerationJob {
     /// While the run is blocked on an overwrite question there is no next file
     /// boundary to reach, so the question is answered with
     /// [`Decision::Cancel`], which is what unblocks it.
+    ///
+    /// While the tables are still being read there is no run to stop and no
+    /// file written to list, so the dialog simply goes. The reads that are
+    /// still out find their phase over through [`GenerationJob::is_loading`]
+    /// and start nothing.
     pub fn cancel(&mut self, cx: &mut Context<Self>) {
+        match std::mem::replace(&mut self.stage, Stage::Idle) {
+            Stage::Loading { .. } => {
+                self.log.clear();
+                cx.emit(JobEvent::Closed);
+                cx.notify();
+                return;
+            }
+            Stage::Asking {
+                reply, done, total, ..
+            } => {
+                reply.send(Decision::Cancel).ok();
+                self.stage = Stage::Running { done, total };
+            }
+            stage => self.stage = stage,
+        }
         if let Some(handle) = self.cancel.take() {
             handle.cancel();
-        }
-        if let Stage::Asking { reply, .. } =
-            std::mem::replace(&mut self.stage, Stage::Running { done: 0, total: 0 })
-        {
-            reply.send(Decision::Cancel).ok();
         }
         self.note(ts!("progress.canceling"), cx);
     }
@@ -803,5 +850,60 @@ mod tests {
         assert_eq!(path, Path::new("/tmp/model.java"));
         reply.send(Decision::SkipAll).expect("the run is waiting");
         assert_eq!(asking.join().expect("the run thread"), Decision::SkipAll);
+    }
+
+    #[gpui::test]
+    fn cancel_while_the_tables_are_read_takes_the_dialog_down(cx: &mut gpui::TestAppContext) {
+        let job = cx.new(GenerationJob::new);
+        let closed = std::rc::Rc::new(std::cell::Cell::new(0));
+        cx.update(|cx| {
+            let closed = closed.clone();
+            cx.subscribe(&job, move |_, event: &JobEvent, _| match event {
+                JobEvent::Closed => closed.set(closed.get() + 1),
+            })
+            .detach();
+        });
+
+        let ticket = job.update(cx, |job, cx| job.begin_loading(3, cx));
+        assert!(job.read_with(cx, |job, _| job.is_loading(ticket)));
+
+        // There is no run to stop and no file to list, so nothing is left on
+        // screen to be stuck behind — the dialog is gone, not busy.
+        job.update(cx, |job, cx| job.cancel(cx));
+        cx.run_until_parked();
+        job.read_with(cx, |job, _| {
+            assert!(!job.is_open(), "the dialog stayed up");
+            assert!(!job.is_busy(), "a canceled load still blocks the window");
+            assert!(!job.is_loading(ticket), "the reads were not told to stop");
+        });
+        assert_eq!(closed.get(), 1, "the keyboard was not handed back");
+
+        // A read of the canceled phase that comes back late must not take a
+        // later phase for its own.
+        let next = job.update(cx, |job, cx| job.begin_loading(1, cx));
+        job.read_with(cx, |job, _| {
+            assert!(job.is_loading(next));
+            assert!(!job.is_loading(ticket));
+        });
+    }
+
+    #[gpui::test]
+    fn cancel_on_the_question_answers_it_and_keeps_the_bar(cx: &mut gpui::TestAppContext) {
+        let job = cx.new(GenerationJob::new);
+        let (reply, answer) = channel();
+        job.update(cx, |job, cx| {
+            job.stage = Stage::Asking {
+                path: PathBuf::from("/tmp/model.java"),
+                reply,
+                done: 3,
+                total: 5,
+            };
+            job.cancel(cx);
+        });
+        assert_eq!(answer.recv().expect("the run is waiting"), Decision::Cancel);
+        job.read_with(cx, |job, _| {
+            assert!(job.is_busy(), "the run is still winding down");
+            assert_eq!(job.counts(), (3, 5), "the bar went back to nothing");
+        });
     }
 }

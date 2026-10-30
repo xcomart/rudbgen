@@ -347,10 +347,18 @@ impl ExplorerSource {
     /// to be given a blank sheet. A table that is gone the second time around
     /// stays in the selection and simply has no row — which is the honest
     /// answer, since the tick was about a name and the name is what is missing.
+    ///
+    /// The index survives, and each schema's part of it is replaced when that
+    /// schema's list comes back ([`ExplorerSource::set_tables`]). A table is
+    /// read again straight after a refresh — the inspector's, a live
+    /// preview's — and the reader copies the kind, the comment and the
+    /// position off the row it is handed rather than asking for them, so an
+    /// emptied index would have them read as blanks. A schema nobody has
+    /// opened again is never listed again, and its ticked tables would be
+    /// generated with those blanks too.
     fn invalidate(&mut self) {
         self.schemas = Fetch::NotLoaded;
         self.tables.clear();
-        self.index.clear();
     }
 
     /// Records one schema's table list, or why it could not be read.
@@ -646,6 +654,13 @@ pub enum ExplorerEvent {
     LoadTables(SchemaKey),
     /// The set of ticked tables changed; the status bar counts it.
     SelectionChanged,
+    /// The user asked the database again with **Refresh**.
+    ///
+    /// The panel drops only what it holds itself — the schemas and the table
+    /// lists. What has been read about each table is the inspector's, and a
+    /// run reads its tables from there, so that has to go as well or a column
+    /// added since would be missing from the next file written.
+    Refreshed,
     /// This table should be what the inspector describes.
     Inspect {
         /// Which table.
@@ -817,6 +832,7 @@ impl Explorer {
     pub fn refresh(&mut self, cx: &mut Context<Self>) {
         self.menu = None;
         self.update_source(cx, ExplorerSource::invalidate);
+        cx.emit(ExplorerEvent::Refreshed);
     }
 
     /// The ticked tables, in generation order.
@@ -1259,6 +1275,7 @@ mod tests {
         Tables(String),
         Selection,
         Inspect(String, bool),
+        Refreshed,
     }
 
     /// Opens the panel in a window and hands back it and what it announced.
@@ -1285,6 +1302,7 @@ mod tests {
                             ExplorerEvent::Inspect { table, reveal } => {
                                 Announced::Inspect(table.name.clone(), *reveal)
                             }
+                            ExplorerEvent::Refreshed => Announced::Refreshed,
                         });
                     },
                 )
@@ -1458,8 +1476,12 @@ mod tests {
         });
         cx.run_until_parked();
         // A refresh throws the metadata away and asks again — and keeps the
-        // ticks, because the user did not change their mind.
-        assert_eq!(drain(&events), vec![Announced::Schemas]);
+        // ticks, because the user did not change their mind. It says so
+        // first, for the table descriptions the panel does not hold.
+        assert_eq!(
+            drain(&events),
+            vec![Announced::Refreshed, Announced::Schemas]
+        );
         assert_eq!(cx.update(|_, cx| explorer.read(cx).selected_count(cx)), 1);
     }
 

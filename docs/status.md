@@ -270,10 +270,11 @@ profile and *Manage connections* the saved ones; the welcome list uses the
 dialog's rows with a context menu; failed connections offer the hint, *Trust
 this key*, *Edit connection* and *Retry*; *Remember password* is per profile;
 ticks are kept per profile; a run over unsaved template tabs asks first. The
-shared halves — the window close guard and quit question, the modal backdrop
-guard and initial-focus option, menu keyboard navigation, middle-click close,
-toasts, UI-scale tokens and a start directory for the file pickers — are
-rugpui's, and are wired in once it has them. The screenshots predate this
+shared halves from rugpui 877d8ac are wired in: the close guard on window close,
+quit and the update's restart; the modal dismiss guard and initial focus; `F10`
+and `Shift+F10` menus; middle-click tab close; toasts; the interface size as
+the UI scale; fitted form labels; and the template pickers starting in
+`<config>/templates`. The screenshots predate this
 round and were not recaptured: doing so needs the GUI on a display.
 
 Decisions taken along the way, written down so they are not mistaken for

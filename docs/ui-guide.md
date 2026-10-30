@@ -239,7 +239,8 @@ written.
   tick, its name, its file, the **output name template** that names the file it
   writes, and buttons to edit or remove it. Removing a row can be undone the
   same way. An empty list offers each set as a button, beside *Add template…*,
-  which opens a file picker.
+  which opens a file picker in the `templates/` folder of the configuration
+  directory.
 
   The output name is itself a template: `${name.suffix.pascal}Model.java`, or
   `${package.replace('.','/')}/${name.suffix.pascal}.java` to write into a
@@ -362,7 +363,9 @@ The tab strip works from the keyboard: <kbd>Ctrl</kbd>+<kbd>PageDown</kbd> /
 tab, <kbd>Ctrl</kbd>+<kbd>1</kbd>–<kbd>9</kbd> go to a tab by number,
 <kbd>Ctrl</kbd>+<kbd>W</kbd> closes the tab on top as its close button would,
 and <kbd>F6</kbd> puts the keyboard on the strip itself, where the arrows walk
-it and <kbd>Delete</kbd> closes. Right-click a tab for *Close tab*, *Close other
+it and <kbd>Delete</kbd> closes. A middle click on a tab closes it, through the
+same unsaved-edits question as its close button. Right-click a tab — or press
+<kbd>Shift</kbd>+<kbd>F10</kbd> on the strip — for *Close tab*, *Close other
 tabs*, *Close tabs to the right* and, on a template, *Copy path*. The Generate
 tab is never closed.
 
@@ -471,10 +474,39 @@ rudbgen asks for it.
 theme directory), the interface language, the fonts, the Java heap the embedded
 JVM starts with and its extra arguments, the window chrome, and the default
 overwrite policy. The language changes live — there is nothing to restart.
+**Interface size** scales the whole window — every label, list, tab, menu,
+dialog and bar, not only the text fields — from its default of 14, previewed as
+you type it.
 <kbd>Ctrl</kbd>+<kbd>S</kbd> saves; closing with changes on the form asks first.
 
 While any dialog is up, the window's own shortcuts stand down: a chord pressed
-in a dialog's field does nothing to the window behind it.
+in a dialog's field does nothing to the window behind it. A click beside a dialog
+with changes on its form does nothing either.
+
+## Closing and quitting
+
+Closing the window — its close button, the platform's, <kbd>Alt</kbd>+<kbd>F4</kbd>
+— quitting with <kbd>Ctrl</kbd>/<kbd>Cmd</kbd>+<kbd>Q</kbd>, and the restart
+**Update and restart** performs all ask first when something would be lost: a
+template tab with unsaved edits, a generation run still writing files, or a
+dialog with unsaved changes. The question lists them, and offers **Save all**
+(which writes the template tabs), **Cancel**, and closing, quitting or
+restarting anyway. With nothing to lose, nothing is asked.
+
+## Menus and notices
+
+On Linux and Windows <kbd>F10</kbd> opens the ☰ menu, which is also a stop in the
+<kbd>Tab</kbd> order; <kbd>Shift</kbd>+<kbd>F10</kbd> or the Menu key opens the
+right-click menu of whatever has the keyboard — the explorer's selected row, the
+template editor at the caret, a focused row of the welcome list, or the tab on
+top while the tab strip has the keyboard. In an open menu the arrows,
+<kbd>Home</kbd>/<kbd>End</kbd> and typed letters move the highlight and
+<kbd>Enter</kbd> runs the row.
+
+Short notices — a template added to the generation list, a path copied, a
+password the keychain would not keep, a connection list that could not be
+written — appear for a moment above the status bar; an error stays until you
+close it.
 
 Eight languages ship: English, Korean, Japanese, Simplified Chinese, German,
 Spanish, French and Russian.
@@ -500,9 +532,12 @@ and <kbd>Ctrl</kbd>+<kbd>Tab</kbd>, which are <kbd>Ctrl</kbd> on every platform.
 | <kbd>Ctrl</kbd>+<kbd>1</kbd>–<kbd>9</kbd> | Go to tab 1–9 |
 | <kbd>Ctrl</kbd>+<kbd>W</kbd> | Close the tab on top |
 | <kbd>F6</kbd> | Put the keyboard on the tab strip |
+| <kbd>F10</kbd> | Open the ☰ menu (Linux and Windows) |
+| <kbd>Shift</kbd>+<kbd>F10</kbd>, Menu key | Open the right-click menu of what has the keyboard |
+| Middle click on a tab | Close the tab |
 | <kbd>Enter</kbd> | In a question: its default answer |
 | <kbd>Esc</kbd> | Close the open menu, or dismiss the dialog on top (on the overwrite question: Cancel) |
-| <kbd>Ctrl</kbd>+<kbd>Q</kbd> | Quit |
+| <kbd>Ctrl</kbd>+<kbd>Q</kbd> | Quit (asks first when something would be lost) |
 
 Preview and Dry run are deliberately unbound: they are one button press away,
 and the chords are better spent on the template editor.

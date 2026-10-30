@@ -41,7 +41,8 @@ impl Workspace {
     /// announces itself only into an empty window. It is the one dialog nobody
     /// asked for, and it must not land on top of something the user opened.
     pub(super) fn dialog_open(&self, cx: &App) -> bool {
-        self.closing.is_some()
+        self.close_guard.read(cx).is_open()
+            || self.closing.is_some()
             || self.unsaved_run.is_some()
             || self.deleting_profile.is_some()
             || self.password_prompt.is_some()
@@ -140,6 +141,38 @@ impl Workspace {
                 || self.abbreviations.read(cx).is_dirty(cx)
                 || self.import.read(cx).is_busy(),
         }
+    }
+
+    /// [`Workspace::unsaved_work`] as the close guard's question lists it: one
+    /// line per thing a close would lose.
+    pub(super) fn unsaved_lines(&self, cx: &App) -> Vec<SharedString> {
+        let work = self.unsaved_work(cx);
+        let mut lines: Vec<SharedString> = work
+            .templates
+            .into_iter()
+            .map(|name| ts!("close_guard.item_template", name = name))
+            .collect();
+        if work.run {
+            lines.push(ts!("close_guard.item_run"));
+        }
+        if work.draft {
+            lines.push(ts!("close_guard.item_draft"));
+        }
+        lines
+    }
+
+    /// The close guard's *Save all*: writes every template tab with unsaved
+    /// edits, and answers whether every one of them was written. A save that
+    /// fails leaves its tab showing why, and the question stays up with it.
+    pub(super) fn save_all_templates(&mut self, cx: &mut Context<Self>) -> bool {
+        let mut saved = true;
+        for pane in self.templates.clone() {
+            if pane.read(cx).is_dirty(cx) {
+                saved &= pane.update(cx, |pane, cx| pane.save(cx));
+            }
+        }
+        self.retitle_templates(cx);
+        saved
     }
 
     /// Clears the screen for a dialog about to open, and answers whether it
@@ -447,6 +480,9 @@ impl Workspace {
     pub(super) fn set_menu_open(&mut self, open: bool, cx: &mut Context<Self>) {
         if open {
             self.close_template_menus(cx);
+            self.close_context_menus(cx);
+        } else {
+            self.menu_by_keyboard = false;
         }
         if self.menu_open != open {
             self.menu_open = open;

@@ -48,7 +48,7 @@ use rugpui::{
 use uuid::Uuid;
 
 use crate::i18n::ts;
-use crate::{app_settings, icons, prompt};
+use crate::{app_settings, icons};
 
 /// How long the panel waits after the last edit before writing
 /// `connections.json`.
@@ -385,10 +385,10 @@ pub struct GeneratePane {
     origin_set: Option<Uuid>,
     /// The set the delete-confirmation prompt is up for, if any.
     deleting_set: Option<Uuid>,
-    /// The box the delete confirmation is drawn in; see [`prompt::body`].
+    /// The delete confirmation's Cancel, which holds the keyboard while it is
+    /// up: deleting a set cannot be taken back, so it is the answer that
+    /// needs a deliberate press.
     prompt_focus: FocusHandle,
-    /// Whether that box should take the keyboard on the next frame.
-    pending_prompt_focus: bool,
     /// What the last list change that lost rows can be taken back to.
     undo: Option<Undo>,
     /// The overwrite policy for the next generate, when it is not the one the
@@ -471,7 +471,6 @@ impl GeneratePane {
             origin_set: None,
             deleting_set: None,
             prompt_focus: cx.focus_handle(),
-            pending_prompt_focus: false,
             undo: None,
             overwrite: None,
             ticks: Vec::new(),
@@ -1004,22 +1003,25 @@ impl GeneratePane {
 
     /// Asks the platform for template files and appends what it hands back.
     ///
-    /// §4.4 asks for the picker to start in `<config>/templates`, which is
-    /// where the built-ins land. gpui's [`PathPromptOptions`] carries no
-    /// starting directory, so it starts wherever the platform last left it;
-    /// the day the option exists, `rudbgen_core::templates_dir` is what goes in it.
+    /// The picker starts in `<config>/templates` (§4.4), which is where the
+    /// built-ins land and where *New template…* puts a new one; a platform
+    /// that cannot be told so opens wherever it last left off.
     ///
     /// Nothing waits on the prompt: on X11 that call is the one gpui had to be
     /// patched around, so the click returns immediately and the answer is
     /// picked up on a task of its own — the shape `driver_manager` and the
     /// settings dialog both use.
     fn add_templates(&mut self, cx: &mut Context<Self>) {
-        let paths = cx.prompt_for_paths(PathPromptOptions {
+        let options = PathPromptOptions {
             files: true,
             directories: false,
             multiple: true,
             prompt: Some(ts!("generate.add_template_select")),
-        });
+        };
+        let paths = match rudbgen_core::templates_dir() {
+            Ok(directory) => cx.prompt_for_paths_in(options, &directory),
+            Err(_) => cx.prompt_for_paths(options),
+        };
         cx.spawn(async move |pane, cx| {
             let chosen = match paths.await {
                 Ok(Ok(Some(paths))) => paths,
@@ -1255,10 +1257,8 @@ impl GeneratePane {
                 Button::new("generate-save-set", ts!("generate.save_as_set"))
                     .variant(ButtonVariant::Secondary)
                     .disabled(self.templates.is_empty())
-                    .on_click(move |_, window, cx| {
+                    .on_click(move |_, _window, cx| {
                         naming.update(cx, |pane, cx| pane.open_set_prompt(cx));
-                        let handle = naming.read(cx).set_name.read(cx).focus_handle(cx);
-                        window.focus(&handle, cx);
                     }),
             )
             .child(
@@ -1268,7 +1268,6 @@ impl GeneratePane {
                     .on_click(move |_, _window, cx| {
                         deleting.update(cx, |pane, cx| {
                             pane.deleting_set = matched;
-                            pane.pending_prompt_focus = true;
                             cx.notify();
                         });
                     }),
@@ -1301,6 +1300,8 @@ impl GeneratePane {
                         ts!("generate.use_set", name = set.name.clone()),
                     )
                     .variant(ButtonVariant::Secondary)
+                    // A set's name is the user's, of any length.
+                    .truncate(true)
                     .on_click(move |_, _window, cx| {
                         apply.update(cx, |pane, cx| pane.apply_set(id, cx));
                     })
@@ -1311,13 +1312,16 @@ impl GeneratePane {
                 .flex_col()
                 .gap(px(8.))
                 .py(px(8.))
-                .child(div().text_size(px(12.)).text_color(theme.text_muted).child(
-                    if sets.is_empty() {
-                        ts!("generate.no_templates")
-                    } else {
-                        ts!("generate.no_templates_sets")
-                    },
-                ))
+                .child(
+                    div()
+                        .text_size(rugpui::TextSize::Sm.size(cx))
+                        .text_color(theme.text_muted)
+                        .child(if sets.is_empty() {
+                            ts!("generate.no_templates")
+                        } else {
+                            ts!("generate.no_templates_sets")
+                        }),
+                )
                 .when(!sets.is_empty(), |empty| {
                     empty.child(
                         div()
@@ -1335,7 +1339,7 @@ impl GeneratePane {
         // the heading says what it is for.
         let heading = |text: SharedString| {
             div()
-                .text_size(px(10.))
+                .text_size(rugpui::scaled(10., cx))
                 .text_color(theme.text_muted)
                 .truncate()
                 .child(text)
@@ -1384,7 +1388,7 @@ impl GeneratePane {
                         .flex_1()
                         .min_w_0()
                         .truncate()
-                        .text_size(px(11.))
+                        .text_size(rugpui::TextSize::Xs.size(cx))
                         .text_color(theme.text_muted)
                         .child(message),
                 )
@@ -1474,7 +1478,7 @@ impl GeneratePane {
                     .min_w_0()
                     .truncate()
                     .cursor_pointer()
-                    .text_size(px(11.))
+                    .text_size(rugpui::TextSize::Xs.size(cx))
                     .text_color(theme.text_muted)
                     .tooltip(tooltip_label(ts!("generate.tip_open")))
                     .on_click({
@@ -1519,7 +1523,7 @@ impl GeneratePane {
                     .justify_center()
                     .size(px(22.))
                     .rounded_md()
-                    .text_size(px(12.))
+                    .text_size(rugpui::TextSize::Sm.size(cx))
                     .text_color(theme.icon)
                     .cursor_pointer()
                     .hover(|style| style.bg(theme.surface_hover).text_color(theme.text))
@@ -1543,7 +1547,7 @@ impl GeneratePane {
                     .justify_center()
                     .size(px(22.))
                     .rounded_md()
-                    .text_size(px(12.))
+                    .text_size(rugpui::TextSize::Sm.size(cx))
                     .text_color(theme.icon)
                     .cursor_pointer()
                     .hover(|style| style.bg(theme.surface_hover).text_color(theme.danger))
@@ -1607,7 +1611,7 @@ impl GeneratePane {
             .child(
                 div()
                     .flex_none()
-                    .text_size(px(11.))
+                    .text_size(rugpui::TextSize::Xs.size(cx))
                     .text_color(theme(cx).text_muted)
                     .child(ts!("generate.all_connections")),
             )
@@ -1655,7 +1659,7 @@ impl GeneratePane {
                 .children(overwritten.map(|name| {
                     div()
                         .debug_selector(|| "generate-set-overwrite".to_string())
-                        .text_size(px(12.))
+                        .text_size(rugpui::TextSize::Sm.size(cx))
                         .text_color(theme.text_muted)
                         .child(ts!("generate.overwrite_set_note", name = name))
                 }))
@@ -1694,6 +1698,7 @@ impl GeneratePane {
                 });
             },
         )
+        .initial_focus(&gpui::Focusable::focus_handle(self.set_name.read(cx), cx))
     }
 
     /// The "Delete set" confirmation prompt.
@@ -1714,45 +1719,39 @@ impl GeneratePane {
             "generate-delete-set",
             ts!("generate.delete_set"),
             px(360.),
-            // `Enter` keeps the set: deleting one is the answer that cannot be
-            // taken back, so it is the one that needs a deliberate press.
-            prompt::body(&self.prompt_focus, move |_window, cx| {
-                default.update(cx, |pane, cx| {
-                    pane.deleting_set = None;
-                    cx.notify();
-                });
-            })
-            .flex()
-            .flex_col()
-            .gap(px(12.))
-            .child(ts!("generate.delete_set_confirm", name = name))
-            .child(
-                div()
-                    .flex()
-                    .flex_row()
-                    .justify_end()
-                    .gap(px(8.))
-                    .child(
-                        Button::new("generate-delete-set-cancel", ts!("common.cancel"))
-                            .variant(ButtonVariant::Secondary)
-                            .on_click({
-                                let cancel = cancel.clone();
-                                move |_, _window, cx| {
-                                    cancel.update(cx, |pane, cx| {
-                                        pane.deleting_set = None;
-                                        cx.notify();
-                                    });
-                                }
-                            }),
-                    )
-                    .child(
-                        Button::new("generate-delete-set-confirm", ts!("generate.delete_set"))
-                            .variant(ButtonVariant::Danger)
-                            .on_click(move |_, _window, cx| {
-                                delete.update(cx, |pane, cx| pane.delete_set(id, cx));
-                            }),
-                    ),
-            ),
+            div()
+                .flex()
+                .flex_col()
+                .gap(px(12.))
+                .child(ts!("generate.delete_set_confirm", name = name))
+                .child(
+                    div()
+                        .flex()
+                        .flex_row()
+                        .justify_end()
+                        .gap(px(8.))
+                        .child(
+                            Button::new("generate-delete-set-cancel", ts!("common.cancel"))
+                                .variant(ButtonVariant::Secondary)
+                                .focus_handle(&self.prompt_focus)
+                                .on_click({
+                                    let cancel = cancel.clone();
+                                    move |_, _window, cx| {
+                                        cancel.update(cx, |pane, cx| {
+                                            pane.deleting_set = None;
+                                            cx.notify();
+                                        });
+                                    }
+                                }),
+                        )
+                        .child(
+                            Button::new("generate-delete-set-confirm", ts!("generate.delete_set"))
+                                .variant(ButtonVariant::Danger)
+                                .on_click(move |_, _window, cx| {
+                                    delete.update(cx, |pane, cx| pane.delete_set(id, cx));
+                                }),
+                        ),
+                ),
             move |_window, cx| {
                 cancel.update(cx, |pane, cx| {
                     pane.deleting_set = None;
@@ -1760,6 +1759,14 @@ impl GeneratePane {
                 });
             },
         )
+        // `Enter` keeps the set, as the focused Cancel does.
+        .initial_focus(&self.prompt_focus)
+        .on_confirm(move |_window, cx| {
+            default.update(cx, |pane, cx| {
+                pane.deleting_set = None;
+                cx.notify();
+            });
+        })
     }
 }
 
@@ -1772,12 +1779,9 @@ impl Focusable for GeneratePane {
 }
 
 impl Render for GeneratePane {
-    fn render(&mut self, window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
+    fn render(&mut self, _window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
         let theme = theme(cx);
         self.watch_scroll(cx);
-        if self.deleting_set.is_some() && std::mem::take(&mut self.pending_prompt_focus) {
-            window.focus(&self.prompt_focus, cx);
-        }
 
         // The overwrite policy of the next generate: the settings' default
         // until something else is picked here, and that again once the run
@@ -1817,13 +1821,16 @@ impl Render for GeneratePane {
                         });
                     }),
             )
-            .child(div().text_size(px(11.)).text_color(theme.text_muted).child(
-                if self.overwrite.is_some() {
-                    ts!("generate.overwrite_once")
-                } else {
-                    ts!("generate.overwrite_default")
-                },
-            ));
+            .child(
+                div()
+                    .text_size(rugpui::TextSize::Xs.size(cx))
+                    .text_color(theme.text_muted)
+                    .child(if self.overwrite.is_some() {
+                        ts!("generate.overwrite_once")
+                    } else {
+                        ts!("generate.overwrite_default")
+                    }),
+            );
 
         let chooser = cx.entity();
         let output = div()
@@ -1843,9 +1850,10 @@ impl Render for GeneratePane {
                     }),
             );
 
+        let heading_size = rugpui::TextSize::Xs.size(cx);
         let heading = |text: SharedString| {
             div()
-                .text_size(px(11.))
+                .text_size(heading_size)
                 .text_color(theme.text_muted)
                 .child(text)
         };
@@ -1869,7 +1877,7 @@ impl Render for GeneratePane {
                     .children(
                         self.sets_error
                             .clone()
-                            .map(|message| error_line(message, &theme)),
+                            .map(|message| error_line(message, &theme, cx)),
                     ),
             )
             .child(
@@ -1890,15 +1898,15 @@ impl Render for GeneratePane {
                     .w_full()
                     .min_w_0()
                     .child(heading(ts!("generate.options")))
-                    .child(labeled(ts!("generate.output_dir"), output))
-                    .child(labeled(ts!("generate.author"), self.author.clone()))
-                    .child(labeled(ts!("generate.variables"), self.render_vars()))
-                    .child(labeled(ts!("generate.overwrite"), overwrite))
+                    .child(labeled(ts!("generate.output_dir"), output, cx))
+                    .child(labeled(ts!("generate.author"), self.author.clone(), cx))
+                    .child(labeled(ts!("generate.variables"), self.render_vars(), cx))
+                    .child(labeled(ts!("generate.overwrite"), overwrite, cx))
                     .child(self.render_abbreviations(cx))
                     .children(
                         self.abbr_error
                             .clone()
-                            .map(|message| error_line(message, &theme)),
+                            .map(|message| error_line(message, &theme, cx)),
                     ),
             );
 
@@ -1948,9 +1956,9 @@ impl Render for GeneratePane {
 }
 
 /// A line saying why a global store could not be changed.
-fn error_line(message: SharedString, theme: &Theme) -> impl IntoElement + use<> {
+fn error_line(message: SharedString, theme: &Theme, cx: &App) -> impl IntoElement + use<> {
     div()
-        .text_size(px(11.))
+        .text_size(rugpui::TextSize::Xs.size(cx))
         .text_color(theme.danger)
         .child(message)
 }
@@ -1970,7 +1978,7 @@ fn abbr_failed(error: &anyhow::Error) -> SharedString {
 /// [`rugpui::form_row`]'s label column is sized for a dialog; the options
 /// here sit beside a template list and need a wider one, so the shape is
 /// repeated rather than the widget parameterized for one caller.
-fn labeled(label: SharedString, control: impl IntoElement) -> impl IntoElement {
+fn labeled(label: SharedString, control: impl IntoElement, cx: &App) -> impl IntoElement {
     div()
         .flex()
         .flex_row()
@@ -1983,7 +1991,7 @@ fn labeled(label: SharedString, control: impl IntoElement) -> impl IntoElement {
                 .flex_none()
                 .w(px(LABEL_WIDTH))
                 .pt(px(6.))
-                .text_size(px(12.))
+                .text_size(rugpui::TextSize::Sm.size(cx))
                 .child(label),
         )
         .child(div().flex_grow_1().min_w_0().child(control))

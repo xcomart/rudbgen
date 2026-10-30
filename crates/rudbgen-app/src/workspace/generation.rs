@@ -34,7 +34,6 @@ impl Workspace {
         // the user has just been looking at. So the question comes first.
         if !self.unsaved_run_templates(cx).is_empty() {
             self.unsaved_run = Some(kind);
-            self.focus_prompt = true;
             cx.notify();
             return;
         }
@@ -115,61 +114,65 @@ impl Workspace {
             "unsaved-run",
             ts!("unsaved.title"),
             px(440.),
-            prompt::body(&self.prompt_focus, move |window, cx| {
-                default.update(cx, |workspace, cx| {
-                    workspace.answer_unsaved_run(Some(true), window, cx);
-                });
-            })
-            .flex()
-            .flex_col()
-            .gap(px(14.))
-            .child(
-                div()
-                    .text_size(px(12.))
-                    .text_color(theme.text)
-                    .child(ts!("unsaved.question", names = names.join(", "))),
-            )
-            .child(
-                div()
-                    .flex()
-                    .flex_row()
-                    .flex_wrap()
-                    .justify_end()
-                    .gap(px(8.))
-                    .child(
-                        Button::new("unsaved-cancel", ts!("common.cancel"))
-                            .variant(ButtonVariant::Secondary)
-                            .on_click(move |_, window, cx| {
-                                cancel.update(cx, |workspace, cx| {
-                                    workspace.answer_unsaved_run(None, window, cx);
-                                });
-                            }),
-                    )
-                    .child(
-                        Button::new("unsaved-plain", ts!("unsaved.run_without_saving"))
-                            .variant(ButtonVariant::Secondary)
-                            .on_click(move |_, window, cx| {
-                                plain.update(cx, |workspace, cx| {
-                                    workspace.answer_unsaved_run(Some(false), window, cx);
-                                });
-                            }),
-                    )
-                    .child(
-                        Button::new("unsaved-save", ts!("unsaved.save_and_run"))
-                            .variant(ButtonVariant::Primary)
-                            .on_click(move |_, window, cx| {
-                                save.update(cx, |workspace, cx| {
-                                    workspace.answer_unsaved_run(Some(true), window, cx);
-                                });
-                            }),
-                    ),
-            ),
+            div()
+                .flex()
+                .flex_col()
+                .gap(px(14.))
+                .child(
+                    div()
+                        .text_size(rugpui::TextSize::Sm.size(cx))
+                        .text_color(theme.text)
+                        .child(ts!("unsaved.question", names = names.join(", "))),
+                )
+                .child(
+                    div()
+                        .flex()
+                        .flex_row()
+                        .flex_wrap()
+                        .justify_end()
+                        .gap(px(8.))
+                        .child(
+                            Button::new("unsaved-cancel", ts!("common.cancel"))
+                                .variant(ButtonVariant::Secondary)
+                                .on_click(move |_, window, cx| {
+                                    cancel.update(cx, |workspace, cx| {
+                                        workspace.answer_unsaved_run(None, window, cx);
+                                    });
+                                }),
+                        )
+                        .child(
+                            Button::new("unsaved-plain", ts!("unsaved.run_without_saving"))
+                                .variant(ButtonVariant::Secondary)
+                                .on_click(move |_, window, cx| {
+                                    plain.update(cx, |workspace, cx| {
+                                        workspace.answer_unsaved_run(Some(false), window, cx);
+                                    });
+                                }),
+                        )
+                        .child(
+                            Button::new("unsaved-save", ts!("unsaved.save_and_run"))
+                                .variant(ButtonVariant::Primary)
+                                .focus_handle(&self.prompt_focus)
+                                .on_click(move |_, window, cx| {
+                                    save.update(cx, |workspace, cx| {
+                                        workspace.answer_unsaved_run(Some(true), window, cx);
+                                    });
+                                }),
+                        ),
+                ),
             move |window, cx| {
                 dismissed.update(cx, |workspace, cx| {
                     workspace.answer_unsaved_run(None, window, cx);
                 });
             },
         )
+        // *Save and run* holds the keyboard and is what `Enter` answers.
+        .initial_focus(&self.prompt_focus)
+        .on_confirm(move |window, cx| {
+            default.update(cx, |workspace, cx| {
+                workspace.answer_unsaved_run(Some(true), window, cx);
+            });
+        })
         .into_any_element()
     }
 

@@ -343,6 +343,7 @@ generate:
   rendering: "正在渲染…"
   dry_into: "将在 %{dir} 下写入 %{count} 个文件"
   dry_no_output: "尚未选择输出目录：路径显示在临时目录下，因此所有文件都显示为新建。"
+  added_to_list: "已将“%{name}”添加到生成列表。"
 
 progress:
   title: 正在生成…
@@ -496,7 +497,7 @@ update:
   title: 有可用更新
   available: "%{app} %{version} 已发布。"
   installed: "当前运行的是 %{version}。"
-  update: 更新
+  update: "更新并重新启动"
   ignore: 忽略此版本
   checking: 正在检查更新…
   up_to_date: 已是最新版本。
@@ -741,6 +742,7 @@ context:
   close_others: "关闭其他标签页"
   close_right: "关闭右侧标签页"
   copy_path: "复制路径"
+  path_copied: "已复制路径。"
 
 password:
   title: "密码"
@@ -761,3 +763,17 @@ unsaved:
   question: "以下模板有未保存的更改：%{names}。运行读取的是已保存的文件，而不是标签页中的内容。"
   save_and_run: "保存并运行"
   run_without_saving: "不保存直接运行"
+
+close_guard:
+  title_window: "有未保存的工作，要关闭窗口吗？"
+  title_quit: "有未保存的工作，要退出吗？"
+  title_restart: "有未保存的工作，要重新启动吗？"
+  message: "如果继续，以下内容将会丢失："
+  more: "…另外 %{count} 项"
+  close_anyway: "仍然关闭"
+  quit_anyway: "仍然退出"
+  restart_anyway: "仍然重新启动"
+  save_all: "全部保存"
+  item_template: "未保存的模板“%{name}”"
+  item_run: "仍在写入文件的生成任务"
+  item_draft: "已打开对话框中未保存的更改"

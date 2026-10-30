@@ -338,6 +338,9 @@ pub struct TemplatePane {
     completion: Option<Completion>,
     /// Pointer position of the source editor's context menu.
     context_menu: Option<Point<Pixels>>,
+    /// Whether that menu was opened from the keyboard, and so opens on its
+    /// first row.
+    context_by_keyboard: bool,
     /// Where the header's tab width menu hangs from, while it is up.
     tab_menu: Option<Point<Pixels>>,
     /// Whether the buffer should take the keyboard on the next frame.
@@ -393,6 +396,7 @@ impl TemplatePane {
                 pane.choice_open = false;
                 pane.tab_menu = None;
                 pane.context_menu = Some(*position);
+                pane.context_by_keyboard = false;
                 cx.notify();
             }
             _ => {}
@@ -439,6 +443,7 @@ impl TemplatePane {
             items: Vec::new(),
             completion: None,
             context_menu: None,
+            context_by_keyboard: false,
             tab_menu: None,
             pending_focus: true,
             listed: None,
@@ -738,6 +743,7 @@ impl TemplatePane {
         Some(
             ContextMenu::new("template-context")
                 .position(position)
+                .highlight_first(self.context_by_keyboard)
                 .entries(menu_rows::entries(self.editor_rows(cx)))
                 .on_dismiss(move |_window, cx| {
                     this.update(cx, |pane, cx| {
@@ -1192,14 +1198,14 @@ impl TemplatePane {
                     .flex_1()
                     .min_w_0()
                     .truncate()
-                    .text_size(px(11.))
+                    .text_size(rugpui::TextSize::Xs.size(cx))
                     .text_color(theme.text_muted)
                     .child(SharedString::from(self.path.display().to_string())),
             )
             .children(dirty.then(|| {
                 div()
                     .flex_none()
-                    .text_size(px(11.))
+                    .text_size(rugpui::TextSize::Xs.size(cx))
                     .text_color(theme.accent)
                     .child(ts!("template.unsaved"))
             }))
@@ -1211,10 +1217,10 @@ impl TemplatePane {
                     .flex_none()
                     .items_center()
                     .justify_center()
-                    .h(px(20.))
+                    .h(rugpui::scaled(20., cx))
                     .px(px(8.))
                     .rounded_md()
-                    .text_size(px(11.))
+                    .text_size(rugpui::TextSize::Xs.size(cx))
                     .text_color(if tab_menu_open {
                         theme.text
                     } else {
@@ -1252,10 +1258,10 @@ impl TemplatePane {
                     .flex_none()
                     .items_center()
                     .justify_center()
-                    .h(px(20.))
+                    .h(rugpui::scaled(20., cx))
                     .px(px(8.))
                     .rounded_md()
-                    .text_size(px(11.))
+                    .text_size(rugpui::TextSize::Xs.size(cx))
                     .text_color(if open { theme.text } else { theme.text_muted })
                     .cursor_pointer()
                     .hover(|style| style.bg(theme.surface_hover))
@@ -1330,7 +1336,7 @@ impl TemplatePane {
                             .flex_1()
                             .min_w_0()
                             .truncate()
-                            .text_size(px(11.))
+                            .text_size(rugpui::TextSize::Xs.size(cx))
                             .text_color(theme.text_muted)
                             .child(path)
                     })),
@@ -1346,7 +1352,7 @@ impl TemplatePane {
                     .min_w_0()
                     .w_full()
                     .p(px(12.))
-                    .text_size(px(12.))
+                    .text_size(rugpui::TextSize::Sm.size(cx))
                     .text_color(theme.text_muted)
                     .child(note.clone())
                     .into_any_element(),
@@ -1416,7 +1422,7 @@ impl TemplatePane {
                         div()
                             .flex_none()
                             .w(px(64.))
-                            .text_size(px(11.))
+                            .text_size(rugpui::TextSize::Xs.size(cx))
                             .text_color(color)
                             .child(ts!(
                                 "diagnostics.at",
@@ -1429,7 +1435,7 @@ impl TemplatePane {
                             .flex_1()
                             .min_w_0()
                             .truncate()
-                            .text_size(px(11.))
+                            .text_size(rugpui::TextSize::Xs.size(cx))
                             .text_color(theme.text)
                             .child(diagnostic.message.clone()),
                     )
@@ -1443,7 +1449,7 @@ impl TemplatePane {
             .flex_none()
             .w_full()
             .min_w_0()
-            .h(px(DIAGNOSTICS_HEIGHT))
+            .h(rugpui::scaled(DIAGNOSTICS_HEIGHT, cx))
             .gap(px(1.))
             .py(px(4.))
             .overflow_y_scroll()
@@ -1454,7 +1460,7 @@ impl TemplatePane {
                 div()
                     .px(px(8.))
                     .pb(px(2.))
-                    .text_size(px(10.))
+                    .text_size(rugpui::scaled(10., cx))
                     .text_color(theme.text_muted)
                     .child(ts!("diagnostics.title", count = self.diagnostics.len())),
             )
@@ -1501,7 +1507,7 @@ impl TemplatePane {
                         div()
                             .flex_none()
                             .font_family(mono.clone())
-                            .text_size(px(11.))
+                            .text_size(rugpui::TextSize::Xs.size(cx))
                             .text_color(theme.text)
                             .child(item.name.clone()),
                     )
@@ -1510,7 +1516,7 @@ impl TemplatePane {
                             .flex_1()
                             .min_w_0()
                             .truncate()
-                            .text_size(px(10.))
+                            .text_size(rugpui::scaled(10., cx))
                             .text_color(theme.text_muted)
                             .child(item.description.clone()),
                     )
@@ -1530,7 +1536,7 @@ impl TemplatePane {
             .pt(px(2.))
             .border_t_1()
             .border_color(theme.border)
-            .text_size(px(10.))
+            .text_size(rugpui::scaled(10., cx))
             .text_color(theme.text_muted)
             .child(ts!("completion.hint"))
             .children((hidden > 0).then(|| div().child(ts!("completion.more", count = hidden))));
@@ -1598,7 +1604,7 @@ impl Render for TemplatePane {
                 .h_full()
                 .min_h_0()
                 .p(px(16.))
-                .text_size(px(12.))
+                .text_size(rugpui::TextSize::Sm.size(cx))
                 .text_color(theme.danger)
                 .child(failure.clone())
                 .into_any_element();
@@ -1668,7 +1674,7 @@ impl Render for TemplatePane {
                     .flex_none()
                     .px(px(10.))
                     .py(px(4.))
-                    .text_size(px(11.))
+                    .text_size(rugpui::TextSize::Xs.size(cx))
                     .text_color(theme.danger)
                     .child(message)
             }))
@@ -1685,6 +1691,19 @@ impl Render for TemplatePane {
             .children((!self.diagnostics.is_empty()).then(|| self.render_diagnostics(cx)))
             .children(self.render_completion(cx))
             .children(self.render_context_menu(cx))
+            // `Shift+F10` and the Menu key: the editor's menu, at the caret —
+            // the one place a keyboard user is looking.
+            .on_action(
+                cx.listener(|pane, _: &rugpui::OpenContextMenu, _window, cx| {
+                    let caret = pane.editor.read(cx).caret_bounds();
+                    let Some(caret) = caret else {
+                        return;
+                    };
+                    pane.context_menu = Some(caret.bottom_left());
+                    pane.context_by_keyboard = true;
+                    cx.notify();
+                }),
+            )
             .children(self.render_tab_menu(cx))
             .into_any_element()
     }

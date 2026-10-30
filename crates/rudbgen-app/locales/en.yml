@@ -485,6 +485,7 @@ generate:
   rendering: "Rendering…"
   dry_into: "%{count} files would be written under %{dir}"
   dry_no_output: "No output directory is chosen yet: the paths are shown under a temporary one, so every file reads new."
+  added_to_list: "Added “%{name}” to the generation list."
 
 # The progress dialog of a run (D11). Every line here is one row of its log,
 # so they are worded as a log is: lower case, no full stop.
@@ -683,7 +684,7 @@ update:
   installed: "You are currently running %{version}."
   # Downloads the release built for this platform and restarts into it. Falls
   # back to opening the release page where the project publishes no such build.
-  update: Update
+  update: "Update and restart"
   # Never mention *this* release again. A later one still announces itself, so
   # the wording has to name the version rather than promise silence in general.
   ignore: Ignore this version
@@ -981,6 +982,7 @@ context:
   close_others: "Close other tabs"
   close_right: "Close tabs to the right"
   copy_path: "Copy path"
+  path_copied: "Path copied."
 
 # The password the main window asks for, when a connection keeps none
 # in the keychain or the database refused the one it had.
@@ -1006,3 +1008,22 @@ unsaved:
   question: "These templates have changes that are not saved: %{names}. A run reads the saved files, not what is in the tabs."
   save_and_run: "Save and run"
   run_without_saving: "Run without saving"
+
+# The question a window close, a quit or an update's restart asks while
+# something would be lost. The titles, the message and the buttons are
+# rugpui-shell's keys; the `item_*` lines are rudbgen's, one per thing.
+close_guard:
+  title_window: "Close the window with unsaved work?"
+  title_quit: "Quit with unsaved work?"
+  title_restart: "Restart with unsaved work?"
+  message: "If you go on, this is lost:"
+  # `%{count}` is how many more items there are.
+  more: "…and %{count} more"
+  close_anyway: "Close anyway"
+  quit_anyway: "Quit anyway"
+  restart_anyway: "Restart anyway"
+  save_all: "Save all"
+  # `%{name}` is the template tab's title.
+  item_template: "Unsaved template “%{name}”"
+  item_run: "A generation run that is still writing files"
+  item_draft: "Unsaved changes in an open dialog"

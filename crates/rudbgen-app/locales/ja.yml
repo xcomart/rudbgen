@@ -344,6 +344,7 @@ generate:
   rendering: "レンダリング中…"
   dry_into: "%{dir} の下に %{count} 件のファイルを書き出します"
   dry_no_output: "出力先がまだ未設定のため、一時フォルダーを基準に表示しています。そのためすべて新規と表示されます。"
+  added_to_list: "「%{name}」を生成リストに追加しました。"
 
 progress:
   title: 生成中…
@@ -497,7 +498,7 @@ update:
   title: 更新があります
   available: "%{app} %{version} が利用できます。"
   installed: "現在実行中のバージョンは %{version} です。"
-  update: 更新
+  update: "更新して再起動"
   ignore: このバージョンを無視
   checking: 更新を確認しています…
   up_to_date: 最新バージョンです。
@@ -742,6 +743,7 @@ context:
   close_others: "他のタブを閉じる"
   close_right: "右側のタブを閉じる"
   copy_path: "パスをコピー"
+  path_copied: "パスをコピーしました。"
 
 password:
   title: "パスワード"
@@ -762,3 +764,17 @@ unsaved:
   question: "次のテンプレートに未保存の変更があります: %{names}。実行はタブの内容ではなく、保存済みのファイルを読みます。"
   save_and_run: "保存して実行"
   run_without_saving: "保存せずに実行"
+
+close_guard:
+  title_window: "未保存の作業があります。ウィンドウを閉じますか？"
+  title_quit: "未保存の作業があります。終了しますか？"
+  title_restart: "未保存の作業があります。再起動しますか？"
+  message: "続けると、次の内容が失われます:"
+  more: "…ほか %{count} 件"
+  close_anyway: "それでも閉じる"
+  quit_anyway: "それでも終了"
+  restart_anyway: "それでも再起動"
+  save_all: "すべて保存"
+  item_template: "未保存のテンプレート「%{name}」"
+  item_run: "まだファイルを書き込んでいる生成処理"
+  item_draft: "開いているダイアログの未保存の変更"

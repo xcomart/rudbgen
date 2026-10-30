@@ -437,6 +437,7 @@ impl ExplorerSource {
         info: TreeRowInfo,
         state: Tick,
         chrome: &Theme,
+        cx: &App,
     ) -> AnyElement {
         let (bg, border, glyph) = match state {
             Tick::On => (chrome.accent, chrome.accent, TICK_ON),
@@ -457,7 +458,7 @@ impl ExplorerSource {
             .border_1()
             .border_color(border)
             .bg(bg)
-            .text_size(px(10.))
+            .text_size(rugpui::scaled(10., cx))
             .text_color(if matches!(state, Tick::On) {
                 chrome.background
             } else {
@@ -554,7 +555,7 @@ impl TreeSource for ExplorerSource {
                         .flex_1()
                         .min_w_0()
                         .truncate()
-                        .text_size(px(11.))
+                        .text_size(rugpui::TextSize::Xs.size(cx))
                         .text_color(chrome.danger)
                         .child(label),
                 )
@@ -568,7 +569,7 @@ impl TreeSource for ExplorerSource {
             NodeId::Catalog(_) => None,
             NodeId::Schema(key) => {
                 let members = self.visible_keys(key);
-                Some(self.render_tick(id, info, tick_of(&self.selection, &members), &chrome))
+                Some(self.render_tick(id, info, tick_of(&self.selection, &members), &chrome, cx))
             }
             NodeId::Table(key) => {
                 let state = if self.selection.contains(key) {
@@ -576,7 +577,7 @@ impl TreeSource for ExplorerSource {
                 } else {
                     Tick::Off
                 };
-                Some(self.render_tick(id, info, state, &chrome))
+                Some(self.render_tick(id, info, state, &chrome, cx))
             }
             NodeId::Error(_) => None,
         };
@@ -630,7 +631,7 @@ impl TreeSource for ExplorerSource {
                     .flex_initial()
                     .min_w(px(24.))
                     .truncate()
-                    .text_size(px(12.))
+                    .text_size(rugpui::TextSize::Sm.size(cx))
                     .when(info.selected, |label| label.text_color(chrome.text))
                     .child(label),
             )
@@ -643,7 +644,7 @@ impl TreeSource for ExplorerSource {
                     .min_w_0()
                     .max_w(px(120.))
                     .truncate()
-                    .text_size(px(10.))
+                    .text_size(rugpui::scaled(10., cx))
                     .text_color(chrome.text_muted)
                     .child(remarks)
             }))
@@ -652,7 +653,7 @@ impl TreeSource for ExplorerSource {
 
     fn render_loading(&self, _window: &mut Window, cx: &mut App) -> AnyElement {
         div()
-            .text_size(px(11.))
+            .text_size(rugpui::TextSize::Xs.size(cx))
             .text_color(theme(cx).text_muted)
             .child(ts!("explorer.loading"))
             .into_any_element()
@@ -698,6 +699,12 @@ pub struct Explorer {
     filter: Entity<TextInput>,
     /// The right-click menu, while one is open, and where it hangs from.
     menu: Option<(NodeId, Point<Pixels>)>,
+    /// Whether that menu was opened from the keyboard, and so opens on its
+    /// first row.
+    menu_by_keyboard: bool,
+    /// Where the tree was drawn last, for a menu opened from the keyboard to
+    /// hang from: the selected row's own box is the tree's to know.
+    tree_bounds: std::rc::Rc<std::cell::Cell<gpui::Bounds<Pixels>>>,
     /// Schemas ticked before their tables arrived.
     ///
     /// A tick on an unexpanded schema is still a promise — "select this whole
@@ -759,6 +766,7 @@ impl Explorer {
             TreeEvent::SelectionChanged(_) => {}
             TreeEvent::ContextMenu { id, position } => {
                 explorer.menu = Some((id.clone(), *position));
+                explorer.menu_by_keyboard = false;
                 cx.notify();
             }
         });
@@ -780,6 +788,8 @@ impl Explorer {
             tree,
             filter,
             menu: None,
+            menu_by_keyboard: false,
+            tree_bounds: std::rc::Rc::default(),
             pending_ticks: BTreeSet::new(),
             unverified: BTreeSet::new(),
             missing: Vec::new(),
@@ -1252,7 +1262,7 @@ impl Explorer {
                     div()
                         .flex_1()
                         .min_w_0()
-                        .text_size(px(11.))
+                        .text_size(rugpui::TextSize::Xs.size(cx))
                         .text_color(chrome.danger)
                         .child(ts!("explorer.missing", names = names.join(", "))),
                 )
@@ -1290,6 +1300,7 @@ impl Render for Explorer {
             let rows = self.menu_rows(&id, cx);
             rugpui::ContextMenu::new("explorer-context")
                 .position(position)
+                .highlight_first(self.menu_by_keyboard)
                 .entries(menu_rows::entries(rows))
                 .on_dismiss(move |_window, cx| {
                     this.update(cx, |explorer, cx| {
@@ -1319,9 +1330,9 @@ impl Render for Explorer {
                     .flex()
                     .flex_none()
                     .items_center()
-                    .h(px(HEADER_HEIGHT))
+                    .h(rugpui::scaled(HEADER_HEIGHT, cx))
                     .px(px(10.))
-                    .text_size(px(10.))
+                    .text_size(rugpui::scaled(10., cx))
                     .text_color(chrome.text_muted)
                     .child(ts!("explorer.title")),
             )
@@ -1337,18 +1348,40 @@ impl Render for Explorer {
                     .items_center()
                     .justify_center()
                     .px(px(12.))
-                    .text_size(px(11.))
+                    .text_size(rugpui::TextSize::Xs.size(cx))
                     .text_color(chrome.danger)
                     .child(message)
                     .into_any_element(),
-                None => div()
-                    .flex()
-                    .flex_1()
-                    .min_h_0()
-                    .child(self.tree.clone())
-                    .into_any_element(),
+                None => {
+                    let bounds = self.tree_bounds.clone();
+                    div()
+                        .relative()
+                        .flex()
+                        .flex_1()
+                        .min_h_0()
+                        .child(self.tree.clone())
+                        .child(
+                            gpui::canvas(move |drawn, _, _| bounds.set(drawn), |_, _, _, _| {})
+                                .absolute()
+                                .size_full(),
+                        )
+                        .into_any_element()
+                }
             })
             .children(menu)
+            // `Shift+F10` and the Menu key: the selected row's menu, hung
+            // inside the top of the tree, opening on its first row.
+            .on_action(
+                cx.listener(|explorer, _: &rugpui::OpenContextMenu, _window, cx| {
+                    let Some(id) = explorer.tree.read(cx).selected().cloned() else {
+                        return;
+                    };
+                    let origin = explorer.tree_bounds.get().origin;
+                    explorer.menu = Some((id, origin + gpui::point(px(16.), px(16.))));
+                    explorer.menu_by_keyboard = true;
+                    cx.notify();
+                }),
+            )
     }
 }
 

@@ -60,12 +60,12 @@
 pub(crate) use bootstrap::editor_theme_for;
 
 use crate::{
-    AddToGeneration, CheckUpdates, CloseTab, ConfirmDialog, DismissDialog, DryRun,
-    EditAbbreviations, FocusTabs, Generate, ImportJdbgen, ManageConnections, NewConnection,
-    NewProfile, NewTemplate, NextDiagnostic, NextTab, OpenSettings, OpenTemplate, PrevDiagnostic,
-    PrevTab, Preview, Quit, SaveDialog, SaveTemplate, SelectTab, ShowAbout, ToggleExplorer,
-    ToggleInspector, ToggleLivePreview, TriggerCompletion, app_settings, builtin_templates,
-    connection, generate_pane, i18n, icons, palette, prompt, sample_db,
+    AddToGeneration, CheckUpdates, CloseTab, DismissDialog, DryRun, EditAbbreviations, FocusTabs,
+    Generate, ImportJdbgen, ManageConnections, NewConnection, NewProfile, NewTemplate,
+    NextDiagnostic, NextTab, OpenSettings, OpenTemplate, PrevDiagnostic, PrevTab, Preview, Quit,
+    SaveDialog, SaveTemplate, SelectTab, ShowAbout, ToggleExplorer, ToggleInspector,
+    ToggleLivePreview, TriggerCompletion, app_settings, builtin_templates, connection,
+    generate_pane, i18n, icons, palette, sample_db,
 };
 
 mod actions;
@@ -104,7 +104,7 @@ use rugpui::{
     set_editor_theme, set_theme, set_window_tint, theme, tooltip_label,
 };
 use rugpui_shell::{
-    AboutDialog, AboutDialogEvent, AppIdentity, Pane, UpdateDialog, UpdateDialogEvent,
+    AboutDialog, AboutDialogEvent, AppIdentity, CloseGuard, Pane, UpdateDialog, UpdateDialogEvent,
     apply_caption_theme, chrome, menu_rows, update,
 };
 
@@ -515,8 +515,6 @@ struct PasswordPrompt {
     driver: Box<DriverDef>,
     /// What to type into; masked.
     input: Entity<rugpui::TextInput>,
-    /// Whether the field should take the keyboard on the next frame.
-    focus: bool,
     /// Whether the password is to be kept in the keychain once it works.
     remember: bool,
     /// Why the question is being asked again, when it is.
@@ -662,16 +660,14 @@ struct Workspace {
     deleting_profile: Option<uuid::Uuid>,
     /// The password a connection is waiting on, while the question is up.
     password_prompt: Option<PasswordPrompt>,
-    /// Something the user has to hear about the session that opened — that
-    /// the keychain refused its password — shown on the status bar until the
-    /// next connection replaces it.
+    /// Something the user has to hear once the session being opened is open
+    /// — that the keychain refused its password — said in a toast then, and
+    /// dropped if the session never opens.
     connection_notice: Option<SharedString>,
-    /// The box the shell's own questions are drawn in — save before closing,
-    /// save before running, delete this connection; see [`prompt::body`].
+    /// The button the shell's own questions put the keyboard on — Save before
+    /// closing, *Save and run*, Cancel before deleting a connection. One
+    /// handle, because only one of them is ever up.
     prompt_focus: FocusHandle,
-    /// Whether that box should take the keyboard on the next frame, for a
-    /// question put up from somewhere that has no window to hand.
-    focus_prompt: bool,
     /// The work area's tab strip, for the keyboard to reach it by
     /// ([`FocusTabs`]); see [`TabBar::focus_handle`].
     tabs_focus: FocusHandle,
@@ -734,6 +730,16 @@ struct Workspace {
     update: Entity<UpdateDialog>,
     /// Whether the help menu is showing.
     menu_open: bool,
+    /// Whether it was opened from the keyboard (`F10`), and so opens on its
+    /// first row.
+    menu_by_keyboard: bool,
+    /// Whether the tab menu was opened from the keyboard.
+    tab_menu_by_keyboard: bool,
+    /// Whether the welcome row's menu was opened from the keyboard.
+    profile_menu_by_keyboard: bool,
+    /// Where the tab strip was drawn last, for a menu opened on it from the
+    /// keyboard to hang from.
+    tabs_bounds: std::rc::Rc<std::cell::Cell<gpui::Bounds<Pixels>>>,
     /// Title bar style currently *on the window*.
     ///
     /// Starts as the style the window was created with. Not read from the
@@ -766,6 +772,9 @@ struct Workspace {
     _palette_events: Subscription,
     /// Keeps the generation dialog's subscription alive.
     _job_events: Subscription,
+    /// The question a close, a quit or an update's restart asks while there
+    /// is work it would lose; drawn last, over every other overlay.
+    close_guard: Entity<CloseGuard>,
     /// Closes the session before the process winds down.
     _quit: Subscription,
     /// Records the window's placement as it is moved and resized.
@@ -808,8 +817,8 @@ impl Workspace {
             // debounce; written now, or lost with the process.
             workspace.generate.update(cx, |pane, cx| pane.flush(cx));
             workspace.remember_ticks(cx);
-            // Nothing stops the quit from here yet — that question is the
-            // window's close guard's to ask — but what it cost goes on record.
+            // The close guard asked before the quit got here; what the user
+            // chose to leave behind goes on record.
             let lost = workspace.unsaved_work(cx);
             if !lost.is_empty() {
                 log::warn!("quitting with work that was not saved: {lost:?}");
@@ -823,6 +832,27 @@ impl Workspace {
 
         let update = cx.new(UpdateDialog::new);
         let update_events = cx.subscribe_in(&update, window, Self::on_update_event);
+
+        // The window's close guard: the caption's close, the platform's, a
+        // quit and an update's restart all ask it first, and it asks the user
+        // only when `unsaved_lines` names something. *Save all* writes the
+        // template tabs; a run and a dialog's draft are not things it can
+        // save, so they stay on the list until the user deals with them.
+        let lines = cx.weak_entity();
+        let saving = cx.weak_entity();
+        let close_guard = cx.new(|cx| {
+            CloseGuard::new(window, cx, move |_intent, _window, cx| {
+                lines
+                    .read_with(cx, |workspace, cx| workspace.unsaved_lines(cx))
+                    .unwrap_or_default()
+            })
+            .with_save_all(move |_window, cx| {
+                let saved = saving
+                    .update(cx, |workspace, cx| workspace.save_all_templates(cx))
+                    .unwrap_or(false);
+                Task::ready(saved)
+            })
+        });
 
         Self::start_background_work(cx);
 
@@ -906,7 +936,6 @@ impl Workspace {
             password_prompt: None,
             connection_notice: None,
             prompt_focus: cx.focus_handle(),
-            focus_prompt: false,
             tabs_focus: cx.focus_handle(),
             tab_menu: None,
             profile_menu: None,
@@ -924,6 +953,10 @@ impl Workspace {
             inspector_width: layout.inspector_width,
             update,
             menu_open: false,
+            menu_by_keyboard: false,
+            tab_menu_by_keyboard: false,
+            profile_menu_by_keyboard: false,
+            tabs_bounds: std::rc::Rc::default(),
             titlebar,
             _about_events: about_events,
             _settings_events: settings_events,
@@ -937,6 +970,7 @@ impl Workspace {
             _preview_events: preview_events,
             _palette_events: palette_events,
             _job_events: job_events,
+            close_guard,
             _quit: quit,
             _bounds: bounds,
             _button_layout: button_layout,

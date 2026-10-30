@@ -537,7 +537,7 @@ impl Inspector {
             .flex_none()
             .items_center()
             .gap(px(6.))
-            .h(px(HEADER_HEIGHT))
+            .h(rugpui::scaled(HEADER_HEIGHT, cx))
             .px(px(10.))
             .border_b_1()
             .border_color(chrome.border)
@@ -548,7 +548,7 @@ impl Inspector {
                     .flex_none()
                     .max_w(px(180.))
                     .truncate()
-                    .text_size(px(12.))
+                    .text_size(rugpui::TextSize::Sm.size(cx))
                     .text_color(chrome.text)
                     // The name is cut to keep the header one row tall, so the
                     // whole of it — catalog and schema included — has to be
@@ -564,7 +564,7 @@ impl Inspector {
             .children(kind.map(|kind| {
                 div()
                     .flex_none()
-                    .text_size(px(10.))
+                    .text_size(rugpui::scaled(10., cx))
                     .text_color(chrome.text_muted)
                     .child(kind)
             }))
@@ -572,7 +572,7 @@ impl Inspector {
                 div()
                     .min_w_0()
                     .truncate()
-                    .text_size(px(10.))
+                    .text_size(rugpui::scaled(10., cx))
                     .text_color(chrome.text_muted)
                     .child(SharedString::from(remarks))
             }))
@@ -634,13 +634,13 @@ impl Inspector {
     fn render_body(&self, chrome: &Theme, cx: &mut Context<Self>) -> AnyElement {
         let table = match &self.load {
             Load::Idle => {
-                return fill(ts!("inspector.empty"), chrome.text_muted);
+                return fill(ts!("inspector.empty"), chrome.text_muted, cx);
             }
             Load::Running => {
-                return fill(ts!("inspector.loading"), chrome.text_muted);
+                return fill(ts!("inspector.loading"), chrome.text_muted, cx);
             }
             Load::Failed(message) => {
-                return fill(message.clone(), chrome.danger);
+                return fill(message.clone(), chrome.danger, cx);
             }
             Load::Ready(table) => Rc::clone(table),
         };
@@ -667,6 +667,7 @@ impl Inspector {
                 ],
                 &key_rows(&table),
                 chrome,
+                cx,
             ),
             // Two sections, labeled by direction rather than by JDBC's
             // "imported" and "exported": which way a key points is the one thing
@@ -687,8 +688,10 @@ impl Inspector {
                         ],
                         &foreign_key_rows(&table.imports),
                         chrome,
+                        cx,
                     ),
                     chrome,
+                    cx,
                 ))
                 .child(section(
                     ts!("inspector.references_in"),
@@ -702,8 +705,10 @@ impl Inspector {
                         ],
                         &foreign_key_rows(&table.exports),
                         chrome,
+                        cx,
                     ),
                     chrome,
+                    cx,
                 ))
                 .into_any_element(),
             Tab::Indexes => metadata_table(
@@ -714,6 +719,7 @@ impl Inspector {
                 ],
                 &index_rows(&table),
                 chrome,
+                cx,
             ),
         };
 
@@ -886,7 +892,7 @@ fn rule(action: &str) -> SharedString {
 }
 
 /// A one-line message filling the body.
-fn fill(message: SharedString, color: Hsla) -> AnyElement {
+fn fill(message: SharedString, color: Hsla, cx: &App) -> AnyElement {
     div()
         .flex()
         .flex_1()
@@ -894,21 +900,21 @@ fn fill(message: SharedString, color: Hsla) -> AnyElement {
         .items_center()
         .justify_center()
         .px(px(12.))
-        .text_size(px(11.))
+        .text_size(rugpui::TextSize::Xs.size(cx))
         .text_color(color)
         .child(message)
         .into_any_element()
 }
 
 /// A titled block inside a tab.
-fn section(title: SharedString, body: AnyElement, chrome: &Theme) -> AnyElement {
+fn section(title: SharedString, body: AnyElement, chrome: &Theme, cx: &App) -> AnyElement {
     div()
         .flex()
         .flex_col()
         .gap(px(6.))
         .child(
             div()
-                .text_size(px(11.))
+                .text_size(rugpui::TextSize::Xs.size(cx))
                 .text_color(chrome.text_muted)
                 .child(title),
         )
@@ -926,11 +932,12 @@ fn metadata_table<const N: usize>(
     headers: [SharedString; N],
     rows: &[Row],
     chrome: &Theme,
+    cx: &App,
 ) -> AnyElement {
     if rows.is_empty() {
         return div()
             .py(px(6.))
-            .text_size(px(11.))
+            .text_size(rugpui::TextSize::Xs.size(cx))
             .text_color(chrome.text_muted)
             .child(ts!("inspector.nothing_here"))
             .into_any_element();
@@ -943,7 +950,7 @@ fn metadata_table<const N: usize>(
             .truncate()
             .px(px(6.))
             .py(px(3.))
-            .text_size(px(11.))
+            .text_size(rugpui::TextSize::Xs.size(cx))
             .text_color(if muted {
                 chrome.text_muted
             } else {

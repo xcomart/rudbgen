@@ -487,14 +487,14 @@ impl PreviewPane {
                             .overflow_hidden()
                             .whitespace_nowrap()
                             .text_ellipsis_start()
-                            .text_size(px(11.))
+                            .text_size(rugpui::TextSize::Xs.size(cx))
                             .text_color(theme.text)
                             .child(shown),
                     )
                     .child(
                         div()
                             .flex_none()
-                            .text_size(px(11.))
+                            .text_size(rugpui::TextSize::Xs.size(cx))
                             .text_color(if file.exists {
                                 theme.danger
                             } else {
@@ -510,7 +510,7 @@ impl PreviewPane {
                         div()
                             .flex_none()
                             .w(px(70.))
-                            .text_size(px(11.))
+                            .text_size(rugpui::TextSize::Xs.size(cx))
                             .text_color(theme.text_muted)
                             .child(ts!("generate.dry_bytes", bytes = file.content.len())),
                     )
@@ -525,7 +525,7 @@ impl PreviewPane {
             .gap(px(1.))
             .w_full()
             .min_w_0()
-            .h(px(LIST_HEIGHT))
+            .h(rugpui::scaled(LIST_HEIGHT, cx))
             .p(px(4.))
             .overflow_y_scroll()
             .rounded_md()
@@ -568,7 +568,7 @@ impl Render for PreviewPane {
                         .child(
                             div()
                                 .flex_1()
-                                .text_size(px(12.))
+                                .text_size(rugpui::TextSize::Sm.size(cx))
                                 .text_color(theme.text_muted)
                                 .child(ts!("generate.rendering")),
                         )
@@ -604,7 +604,7 @@ impl Render for PreviewPane {
                         div()
                             .flex_1()
                             .min_w_0()
-                            .text_size(px(11.))
+                            .text_size(rugpui::TextSize::Xs.size(cx))
                             .text_color(theme.text_muted)
                             .child(match &self.output_dir {
                                 Some(dir) => ts!(
@@ -668,7 +668,7 @@ impl Render for PreviewPane {
                 .bg(theme.surface)
                 .border_1()
                 .border_color(theme.accent)
-                .text_size(px(11.))
+                .text_size(rugpui::TextSize::Xs.size(cx))
                 .text_color(theme.text_muted)
                 .child(
                     div()
@@ -687,7 +687,7 @@ impl Render for PreviewPane {
                 .w_full()
                 .min_w_0()
                 .p(px(12.))
-                .text_size(px(12.))
+                .text_size(rugpui::TextSize::Sm.size(cx))
                 .text_color(theme.danger)
                 .child(message.clone())
                 .into_any_element(),
@@ -702,7 +702,7 @@ impl Render for PreviewPane {
                 .child(
                     div()
                         .px(px(2.))
-                        .text_size(px(11.))
+                        .text_size(rugpui::TextSize::Xs.size(cx))
                         .text_color(theme.text_muted)
                         .child(SharedString::from(file.path.display().to_string())),
                 )
@@ -727,7 +727,7 @@ impl Render for PreviewPane {
                 .w_full()
                 .min_w_0()
                 .p(px(12.))
-                .text_size(px(12.))
+                .text_size(rugpui::TextSize::Sm.size(cx))
                 .text_color(theme.text_muted)
                 .child(ts!("generate.preview_empty"))
                 .into_any_element(),

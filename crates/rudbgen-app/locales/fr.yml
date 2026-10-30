@@ -346,6 +346,7 @@ generate:
   rendering: "Rendu en cours…"
   dry_into: "%{count} fichiers seraient écrits sous %{dir}"
   dry_no_output: "Aucun dossier de sortie n’est encore choisi : les chemins sont montrés sous un dossier temporaire, et tous les fichiers paraissent donc nouveaux."
+  added_to_list: "« %{name} » a été ajouté à la liste de génération."
 
 progress:
   title: Génération…
@@ -499,7 +500,7 @@ update:
   title: Mise à jour disponible
   available: "%{app} %{version} est disponible."
   installed: "Vous utilisez actuellement la %{version}."
-  update: Mettre à jour
+  update: "Mettre à jour et redémarrer"
   ignore: Ignorer cette version
   checking: Recherche de mises à jour…
   up_to_date: Vous utilisez la dernière version.
@@ -744,6 +745,7 @@ context:
   close_others: "Fermer les autres onglets"
   close_right: "Fermer les onglets à droite"
   copy_path: "Copier le chemin"
+  path_copied: "Chemin copié."
 
 password:
   title: "Mot de passe"
@@ -764,3 +766,17 @@ unsaved:
   question: "Ces modèles contiennent des modifications non enregistrées : %{names}. Une exécution lit les fichiers enregistrés, pas le contenu des onglets."
   save_and_run: "Enregistrer et exécuter"
   run_without_saving: "Exécuter sans enregistrer"
+
+close_guard:
+  title_window: "Fermer la fenêtre malgré le travail non enregistré ?"
+  title_quit: "Quitter malgré le travail non enregistré ?"
+  title_restart: "Redémarrer malgré le travail non enregistré ?"
+  message: "Si vous continuez, ceci sera perdu :"
+  more: "…et %{count} de plus"
+  close_anyway: "Fermer quand même"
+  quit_anyway: "Quitter quand même"
+  restart_anyway: "Redémarrer quand même"
+  save_all: "Tout enregistrer"
+  item_template: "Modèle non enregistré « %{name} »"
+  item_run: "Une génération qui écrit encore des fichiers"
+  item_draft: "Modifications non enregistrées dans une boîte de dialogue ouverte"

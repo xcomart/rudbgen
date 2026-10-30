@@ -220,7 +220,7 @@ impl Render for VariablePalette {
                             div()
                                 .flex_none()
                                 .font_family(mono.clone())
-                                .text_size(px(11.))
+                                .text_size(rugpui::TextSize::Xs.size(cx))
                                 .text_color(theme.text)
                                 .child(item.name.clone()),
                         )
@@ -229,7 +229,7 @@ impl Render for VariablePalette {
                                 .flex_1()
                                 .min_w_0()
                                 .truncate()
-                                .text_size(px(11.))
+                                .text_size(rugpui::TextSize::Xs.size(cx))
                                 .text_color(theme.text_muted)
                                 .child(SharedString::from(format!("\u{2192} {example}")))
                         }))
@@ -245,7 +245,7 @@ impl Render for VariablePalette {
                         div()
                             .px(px(6.))
                             .pt(px(6.))
-                            .text_size(px(10.))
+                            .text_size(rugpui::scaled(10., cx))
                             .text_color(theme.text_muted)
                             .child(section.title()),
                     )
@@ -256,7 +256,7 @@ impl Render for VariablePalette {
         let empty = groups.is_empty().then(|| {
             div()
                 .p(px(10.))
-                .text_size(px(11.))
+                .text_size(rugpui::TextSize::Xs.size(cx))
                 .text_color(theme.text_muted)
                 .child(ts!("palette.no_match"))
         });
@@ -288,7 +288,7 @@ impl Render for VariablePalette {
                     .border_color(theme.border)
                     .child(
                         div()
-                            .text_size(px(12.))
+                            .text_size(rugpui::TextSize::Sm.size(cx))
                             .text_color(theme.text)
                             .child(ts!("palette.title")),
                     )

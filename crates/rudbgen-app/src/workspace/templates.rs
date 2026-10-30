@@ -71,13 +71,20 @@ impl Workspace {
     /// The one way in that needs no connection (§4.3). Nothing waits on the
     /// prompt — on X11 that call is what gpui had to be patched around — so the
     /// click returns and the answer is picked up on a task of its own.
+    ///
+    /// The picker starts in `<config>/templates`, where the templates the
+    /// application ships and makes are.
     pub(super) fn choose_template(&mut self, cx: &mut Context<Self>) {
-        let paths = cx.prompt_for_paths(gpui::PathPromptOptions {
+        let options = gpui::PathPromptOptions {
             files: true,
             directories: false,
             multiple: true,
             prompt: Some(ts!("template.open_select")),
-        });
+        };
+        let paths = match rudbgen_core::templates_dir() {
+            Ok(directory) => cx.prompt_for_paths_in(options, &directory),
+            Err(_) => cx.prompt_for_paths(options),
+        };
         cx.spawn(async move |this, cx| {
             let chosen = match paths.await {
                 Ok(Ok(Some(paths))) => paths,
@@ -530,9 +537,19 @@ impl Workspace {
         if !matches!(self.connection, ConnectionState::Open { .. }) {
             return;
         }
+        let name = file
+            .file_name()
+            .map(|name| name.to_string_lossy().into_owned())
+            .unwrap_or_default();
         self.generate
             .update(cx, |pane, cx| pane.add_template_file(file, cx));
         self.refresh_generation_marks(cx);
+        // The list it joined is on another tab; this is the only word of it
+        // on the one the user is looking at.
+        rugpui_shell::show_toast(
+            rugpui_shell::Toast::info(ts!("generate.added_to_list", name = name)),
+            cx,
+        );
         cx.notify();
     }
 
@@ -626,6 +643,10 @@ impl Workspace {
             entries.push(MenuEntry::new(ts!("context.copy_path")).on_activate(
                 move |_window, cx| {
                     cx.write_to_clipboard(gpui::ClipboardItem::new_string(path.clone()));
+                    rugpui_shell::show_toast(
+                        rugpui_shell::Toast::info(ts!("context.path_copied")),
+                        cx,
+                    );
                     copy.update(cx, |workspace, cx| {
                         workspace.tab_menu = None;
                         cx.notify();
@@ -647,6 +668,7 @@ impl Workspace {
         Some(
             rugpui::ContextMenu::new("tab-context")
                 .position(position)
+                .highlight_first(self.tab_menu_by_keyboard)
                 .entries(entries)
                 .on_dismiss(move |_window, cx| {
                     this.update(cx, |workspace, cx| {
@@ -681,9 +703,6 @@ impl Workspace {
                     .is_some_and(|at| self.templates[at].read(cx).is_dirty(cx));
                 if dirty {
                     self.closing = Some(index);
-                    // The question takes the keyboard, so `Enter` saves rather
-                    // than breaking a line in the buffer it is asking about.
-                    window.focus(&self.prompt_focus, cx);
                     cx.notify();
                 } else {
                     self.close_tab(index, window, cx);
@@ -856,16 +875,23 @@ impl Workspace {
                             return;
                         };
                         log::warn!("the password could not be kept in the keychain: {error:#}");
-                        this.update(cx, |workspace, cx| {
-                            workspace.connection_notice = Some(ts!(
-                                "connect.keychain_failed_connected",
-                                error = format!("{error:#}")
-                            ));
-                            cx.notify();
+                        this.update(cx, |_workspace, cx| {
+                            rugpui_shell::show_toast(
+                                rugpui_shell::Toast::warning(ts!(
+                                    "connect.keychain_failed_connected",
+                                    error = format!("{error:#}")
+                                )),
+                                cx,
+                            );
                         })
                         .ok();
                     })
                     .detach();
+                }
+                // The dialog's own word about the save that went with this
+                // attempt, now that "connected" is true.
+                if let Some(notice) = self.connection_notice.take() {
+                    rugpui_shell::show_toast(rugpui_shell::Toast::warning(notice), cx);
                 }
                 // The welcome screen marks it next time.
                 let mut settings = app_settings::current(cx);

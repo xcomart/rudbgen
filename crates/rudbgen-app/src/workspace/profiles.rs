@@ -112,7 +112,6 @@ impl Workspace {
             profile: Box::new(profile),
             driver: Box::new(driver),
             input,
-            focus: true,
             reason,
         });
         self.connection_list_open = false;
@@ -150,7 +149,7 @@ impl Workspace {
             );
             match written {
                 Ok(store) => self.profiles = store,
-                Err(error) => log::error!("connections.json was not changed: {error:#}"),
+                Err(error) => self.store_failed(&error, cx),
             }
         }
         let keep = prompt.remember.then(|| password.clone());
@@ -187,13 +186,13 @@ impl Workspace {
                     .gap(px(12.))
                     .child(
                         div()
-                            .text_size(px(12.))
+                            .text_size(rugpui::TextSize::Sm.size(cx))
                             .text_color(theme.text)
                             .child(ts!("password.question", name = name)),
                     )
                     .children(prompt.reason.clone().map(|reason| {
                         div()
-                            .text_size(px(11.))
+                            .text_size(rugpui::TextSize::Xs.size(cx))
                             .text_color(theme.danger)
                             .child(reason)
                     }))
@@ -246,8 +245,19 @@ impl Workspace {
                     dismissed.update(cx, |workspace, cx| workspace.cancel_password(window, cx));
                 },
             )
+            .initial_focus(&gpui::Focusable::focus_handle(prompt.input.read(cx), cx))
             .into_any_element(),
         )
+    }
+
+    /// Says that `connections.json` was not changed, and why: the welcome
+    /// list's commands have no form of their own to say it under.
+    fn store_failed(&self, error: &anyhow::Error, cx: &mut Context<Self>) {
+        log::error!("connections.json was not changed: {error:#}");
+        rugpui_shell::show_toast(
+            rugpui_shell::Toast::error(ts!("connect.save_failed", error = format!("{error:#}"))),
+            cx,
+        );
     }
 
     // --- the welcome list's menu ------------------------------------------
@@ -257,12 +267,14 @@ impl Workspace {
         &mut self,
         id: uuid::Uuid,
         position: Point<Pixels>,
+        keyboard: bool,
         cx: &mut Context<Self>,
     ) {
         self.close_template_menus(cx);
         self.menu_open = false;
         self.tab_menu = None;
         self.profile_menu = Some((id, position));
+        self.profile_menu_by_keyboard = keyboard;
         cx.notify();
     }
 
@@ -309,15 +321,15 @@ impl Workspace {
                 workspace.duplicate_profile(id, cx);
             }),
             MenuEntry::separator(),
-            row(ts!("context.delete"), |workspace, id, window, cx| {
+            row(ts!("context.delete"), |workspace, id, _window, cx| {
                 workspace.deleting_profile = Some(id);
-                window.focus(&workspace.prompt_focus, cx);
                 cx.notify();
             }),
         ];
         Some(
             rugpui::ContextMenu::new("profile-context")
                 .position(position)
+                .highlight_first(self.profile_menu_by_keyboard)
                 .entries(entries)
                 .on_dismiss(move |_window, cx| {
                     this.update(cx, |workspace, cx| {
@@ -344,7 +356,7 @@ impl Workspace {
         );
         match written {
             Ok(store) => self.profiles = store,
-            Err(error) => log::error!("connections.json was not changed: {error:#}"),
+            Err(error) => self.store_failed(&error, cx),
         }
         cx.notify();
     }
@@ -378,7 +390,7 @@ impl Workspace {
                     self.connection = ConnectionState::Idle;
                 }
             }
-            Err(error) => log::error!("connections.json was not changed: {error:#}"),
+            Err(error) => self.store_failed(&error, cx),
         }
         self.return_focus(window, cx);
         cx.notify();
@@ -403,47 +415,52 @@ impl Workspace {
                 "profile-delete",
                 ts!("connect.delete"),
                 px(400.),
-                // `Enter` keeps the connection: deleting it is the answer
-                // that cannot be taken back.
-                prompt::body(&self.prompt_focus, move |window, cx| {
-                    default.update(cx, |workspace, cx| keep(workspace, window, cx));
-                })
-                .flex()
-                .flex_col()
-                .gap(px(14.))
-                .child(
-                    div()
-                        .text_size(px(12.))
-                        .text_color(theme.text)
-                        .child(ts!("connect.delete_confirm", name = name)),
-                )
-                .child(
-                    div()
-                        .flex()
-                        .flex_row()
-                        .justify_end()
-                        .gap(px(8.))
-                        .child(
-                            Button::new("profile-delete-cancel", ts!("common.cancel"))
-                                .variant(ButtonVariant::Secondary)
-                                .on_click(move |_, window, cx| {
-                                    cancel.update(cx, |workspace, cx| keep(workspace, window, cx));
-                                }),
-                        )
-                        .child(
-                            Button::new("profile-delete-confirm", ts!("connect.delete"))
-                                .variant(ButtonVariant::Danger)
-                                .on_click(move |_, window, cx| {
-                                    delete.update(cx, |workspace, cx| {
-                                        workspace.delete_profile(window, cx);
-                                    });
-                                }),
-                        ),
-                ),
+                div()
+                    .flex()
+                    .flex_col()
+                    .gap(px(14.))
+                    .child(
+                        div()
+                            .text_size(rugpui::TextSize::Sm.size(cx))
+                            .text_color(theme.text)
+                            .child(ts!("connect.delete_confirm", name = name)),
+                    )
+                    .child(
+                        div()
+                            .flex()
+                            .flex_row()
+                            .justify_end()
+                            .gap(px(8.))
+                            .child(
+                                Button::new("profile-delete-cancel", ts!("common.cancel"))
+                                    .variant(ButtonVariant::Secondary)
+                                    .focus_handle(&self.prompt_focus)
+                                    .on_click(move |_, window, cx| {
+                                        cancel.update(cx, |workspace, cx| {
+                                            keep(workspace, window, cx)
+                                        });
+                                    }),
+                            )
+                            .child(
+                                Button::new("profile-delete-confirm", ts!("connect.delete"))
+                                    .variant(ButtonVariant::Danger)
+                                    .on_click(move |_, window, cx| {
+                                        delete.update(cx, |workspace, cx| {
+                                            workspace.delete_profile(window, cx);
+                                        });
+                                    }),
+                            ),
+                    ),
                 move |window, cx| {
                     dismissed.update(cx, |workspace, cx| keep(workspace, window, cx));
                 },
             )
+            // `Enter` keeps the connection, as the focused Cancel does:
+            // deleting it is the answer that cannot be taken back.
+            .initial_focus(&self.prompt_focus)
+            .on_confirm(move |window, cx| {
+                default.update(cx, |workspace, cx| keep(workspace, window, cx));
+            })
             .into_any_element(),
         )
     }

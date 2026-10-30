@@ -134,10 +134,8 @@ pub struct AbbreviationDialog {
     scrollbar: ScrollbarState,
     /// Whether "discard your edits?" is up over the table.
     discarding: bool,
-    /// The box that question is drawn in; see [`prompt::body`].
+    /// The question's *Keep editing*, which holds the keyboard while it is up.
     prompt_focus: FocusHandle,
-    /// Whether the question should take the keyboard on the next frame.
-    pending_prompt_focus: bool,
 }
 
 impl AbbreviationDialog {
@@ -159,7 +157,6 @@ impl AbbreviationDialog {
             scrollbar: ScrollbarState::new(),
             discarding: false,
             prompt_focus: cx.focus_handle(),
-            pending_prompt_focus: false,
         }
     }
 
@@ -244,7 +241,6 @@ impl AbbreviationDialog {
     fn request_close(&mut self, cx: &mut Context<Self>) {
         if self.is_dirty(cx) {
             self.discarding = true;
-            self.pending_prompt_focus = true;
             cx.notify();
             return;
         }
@@ -254,7 +250,6 @@ impl AbbreviationDialog {
     /// Takes "discard your edits?" down and goes back to the table.
     fn keep_editing(&mut self, cx: &mut Context<Self>) {
         self.discarding = false;
-        self.pending_focus = true;
         cx.notify();
     }
 
@@ -489,9 +484,6 @@ impl AbbreviationDialog {
     /// Moves focus into the dialog when it opens, so `Escape` reaches it.
     fn apply_pending_focus(&mut self, window: &mut Window, cx: &mut Context<Self>) {
         if self.discarding {
-            if std::mem::take(&mut self.pending_prompt_focus) {
-                window.focus(&self.prompt_focus, cx);
-            }
             return;
         }
         if !self.pending_focus {
@@ -570,11 +562,11 @@ impl AbbreviationDialog {
     // --- rendering --------------------------------------------------------
 
     /// The column headings of the table.
-    fn render_head(&self, chrome: &Theme) -> impl IntoElement + use<> {
+    fn render_head(&self, chrome: &Theme, cx: &App) -> impl IntoElement + use<> {
         let cell = |width: Option<f32>, label: SharedString| {
             let base = div()
                 .flex_none()
-                .text_size(px(11.))
+                .text_size(rugpui::TextSize::Xs.size(cx))
                 .text_color(chrome.text_muted);
             match width {
                 Some(width) => base.w(px(width)).child(label),
@@ -705,7 +697,7 @@ impl AbbreviationDialog {
                     .justify_center()
                     .size(px(22.))
                     .rounded_md()
-                    .text_size(px(12.))
+                    .text_size(rugpui::TextSize::Sm.size(cx))
                     .text_color(chrome.icon)
                     .cursor_pointer()
                     .hover(|style| style.bg(chrome.surface_hover).text_color(chrome.danger))
@@ -791,7 +783,7 @@ impl Render for AbbreviationDialog {
 
         let complaint = (!offenders.is_empty()).then(|| {
             div()
-                .text_size(px(11.))
+                .text_size(rugpui::TextSize::Xs.size(cx))
                 .text_color(chrome.danger)
                 .child(ts!(
                     "abbr.duplicate",
@@ -805,7 +797,7 @@ impl Render for AbbreviationDialog {
 
         let error = self.error.clone().map(|message| {
             div()
-                .text_size(px(11.))
+                .text_size(rugpui::TextSize::Xs.size(cx))
                 .text_color(chrome.danger)
                 .child(message)
         });
@@ -846,11 +838,11 @@ impl Render for AbbreviationDialog {
             .child(apply)
             .child(
                 div()
-                    .text_size(px(11.))
+                    .text_size(rugpui::TextSize::Xs.size(cx))
                     .text_color(chrome.text_muted)
                     .child(ts!("abbr.how_it_works")),
             )
-            .child(self.render_head(&chrome))
+            .child(self.render_head(&chrome, cx))
             .child(table)
             .children(complaint)
             .children(error)
@@ -863,6 +855,7 @@ impl Render for AbbreviationDialog {
             }
         };
 
+        let dirty = self.is_dirty(cx);
         let discard = self.discarding.then(|| {
             let (keep, gone) = (cx.entity(), cx.entity());
             prompt::discard(
@@ -907,13 +900,21 @@ impl Render for AbbreviationDialog {
                     dialog.release_scrollbar(cx);
                 }),
             )
-            .child(modal(
-                "abbr-modal",
-                ts!("abbr.title"),
-                px(DIALOG_WIDTH),
-                body,
-                on_dismiss,
-            ))
+            .child(
+                modal(
+                    "abbr-modal",
+                    ts!("abbr.title"),
+                    px(DIALOG_WIDTH),
+                    body,
+                    on_dismiss,
+                )
+                // With edits on the form a press beside the dialog is no answer:
+                // `Escape` and Cancel ask before the draft goes, a stray click
+                // does nothing.
+                .dismiss_guard(move |reason, _window, _cx| {
+                    !(dirty && matches!(reason, rugpui::DismissReason::Backdrop))
+                }),
+            )
             .children(discard)
     }
 }

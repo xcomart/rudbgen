@@ -327,6 +327,9 @@ pub struct SettingsDialog {
     editor_events: Option<Subscription>,
     /// Message strip shown above the buttons.
     status: Option<SharedString>,
+    /// Width of the form's label column, the widest of its labels in the
+    /// language on screen; measured as each frame is drawn.
+    label_width: gpui::Pixels,
     /// Focus of the dialog root; also the anchor for the `Escape` handler.
     focus_handle: FocusHandle,
     /// Whether focus should move into the form on the next render.
@@ -335,10 +338,8 @@ pub struct SettingsDialog {
     opened: Option<FormValues>,
     /// Whether "discard your changes?" is up over the form.
     discarding: bool,
-    /// The box that question is drawn in; see [`prompt::body`].
+    /// The question's *Keep editing*, which holds the keyboard while it is up.
     prompt_focus: FocusHandle,
-    /// Whether the question should take the keyboard on the next frame.
-    pending_prompt_focus: bool,
     /// Scroll position of the form body, so `Tab` can reveal the section it
     /// just moved into.
     body_scroll: ScrollHandle,
@@ -474,9 +475,9 @@ impl SettingsDialog {
             focus_handle: cx.focus_handle(),
             pending_focus: false,
             opened: None,
+            label_width: px(rugpui::modal::FORM_LABEL_WIDTH),
             discarding: false,
             prompt_focus: cx.focus_handle(),
-            pending_prompt_focus: false,
             body_scroll: ScrollHandle::new(),
             body_scrollbar: ScrollbarState::new(),
             visible_section: 0,
@@ -841,7 +842,6 @@ impl SettingsDialog {
     fn request_close(&mut self, cx: &mut Context<Self>) {
         if self.is_dirty(cx) {
             self.discarding = true;
-            self.pending_prompt_focus = true;
             cx.notify();
             return;
         }
@@ -851,7 +851,6 @@ impl SettingsDialog {
     /// Takes "discard your changes?" down and goes back to the form.
     fn keep_editing(&mut self, cx: &mut Context<Self>) {
         self.discarding = false;
-        self.pending_focus = true;
         cx.notify();
     }
 
@@ -1069,9 +1068,6 @@ impl SettingsDialog {
     /// wherever the second one happened to run.
     fn apply_pending_focus(&mut self, window: &mut Window, cx: &mut Context<Self>) {
         if self.discarding {
-            if std::mem::take(&mut self.pending_prompt_focus) {
-                window.focus(&self.prompt_focus, cx);
-            }
             return;
         }
         if !self.pending_focus || self.editor.is_some() {
@@ -1249,7 +1245,8 @@ impl SettingsDialog {
                 .flex()
                 .flex_col()
                 .gap(px(10.))
-                .child(form_row(
+                .child(labeled_row(
+                    self.label_width,
                     ts!("settings.ui_theme"),
                     div()
                         .flex()
@@ -1258,8 +1255,9 @@ impl SettingsDialog {
                         .child(theme_picker)
                         .child(theme_actions),
                 ))
-                .child(form_row("", follows_ui))
-                .child(form_row(
+                .child(labeled_row(self.label_width, "", follows_ui))
+                .child(labeled_row(
+                    self.label_width,
                     ts!("settings.editor_theme"),
                     div()
                         .flex()
@@ -1268,7 +1266,8 @@ impl SettingsDialog {
                         .child(editor_theme)
                         .child(editor_theme_actions),
                 ))
-                .child(form_row(
+                .child(labeled_row(
+                    self.label_width,
                     ts!("settings.ui_font_size"),
                     suffixed(
                         self.ui_font_size_input.clone(),
@@ -1276,8 +1275,13 @@ impl SettingsDialog {
                         cx,
                     ),
                 ))
-                .child(form_row(ts!("settings.editor_font"), font))
-                .child(form_row(
+                .child(labeled_row(
+                    self.label_width,
+                    ts!("settings.editor_font"),
+                    font,
+                ))
+                .child(labeled_row(
+                    self.label_width,
                     ts!("settings.editor_font_size"),
                     suffixed(
                         self.editor_font_size_input.clone(),
@@ -1285,7 +1289,7 @@ impl SettingsDialog {
                         cx,
                     ),
                 ))
-                .child(form_row("", word_wrap)),
+                .child(labeled_row(self.label_width, "", word_wrap)),
         )
     }
 
@@ -1334,12 +1338,17 @@ impl SettingsDialog {
                 .flex()
                 .flex_col()
                 .gap(px(10.))
-                .child(form_row(
+                .child(labeled_row(
+                    self.label_width,
                     ts!("settings.opacity"),
                     suffixed(self.opacity_input.clone(), ts!("settings.opacity_hint"), cx),
                 ))
-                .child(form_row("", blur))
-                .child(form_row(ts!("settings.titlebar"), titlebar)),
+                .child(labeled_row(self.label_width, "", blur))
+                .child(labeled_row(
+                    self.label_width,
+                    ts!("settings.titlebar"),
+                    titlebar,
+                )),
         )
     }
 
@@ -1387,7 +1396,11 @@ impl SettingsDialog {
                 .flex()
                 .flex_col()
                 .gap(px(10.))
-                .child(form_row(ts!("settings.language"), language))
+                .child(labeled_row(
+                    self.label_width,
+                    ts!("settings.language"),
+                    language,
+                ))
                 .child(hint(ts!("settings.language_hint"), cx)),
         )
     }
@@ -1430,7 +1443,11 @@ impl SettingsDialog {
                 .flex()
                 .flex_col()
                 .gap(px(10.))
-                .child(form_row(ts!("settings.overwrite_policy"), policy))
+                .child(labeled_row(
+                    self.label_width,
+                    ts!("settings.overwrite_policy"),
+                    policy,
+                ))
                 .child(hint(ts!("settings.overwrite_hint"), cx)),
         )
     }
@@ -1444,7 +1461,8 @@ impl SettingsDialog {
                 .flex()
                 .flex_col()
                 .gap(px(10.))
-                .child(form_row(
+                .child(labeled_row(
+                    self.label_width,
                     ts!("settings.jvm_heap"),
                     suffixed(
                         self.jvm_heap_input.clone(),
@@ -1452,7 +1470,8 @@ impl SettingsDialog {
                         cx,
                     ),
                 ))
-                .child(form_row(
+                .child(labeled_row(
+                    self.label_width,
                     ts!("settings.jvm_args"),
                     self.jvm_args_input.clone(),
                 ))
@@ -1517,7 +1536,7 @@ impl SettingsDialog {
 
         let status = self.status.clone().map(|message| {
             div()
-                .text_size(px(12.))
+                .text_size(rugpui::TextSize::Sm.size(cx))
                 .text_color(StatusLevel::Error.color(&chrome))
                 .child(message)
         });
@@ -1574,6 +1593,23 @@ impl Render for SettingsDialog {
         if !self.open {
             return div().id("settings-dialog");
         }
+        self.label_width = rugpui::fit_label_width(
+            [
+                ts!("settings.ui_theme"),
+                ts!("settings.editor_theme"),
+                ts!("settings.ui_font_size"),
+                ts!("settings.editor_font"),
+                ts!("settings.editor_font_size"),
+                ts!("settings.opacity"),
+                ts!("settings.titlebar"),
+                ts!("settings.language"),
+                ts!("settings.overwrite_policy"),
+                ts!("settings.jvm_heap"),
+                ts!("settings.jvm_args"),
+            ],
+            window,
+            cx,
+        );
 
         self.apply_pending_focus(window, cx);
         self.watch_scroll(cx);
@@ -1597,6 +1633,7 @@ impl Render for SettingsDialog {
         // A click on the backdrop backs out of whatever is in front: the editor
         // while one is open, otherwise the dialog itself. Anything else would
         // discard an unsaved palette by way of a stray click.
+        let dirty = self.is_dirty(cx);
         let discard = self.discarding.then(|| {
             let (keep, gone) = (cx.entity(), cx.entity());
             prompt::discard(
@@ -1658,13 +1695,15 @@ impl Render for SettingsDialog {
                     dialog.release_scrollbar(cx);
                 }),
             )
-            .child(modal(
-                "settings-modal",
-                title,
-                px(DIALOG_WIDTH),
-                body,
-                on_dismiss,
-            ))
+            .child(
+                modal("settings-modal", title, px(DIALOG_WIDTH), body, on_dismiss)
+                    // With edits on the form a press beside the dialog is no answer:
+                    // `Escape` and Cancel ask before the draft goes, a stray click
+                    // does nothing.
+                    .dismiss_guard(move |reason, _window, _cx| {
+                        !(dirty && matches!(reason, rugpui::DismissReason::Backdrop))
+                    }),
+            )
             .children(discard)
     }
 }
@@ -1736,6 +1775,18 @@ fn section_of(tab_index: isize) -> usize {
 /// on, since the JVM rejects an empty argument outright.
 fn split_arguments(value: &str) -> Vec<String> {
     value.split_whitespace().map(ToOwned::to_owned).collect()
+}
+
+/// A labeled form row with the label column at `width` — the widest label of
+/// the form, measured in the language on screen (see
+/// [`rugpui::fit_label_width`]), so that "Authentifizierung" is not broken in
+/// the middle of a word and every row of the form lines up with every other.
+fn labeled_row(
+    width: gpui::Pixels,
+    label: impl Into<SharedString>,
+    control: impl IntoElement,
+) -> rugpui::FormRow {
+    form_row(label, control).label_width(width)
 }
 
 #[cfg(test)]

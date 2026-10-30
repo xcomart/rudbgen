@@ -497,3 +497,51 @@ impl Workspace {
         self.add_to_generation(file, cx);
     }
 }
+
+impl Workspace {
+    // --- menus from the keyboard ------------------------------------------
+
+    /// `F10`: the application menu, on its first row.
+    ///
+    /// Off macOS only, which is where the ☰ menu is: on macOS the commands are
+    /// the menu bar's, and the key is left to whatever it means there.
+    pub(super) fn open_app_menu_action(
+        &mut self,
+        _: &rugpui::OpenAppMenu,
+        _window: &mut Window,
+        cx: &mut Context<Self>,
+    ) {
+        if cfg!(target_os = "macos") || self.shortcut_blocked(cx) {
+            cx.propagate();
+            return;
+        }
+        self.set_menu_open(true, cx);
+        self.menu_by_keyboard = true;
+        cx.notify();
+    }
+
+    /// `Shift+F10` and the Menu key, for the surfaces the shell draws menus
+    /// for itself: the tab strip, while it has the keyboard, opens the menu of
+    /// the tab on top. The explorer, the template editor and the welcome rows
+    /// answer the key themselves, deeper down.
+    pub(super) fn open_context_menu_action(
+        &mut self,
+        _: &rugpui::OpenContextMenu,
+        window: &mut Window,
+        cx: &mut Context<Self>,
+    ) {
+        if self.shortcut_blocked(cx) || !self.tabs_focus.is_focused(window) {
+            cx.propagate();
+            return;
+        }
+        let origin = self.tabs_bounds.get().bottom_left();
+        self.close_template_menus(cx);
+        self.profile_menu = None;
+        self.tab_menu = Some((
+            self.pane.active_index(),
+            origin + gpui::point(px(16.), px(0.)),
+        ));
+        self.tab_menu_by_keyboard = true;
+        cx.notify();
+    }
+}

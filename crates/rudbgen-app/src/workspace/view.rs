@@ -117,17 +117,6 @@ impl Render for Workspace {
             .map(|prompt| div().absolute().inset_0().child(prompt));
         let tab_menu = self.render_tab_menu(cx);
         let profile_menu = self.render_profile_menu(cx);
-        // The password question's field takes the keyboard on the frame that
-        // first draws it, which is this one.
-        if let Some(prompt) = self.password_prompt.as_mut()
-            && std::mem::take(&mut prompt.focus)
-        {
-            let handle = gpui::Focusable::focus_handle(prompt.input.read(cx), cx);
-            window.focus(&handle, cx);
-        }
-        if std::mem::take(&mut self.focus_prompt) {
-            window.focus(&self.prompt_focus, cx);
-        }
         // The dry run tab's Generate follows the run buttons' rule.
         let can_generate = self.can_generate(cx);
         self.preview
@@ -214,6 +203,8 @@ impl Render for Workspace {
             .on_action(cx.listener(Self::next_diagnostic_action))
             .on_action(cx.listener(Self::prev_diagnostic_action))
             .on_action(cx.listener(Self::add_to_generation_action))
+            .on_action(cx.listener(Self::open_app_menu_action))
+            .on_action(cx.listener(Self::open_context_menu_action))
             .on_action(cx.listener(Self::open_settings_action))
             .on_action(cx.listener(Self::show_about_action))
             .on_action(cx.listener(Self::check_updates_action))
@@ -249,7 +240,14 @@ impl Render for Workspace {
             // The right-click menus paint over everything, dialogs included,
             // and dismiss themselves on the next press.
             .children(tab_menu)
-            .children(profile_menu);
+            .children(profile_menu)
+            // The close guard's question, over everything else; and the
+            // toasts above the status bar, over that.
+            .child(self.close_guard.clone())
+            .child(
+                rugpui_shell::toast_stack()
+                    .bottom_inset(rugpui::scaled(STATUS_BAR_HEIGHT, cx) + px(8.)),
+            );
 
         let Some(tiling) = tiling else {
             // A server-decorated window: the compositor frames and shadows it,
@@ -460,6 +458,12 @@ impl Workspace {
 
         MenuButton::new("app-menu")
             .tooltip(ts!("titlebar.tip_menu"))
+            // A stop in the tab ring, opened by `Enter`, `Space` or `Down` —
+            // and by `F10` from anywhere (`open_app_menu_action`) — on its
+            // first row: the one list of every command, reachable without
+            // the pointer.
+            .tab_index(0)
+            .highlight_first(self.menu_by_keyboard)
             .open(self.menu_open)
             .entries(entries)
             .on_open_change(move |open, _window, cx| {
@@ -719,13 +723,20 @@ impl Workspace {
         let over = cx.entity();
         let context = cx.entity();
 
+        let bounds = self.tabs_bounds.clone();
         div()
+            .relative()
             .flex()
             .flex_none()
             .w_full()
             .bg(theme.surface)
             .border_b_1()
             .border_color(theme.border)
+            .child(
+                gpui::canvas(move |drawn, _, _| bounds.set(drawn), |_, _, _, _| {})
+                    .absolute()
+                    .size_full(),
+            )
             .child(
                 TabBar::new("work-tabs")
                     .tabs(tabs)
@@ -756,6 +767,7 @@ impl Workspace {
                             workspace.close_template_menus(cx);
                             workspace.profile_menu = None;
                             workspace.tab_menu = Some((index, position));
+                            workspace.tab_menu_by_keyboard = false;
                             cx.notify();
                         });
                     })
@@ -863,60 +875,63 @@ impl Workspace {
             "template-close",
             ts!("template.close_title"),
             px(400.),
-            // `Enter` saves, the highlighted answer; `Escape` is Cancel, which
-            // the shell routes (see `dismiss_dialog_action`).
-            prompt::body(&self.prompt_focus, move |window, cx| {
-                default.update(cx, |workspace, cx| workspace.answer_close(true, window, cx));
-            })
-            .flex()
-            .flex_col()
-            .gap(px(14.))
-            .child(
-                div()
-                    .text_size(px(12.))
-                    .text_color(theme.text)
-                    .child(ts!("template.close_question", file = title)),
-            )
-            .child(
-                div()
-                    .flex()
-                    .flex_row()
-                    .justify_end()
-                    .gap(px(8.))
-                    .child(
-                        Button::new("template-close-cancel", ts!("common.cancel"))
-                            .variant(ButtonVariant::Secondary)
-                            .on_click(move |_, window, cx| {
-                                cancel.update(cx, |workspace, cx| {
-                                    workspace.cancel_close(window, cx);
-                                });
-                            }),
-                    )
-                    .child(
-                        Button::new("template-close-discard", ts!("template.discard"))
-                            .variant(ButtonVariant::Danger)
-                            .on_click(move |_, window, cx| {
-                                discard.update(cx, |workspace, cx| {
-                                    workspace.answer_close(false, window, cx);
-                                });
-                            }),
-                    )
-                    .child(
-                        Button::new("template-close-save", ts!("common.save"))
-                            .variant(ButtonVariant::Primary)
-                            .on_click(move |_, window, cx| {
-                                save.update(cx, |workspace, cx| {
-                                    workspace.answer_close(true, window, cx);
-                                });
-                            }),
-                    ),
-            ),
+            div()
+                .flex()
+                .flex_col()
+                .gap(px(14.))
+                .child(
+                    div()
+                        .text_size(rugpui::TextSize::Sm.size(cx))
+                        .text_color(theme.text)
+                        .child(ts!("template.close_question", file = title)),
+                )
+                .child(
+                    div()
+                        .flex()
+                        .flex_row()
+                        .justify_end()
+                        .gap(px(8.))
+                        .child(
+                            Button::new("template-close-cancel", ts!("common.cancel"))
+                                .variant(ButtonVariant::Secondary)
+                                .on_click(move |_, window, cx| {
+                                    cancel.update(cx, |workspace, cx| {
+                                        workspace.cancel_close(window, cx);
+                                    });
+                                }),
+                        )
+                        .child(
+                            Button::new("template-close-discard", ts!("template.discard"))
+                                .variant(ButtonVariant::Danger)
+                                .on_click(move |_, window, cx| {
+                                    discard.update(cx, |workspace, cx| {
+                                        workspace.answer_close(false, window, cx);
+                                    });
+                                }),
+                        )
+                        .child(
+                            Button::new("template-close-save", ts!("common.save"))
+                                .variant(ButtonVariant::Primary)
+                                .focus_handle(&self.prompt_focus)
+                                .on_click(move |_, window, cx| {
+                                    save.update(cx, |workspace, cx| {
+                                        workspace.answer_close(true, window, cx);
+                                    });
+                                }),
+                        ),
+                ),
             move |window, cx| {
                 dismissed.update(cx, |workspace, cx| {
                     workspace.cancel_close(window, cx);
                 });
             },
         )
+        // `Enter` saves, the highlighted answer, which holds the keyboard;
+        // `Escape` is Cancel, which the shell routes (`dismiss_dialog_action`).
+        .initial_focus(&self.prompt_focus)
+        .on_confirm(move |window, cx| {
+            default.update(cx, |workspace, cx| workspace.answer_close(true, window, cx));
+        })
         .into_any_element()
     }
 
@@ -934,7 +949,7 @@ impl Workspace {
         // carries the shortcut that skips the button instead.
         let hint = (!profiles.is_empty()).then(|| {
             div()
-                .text_size(px(11.))
+                .text_size(rugpui::TextSize::Xs.size(cx))
                 .text_color(theme.text_muted)
                 .child(ts!(
                     "welcome.hint",
@@ -958,6 +973,7 @@ impl Workspace {
             _ => None,
         };
         let cancel = cx.entity();
+        let detail_size = rugpui::TextSize::Xs.size(cx);
         let trailing = move |profile: &ConnectionProfile| -> Option<AnyElement> {
             if connecting == Some(profile.id) {
                 let cancel = cancel.clone();
@@ -994,7 +1010,7 @@ impl Workspace {
                     .flex_none()
                     .max_w(px(140.))
                     .truncate()
-                    .text_size(px(11.))
+                    .text_size(detail_size)
                     .text_color(theme.text_muted)
                     .child(SharedString::from(name))
                     .into_any_element(),
@@ -1010,18 +1026,20 @@ impl Workspace {
         let rows = connection_dialog::profile_rows(
             profiles,
             last,
-            theme,
+            cx,
             move |id, clicks, window, cx| {
                 if clicks > 1 {
                     return;
                 }
                 open.update(cx, |workspace, cx| workspace.open_profile(id, window, cx));
             },
-            Some(std::rc::Rc::new(move |id, position, _window, cx| {
-                menu.update(cx, |workspace, cx| {
-                    workspace.open_profile_menu(id, position, cx);
-                });
-            })),
+            Some(std::rc::Rc::new(
+                move |id, position, keyboard, _window, cx| {
+                    menu.update(cx, |workspace, cx| {
+                        workspace.open_profile_menu(id, position, keyboard, cx);
+                    });
+                },
+            )),
             Some(&trailing),
             None,
         );
@@ -1031,13 +1049,16 @@ impl Workspace {
             .flex_col()
             .gap(px(6.))
             .w(px(WELCOME_WIDTH))
-            .child(div().text_size(px(11.)).text_color(theme.text_muted).child(
-                if profiles.is_empty() {
-                    ts!("welcome.empty")
-                } else {
-                    ts!("welcome.saved")
-                },
-            ))
+            .child(
+                div()
+                    .text_size(rugpui::TextSize::Xs.size(cx))
+                    .text_color(theme.text_muted)
+                    .child(if profiles.is_empty() {
+                        ts!("welcome.empty")
+                    } else {
+                        ts!("welcome.saved")
+                    }),
+            )
             .when(!rows.is_empty(), |list| {
                 list.child(div().flex().flex_col().gap(px(1.)).children(rows))
             });
@@ -1049,14 +1070,14 @@ impl Workspace {
             .gap(px(14.))
             .child(
                 div()
-                    .text_size(px(30.))
+                    .text_size(rugpui::scaled(30., cx))
                     .text_color(theme.text)
                     .child(APP_NAME),
             )
             .child(
                 div()
                     .w(px(WELCOME_WIDTH))
-                    .text_size(px(13.))
+                    .text_size(rugpui::TextSize::Body.size(cx))
                     .text_color(theme.text_muted)
                     .child(ts!("welcome.tagline")),
             )
@@ -1072,6 +1093,10 @@ impl Workspace {
                             .debug_selector(|| WELCOME_NEW_SELECTOR.to_string())
                             .child(
                                 Button::new("welcome-new", ts!("welcome.new_connection"))
+                                    // A translation longer than the column is cut with
+                                    // an ellipsis and shown whole on hover, rather than
+                                    // running out of the button.
+                                    .truncate(true)
                                     .variant(ButtonVariant::Primary)
                                     .full_width(true)
                                     .tab_index(WELCOME_FIRST_TAB)
@@ -1092,6 +1117,10 @@ impl Workspace {
                             .debug_selector(|| WELCOME_IMPORT_SELECTOR.to_string())
                             .child(
                                 Button::new("welcome-import", ts!("welcome.import_jdbgen"))
+                                    // A translation longer than the column is cut with
+                                    // an ellipsis and shown whole on hover, rather than
+                                    // running out of the button.
+                                    .truncate(true)
                                     .variant(ButtonVariant::Secondary)
                                     .full_width(true)
                                     .tab_index(WELCOME_FIRST_TAB + 1)
@@ -1107,6 +1136,10 @@ impl Workspace {
                             .debug_selector(|| WELCOME_TEMPLATE_SELECTOR.to_string())
                             .child(
                                 Button::new("welcome-template", ts!("welcome.open_template"))
+                                    // A translation longer than the column is cut with
+                                    // an ellipsis and shown whole on hover, rather than
+                                    // running out of the button.
+                                    .truncate(true)
                                     .variant(ButtonVariant::Secondary)
                                     .full_width(true)
                                     .tab_index(WELCOME_FIRST_TAB + 2)
@@ -1154,12 +1187,17 @@ impl Workspace {
                 .flex()
                 .flex_col()
                 .gap(px(4.))
-                .child(div().text_size(px(11.)).text_color(theme.text).child(ts!(
-                    "connect.host_key_question",
-                    host = key.host.clone(),
-                    algorithm = key.algorithm.clone(),
-                    fingerprint = key.fingerprint.clone()
-                )))
+                .child(
+                    div()
+                        .text_size(rugpui::TextSize::Xs.size(cx))
+                        .text_color(theme.text)
+                        .child(ts!(
+                            "connect.host_key_question",
+                            host = key.host.clone(),
+                            algorithm = key.algorithm.clone(),
+                            fingerprint = key.fingerprint.clone()
+                        )),
+                )
                 .child(
                     div().flex().flex_row().child(
                         Button::new("welcome-trust-key", ts!("connect.trust_host_key"))
@@ -1187,20 +1225,22 @@ impl Workspace {
                 .debug_selector(|| "welcome-failure".to_string())
                 .child(
                     div()
-                        .text_size(px(12.))
+                        .text_size(rugpui::TextSize::Sm.size(cx))
                         .text_color(theme.danger)
                         .child(ts!("connect.could_not_open", name = label_of(profile))),
                 )
                 .child(
                     div()
-                        .text_size(px(11.))
+                        .text_size(rugpui::TextSize::Xs.size(cx))
                         .text_color(theme.text_muted)
                         .child(message.clone()),
                 )
-                .children(
-                    hint.clone()
-                        .map(|hint| div().text_size(px(11.)).text_color(theme.text).child(hint)),
-                )
+                .children(hint.clone().map(|hint| {
+                    div()
+                        .text_size(rugpui::TextSize::Xs.size(cx))
+                        .text_color(theme.text)
+                        .child(hint)
+                }))
                 .children(key)
                 .child(
                     div()
@@ -1252,7 +1292,7 @@ impl Workspace {
             .flex_none()
             .items_center()
             .gap(px(14.))
-            .h(px(STATUS_BAR_HEIGHT))
+            .h(rugpui::scaled(STATUS_BAR_HEIGHT, cx))
             .px(px(10.))
             // The bar is inert, so a press on it must not move the keyboard.
             // Without this the workspace root's `track_focus` would claim the
@@ -1261,7 +1301,7 @@ impl Workspace {
             .bg(theme.surface)
             .border_t_1()
             .border_color(theme.border)
-            .text_size(px(11.))
+            .text_size(rugpui::TextSize::Xs.size(cx))
             .text_color(theme.text_muted)
             .child(
                 div()
@@ -1296,20 +1336,11 @@ impl Workspace {
                     .flex_1()
                     .min_w_0()
                     .truncate()
-                    .when(self.connection_notice.is_some(), |cell| {
-                        cell.text_color(theme.danger)
-                    })
                     .child(match &self.connection {
                         // The reason lives here for as long as the failure
                         // does: a message the user can still read while they
                         // open the dialog to fix what it names.
                         ConnectionState::Failed { message, .. } => message.clone(),
-                        // The session opened, but something about the save
-                        // that went with it did not — the keychain refused
-                        // the password — and nothing else on screen says so.
-                        ConnectionState::Open { .. } if self.connection_notice.is_some() => {
-                            self.connection_notice.clone().unwrap_or_default()
-                        }
                         // §4.2's arithmetic, in as many words: what will be
                         // read, what it will be read through, how many files
                         // that is, and where they go.

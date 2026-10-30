@@ -91,10 +91,6 @@ actions!(
         PrevDiagnostic,
         /// Adds the template on top to the connection's generation list.
         AddToGeneration,
-        /// Answers the question a prompt is asking with its default button.
-        ///
-        /// Bound to `Enter` inside a prompt only; see `prompt::PROMPT_CONTEXT`.
-        ConfirmDialog,
         /// Saves whatever the dialog on top is editing (`Ctrl+S` inside it).
         SaveDialog,
         /// Adds a blank profile inside the connection dialog (`Ctrl+N` there).

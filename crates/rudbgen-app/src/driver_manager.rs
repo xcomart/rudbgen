@@ -445,6 +445,9 @@ pub struct DriverManager {
     /// Whether "discard your edits?" is up; the connection dialog draws it,
     /// over the whole window rather than inside the panel this is drawn in.
     discarding: bool,
+    /// Width of the form's label column, the widest of its labels in the
+    /// language on screen; measured as each frame is drawn.
+    label_width: gpui::Pixels,
     /// Focus of the manager's root.
     focus_handle: FocusHandle,
     /// Scroll of the driver list.
@@ -533,6 +536,7 @@ impl DriverManager {
         let mut manager = Self {
             saved,
             discarding: false,
+            label_width: px(rugpui::modal::FORM_LABEL_WIDTH),
             store,
             selected,
             download: None,
@@ -1192,14 +1196,14 @@ impl DriverManager {
                     })
                     .child(
                         div()
-                            .text_size(px(12.))
+                            .text_size(rugpui::TextSize::Sm.size(cx))
                             .text_color(chrome.text)
                             .truncate()
                             .child(name),
                     )
                     .child(
                         div()
-                            .text_size(px(10.))
+                            .text_size(rugpui::scaled(10., cx))
                             .text_color(if driver.jars.is_empty() {
                                 chrome.danger
                             } else {
@@ -1302,7 +1306,7 @@ impl DriverManager {
                                     .flex_1()
                                     .min_w_0()
                                     .truncate()
-                                    .text_size(px(11.))
+                                    .text_size(rugpui::TextSize::Xs.size(cx))
                                     .text_color(chrome.text)
                                     .child(SharedString::from(class.clone())),
                             )
@@ -1310,7 +1314,7 @@ impl DriverManager {
                                 row.child(
                                     div()
                                         .flex_none()
-                                        .text_size(px(10.))
+                                        .text_size(rugpui::scaled(10., cx))
                                         .text_color(chrome.accent)
                                         .child(ts!("driver.probe_recommended")),
                                 )
@@ -1554,7 +1558,7 @@ impl DriverManager {
                             .flex_1()
                             .min_w_0()
                             .truncate()
-                            .text_size(px(11.))
+                            .text_size(rugpui::TextSize::Xs.size(cx))
                             .text_color(if missing { chrome.danger } else { chrome.text })
                             .child(SharedString::from(path.display().to_string())),
                     )
@@ -1566,7 +1570,7 @@ impl DriverManager {
                         row.child(
                             div()
                                 .flex_none()
-                                .text_size(px(10.))
+                                .text_size(rugpui::scaled(10., cx))
                                 .text_color(chrome.danger)
                                 .child(ts!("driver.jar_missing")),
                         )
@@ -1646,7 +1650,7 @@ impl DriverManager {
                                 .flex_1()
                                 .min_w_0()
                                 .truncate()
-                                .text_size(px(11.))
+                                .text_size(rugpui::TextSize::Xs.size(cx))
                                 .text_color(chrome.text_muted)
                                 .child(label),
                         )
@@ -1719,7 +1723,7 @@ impl DriverManager {
                     .child(
                         div()
                             .flex_none()
-                            .text_size(px(13.))
+                            .text_size(rugpui::TextSize::Body.size(cx))
                             .text_color(chrome.text)
                             .child(ts!("custom_query.section")),
                     )
@@ -1739,7 +1743,7 @@ impl DriverManager {
                     .child(
                         div()
                             .flex_none()
-                            .text_size(px(11.))
+                            .text_size(rugpui::TextSize::Xs.size(cx))
                             .text_color(chrome.text_muted)
                             .child(ts!("custom_query.test_values")),
                     )
@@ -1747,16 +1751,19 @@ impl DriverManager {
                         "${catalog}",
                         self.test_catalog_input.clone(),
                         chrome,
+                        cx,
                     ))
                     .child(test_value(
                         "${schema}",
                         self.test_schema_input.clone(),
                         chrome,
+                        cx,
                     ))
                     .child(test_value(
                         "${table}",
                         self.test_table_input.clone(),
                         chrome,
+                        cx,
                     )),
             )
             .children(
@@ -1804,7 +1811,7 @@ impl DriverManager {
 
         let result = self.test_result[index].clone().map(|(message, is_error)| {
             div()
-                .text_size(px(11.))
+                .text_size(rugpui::TextSize::Xs.size(cx))
                 .text_color(if is_error {
                     chrome.danger
                 } else {
@@ -1894,7 +1901,7 @@ impl DriverManager {
                 .min_w_0()
                 .items_center()
                 .justify_center()
-                .text_size(px(12.))
+                .text_size(rugpui::TextSize::Sm.size(cx))
                 .text_color(chrome.text_muted)
                 .child(ts!("driver.none_selected"))
                 .into_any_element();
@@ -1926,19 +1933,33 @@ impl DriverManager {
                     .overflow_y_scroll()
                     .smooth_scroll(&self.body_scroll)
                     .restrict_scroll_to_axis()
-                    .child(form_row(ts!("driver.name"), self.name_input.clone()))
-                    .child(form_row(ts!("driver.class"), class_row))
-                    .child(form_row(
+                    .child(labeled_row(
+                        self.label_width,
+                        ts!("driver.name"),
+                        self.name_input.clone(),
+                    ))
+                    .child(labeled_row(
+                        self.label_width,
+                        ts!("driver.class"),
+                        class_row,
+                    ))
+                    .child(labeled_row(
+                        self.label_width,
                         ts!("driver.url_template"),
                         self.url_template_input.clone(),
                     ))
-                    .child(form_row(
+                    .child(labeled_row(
+                        self.label_width,
                         ts!("driver.default_port"),
                         self.port_input.clone(),
                     ))
-                    .child(form_row(ts!("driver.dialect"), self.dialect_input.clone()))
-                    .child(form_row(ts!("driver.maven"), maven))
-                    .child(form_row(ts!("driver.jars"), jars))
+                    .child(labeled_row(
+                        self.label_width,
+                        ts!("driver.dialect"),
+                        self.dialect_input.clone(),
+                    ))
+                    .child(labeled_row(self.label_width, ts!("driver.maven"), maven))
+                    .child(labeled_row(self.label_width, ts!("driver.jars"), jars))
                     .child(
                         Checkbox::new("driver-no-auth", ts!("driver.no_auth"))
                             .checked(no_auth)
@@ -1962,7 +1983,7 @@ impl DriverManager {
 
         let status = self.status.clone().map(|message| {
             div()
-                .text_size(px(11.))
+                .text_size(rugpui::TextSize::Xs.size(cx))
                 .text_color(if self.status_is_error {
                     chrome.danger
                 } else {
@@ -1989,7 +2010,7 @@ impl DriverManager {
                         .flex_1()
                         .min_w_0()
                         .truncate()
-                        .text_size(px(12.))
+                        .text_size(rugpui::TextSize::Sm.size(cx))
                         .child(ts!("driver.delete_confirm", name = name)),
                 )
                 .child(
@@ -2092,7 +2113,20 @@ impl Focusable for DriverManager {
 }
 
 impl Render for DriverManager {
-    fn render(&mut self, _window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
+    fn render(&mut self, window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
+        self.label_width = rugpui::fit_label_width(
+            [
+                ts!("driver.name"),
+                ts!("driver.class"),
+                ts!("driver.url_template"),
+                ts!("driver.default_port"),
+                ts!("driver.dialect"),
+                ts!("driver.maven"),
+                ts!("driver.jars"),
+            ],
+            window,
+            cx,
+        );
         self.watch_scroll(cx);
         let chrome = theme(cx);
         let list = self.render_list(&chrome, cx);
@@ -2164,6 +2198,7 @@ fn test_value(
     name: &'static str,
     input: Entity<TextInput>,
     chrome: &Theme,
+    cx: &App,
 ) -> impl IntoElement + use<> {
     div()
         .flex()
@@ -2173,7 +2208,7 @@ fn test_value(
         .child(
             div()
                 .flex_none()
-                .text_size(px(11.))
+                .text_size(rugpui::TextSize::Xs.size(cx))
                 .text_color(chrome.text_muted)
                 .child(name),
         )
@@ -2193,7 +2228,7 @@ fn query_label(kind: CustomQueryKind) -> SharedString {
 fn hint(text: SharedString, cx: &App) -> impl IntoElement + use<> {
     let chrome = theme(cx);
     div()
-        .text_size(px(11.))
+        .text_size(rugpui::TextSize::Xs.size(cx))
         .text_color(chrome.text_muted)
         .child(text)
 }
@@ -2216,6 +2251,18 @@ fn editor_text(editor: &Entity<EditorView>, cx: &App) -> String {
 /// Replaces the contents of a custom-query editor.
 fn set_editor_text(editor: &Entity<EditorView>, value: &str, cx: &mut App) {
     editor.update(cx, |editor, cx| editor.set_text(value, cx));
+}
+
+/// A labeled form row with the label column at `width` — the widest label of
+/// the form, measured in the language on screen (see
+/// [`rugpui::fit_label_width`]), so that "Authentifizierung" is not broken in
+/// the middle of a word and every row of the form lines up with every other.
+fn labeled_row(
+    width: gpui::Pixels,
+    label: impl Into<SharedString>,
+    control: impl IntoElement,
+) -> rugpui::FormRow {
+    form_row(label, control).label_width(width)
 }
 
 #[cfg(test)]

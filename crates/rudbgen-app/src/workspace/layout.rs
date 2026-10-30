@@ -210,7 +210,7 @@ impl Workspace {
             .flex_none()
             .items_center()
             .gap(px(6.))
-            .h(px(TOOLBAR_HEIGHT))
+            .h(rugpui::scaled(TOOLBAR_HEIGHT, cx))
             .px(px(4.))
             .bg(theme.surface)
             .border_b_1()
@@ -227,7 +227,7 @@ impl Workspace {
                 div()
                     .flex_none()
                     .w(px(TRAFFIC_LIGHT_GAP))
-                    .h(px(TOOLBAR_HEIGHT))
+                    .h(rugpui::scaled(TOOLBAR_HEIGHT, cx))
                     .bg(theme.surface)
                     .border_b_1()
                     .border_color(theme.border)
@@ -266,14 +266,14 @@ impl Workspace {
                 .flex_none()
                 .items_center()
                 .gap(px(6.))
-                .h(px(TOOLBAR_HEIGHT))
+                .h(rugpui::scaled(TOOLBAR_HEIGHT, cx))
                 .px(px(10.))
                 .bg(theme.surface)
                 .border_b_1()
                 .border_color(theme.border)
                 // A shade quieter than the connection selector, which is the
                 // one control in this row that has to be read.
-                .text_size(px(12.))
+                .text_size(rugpui::TextSize::Sm.size(cx))
                 .text_color(titlebar_text)
                 .children(icon)
                 .child(APP_NAME)
@@ -295,7 +295,7 @@ impl Workspace {
             .flex_none()
             .items_center()
             .w_full()
-            .h(px(TOOLBAR_HEIGHT))
+            .h(rugpui::scaled(TOOLBAR_HEIGHT, cx))
             .when(custom, |this| {
                 // Occluding is load-bearing, not just hygiene: the workspace
                 // root tracks focus, and gpui's focus transfer marks every
@@ -321,7 +321,7 @@ impl Workspace {
                 div()
                     .flex_1()
                     .min_w_0()
-                    .h(px(TOOLBAR_HEIGHT))
+                    .h(rugpui::scaled(TOOLBAR_HEIGHT, cx))
                     .bg(theme.surface)
                     .border_b_1()
                     .border_color(theme.border),

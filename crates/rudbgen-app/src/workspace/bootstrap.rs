@@ -2,7 +2,7 @@
 
 use super::*;
 
-/// Installs both palettes the settings name.
+/// Installs both palettes the settings name, and the interface scale.
 ///
 /// The chrome theme comes straight from the configured id; the editor theme
 /// goes through [`editor_theme_for`], which is where "follow the UI theme" is
@@ -24,6 +24,14 @@ pub(super) fn apply_themes(settings: &AppSettings, cx: &mut App) {
     let editor = EditorThemeRegistry::resolve(&editor_id, cx);
     set_theme(ui, cx);
     set_editor_theme(editor, cx);
+    // The interface size, as the scale every widget and every size of the
+    // shell's own is drawn at: the default 14 pt is 1.0, where nothing
+    // moves. Here, with the palettes, because it is applied — and previewed —
+    // from the same three places they are.
+    rugpui::set_ui_scale(
+        settings.ui_font_size / rudbgen_core::settings::DEFAULT_UI_FONT_SIZE,
+        cx,
+    );
 }
 
 /// The editor theme to install, given the configured one and the chrome theme.
@@ -276,8 +284,6 @@ pub(super) fn bind_shortcuts(cx: &mut App) {
         // in browsers and on Windows. The template editor would otherwise
         // keep the keyboard, `Tab` included, for itself.
         KeyBinding::new("f6", FocusTabs, Some(KEY_CONTEXT)),
-        // Inside a question, `Enter` is its default answer; see `prompt`.
-        KeyBinding::new("enter", ConfirmDialog, Some(prompt::PROMPT_CONTEXT)),
         // Inside the dialogs that edit something, `Ctrl+S` saves that and
         // `Ctrl+N` makes a new profile — gpui matches these deeper contexts
         // ahead of the shell's, which would read the same chords as "save the
@@ -456,7 +462,9 @@ pub(super) fn run() {
         // see [`app_settings::window_tint`].
         set_window_tint(settings.window.background_opacity, cx);
 
-        cx.on_action(|_: &Quit, cx: &mut App| cx.quit());
+        // Through the close guard: a quit with a template unsaved or a run
+        // still writing asks first (see `Workspace::unsaved_lines`).
+        cx.on_action(|_: &Quit, cx: &mut App| rugpui_shell::request_quit(cx));
         // The window's geometry is only in memory until here; this is the one
         // write of `settings.json` the shell performs. Nothing in the closure
         // re-enters gpui — the file write is the whole of it — which is what

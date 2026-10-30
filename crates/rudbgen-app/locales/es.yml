@@ -346,6 +346,7 @@ generate:
   rendering: "Renderizando…"
   dry_into: "Se escribirían %{count} archivos en %{dir}"
   dry_no_output: "Aún no hay carpeta de salida: las rutas se muestran bajo una temporal, así que todos los archivos aparecen como nuevos."
+  added_to_list: "Se añadió «%{name}» a la lista de generación."
 
 progress:
   title: Generando…
@@ -499,7 +500,7 @@ update:
   title: Actualización disponible
   available: "%{app} %{version} ya está disponible."
   installed: "Ahora mismo estás usando la %{version}."
-  update: Actualizar
+  update: "Actualizar y reiniciar"
   ignore: Ignorar esta versión
   checking: Buscando actualizaciones…
   up_to_date: Ya tienes la última versión.
@@ -744,6 +745,7 @@ context:
   close_others: "Cerrar las demás pestañas"
   close_right: "Cerrar las pestañas de la derecha"
   copy_path: "Copiar la ruta"
+  path_copied: "Ruta copiada."
 
 password:
   title: "Contraseña"
@@ -764,3 +766,17 @@ unsaved:
   question: "Estas plantillas tienen cambios sin guardar: %{names}. Una ejecución lee los archivos guardados, no lo que hay en las pestañas."
   save_and_run: "Guardar y ejecutar"
   run_without_saving: "Ejecutar sin guardar"
+
+close_guard:
+  title_window: "¿Cerrar la ventana con trabajo sin guardar?"
+  title_quit: "¿Salir con trabajo sin guardar?"
+  title_restart: "¿Reiniciar con trabajo sin guardar?"
+  message: "Si continúas, se perderá lo siguiente:"
+  more: "…y %{count} más"
+  close_anyway: "Cerrar de todos modos"
+  quit_anyway: "Salir de todos modos"
+  restart_anyway: "Reiniciar de todos modos"
+  save_all: "Guardar todo"
+  item_template: "Plantilla sin guardar «%{name}»"
+  item_run: "Una generación que todavía está escribiendo archivos"
+  item_draft: "Cambios sin guardar en un cuadro de diálogo abierto"

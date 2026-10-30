@@ -1,5 +1,18 @@
 use super::*;
 
+/// Presses and releases `Enter`, as a keyboard does: a focused button takes
+/// its click from the release.
+fn press_enter(cx: &mut gpui::VisualTestContext) {
+    let keystroke = gpui::Keystroke::parse("enter").expect("a keystroke");
+    cx.simulate_event(gpui::KeyDownEvent {
+        keystroke: keystroke.clone(),
+        is_held: false,
+        prefer_character_input: false,
+    });
+    cx.simulate_event(gpui::KeyUpEvent { keystroke });
+    cx.run_until_parked();
+}
+
 /// A window with the shell's own key bindings installed, as `run` installs
 /// them — which a plain test window does not have.
 fn bound_window(cx: &mut gpui::TestAppContext) -> gpui::WindowHandle<Workspace> {
@@ -86,8 +99,7 @@ fn enter_answers_the_overwrite_question(cx: &mut gpui::TestAppContext) {
         .expect("the window is open");
     let mut cx = gpui::VisualTestContext::from_window(*window, cx);
     cx.run_until_parked();
-    cx.simulate_keystrokes("enter");
-    cx.run_until_parked();
+    press_enter(&mut cx);
     assert_eq!(
         answer.try_recv().expect("the run was answered"),
         rudbgen_gen::Decision::Overwrite
@@ -140,8 +152,7 @@ fn enter_saves_a_template_being_closed(cx: &mut gpui::TestAppContext) {
         })
         .expect("the window is open");
     cx.run_until_parked();
-    cx.simulate_keystrokes("enter");
-    cx.run_until_parked();
+    press_enter(&mut cx);
     assert!(
         std::fs::read_to_string(&file)
             .expect("the template is there")
@@ -211,6 +222,155 @@ fn escape_takes_the_tab_menu_down_first(cx: &mut gpui::TestAppContext) {
             assert!(workspace.dialog_open(cx));
             workspace.dismiss_dialog_action(&DismissDialog, window, cx);
             assert!(workspace.deleting_profile.is_none());
+        })
+        .expect("the window is open");
+}
+
+/// A close with a template unsaved asks first, naming it; with nothing to
+/// lose the guard lets the close straight through.
+#[gpui::test]
+fn the_close_guard_lists_what_a_close_would_lose(cx: &mut gpui::TestAppContext) {
+    let dir = tempfile::tempdir().expect("tempdir");
+    let file = dir.path().join("model.java");
+    std::fs::write(&file, "class A {}\n").expect("the template is written");
+    let window = bound_window(cx);
+    window
+        .update(cx, |workspace, window, cx| {
+            assert!(workspace.unsaved_lines(cx).is_empty());
+            workspace.open_template(file.clone(), cx);
+            let at = workspace.active_template(cx).expect("the tab is on top");
+            workspace.templates[at].update(cx, |pane, cx| pane.insert("// edit\n", window, cx));
+            let lines = workspace.unsaved_lines(cx);
+            assert_eq!(lines.len(), 1);
+            assert!(lines[0].contains("model.java"), "{lines:?}");
+            rugpui_shell::request_close(window, cx);
+        })
+        .expect("the window is open");
+    cx.run_until_parked();
+    window
+        .update(cx, |workspace, _window, cx| {
+            assert!(
+                workspace.close_guard.read(cx).is_open(),
+                "the close did not ask"
+            );
+            assert!(workspace.dialog_open(cx), "the question is not a dialog");
+        })
+        .expect("the window closed over an unsaved template");
+
+    // Save all writes the tab, and the close goes on.
+    window
+        .update(cx, |workspace, _window, cx| {
+            assert!(workspace.save_all_templates(cx));
+            assert!(workspace.unsaved_lines(cx).is_empty());
+        })
+        .expect("the window is open");
+    assert!(
+        std::fs::read_to_string(&file)
+            .expect("the template is there")
+            .contains("// edit")
+    );
+}
+
+/// A press on the backdrop of a dialog with a changed draft does nothing — not
+/// even the question `Escape` asks — while over an untouched one it closes it.
+#[gpui::test]
+fn the_backdrop_leaves_a_changed_draft_alone(cx: &mut gpui::TestAppContext) {
+    let window = bound_window(cx);
+    window
+        .update(cx, |workspace, _window, cx| {
+            workspace.abbreviations.update(cx, |dialog, cx| {
+                dialog.open(&rudbgen_core::AbbreviationStore::default(), Vec::new(), cx);
+                dialog.write_row(
+                    0,
+                    &rudbgen_core::AbbreviationRule {
+                        enabled: true,
+                        whole_name: false,
+                        abbreviation: "EMP".to_string(),
+                        replacement: "Employee".to_string(),
+                    },
+                    cx,
+                );
+            });
+        })
+        .expect("the window is open");
+    let mut cx = gpui::VisualTestContext::from_window(*window, cx);
+    cx.run_until_parked();
+    // The window's top left corner is backdrop, well clear of the panel.
+    cx.simulate_click(gpui::point(px(4.), px(4.)), gpui::Modifiers::none());
+    cx.run_until_parked();
+    window
+        .update(&mut cx, |workspace, _window, cx| {
+            assert!(
+                workspace.abbreviations.read(cx).is_open(),
+                "the click dropped the draft"
+            );
+            assert!(
+                !workspace.abbreviations.read(cx).is_discarding(),
+                "a stray click asked a question"
+            );
+            workspace.abbreviations.update(cx, |dialog, cx| {
+                dialog.open(&rudbgen_core::AbbreviationStore::default(), Vec::new(), cx);
+            });
+        })
+        .expect("the window is open");
+    cx.run_until_parked();
+    cx.simulate_click(gpui::point(px(4.), px(4.)), gpui::Modifiers::none());
+    cx.run_until_parked();
+    window
+        .update(&mut cx, |workspace, _window, cx| {
+            assert!(
+                !workspace.abbreviations.read(cx).is_open(),
+                "an untouched dialog stayed up"
+            );
+        })
+        .expect("the window is open");
+}
+
+/// The interface size is the scale everything is drawn at: 14 pt is 1.0, and
+/// a saved size moves it — the preview included.
+#[gpui::test]
+fn the_interface_size_sets_the_ui_scale(cx: &mut gpui::TestAppContext) {
+    let _window = bound_window(cx);
+    cx.update(|cx| {
+        let mut settings = AppSettings::default();
+        bootstrap::apply_themes(&settings, cx);
+        assert_eq!(rugpui::ui_scale(cx), 1.0);
+        settings.ui_font_size = 21.0;
+        bootstrap::apply_themes(&settings, cx);
+        assert_eq!(rugpui::ui_scale(cx), 1.5);
+        assert_eq!(rugpui::TextSize::Xs.size(cx), px(16.5));
+        bootstrap::apply_themes(&AppSettings::default(), cx);
+    });
+}
+
+/// `F10` opens the application menu on its first row, and not over a dialog.
+#[cfg(not(target_os = "macos"))]
+#[gpui::test]
+fn f10_opens_the_app_menu(cx: &mut gpui::TestAppContext) {
+    // The menu names the application, which the shell is told at start-up.
+    cx.update(|cx| rugpui_shell::init(IDENTITY, cx));
+    let window = bound_window(cx);
+    window
+        .update(cx, |workspace, window, cx| {
+            window.focus(&workspace.focus_handle, cx);
+        })
+        .expect("the window is open");
+    let mut cx = gpui::VisualTestContext::from_window(*window, cx);
+    cx.run_until_parked();
+    cx.simulate_keystrokes("f10");
+    window
+        .update(&mut cx, |workspace, window, cx| {
+            assert!(workspace.menu_open, "F10 did not open the menu");
+            assert!(workspace.menu_by_keyboard, "the menu opened on no row");
+            workspace.set_menu_open(false, cx);
+            assert!(!workspace.menu_by_keyboard);
+            workspace.open_about(window, cx);
+        })
+        .expect("the window is open");
+    cx.simulate_keystrokes("f10");
+    window
+        .update(&mut cx, |workspace, _window, _cx| {
+            assert!(!workspace.menu_open, "F10 opened the menu behind a dialog");
         })
         .expect("the window is open");
 }

@@ -346,6 +346,7 @@ generate:
   rendering: "Wird gerendert…"
   dry_into: "%{count} Dateien würden unter %{dir} geschrieben"
   dry_no_output: "Noch kein Zielordner gewählt: Die Pfade werden unter einem temporären Ordner gezeigt, daher ist jede Datei neu."
+  added_to_list: "„%{name}“ wurde zur Erzeugungsliste hinzugefügt."
 
 progress:
   title: Wird erzeugt…
@@ -499,7 +500,7 @@ update:
   title: Update verfügbar
   available: "%{app} %{version} ist verfügbar."
   installed: "Sie verwenden derzeit %{version}."
-  update: Update installieren
+  update: "Aktualisieren und neu starten"
   ignore: Diese Version ignorieren
   checking: Suche nach Updates…
   up_to_date: Sie verwenden die neueste Version.
@@ -744,6 +745,7 @@ context:
   close_others: "Andere Tabs schließen"
   close_right: "Tabs rechts davon schließen"
   copy_path: "Pfad kopieren"
+  path_copied: "Pfad kopiert."
 
 password:
   title: "Passwort"
@@ -764,3 +766,17 @@ unsaved:
   question: "Diese Vorlagen haben Änderungen, die nicht gespeichert sind: %{names}. Ein Lauf liest die gespeicherten Dateien, nicht den Inhalt der Tabs."
   save_and_run: "Speichern und ausführen"
   run_without_saving: "Ohne Speichern ausführen"
+
+close_guard:
+  title_window: "Fenster mit nicht gespeicherter Arbeit schließen?"
+  title_quit: "Mit nicht gespeicherter Arbeit beenden?"
+  title_restart: "Mit nicht gespeicherter Arbeit neu starten?"
+  message: "Wenn Sie fortfahren, geht Folgendes verloren:"
+  more: "…und %{count} weitere"
+  close_anyway: "Trotzdem schließen"
+  quit_anyway: "Trotzdem beenden"
+  restart_anyway: "Trotzdem neu starten"
+  save_all: "Alle speichern"
+  item_template: "Nicht gespeicherte Vorlage „%{name}“"
+  item_run: "Ein Erzeugungslauf, der noch Dateien schreibt"
+  item_draft: "Nicht gespeicherte Änderungen in einem offenen Dialog"

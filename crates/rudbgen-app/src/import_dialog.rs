@@ -834,7 +834,7 @@ impl ImportDialog {
             .gap(px(12.))
             .child(
                 div()
-                    .text_size(px(12.))
+                    .text_size(rugpui::TextSize::Sm.size(cx))
                     .text_color(chrome.text_muted)
                     .child(ts!("import.password_hint")),
             )
@@ -849,7 +849,7 @@ impl ImportDialog {
                             .flex_1()
                             .min_w_0()
                             .truncate()
-                            .text_size(px(12.))
+                            .text_size(rugpui::TextSize::Sm.size(cx))
                             .text_color(chrome.text)
                             .child(SharedString::from(self.path.display().to_string())),
                     )
@@ -873,7 +873,7 @@ impl ImportDialog {
                     .gap(px(4.))
                     .child(
                         div()
-                            .text_size(px(11.))
+                            .text_size(rugpui::TextSize::Xs.size(cx))
                             .text_color(chrome.text_muted)
                             .child(ts!("import.master_password")),
                     )
@@ -881,14 +881,14 @@ impl ImportDialog {
             )
             .children(error.map(|message| {
                 div()
-                    .text_size(px(11.))
+                    .text_size(rugpui::TextSize::Xs.size(cx))
                     .text_color(chrome.danger)
                     .child(message)
             }))
             .when(busy, |body| {
                 body.child(
                     div()
-                        .text_size(px(11.))
+                        .text_size(rugpui::TextSize::Xs.size(cx))
                         .text_color(chrome.text_muted)
                         .child(ts!("import.opening")),
                 )
@@ -953,7 +953,7 @@ impl ImportDialog {
             .flex()
             .flex_col()
             .gap(px(4.))
-            .child(heading(ts!("import.section_rules"), chrome))
+            .child(heading(ts!("import.section_rules"), chrome, cx))
             .child(
                 Checkbox::new(
                     "import-rules",
@@ -991,7 +991,7 @@ impl ImportDialog {
             .flex()
             .flex_col()
             .gap(px(4.))
-            .child(heading(ts!("import.section_settings"), chrome))
+            .child(heading(ts!("import.section_settings"), chrome, cx))
             .child(
                 Checkbox::new(
                     "import-settings",
@@ -1026,7 +1026,7 @@ impl ImportDialog {
             .flex()
             .flex_col()
             .gap(px(4.))
-            .child(heading(ts!("import.section_conflicts"), chrome))
+            .child(heading(ts!("import.section_conflicts"), chrome, cx))
             .child(
                 Checkbox::new("import-rename", ts!("import.conflict_rename"))
                     .checked(rename)
@@ -1046,7 +1046,7 @@ impl ImportDialog {
             )
             .child(
                 div()
-                    .text_size(px(11.))
+                    .text_size(rugpui::TextSize::Xs.size(cx))
                     .text_color(chrome.text_muted)
                     .child(if rename {
                         ts!("import.conflict_rename_hint")
@@ -1059,10 +1059,10 @@ impl ImportDialog {
             .flex()
             .flex_col()
             .gap(px(3.))
-            .child(heading(ts!("import.section_notes"), chrome))
+            .child(heading(ts!("import.section_notes"), chrome, cx))
             .children(preview.notes.iter().map(|note| {
                 div()
-                    .text_size(px(11.))
+                    .text_size(rugpui::TextSize::Xs.size(cx))
                     .text_color(chrome.text_muted)
                     .child(note_text(note))
             }));
@@ -1101,11 +1101,11 @@ impl ImportDialog {
             .flex()
             .flex_col()
             .gap(px(4.))
-            .child(heading(title, chrome))
+            .child(heading(title, chrome, cx))
             .when(rows.is_empty(), |block| {
                 block.child(
                     div()
-                        .text_size(px(11.))
+                        .text_size(rugpui::TextSize::Xs.size(cx))
                         .text_color(chrome.text_muted)
                         .child(ts!("import.nothing_here")),
                 )
@@ -1131,7 +1131,7 @@ impl ImportDialog {
                             .flex_1()
                             .min_w_0()
                             .truncate()
-                            .text_size(px(11.))
+                            .text_size(rugpui::TextSize::Xs.size(cx))
                             .text_color(chrome.text_muted)
                             .child(note)
                     }))
@@ -1144,6 +1144,7 @@ impl ImportDialog {
         result: &Imported,
         no_keychain: &[String],
         chrome: &Theme,
+        cx: &App,
     ) -> impl IntoElement + use<> {
         div()
             .flex()
@@ -1151,7 +1152,7 @@ impl ImportDialog {
             .gap(px(10.))
             .child(
                 div()
-                    .text_size(px(13.))
+                    .text_size(rugpui::TextSize::Body.size(cx))
                     .text_color(chrome.text)
                     .child(if result.is_empty() {
                         ts!("import.nothing_written")
@@ -1168,7 +1169,7 @@ impl ImportDialog {
             .when(!result.skipped.is_empty(), |body| {
                 body.child(
                     div()
-                        .text_size(px(11.))
+                        .text_size(rugpui::TextSize::Xs.size(cx))
                         .text_color(chrome.text_muted)
                         .child(ts!("import.skipped", names = result.skipped.join(", "))),
                 )
@@ -1176,7 +1177,7 @@ impl ImportDialog {
             .when(!result.not_saved.is_empty(), |body| {
                 body.child(
                     div()
-                        .text_size(px(11.))
+                        .text_size(rugpui::TextSize::Xs.size(cx))
                         .text_color(chrome.danger)
                         .child(ts!(
                             "import.not_saved",
@@ -1187,7 +1188,7 @@ impl ImportDialog {
             .when(!no_keychain.is_empty(), |body| {
                 body.child(
                     div()
-                        .text_size(px(11.))
+                        .text_size(rugpui::TextSize::Xs.size(cx))
                         .text_color(chrome.danger)
                         .child(ts!("import.no_keychain", names = no_keychain.join(", "))),
                 )
@@ -1299,7 +1300,7 @@ impl Render for ImportDialog {
         let review_error = match &self.stage {
             Stage::Review { error } => error.clone().map(|message| {
                 div()
-                    .text_size(px(11.))
+                    .text_size(rugpui::TextSize::Xs.size(cx))
                     .text_color(chrome.danger)
                     .child(message)
             }),
@@ -1311,7 +1312,7 @@ impl Render for ImportDialog {
             }
             Stage::Review { .. } => self.render_review(&chrome, cx).into_any_element(),
             Stage::Importing => div()
-                .text_size(px(12.))
+                .text_size(rugpui::TextSize::Sm.size(cx))
                 .text_color(chrome.text_muted)
                 .child(ts!("import.importing"))
                 .into_any_element(),
@@ -1319,7 +1320,7 @@ impl Render for ImportDialog {
                 result,
                 no_keychain,
             } => self
-                .render_done(result, no_keychain, &chrome)
+                .render_done(result, no_keychain, &chrome, cx)
                 .into_any_element(),
         };
 
@@ -1428,9 +1429,9 @@ fn driver_rows(mapped: &Mapped) -> Vec<(SharedString, Option<SharedString>)> {
 }
 
 /// A section heading of the checklist.
-fn heading(text: SharedString, chrome: &Theme) -> impl IntoElement + use<> {
+fn heading(text: SharedString, chrome: &Theme, cx: &App) -> impl IntoElement + use<> {
     div()
-        .text_size(px(11.))
+        .text_size(rugpui::TextSize::Xs.size(cx))
         .text_color(chrome.text_muted)
         .child(text)
 }

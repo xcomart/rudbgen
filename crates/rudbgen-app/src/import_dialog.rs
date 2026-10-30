@@ -1198,6 +1198,7 @@ impl ImportDialog {
     fn render_footer(&self, cx: &mut Context<Self>) -> impl IntoElement + use<> {
         let this = cx.entity();
         let cancel = Button::new("import-cancel", ts!("common.cancel"))
+            .variant(ButtonVariant::Secondary)
             .disabled(matches!(self.stage, Stage::Opening | Stage::Importing))
             .on_click({
                 let this = this.clone();

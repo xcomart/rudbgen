@@ -252,7 +252,14 @@ credential store, under the service name `rudbgen`:
 | Linux | the freedesktop Secret Service (GNOME Keyring, KWallet, …) |
 
 Each connection has up to two entries — one for the database password, one for
-the tunnel's — so that the two can be changed independently.
+the tunnel's — so that the two can be changed independently. Untick **Remember
+password** in the connection dialog and a connection keeps neither: nothing is
+written to the store for it, any entry it had is removed, and the window asks
+for the password every time it opens.
+
+A store that refuses to save a password — locked, or denying access — does not
+keep you from connecting: the connection is saved, opens with the password you
+typed, and the status bar says the password was not kept.
 
 A Secret Service with no default keyring yet — Xfce on MX Linux, for one, never
 creates the login keyring — gets one the first time a password is saved: the
@@ -261,8 +268,8 @@ password is saved into it once you answer.
 
 On a machine with no such store — a headless Linux box with no Secret Service
 running — rudbgen starts anyway and behaves as though no password had ever been
-saved: you are asked for it each time. It never falls back to writing the
-password to disk.
+saved: when the database refuses a connection without one, you are asked for it.
+It never falls back to writing the password to disk.
 
 Unlike jdbgen, there is **no master password**. Nothing rudbgen writes is
 encrypted with a key of its own, because nothing rudbgen writes is a secret; the

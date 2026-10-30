@@ -14,7 +14,7 @@ impl Workspace {
 
     /// Puts the keyboard back where the user was working once a dialog or a
     /// question has gone: the template on top when there is one, which is
-    /// where the `Ctrl+G` or the close button that put the dialog up was
+    /// where the `F5` or the close button that put the dialog up was
     /// pressed from, and the shell otherwise.
     ///
     /// The shell first, in the same update, for [`Workspace::focus_shell`]'s

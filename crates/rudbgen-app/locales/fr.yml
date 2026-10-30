@@ -26,6 +26,7 @@ explorer:
   menu_invert: Inverser la sélection
   menu_inspect: Ouvrir dans l’inspecteur
   menu_refresh: Actualiser
+  missing: "Décochées, car elles ne sont plus dans la base : %{names}"
 
 inspector:
   title: Inspecteur
@@ -137,6 +138,10 @@ connect:
   # JVM et n'est pas traduite.
   could_not_open: "Impossible d’ouvrir %{name}."
   tunnel_ended: "Le tunnel SSH s’est terminé : %{reason}"
+  remember_password: "Mémoriser le mot de passe"
+  keychain_failed_connected: "Connecté, mais le mot de passe n’a pas pu être gardé dans le trousseau : %{error}"
+  edit_connection: "Modifier la connexion…"
+  retry: "Réessayer"
 
 driver:
   title: Pilotes
@@ -235,6 +240,13 @@ menu:
   mac:
     new_connection: Nouvelle connexion…
     quit: Quitter rudbgen
+  manage_connections: "Gérer les connexions…"
+  add_to_generation: "Ajouter à la liste de génération"
+  close_tab: "Fermer l’onglet"
+  next_tab: "Onglet suivant"
+  prev_tab: "Onglet précédent"
+  next_diagnostic: "Problème suivant"
+  prev_diagnostic: "Problème précédent"
 
 titlebar:
   no_connection: Aucune connexion
@@ -243,6 +255,7 @@ titlebar:
   disconnect: Se déconnecter
   connecting: "%{name} — connexion en cours…"
   tip_menu: Menu
+  cancel_connecting: "Annuler la connexion"
 
 welcome:
   tagline: Pointez-le vers une base de données, choisissez des tables et des modèles, et le code est écrit.
@@ -316,6 +329,23 @@ generate:
   blocked_templates: Cochez au moins un modèle.
   blocked_output: Choisissez d’abord un dossier de sortie.
   blocked_running: Une exécution est déjà en cours.
+  set_choose: "Choisir un jeu…"
+  no_templates_sets: "Aucun modèle pour l’instant. Partez d’un jeu de modèles, ou ajoutez les vôtres :"
+  use_set: "Utiliser « %{name} »"
+  column_name: "Nom"
+  column_file: "Fichier du modèle"
+  column_output: "Nom du fichier de sortie"
+  tip_output: "Le fichier où chaque table est écrite, sous le dossier de sortie. Il peut aussi nommer des dossiers, p. ex. ${package.replace('.','/')}/${name.suffix.pascal}.java"
+  undo: "Annuler"
+  undo_replaced: "La liste a été remplacée par le jeu « %{set} »."
+  undo_removed: "« %{name} » a été retiré de la liste."
+  overwrite: "Fichiers existants"
+  overwrite_default: "La valeur par défaut des paramètres, celle de chaque exécution."
+  overwrite_once: "Pour la prochaine exécution seulement ; ensuite, la valeur par défaut des paramètres revient."
+  all_connections: "(toutes les connexions)"
+  rendering: "Rendu en cours…"
+  dry_into: "%{count} fichiers seraient écrits sous %{dir}"
+  dry_no_output: "Aucun dossier de sortie n’est encore choisi : les chemins sont montrés sous un dossier temporaire, et tous les fichiers paraissent donc nouveaux."
 
 progress:
   title: Génération…
@@ -345,6 +375,7 @@ summary:
   skip: Ignorer
   overwrite_all: Tout écraser
   skip_all: Tout ignorer
+  warnings: "Avertissements"
 
 about:
   title: À propos de rudbgen
@@ -501,6 +532,7 @@ template:
   close_title: Modifications non enregistrées
   close_question: "%{file} contient des modifications qui n’ont pas encore été enregistrées."
   discard: Ne pas enregistrer
+  add_to_generation: "Ajouter à la liste de génération"
 
 diagnostics:
   title: Problèmes (%{count})
@@ -685,7 +717,7 @@ import:
   written: "%{connections} connexions, %{drivers} pilotes, %{sets} jeux de modèles et %{rules} règles d’abréviation importés."
   nothing_written: Rien n’a été importé.
   skipped: "Laissé de côté, le nom étant pris : %{names}"
-  no_keychain: "Ces connexions ont été enregistrées sans leur mot de passe, faute de pouvoir le mettre dans le trousseau : %{names}. À l’ouverture, il sera demandé."
+  no_keychain: "Ces connexions ont été enregistrées sans leur mot de passe, faute de pouvoir le mettre dans le trousseau : %{names}. Si, à l’ouverture, la base refuse la connexion sans mot de passe, rudbgen le demande."
   load_failed: "Rien n’a été importé, car un fichier que l’import compléterait n’a pas pu être lu : %{error}. Réparez ou déplacez ce fichier, puis importez à nouveau."
   not_saved: "Non enregistré, car le fichier n’a pas pu être écrit : %{errors}"
   wrong_password: Ce n’est pas le mot de passe maître de cette configuration.
@@ -703,3 +735,32 @@ import:
   path_jar: Le JAR du pilote
   path_template: Le fichier de modèle
   path_output: Le dossier de sortie
+
+context:
+  connect: "Se connecter"
+  edit: "Modifier…"
+  delete: "Supprimer…"
+  close_tab: "Fermer l’onglet"
+  close_others: "Fermer les autres onglets"
+  close_right: "Fermer les onglets à droite"
+  copy_path: "Copier le chemin"
+
+password:
+  title: "Mot de passe"
+  question: "Saisissez le mot de passe de %{name}."
+  refused: "La base de données a refusé le mot de passe."
+
+prompt:
+  discard_title: "Modifications non enregistrées"
+  keep_editing: "Continuer la modification"
+  discard: "Abandonner les modifications"
+  discard_connections: "Les connexions contiennent des modifications non enregistrées. Les abandonner ?"
+  discard_drivers: "Les pilotes contiennent des modifications non enregistrées. Les abandonner ?"
+  discard_rules: "Les règles d’abréviation contiennent des modifications non enregistrées. Les abandonner ?"
+  discard_settings: "Les paramètres contiennent des modifications non enregistrées. Les abandonner ?"
+
+unsaved:
+  title: "Modèles non enregistrés"
+  question: "Ces modèles contiennent des modifications non enregistrées : %{names}. Une exécution lit les fichiers enregistrés, pas le contenu des onglets."
+  save_and_run: "Enregistrer et exécuter"
+  run_without_saving: "Exécuter sans enregistrer"

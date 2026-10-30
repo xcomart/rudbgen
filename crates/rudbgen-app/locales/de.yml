@@ -26,6 +26,7 @@ explorer:
   menu_invert: Auswahl umkehren
   menu_inspect: Im Inspektor öffnen
   menu_refresh: Aktualisieren
+  missing: "Abgewählt, weil sie nicht mehr in der Datenbank sind: %{names}"
 
 inspector:
   title: Inspektor
@@ -137,6 +138,10 @@ connect:
   # oder von der JVM und wird nicht übersetzt.
   could_not_open: "%{name} konnte nicht geöffnet werden."
   tunnel_ended: "Der SSH-Tunnel wurde beendet: %{reason}"
+  remember_password: "Passwort merken"
+  keychain_failed_connected: "Verbunden, aber das Passwort konnte nicht im Schlüsselbund gespeichert werden: %{error}"
+  edit_connection: "Verbindung bearbeiten…"
+  retry: "Erneut versuchen"
 
 driver:
   title: Treiber
@@ -235,6 +240,13 @@ menu:
   mac:
     new_connection: Neue Verbindung…
     quit: rudbgen beenden
+  manage_connections: "Verbindungen verwalten…"
+  add_to_generation: "Zur Erzeugungsliste hinzufügen"
+  close_tab: "Tab schließen"
+  next_tab: "Nächster Tab"
+  prev_tab: "Vorheriger Tab"
+  next_diagnostic: "Nächstes Problem"
+  prev_diagnostic: "Vorheriges Problem"
 
 titlebar:
   no_connection: Keine Verbindung
@@ -243,6 +255,7 @@ titlebar:
   disconnect: Trennen
   connecting: "%{name} — Verbindung wird hergestellt…"
   tip_menu: Menü
+  cancel_connecting: "Verbindungsaufbau abbrechen"
 
 welcome:
   tagline: Auf eine Datenbank zeigen, Tabellen und Vorlagen wählen — der Code wird geschrieben.
@@ -316,6 +329,23 @@ generate:
   blocked_templates: Haken Sie mindestens eine Vorlage an.
   blocked_output: Wählen Sie zuerst einen Zielordner.
   blocked_running: Ein Lauf läuft bereits.
+  set_choose: "Satz auswählen…"
+  no_templates_sets: "Noch keine Vorlagen. Beginnen Sie mit einem Vorlagensatz oder fügen Sie eigene hinzu:"
+  use_set: "„%{name}“ verwenden"
+  column_name: "Name"
+  column_file: "Vorlagendatei"
+  column_output: "Name der Ausgabedatei"
+  tip_output: "Die Datei, in die jede Tabelle unterhalb des Ausgabeordners geschrieben wird. Ordner sind möglich, z. B. ${package.replace('.','/')}/${name.suffix.pascal}.java"
+  undo: "Rückgängig"
+  undo_replaced: "Die Liste wurde durch den Satz „%{set}“ ersetzt."
+  undo_removed: "„%{name}“ wurde aus der Liste entfernt."
+  overwrite: "Vorhandene Dateien"
+  overwrite_default: "Der Standard aus den Einstellungen, mit dem jeder Lauf beginnt."
+  overwrite_once: "Nur für den nächsten Lauf; danach gilt wieder der Standard aus den Einstellungen."
+  all_connections: "(alle Verbindungen)"
+  rendering: "Wird gerendert…"
+  dry_into: "%{count} Dateien würden unter %{dir} geschrieben"
+  dry_no_output: "Noch kein Zielordner gewählt: Die Pfade werden unter einem temporären Ordner gezeigt, daher ist jede Datei neu."
 
 progress:
   title: Wird erzeugt…
@@ -345,6 +375,7 @@ summary:
   skip: Überspringen
   overwrite_all: Alle überschreiben
   skip_all: Alle überspringen
+  warnings: "Warnungen"
 
 about:
   title: Über rudbgen
@@ -501,6 +532,7 @@ template:
   close_title: Nicht gespeicherte Änderungen
   close_question: "%{file} hat Änderungen, die noch nicht gespeichert sind."
   discard: Nicht speichern
+  add_to_generation: "Zur Erzeugungsliste hinzufügen"
 
 diagnostics:
   title: Probleme (%{count})
@@ -685,7 +717,7 @@ import:
   written: "%{connections} Verbindungen, %{drivers} Treiber, %{sets} Vorlagensätze und %{rules} Abkürzungsregeln importiert."
   nothing_written: Es wurde nichts importiert.
   skipped: "Nicht importiert, weil der Name vergeben war: %{names}"
-  no_keychain: "Diese Verbindungen wurden ohne ihr Passwort gespeichert, weil es nicht in den Schlüsselbund gelegt werden konnte: %{names}. Beim Öffnen wird danach gefragt."
+  no_keychain: "Diese Verbindungen wurden ohne ihr Passwort gespeichert, weil es nicht in den Schlüsselbund gelegt werden konnte: %{names}. Lehnt die Datenbank beim Öffnen eine Verbindung ohne Passwort ab, fragt rudbgen danach."
   load_failed: "Es wurde nichts importiert, weil eine Datei, in die der Import schreiben würde, nicht gelesen werden konnte: %{error}. Reparieren oder verschieben Sie die Datei und importieren Sie erneut."
   not_saved: "Nicht gespeichert, weil die Datei nicht geschrieben werden konnte: %{errors}"
   wrong_password: Das ist nicht das Hauptpasswort dieser Konfiguration.
@@ -703,3 +735,32 @@ import:
   path_jar: Das Treiber-JAR
   path_template: Die Vorlagendatei
   path_output: Der Zielordner
+
+context:
+  connect: "Verbinden"
+  edit: "Bearbeiten…"
+  delete: "Löschen…"
+  close_tab: "Tab schließen"
+  close_others: "Andere Tabs schließen"
+  close_right: "Tabs rechts davon schließen"
+  copy_path: "Pfad kopieren"
+
+password:
+  title: "Passwort"
+  question: "Geben Sie das Passwort für %{name} ein."
+  refused: "Die Datenbank hat das Passwort abgelehnt."
+
+prompt:
+  discard_title: "Nicht gespeicherte Änderungen"
+  keep_editing: "Weiter bearbeiten"
+  discard: "Änderungen verwerfen"
+  discard_connections: "Die Verbindungen haben Änderungen, die nicht gespeichert sind. Verwerfen?"
+  discard_drivers: "Die Treiber haben Änderungen, die nicht gespeichert sind. Verwerfen?"
+  discard_rules: "Die Abkürzungsregeln haben Änderungen, die nicht gespeichert sind. Verwerfen?"
+  discard_settings: "Die Einstellungen haben Änderungen, die nicht gespeichert sind. Verwerfen?"
+
+unsaved:
+  title: "Nicht gespeicherte Vorlagen"
+  question: "Diese Vorlagen haben Änderungen, die nicht gespeichert sind: %{names}. Ein Lauf liest die gespeicherten Dateien, nicht den Inhalt der Tabs."
+  save_and_run: "Speichern und ausführen"
+  run_without_saving: "Ohne Speichern ausführen"

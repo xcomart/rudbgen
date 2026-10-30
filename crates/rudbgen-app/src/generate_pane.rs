@@ -37,17 +37,18 @@ use gpui::{
     SharedString, Subscription, Task, Window, div, prelude::*, px,
 };
 use rudbgen_core::{
-    AbbreviationStore, ConnectionStore, GenerationProfile, TemplateRef, TemplateSet,
-    TemplateSetStore, config_dir,
+    AbbreviationStore, ConnectionStore, GenerationProfile, OverwritePolicy, TableName, TemplateRef,
+    TemplateSet, TemplateSetStore, config_dir,
 };
 use rugpui::{
-    Button, ButtonVariant, Checkbox, Scrollbar, ScrollbarAxis, ScrollbarState, Select, TextInput,
-    Theme, form_row, hide_later, hide_now, modal, scroll_to, scrolled, theme, tooltip_label,
+    Button, ButtonVariant, Checkbox, Scrollbar, ScrollbarAxis, ScrollbarState, Segmented, Select,
+    TextInput, Theme, form_row, hide_later, hide_now, modal, scroll_to, scrolled, theme,
+    tooltip_label,
 };
 use uuid::Uuid;
 
 use crate::i18n::ts;
-use crate::icons;
+use crate::{app_settings, icons, prompt};
 
 /// How long the panel waits after the last edit before writing
 /// `connections.json`.
@@ -302,6 +303,31 @@ struct TemplateRow {
     _subs: [Subscription; 2],
 }
 
+/// The last change to the template list that one click can take back.
+///
+/// The list is saved half a second after every change and has no history of
+/// its own, so the two changes that throw rows away — picking a set over an
+/// edited list, and the ✕ beside a row — leave this behind, and a line above
+/// the list offers it until the next change of the same kind replaces it.
+enum Undo {
+    /// A set replaced this list, and this is what it was.
+    Replaced {
+        /// The rows as they stood.
+        templates: Vec<TemplateRef>,
+        /// The set the list had come from, for the "Save as set…" prompt.
+        origin: Option<Uuid>,
+        /// The set that replaced it, for the line that says so.
+        set: SharedString,
+    },
+    /// This row was removed from this position.
+    Removed {
+        /// Where it was.
+        index: usize,
+        /// What it was.
+        template: TemplateRef,
+    },
+}
+
 /// One row of the custom variable table.
 struct VarRow {
     /// The variable's name.
@@ -359,6 +385,25 @@ pub struct GeneratePane {
     origin_set: Option<Uuid>,
     /// The set the delete-confirmation prompt is up for, if any.
     deleting_set: Option<Uuid>,
+    /// The box the delete confirmation is drawn in; see [`prompt::body`].
+    prompt_focus: FocusHandle,
+    /// Whether that box should take the keyboard on the next frame.
+    pending_prompt_focus: bool,
+    /// What the last list change that lost rows can be taken back to.
+    undo: Option<Undo>,
+    /// The overwrite policy for the next generate, when it is not the one the
+    /// settings start every run from.
+    ///
+    /// Not part of the profile and not saved: the settings hold the default,
+    /// this is the exception for one run, and it goes back to the default as
+    /// soon as that run has started (see [`GeneratePane::take_overwrite`]).
+    overwrite: Option<OverwritePolicy>,
+    /// The tables ticked in the explorer, which the profile keeps for the next
+    /// connection to tick again (see [`GeneratePane::set_ticks`]).
+    ///
+    /// Not drawn here — the ticks are the explorer's — but saved with the rest
+    /// of the profile, through the same debounce and the same diff.
+    ticks: Vec<TableName>,
     /// Vertical scroll of the panel.
     scroll: ScrollHandle,
     /// Whether the panel's overlay scroll indicator is on screen.
@@ -377,7 +422,25 @@ impl GeneratePane {
             cx.new(|cx| TextInput::new(cx).placeholder(ts!("generate.output_placeholder")));
         let author =
             cx.new(|cx| TextInput::new(cx).placeholder(ts!("generate.author_placeholder")));
-        let set_name = cx.new(|cx| TextInput::new(cx).placeholder(ts!("generate.set_name")));
+        // `Enter` in the name saves the set, as the prompt's button does —
+        // deferred, because the field is still leased while its own submit
+        // runs and the save reads it back.
+        let weak = cx.weak_entity();
+        let set_name = cx.new(|cx| {
+            TextInput::new(cx)
+                .placeholder(ts!("generate.set_name"))
+                .on_submit(move |text, _window, cx| {
+                    let (weak, name) = (weak.clone(), text.to_owned());
+                    cx.defer(move |cx| {
+                        weak.update(cx, |pane, cx| {
+                            if pane.naming_set {
+                                pane.save_as_set(name, cx);
+                            }
+                        })
+                        .ok();
+                    });
+                })
+        });
         let subs = vec![
             cx.observe(&output, |pane, _, cx| pane.touch(cx)),
             cx.observe(&author, |pane, _, cx| pane.touch(cx)),
@@ -407,6 +470,11 @@ impl GeneratePane {
             set_name,
             origin_set: None,
             deleting_set: None,
+            prompt_focus: cx.focus_handle(),
+            pending_prompt_focus: false,
+            undo: None,
+            overwrite: None,
+            ticks: Vec::new(),
             scroll: ScrollHandle::new(),
             scrollbar: ScrollbarState::new(),
             _debounce: None,
@@ -444,6 +512,10 @@ impl GeneratePane {
             }
         };
         self.origin_set = matching_set(&self.sets.sets, &profile.templates);
+        self.undo = None;
+        self.overwrite = None;
+        self.ticks = profile.selected_tables.clone();
+        self.withdraw_prompts(cx);
         self.rebuild(profile, cx);
     }
 
@@ -452,8 +524,72 @@ impl GeneratePane {
         self.profile_id = None;
         self.saved = GenerationProfile::default();
         self.origin_set = None;
+        self.undo = None;
+        self.overwrite = None;
+        self.ticks.clear();
         self._debounce = None;
+        self.withdraw_prompts(cx);
         self.rebuild(&GenerationProfile::default(), cx);
+    }
+
+    /// Whether one of the panel's two questions — the name of a set, whether
+    /// to delete one — is up.
+    pub fn prompt_open(&self) -> bool {
+        self.naming_set || self.deleting_set.is_some()
+    }
+
+    /// `Escape`, for whatever the panel has stacked over itself: the set list,
+    /// then either question. Answers whether there was anything to take down.
+    pub fn escape(&mut self, cx: &mut Context<Self>) -> bool {
+        if self.set_open {
+            self.set_open = false;
+        } else if self.naming_set {
+            self.naming_set = false;
+        } else if self.deleting_set.is_some() {
+            self.deleting_set = None;
+        } else {
+            return false;
+        }
+        cx.notify();
+        true
+    }
+
+    /// Takes both questions and the set list down, unanswered.
+    pub fn withdraw_prompts(&mut self, cx: &mut Context<Self>) {
+        if self.naming_set || self.deleting_set.is_some() || self.set_open {
+            self.naming_set = false;
+            self.deleting_set = None;
+            self.set_open = false;
+            cx.notify();
+        }
+    }
+
+    /// The overwrite policy the next generate runs under, after which the
+    /// panel's choice goes back to the settings' default.
+    pub fn take_overwrite(&mut self, cx: &mut Context<Self>) -> OverwritePolicy {
+        let policy = self
+            .overwrite
+            .take()
+            .unwrap_or_else(|| app_settings::current(cx).overwrite_policy);
+        cx.notify();
+        policy
+    }
+
+    /// Whether `file` is one of this connection's templates, ticked or not.
+    pub fn lists_template(&self, file: &Path) -> bool {
+        let stored = store_template_path(file);
+        self.templates
+            .iter()
+            .any(|row| row.file == stored || resolve_template(&row.file) == file)
+    }
+
+    /// Appends `file` to the list, ticked, unless it is already in it: the
+    /// template tab's *Add to generation list*.
+    pub fn add_template_file(&mut self, file: PathBuf, cx: &mut Context<Self>) {
+        if self.profile_id.is_none() || self.lists_template(&file) {
+            return;
+        }
+        self.install_templates(vec![file], cx);
     }
 
     /// The profile as the widgets currently describe it.
@@ -481,7 +617,25 @@ impl GeneratePane {
             output_dir: Some(PathBuf::from(output)).filter(|dir| !dir.as_os_str().is_empty()),
             author: text(&self.author, cx),
             custom_vars: collect_vars(&rows),
+            selected_tables: self.ticks.clone(),
         }
+    }
+
+    /// The tables the explorer has ticked, for the profile to keep.
+    ///
+    /// Saved with the next debounce like any other edit — a tick is cheap to
+    /// make and the file is diffed, so a burst of them is one write.
+    pub fn set_ticks(&mut self, ticks: Vec<TableName>, cx: &mut Context<Self>) {
+        if self.ticks != ticks {
+            self.ticks = ticks;
+            self.schedule_save(cx);
+        }
+    }
+
+    /// The ticks the profile will be saved with.
+    #[cfg(test)]
+    pub fn ticks(&self) -> &[TableName] {
+        &self.ticks
     }
 
     /// The abbreviation rules, which a run needs and only this panel has read.
@@ -713,7 +867,34 @@ impl GeneratePane {
         if index >= self.templates.len() {
             return;
         }
+        let template = self.collect(cx).templates.remove(index);
         self.templates.remove(index);
+        self.undo = Some(Undo::Removed { index, template });
+        self.touch(cx);
+    }
+
+    /// Takes the last list change that lost rows back.
+    fn undo(&mut self, cx: &mut Context<Self>) {
+        let Some(undo) = self.undo.take() else {
+            return;
+        };
+        match undo {
+            Undo::Replaced {
+                templates, origin, ..
+            } => {
+                self.templates.clear();
+                for template in &templates {
+                    let row = self.new_template_row(template, cx);
+                    self.templates.push(row);
+                }
+                self.origin_set = origin;
+            }
+            Undo::Removed { index, template } => {
+                let row = self.new_template_row(&template, cx);
+                let at = index.min(self.templates.len());
+                self.templates.insert(at, row);
+            }
+        }
         self.touch(cx);
     }
 
@@ -721,10 +902,24 @@ impl GeneratePane {
     ///
     /// A replacement and not a merge, which is what jdbgen's presets do: a set
     /// is a description of a whole run, and half of one is not a set.
+    ///
+    /// What it replaces is kept for [`Undo`]: a list that was not already
+    /// this set — rows ticked, renamed, added by hand — is otherwise gone the
+    /// moment a set is picked from a list that was only being looked through.
     fn apply_set(&mut self, id: Uuid, cx: &mut Context<Self>) {
         let Some(set) = self.sets.get(id).cloned() else {
             return;
         };
+        let before = self.collect(cx).templates;
+        if before.is_empty() || before == set.templates {
+            self.undo = None;
+        } else {
+            self.undo = Some(Undo::Replaced {
+                templates: before,
+                origin: self.origin_set,
+                set: SharedString::from(set.name.clone()),
+            });
+        }
         self.templates.clear();
         for template in &set.templates {
             let row = self.new_template_row(template, cx);
@@ -736,7 +931,7 @@ impl GeneratePane {
 
     /// Opens the "Save as set…" prompt on the name of the set the list came
     /// from, or empty when there is none.
-    fn open_set_prompt(&mut self, cx: &mut Context<Self>) {
+    pub fn open_set_prompt(&mut self, cx: &mut Context<Self>) {
         let name = self
             .origin_set
             .and_then(|id| self.sets.get(id))
@@ -847,6 +1042,10 @@ impl GeneratePane {
     /// template that renders to something plausible rather than to an empty
     /// string — the user then edits both in place.
     fn install_templates(&mut self, paths: Vec<PathBuf>, cx: &mut Context<Self>) {
+        // A row added after a replaced list would be lost to its undo.
+        if matches!(self.undo, Some(Undo::Replaced { .. })) {
+            self.undo = None;
+        }
         for path in paths {
             let stored = store_template_path(&path);
             if self.templates.iter().any(|row| row.file == stored) {
@@ -999,10 +1198,20 @@ impl GeneratePane {
         // the list there. The trigger shows it without the list offering it,
         // which `Select` allows — a selection outside the options just
         // highlights no row.
-        let selected = matched
-            .and_then(|id| self.sets.get(id))
-            .map(|set| SharedString::from(set.name.clone()))
-            .unwrap_or_else(|| ts!("generate.set_custom"));
+        //
+        // An empty list is not a custom one, though: there is nothing in it to
+        // be custom, and the word sent a new user looking for what they had
+        // customized. It shows as the question it is instead.
+        let selected = if current.is_empty() {
+            None
+        } else {
+            Some(
+                matched
+                    .and_then(|id| self.sets.get(id))
+                    .map(|set| SharedString::from(set.name.clone()))
+                    .unwrap_or_else(|| ts!("generate.set_custom")),
+            )
+        };
 
         let ids: Vec<Uuid> = self.sets.sets.iter().map(|set| set.id).collect();
         let this = cx.entity();
@@ -1021,8 +1230,9 @@ impl GeneratePane {
             .child(
                 Select::new("generate-set")
                     .chevron_icon(icons::CHEVRON_DOWN)
+                    .placeholder(ts!("generate.set_choose"))
                     .options(options)
-                    .selected(Some(selected))
+                    .selected(selected)
                     .open(self.set_open)
                     .width(px(SET_WIDTH))
                     .on_select(move |index, _text, _window, cx| {
@@ -1058,6 +1268,7 @@ impl GeneratePane {
                     .on_click(move |_, _window, cx| {
                         deleting.update(cx, |pane, cx| {
                             pane.deleting_set = matched;
+                            pane.pending_prompt_focus = true;
                             cx.notify();
                         });
                     }),
@@ -1074,6 +1285,130 @@ impl GeneratePane {
             .collect();
         let this = cx.entity();
 
+        // An empty list says where the templates are: in the sets the
+        // selector above offers, one button per set, rather than only behind
+        // a file picker that opens wherever the platform last left it.
+        let empty = rows.is_empty().then(|| {
+            let sets: Vec<_> = self
+                .sets
+                .sets
+                .iter()
+                .enumerate()
+                .map(|(index, set)| {
+                    let (id, apply) = (set.id, cx.entity());
+                    Button::new(
+                        ("generate-use-set", index),
+                        ts!("generate.use_set", name = set.name.clone()),
+                    )
+                    .variant(ButtonVariant::Secondary)
+                    .on_click(move |_, _window, cx| {
+                        apply.update(cx, |pane, cx| pane.apply_set(id, cx));
+                    })
+                })
+                .collect();
+            div()
+                .flex()
+                .flex_col()
+                .gap(px(8.))
+                .py(px(8.))
+                .child(div().text_size(px(12.)).text_color(theme.text_muted).child(
+                    if sets.is_empty() {
+                        ts!("generate.no_templates")
+                    } else {
+                        ts!("generate.no_templates_sets")
+                    },
+                ))
+                .when(!sets.is_empty(), |empty| {
+                    empty.child(
+                        div()
+                            .flex()
+                            .flex_row()
+                            .flex_wrap()
+                            .gap(px(6.))
+                            .children(sets),
+                    )
+                })
+        });
+
+        // The column headings, over the three fields a row is made of: the
+        // output name above all, whose field reads as one more name until
+        // the heading says what it is for.
+        let heading = |text: SharedString| {
+            div()
+                .text_size(px(10.))
+                .text_color(theme.text_muted)
+                .truncate()
+                .child(text)
+        };
+        let headings = (!rows.is_empty()).then(|| {
+            div()
+                .flex()
+                .flex_row()
+                .items_center()
+                .gap(px(6.))
+                .w_full()
+                .min_w_0()
+                // The checkbox's column, and the two glyphs' at the end.
+                .child(div().flex_none().w(px(16.)))
+                .child(heading(ts!("generate.column_name")).w(px(150.)).flex_none())
+                .child(heading(ts!("generate.column_file")).flex_1().min_w_0())
+                .child(
+                    heading(ts!("generate.column_output"))
+                        .flex_1()
+                        .flex_grow(2.)
+                        .min_w(px(OUT_MIN_WIDTH)),
+                )
+                .child(div().flex_none().w(px(50.)))
+        });
+
+        let undo = self.undo.as_ref().map(|undo| {
+            let message = match undo {
+                Undo::Replaced { set, .. } => ts!("generate.undo_replaced", set = set.clone()),
+                Undo::Removed { template, .. } => {
+                    ts!("generate.undo_removed", name = template.name.clone())
+                }
+            };
+            let (take_back, forget) = (cx.entity(), cx.entity());
+            div()
+                .flex()
+                .flex_row()
+                .items_center()
+                .gap(px(8.))
+                .px(px(8.))
+                .py(px(4.))
+                .rounded_md()
+                .bg(theme.surface)
+                .debug_selector(|| "generate-undo".to_string())
+                .child(
+                    div()
+                        .flex_1()
+                        .min_w_0()
+                        .truncate()
+                        .text_size(px(11.))
+                        .text_color(theme.text_muted)
+                        .child(message),
+                )
+                .child(
+                    Button::new("generate-undo", ts!("generate.undo"))
+                        .variant(ButtonVariant::Secondary)
+                        .compact()
+                        .on_click(move |_, _window, cx| {
+                            take_back.update(cx, |pane, cx| pane.undo(cx));
+                        }),
+                )
+                .child(
+                    Button::new("generate-undo-dismiss", ts!("common.close"))
+                        .variant(ButtonVariant::Ghost)
+                        .compact()
+                        .on_click(move |_, _window, cx| {
+                            forget.update(cx, |pane, cx| {
+                                pane.undo = None;
+                                cx.notify();
+                            });
+                        }),
+                )
+        });
+
         div()
             .flex()
             .flex_col()
@@ -1081,15 +1416,9 @@ impl GeneratePane {
             .w_full()
             .min_w_0()
             .debug_selector(|| "generate-templates".to_string())
-            .when(rows.is_empty(), |list| {
-                list.child(
-                    div()
-                        .py(px(8.))
-                        .text_size(px(12.))
-                        .text_color(theme.text_muted)
-                        .child(ts!("generate.no_templates")),
-                )
-            })
+            .children(undo)
+            .children(empty)
+            .children(headings)
             .children(rows)
             .child(
                 div().pt(px(4.)).child(
@@ -1168,10 +1497,12 @@ impl GeneratePane {
                 // the row, the file the rest: a name that writes into a package
                 // tree is the longest thing a row holds, and the one typed in.
                 div()
+                    .id(("generate-out", index))
                     .debug_selector(move || format!("generate-out-{index}"))
                     .flex_1()
                     .flex_grow(2.)
                     .min_w(px(OUT_MIN_WIDTH))
+                    .tooltip(tooltip_label(ts!("generate.tip_output")))
                     .child(row.out.clone()),
             )
             .child(
@@ -1270,6 +1601,16 @@ impl GeneratePane {
                         this.update(cx, |pane, cx| pane.toggle_abbreviations(checked, cx));
                     }),
             )
+            // The one value on this tab that is not the connection's: the
+            // switch lives in `abbreviations.json`, beside the rules, and
+            // flipping it here flips it for every connection.
+            .child(
+                div()
+                    .flex_none()
+                    .text_size(px(11.))
+                    .text_color(theme(cx).text_muted)
+                    .child(ts!("generate.all_connections")),
+            )
             .child(
                 Button::new("generate-rules", ts!("generate.rules"))
                     .variant(ButtonVariant::Secondary)
@@ -1325,15 +1666,17 @@ impl GeneratePane {
                         .justify_end()
                         .gap(px(8.))
                         .child(
-                            Button::new("generate-set-cancel", ts!("common.cancel")).on_click({
-                                let cancel = cancel.clone();
-                                move |_, _window, cx| {
-                                    cancel.update(cx, |pane, cx| {
-                                        pane.naming_set = false;
-                                        cx.notify();
-                                    });
-                                }
-                            }),
+                            Button::new("generate-set-cancel", ts!("common.cancel"))
+                                .variant(ButtonVariant::Secondary)
+                                .on_click({
+                                    let cancel = cancel.clone();
+                                    move |_, _window, cx| {
+                                        cancel.update(cx, |pane, cx| {
+                                            pane.naming_set = false;
+                                            cx.notify();
+                                        });
+                                    }
+                                }),
                         )
                         .child(
                             Button::new("generate-set-save", label)
@@ -1366,41 +1709,50 @@ impl GeneratePane {
             .unwrap_or_default();
         let cancel = cx.entity();
         let delete = cx.entity();
+        let default = cx.entity();
         modal(
             "generate-delete-set",
             ts!("generate.delete_set"),
             px(360.),
-            div()
-                .flex()
-                .flex_col()
-                .gap(px(12.))
-                .child(ts!("generate.delete_set_confirm", name = name))
-                .child(
-                    div()
-                        .flex()
-                        .flex_row()
-                        .justify_end()
-                        .gap(px(8.))
-                        .child(
-                            Button::new("generate-delete-set-cancel", ts!("common.cancel"))
-                                .on_click({
-                                    let cancel = cancel.clone();
-                                    move |_, _window, cx| {
-                                        cancel.update(cx, |pane, cx| {
-                                            pane.deleting_set = None;
-                                            cx.notify();
-                                        });
-                                    }
-                                }),
-                        )
-                        .child(
-                            Button::new("generate-delete-set-confirm", ts!("generate.delete_set"))
-                                .variant(ButtonVariant::Danger)
-                                .on_click(move |_, _window, cx| {
-                                    delete.update(cx, |pane, cx| pane.delete_set(id, cx));
-                                }),
-                        ),
-                ),
+            // `Enter` keeps the set: deleting one is the answer that cannot be
+            // taken back, so it is the one that needs a deliberate press.
+            prompt::body(&self.prompt_focus, move |_window, cx| {
+                default.update(cx, |pane, cx| {
+                    pane.deleting_set = None;
+                    cx.notify();
+                });
+            })
+            .flex()
+            .flex_col()
+            .gap(px(12.))
+            .child(ts!("generate.delete_set_confirm", name = name))
+            .child(
+                div()
+                    .flex()
+                    .flex_row()
+                    .justify_end()
+                    .gap(px(8.))
+                    .child(
+                        Button::new("generate-delete-set-cancel", ts!("common.cancel"))
+                            .variant(ButtonVariant::Secondary)
+                            .on_click({
+                                let cancel = cancel.clone();
+                                move |_, _window, cx| {
+                                    cancel.update(cx, |pane, cx| {
+                                        pane.deleting_set = None;
+                                        cx.notify();
+                                    });
+                                }
+                            }),
+                    )
+                    .child(
+                        Button::new("generate-delete-set-confirm", ts!("generate.delete_set"))
+                            .variant(ButtonVariant::Danger)
+                            .on_click(move |_, _window, cx| {
+                                delete.update(cx, |pane, cx| pane.delete_set(id, cx));
+                            }),
+                    ),
+            ),
             move |_window, cx| {
                 cancel.update(cx, |pane, cx| {
                     pane.deleting_set = None;
@@ -1420,9 +1772,58 @@ impl Focusable for GeneratePane {
 }
 
 impl Render for GeneratePane {
-    fn render(&mut self, _window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
+    fn render(&mut self, window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
         let theme = theme(cx);
         self.watch_scroll(cx);
+        if self.deleting_set.is_some() && std::mem::take(&mut self.pending_prompt_focus) {
+            window.focus(&self.prompt_focus, cx);
+        }
+
+        // The overwrite policy of the next generate: the settings' default
+        // until something else is picked here, and that again once the run
+        // it was picked for has started.
+        let policy = self
+            .overwrite
+            .unwrap_or_else(|| app_settings::current(cx).overwrite_policy);
+        let pick = cx.entity();
+        let overwrite = div()
+            .flex()
+            .flex_col()
+            .gap(px(4.))
+            .w_full()
+            .min_w_0()
+            .child(
+                Segmented::new("generate-overwrite")
+                    .options([
+                        ("ask", ts!("settings.overwrite_ask")),
+                        ("overwrite", ts!("settings.overwrite_overwrite")),
+                        ("skip", ts!("settings.overwrite_skip")),
+                    ])
+                    .selected(match policy {
+                        OverwritePolicy::Ask => 0,
+                        OverwritePolicy::Overwrite => 1,
+                        OverwritePolicy::Skip => 2,
+                    })
+                    .on_select(move |index, _window, cx| {
+                        pick.update(cx, |pane, cx| {
+                            let chosen = match index {
+                                1 => OverwritePolicy::Overwrite,
+                                2 => OverwritePolicy::Skip,
+                                _ => OverwritePolicy::Ask,
+                            };
+                            let default = app_settings::current(cx).overwrite_policy;
+                            pane.overwrite = (chosen != default).then_some(chosen);
+                            cx.notify();
+                        });
+                    }),
+            )
+            .child(div().text_size(px(11.)).text_color(theme.text_muted).child(
+                if self.overwrite.is_some() {
+                    ts!("generate.overwrite_once")
+                } else {
+                    ts!("generate.overwrite_default")
+                },
+            ));
 
         let chooser = cx.entity();
         let output = div()
@@ -1492,6 +1893,7 @@ impl Render for GeneratePane {
                     .child(labeled(ts!("generate.output_dir"), output))
                     .child(labeled(ts!("generate.author"), self.author.clone()))
                     .child(labeled(ts!("generate.variables"), self.render_vars()))
+                    .child(labeled(ts!("generate.overwrite"), overwrite))
                     .child(self.render_abbreviations(cx))
                     .children(
                         self.abbr_error
@@ -2003,6 +2405,7 @@ mod tests {
                         custom_vars: vec![("package".to_string(), "com.example".to_string())],
                         output_dir: Some(PathBuf::from("/tmp/out")),
                         author: "author".to_string(),
+                        ..Default::default()
                     },
                     cx,
                 );
@@ -2075,6 +2478,7 @@ mod tests {
                     custom_vars: vec![("package".to_string(), "com.example".to_string())],
                     output_dir: Some(PathBuf::from("/tmp/out")),
                     author: "author".to_string(),
+                    ..Default::default()
                 },
                 cx,
             );

@@ -333,6 +333,13 @@ pub struct AppSettings {
     /// differ from it without changing the setting.
     #[serde(deserialize_with = "deserialize_overwrite_policy")]
     pub overwrite_policy: OverwritePolicy,
+    /// The connection that was open last, which the welcome screen marks so
+    /// that the usual one is found at a glance.
+    ///
+    /// Only marked, never opened: a connection that opens itself at start-up
+    /// would be one the user did not ask for, and the database behind it may
+    /// be one they no longer mean to reach.
+    pub last_connection: Option<uuid::Uuid>,
     /// Width of the explorer sidebar in logical pixels; clamped to
     /// 140.0 ..= 720.0 on load.
     ///
@@ -396,6 +403,7 @@ impl Default for AppSettings {
             jvm_heap_mb: DEFAULT_JVM_HEAP_MB,
             jvm_extra_args: Vec::new(),
             overwrite_policy: OverwritePolicy::default(),
+            last_connection: None,
             explorer_width: DEFAULT_EXPLORER_WIDTH,
             explorer_visible: true,
             inspector_width: DEFAULT_INSPECTOR_WIDTH,

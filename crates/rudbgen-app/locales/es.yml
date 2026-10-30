@@ -26,6 +26,7 @@ explorer:
   menu_invert: Invertir la selección
   menu_inspect: Abrir en el inspector
   menu_refresh: Recargar
+  missing: "Desmarcadas porque ya no están en la base de datos: %{names}"
 
 inspector:
   title: Inspector
@@ -137,6 +138,10 @@ connect:
   # de la JVM y no se traduce.
   could_not_open: "No se pudo abrir %{name}."
   tunnel_ended: "El túnel SSH terminó: %{reason}"
+  remember_password: "Recordar la contraseña"
+  keychain_failed_connected: "Conectado, pero no se pudo guardar la contraseña en el llavero: %{error}"
+  edit_connection: "Editar la conexión…"
+  retry: "Reintentar"
 
 driver:
   title: Controladores
@@ -235,6 +240,13 @@ menu:
   mac:
     new_connection: Nueva conexión…
     quit: Salir de rudbgen
+  manage_connections: "Gestionar conexiones…"
+  add_to_generation: "Añadir a la lista de generación"
+  close_tab: "Cerrar la pestaña"
+  next_tab: "Pestaña siguiente"
+  prev_tab: "Pestaña anterior"
+  next_diagnostic: "Problema siguiente"
+  prev_diagnostic: "Problema anterior"
 
 titlebar:
   no_connection: Sin conexión
@@ -243,6 +255,7 @@ titlebar:
   disconnect: Desconectar
   connecting: "%{name} — conectando…"
   tip_menu: Menú
+  cancel_connecting: "Cancelar la conexión"
 
 welcome:
   tagline: Conéctalo a una base de datos, elige tablas y plantillas, y escribirá el código.
@@ -316,6 +329,23 @@ generate:
   blocked_templates: Marca al menos una plantilla.
   blocked_output: Elige primero una carpeta de salida.
   blocked_running: Ya hay una ejecución en marcha.
+  set_choose: "Elegir un conjunto…"
+  no_templates_sets: "Aún no hay plantillas. Empieza con un conjunto de plantillas o añade las tuyas:"
+  use_set: "Usar «%{name}»"
+  column_name: "Nombre"
+  column_file: "Archivo de plantilla"
+  column_output: "Nombre del archivo de salida"
+  tip_output: "El archivo en el que se escribe cada tabla, dentro de la carpeta de salida. Puede incluir carpetas, p. ej. ${package.replace('.','/')}/${name.suffix.pascal}.java"
+  undo: "Deshacer"
+  undo_replaced: "La lista se sustituyó por el conjunto «%{set}»."
+  undo_removed: "Se quitó «%{name}» de la lista."
+  overwrite: "Archivos existentes"
+  overwrite_default: "El valor predeterminado de Ajustes, con el que empieza cada ejecución."
+  overwrite_once: "Solo para la próxima ejecución; después vuelve al valor predeterminado de Ajustes."
+  all_connections: "(todas las conexiones)"
+  rendering: "Renderizando…"
+  dry_into: "Se escribirían %{count} archivos en %{dir}"
+  dry_no_output: "Aún no hay carpeta de salida: las rutas se muestran bajo una temporal, así que todos los archivos aparecen como nuevos."
 
 progress:
   title: Generando…
@@ -345,6 +375,7 @@ summary:
   skip: Omitir
   overwrite_all: Sobrescribir todo
   skip_all: Omitir todo
+  warnings: "Advertencias"
 
 about:
   title: Acerca de rudbgen
@@ -501,6 +532,7 @@ template:
   close_title: Cambios sin guardar
   close_question: "%{file} tiene cambios que todavía no se han guardado."
   discard: No guardar
+  add_to_generation: "Añadir a la lista de generación"
 
 diagnostics:
   title: Problemas (%{count})
@@ -685,7 +717,7 @@ import:
   written: "Importadas %{connections} conexiones, %{drivers} controladores, %{sets} conjuntos de plantillas y %{rules} reglas de abreviatura."
   nothing_written: No se importó nada.
   skipped: "Se omitieron porque el nombre ya estaba ocupado: %{names}"
-  no_keychain: "Estas conexiones se guardaron sin su contraseña porque no se pudo poner en el llavero: %{names}. Al abrir una, la pedirá."
+  no_keychain: "Estas conexiones se guardaron sin su contraseña porque no se pudo poner en el llavero: %{names}. Si al abrir una la base de datos la rechaza sin contraseña, rudbgen la pide."
   load_failed: "No se importó nada porque no se pudo leer un archivo al que la importación añadiría datos: %{error}. Repara o mueve ese archivo e importa de nuevo."
   not_saved: "No se guardó porque no se pudo escribir el archivo: %{errors}"
   wrong_password: Esa no es la contraseña maestra de esta configuración.
@@ -703,3 +735,32 @@ import:
   path_jar: El JAR del controlador
   path_template: El archivo de plantilla
   path_output: La carpeta de salida
+
+context:
+  connect: "Conectar"
+  edit: "Editar…"
+  delete: "Eliminar…"
+  close_tab: "Cerrar la pestaña"
+  close_others: "Cerrar las demás pestañas"
+  close_right: "Cerrar las pestañas de la derecha"
+  copy_path: "Copiar la ruta"
+
+password:
+  title: "Contraseña"
+  question: "Escribe la contraseña de %{name}."
+  refused: "La base de datos rechazó la contraseña."
+
+prompt:
+  discard_title: "Cambios sin guardar"
+  keep_editing: "Seguir editando"
+  discard: "Descartar los cambios"
+  discard_connections: "Las conexiones tienen cambios sin guardar. ¿Descartarlos?"
+  discard_drivers: "Los controladores tienen cambios sin guardar. ¿Descartarlos?"
+  discard_rules: "Las reglas de abreviatura tienen cambios sin guardar. ¿Descartarlos?"
+  discard_settings: "Los ajustes tienen cambios sin guardar. ¿Descartarlos?"
+
+unsaved:
+  title: "Plantillas sin guardar"
+  question: "Estas plantillas tienen cambios sin guardar: %{names}. Una ejecución lee los archivos guardados, no lo que hay en las pestañas."
+  save_and_run: "Guardar y ejecutar"
+  run_without_saving: "Ejecutar sin guardar"

@@ -36,7 +36,7 @@
 use std::path::{Path, PathBuf};
 
 use anyhow::{Context, Result};
-use rudbgen_core::{ConnectionProfile, ConnectionStore, DriverStore};
+use rudbgen_core::{ConnectionProfile, ConnectionStore, DriverStore, GenerationProfile};
 
 /// File name of the shipped database, as it is installed and as it is copied.
 ///
@@ -161,7 +161,18 @@ fn database_url_path(config_dir: &Path) -> String {
 ///
 /// Fails when the configuration directory cannot be created or the connection
 /// store cannot be written.
-pub fn seed(config_dir: &Path, connections_file: &Path, source: Option<&Path>) -> Result<bool> {
+///
+/// The profile comes ready to generate from: the first built-in template set
+/// ticked and `output_dir` — when the caller has one — as its output folder.
+/// A sample whose Generate tab opens on an empty list and no folder is a
+/// sample of nothing; the whole point of seeding it is that the first run has
+/// something to write.
+pub fn seed(
+    config_dir: &Path,
+    connections_file: &Path,
+    source: Option<&Path>,
+    output_dir: Option<&Path>,
+) -> Result<bool> {
     if connections_file.exists() {
         return Ok(false);
     }
@@ -188,16 +199,42 @@ pub fn seed(config_dir: &Path, connections_file: &Path, source: Option<&Path>) -
     let mut store = ConnectionStore::default();
     // `new` and nothing else: every switch the profile carries is whatever the
     // `Default` impl answers, which is the one place they are decided.
-    store.upsert(ConnectionProfile::new(
+    let mut profile = ConnectionProfile::new(
         SAMPLE_CONNECTION_NAME,
         SAMPLE_DRIVER_ID,
         format!("jdbc:h2:{}", database_url_path(config_dir)),
         // `h2-embedded` is `no_auth`: an embedded database has no login.
         "",
-    ));
+    );
+    profile.generation = GenerationProfile {
+        templates: crate::builtin_templates::sets()
+            .into_iter()
+            .next()
+            .map(|set| set.templates)
+            .unwrap_or_default(),
+        output_dir: output_dir.map(Path::to_path_buf),
+        ..GenerationProfile::default()
+    };
+    store.upsert(profile);
     store.save_to(connections_file)?;
     Ok(true)
 }
+
+/// Where the sample connection writes what it generates: a folder of its own
+/// under the user's documents — the home directory where there is none — so
+/// that a first run lands somewhere the user can find, and nothing it writes
+/// sits beside a file of theirs.
+fn sample_output_dir() -> Option<PathBuf> {
+    let dirs = directories::UserDirs::new()?;
+    let base = dirs
+        .document_dir()
+        .map(Path::to_path_buf)
+        .unwrap_or_else(|| dirs.home_dir().to_path_buf());
+    Some(base.join(SAMPLE_OUTPUT_DIR))
+}
+
+/// Name of the folder [`sample_output_dir`] puts the sample's output in.
+const SAMPLE_OUTPUT_DIR: &str = "rudbgen-sample";
 
 /// Puts the bundled driver JAR where the sample connection can load it.
 ///
@@ -277,7 +314,12 @@ pub fn install() {
         log::error!("no configuration directory for the sample database");
         return;
     };
-    match seed(&config_dir, &connections_file, locate().as_deref()) {
+    match seed(
+        &config_dir,
+        &connections_file,
+        locate().as_deref(),
+        sample_output_dir().as_deref(),
+    ) {
         Ok(true) => {
             log::info!(
                 "seeded the sample connection into {}",
@@ -329,7 +371,7 @@ mod tests {
         let config = dir.path().join("config");
         let connections = config.join("connections.json");
 
-        assert!(seed(&config, &connections, Some(&source)).expect("seed"));
+        assert!(seed(&config, &connections, Some(&source), None).expect("seed"));
 
         assert_eq!(
             std::fs::read(config.join(SAMPLE_DB_FILE)).expect("copy"),
@@ -350,6 +392,34 @@ mod tests {
         assert!(!profile.url.contains('\\'));
     }
 
+    /// The sample opens on a Generate tab with something to run: the first
+    /// built-in set's templates, ticked, and the output folder it was given.
+    #[test]
+    fn the_sample_comes_with_a_template_set_and_an_output_folder() {
+        let dir = tempfile::tempdir().expect("tempdir");
+        let source = install_tree(dir.path());
+        let config = dir.path().join("config");
+        let connections = config.join("connections.json");
+        let out = dir.path().join("out");
+
+        assert!(seed(&config, &connections, Some(&source), Some(&out)).expect("seed"));
+
+        let store = ConnectionStore::load_from(&connections).expect("load");
+        let generation = &store.connections()[0].generation;
+        let first = crate::builtin_templates::sets()
+            .into_iter()
+            .next()
+            .expect("a built-in set");
+        assert_eq!(generation.templates, first.templates);
+        assert!(
+            generation
+                .templates
+                .iter()
+                .all(|template| template.selected)
+        );
+        assert_eq!(generation.output_dir.as_deref(), Some(out.as_path()));
+    }
+
     #[test]
     fn an_existing_connections_file_is_left_alone() {
         let dir = tempfile::tempdir().expect("tempdir");
@@ -362,7 +432,7 @@ mod tests {
             .save_to(&connections)
             .expect("empty store");
 
-        assert!(!seed(&config, &connections, Some(&source)).expect("seed"));
+        assert!(!seed(&config, &connections, Some(&source), None).expect("seed"));
 
         assert!(
             ConnectionStore::load_from(&connections)
@@ -379,12 +449,12 @@ mod tests {
         let config = dir.path().join("config");
         let connections = config.join("connections.json");
 
-        assert!(!seed(&config, &connections, None).expect("no source"));
+        assert!(!seed(&config, &connections, None, None).expect("no source"));
         assert!(!connections.exists());
 
         // A path that names nothing is the same case, not a panic.
         let missing = dir.path().join("nowhere").join(SAMPLE_DB_FILE);
-        assert!(!seed(&config, &connections, Some(&missing)).expect("missing source"));
+        assert!(!seed(&config, &connections, Some(&missing), None).expect("missing source"));
         assert!(!connections.exists());
     }
 
@@ -398,7 +468,7 @@ mod tests {
         std::fs::write(config.join(SAMPLE_DB_FILE), b"edited").expect("existing copy");
         let connections = config.join("connections.json");
 
-        assert!(seed(&config, &connections, Some(&source)).expect("seed"));
+        assert!(seed(&config, &connections, Some(&source), None).expect("seed"));
 
         assert_eq!(
             std::fs::read(config.join(SAMPLE_DB_FILE)).expect("copy"),
@@ -481,7 +551,7 @@ mod tests {
         let drivers_file = config.join("drivers.json");
 
         // The sample connection is seeded whether or not a JAR came with it.
-        assert!(seed(&config, &connections, Some(&source)).expect("seed"));
+        assert!(seed(&config, &connections, Some(&source), None).expect("seed"));
         assert!(!seed_driver(&drivers, &drivers_file, None).expect("no jar"));
 
         // Nothing was written, so the built-in list is still whatever this

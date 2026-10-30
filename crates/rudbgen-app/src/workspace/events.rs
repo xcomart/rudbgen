@@ -66,7 +66,16 @@ impl Workspace {
                 self.profiles = load_profiles();
                 let profile = (**profile).clone();
                 self.focus_shell(window, cx);
-                self.connect_to(profile, cx);
+                let handoff = dialog.update(cx, |dialog, _cx| dialog.take_handoff());
+                match handoff {
+                    // The form's own secrets: the profile may keep none in the
+                    // keychain, or the keychain may just have refused them.
+                    Some(handoff) => {
+                        self.connect_with(profile, handoff.credentials, None, cx);
+                        self.connection_notice = handoff.warning;
+                    }
+                    None => self.connect_to(profile, None, window, cx),
+                }
             }
             ConnectionDialogEvent::Dismissed => {
                 dialog.update(cx, |dialog, cx| dialog.close(cx));
@@ -202,6 +211,21 @@ impl Workspace {
             // The status bar counts the ticks, and so does the list of
             // tables a live preview may be rendered against.
             ExplorerEvent::SelectionChanged => {
+                if matches!(self.connection, ConnectionState::Open { .. }) {
+                    let ticks = self
+                        .explorer
+                        .read(cx)
+                        .selection(cx)
+                        .into_iter()
+                        .map(|key| rudbgen_core::TableName {
+                            catalog: key.catalog,
+                            schema: key.schema,
+                            name: key.name,
+                        })
+                        .collect();
+                    self.generate
+                        .update(cx, |pane, cx| pane.set_ticks(ticks, cx));
+                }
                 self.refresh_templates(cx);
                 cx.notify();
             }
@@ -255,8 +279,11 @@ impl Workspace {
         match event {
             GeneratePaneEvent::Changed => {
                 // The palette lists the custom variables, so a variable
-                // typed into the Generate tab has to reach it.
+                // typed into the Generate tab has to reach it — and the
+                // template tabs follow the list, for their *Add to
+                // generation list*.
                 self.refresh_palette(cx);
+                self.refresh_generation_marks(cx);
                 cx.notify();
             }
             GeneratePaneEvent::EditTemplate(file) => {
@@ -279,6 +306,8 @@ impl Workspace {
             PreviewEvent::Reselect { table, template } => {
                 self.render_preview(*table, *template, cx);
             }
+            PreviewEvent::Generate => self.start_run(RunKind::Generate, cx),
+            PreviewEvent::Cancel => self.cancel_dry_run(cx),
         }
     }
 
@@ -302,7 +331,7 @@ impl Workspace {
         cx: &mut Context<Self>,
     ) {
         match event {
-            JobEvent::Closed => self.focus_shell(window, cx),
+            JobEvent::Closed => self.return_focus(window, cx),
         }
     }
 }

@@ -54,6 +54,7 @@ explorer:
   menu_invert: Invert selection
   menu_inspect: Open in inspector
   menu_refresh: Refresh
+  missing: "Unticked, because they are no longer in the database: %{names}"
 
 # The inspector: what one table is made of.
 #
@@ -197,6 +198,12 @@ connect:
   # the JVM and is not translated.
   could_not_open: "%{name} could not be opened."
   tunnel_ended: "The SSH tunnel ended: %{reason}"
+  remember_password: "Remember password"
+  # The session opened with the password as typed; only keeping it failed.
+  # `%{error}` is the keychain's own words and is not translated.
+  keychain_failed_connected: "Connected, but the password could not be kept in the keychain: %{error}"
+  edit_connection: "Edit connection…"
+  retry: "Retry"
 
 driver:
   title: Drivers
@@ -336,6 +343,13 @@ menu:
   mac:
     new_connection: New Connection…
     quit: Quit rudbgen
+  manage_connections: "Manage connections…"
+  add_to_generation: "Add to generation list"
+  close_tab: "Close tab"
+  next_tab: "Next tab"
+  prev_tab: "Previous tab"
+  next_diagnostic: "Next problem"
+  prev_diagnostic: "Previous problem"
 
 # The title bar: the connection selector and the two buttons beside it.
 # The selector reads `no_connection` until a session is open, which in M0 is
@@ -348,6 +362,7 @@ titlebar:
   disconnect: Disconnect
   connecting: "%{name} — connecting…"
   tip_menu: Menu
+  cancel_connecting: "Cancel connecting"
 
 # The welcome screen: the whole body of the window while no connection is
 # open. The name, what the application is for, the three ways in, and the
@@ -451,6 +466,25 @@ generate:
   blocked_templates: Tick at least one template.
   blocked_output: Choose an output directory first.
   blocked_running: A run is already going.
+  set_choose: "Choose a set…"
+  no_templates_sets: "No templates yet. Start from a template set, or add your own:"
+  use_set: "Use “%{name}”"
+  column_name: "Name"
+  column_file: "Template file"
+  column_output: "Output file name"
+  # `${…}` is template syntax and is not translated.
+  tip_output: "The file each table is written to, under the output directory. It may name folders too, e.g. ${package.replace('.','/')}/${name.suffix.pascal}.java"
+  undo: "Undo"
+  undo_replaced: "The list was replaced by the set “%{set}”."
+  undo_removed: "Removed “%{name}” from the list."
+  # The per-run overwrite choice under the options.
+  overwrite: "Existing files"
+  overwrite_default: "The default from Settings, which every run starts from."
+  overwrite_once: "For the next run only; it goes back to the default from Settings after that."
+  all_connections: "(all connections)"
+  rendering: "Rendering…"
+  dry_into: "%{count} files would be written under %{dir}"
+  dry_no_output: "No output directory is chosen yet: the paths are shown under a temporary one, so every file reads new."
 
 # The progress dialog of a run (D11). Every line here is one row of its log,
 # so they are worded as a log is: lower case, no full stop.
@@ -484,6 +518,7 @@ summary:
   skip: Skip
   overwrite_all: Overwrite all
   skip_all: Skip all
+  warnings: "Warnings"
 
 # The about box. The version, the license name and the names of the libraries
 # are values, not words, and are never translated.
@@ -708,6 +743,7 @@ template:
   close_title: Unsaved changes
   close_question: "%{file} has changes that have not been saved yet."
   discard: Don't save
+  add_to_generation: "Add to generation list"
 
 # The list under the editor: what the parser rejected, and what the render
 # could not answer. Both are places in the file, so both are listed the same
@@ -916,7 +952,7 @@ import:
   written: "Imported %{connections} connections, %{drivers} drivers, %{sets} template sets and %{rules} abbreviation rules."
   nothing_written: Nothing was imported.
   skipped: "Left behind, because the name was taken: %{names}"
-  no_keychain: "These connections were saved without their password, because it could not be put in the keychain: %{names}. Open one and it will ask."
+  no_keychain: "These connections were saved without their password, because it could not be put in the keychain: %{names}. When one is opened and the database refuses it without a password, rudbgen asks for it."
   load_failed: "Nothing was imported, because a file the import would add to could not be read: %{error}. Fix or move that file and import again."
   not_saved: "Not saved, because the file could not be written: %{errors}"
   wrong_password: That is not the master password of this configuration.
@@ -935,3 +971,38 @@ import:
   path_jar: driver JAR
   path_template: template file
   path_output: output directory
+
+# The right-click menus of a work tab and of a welcome-screen row.
+context:
+  connect: "Connect"
+  edit: "Edit…"
+  delete: "Delete…"
+  close_tab: "Close tab"
+  close_others: "Close other tabs"
+  close_right: "Close tabs to the right"
+  copy_path: "Copy path"
+
+# The password the main window asks for, when a connection keeps none
+# in the keychain or the database refused the one it had.
+password:
+  title: "Password"
+  question: "Enter the password for %{name}."
+  refused: "The database refused the password."
+
+# The question a dialog with unsaved edits asks before it lets them go.
+prompt:
+  discard_title: "Unsaved changes"
+  keep_editing: "Keep editing"
+  discard: "Discard changes"
+  discard_connections: "The connections have changes that have not been saved. Discard them?"
+  discard_drivers: "The drivers have changes that have not been saved. Discard them?"
+  discard_rules: "The abbreviation rules have changes that have not been saved. Discard them?"
+  discard_settings: "The settings have changes that have not been saved. Discard them?"
+
+# The question a run asks when a ticked template has edits that are not
+# saved: the run reads the files, not the tabs.
+unsaved:
+  title: "Unsaved templates"
+  question: "These templates have changes that are not saved: %{names}. A run reads the saved files, not what is in the tabs."
+  save_and_run: "Save and run"
+  run_without_saving: "Run without saving"

@@ -55,6 +55,7 @@ use rugpui_shell::{
 use crate::app_settings;
 use crate::i18n::{self, ts};
 use crate::icons;
+use crate::{SaveDialog, prompt};
 
 /// Element id of the dialog body's overlay scroll indicator.
 ///
@@ -106,7 +107,7 @@ fn system_default() -> SharedString {
 ///
 /// `Tab` stays scoped here rather than bound globally: a global binding would
 /// take the key away from every text field in the window.
-const KEY_CONTEXT: &str = "SettingsDialog";
+pub(crate) const KEY_CONTEXT: &str = "SettingsDialog";
 
 /// Guards the one-time registration of the dialog's key bindings.
 static BIND_KEYS: Once = Once::new();
@@ -330,6 +331,14 @@ pub struct SettingsDialog {
     focus_handle: FocusHandle,
     /// Whether focus should move into the form on the next render.
     pending_focus: bool,
+    /// What the form held when it was filled; see [`SettingsDialog::is_dirty`].
+    opened: Option<FormValues>,
+    /// Whether "discard your changes?" is up over the form.
+    discarding: bool,
+    /// The box that question is drawn in; see [`prompt::body`].
+    prompt_focus: FocusHandle,
+    /// Whether the question should take the keyboard on the next frame.
+    pending_prompt_focus: bool,
     /// Scroll position of the form body, so `Tab` can reveal the section it
     /// just moved into.
     body_scroll: ScrollHandle,
@@ -464,6 +473,10 @@ impl SettingsDialog {
             status: None,
             focus_handle: cx.focus_handle(),
             pending_focus: false,
+            opened: None,
+            discarding: false,
+            prompt_focus: cx.focus_handle(),
+            pending_prompt_focus: false,
             body_scroll: ScrollHandle::new(),
             body_scrollbar: ScrollbarState::new(),
             visible_section: 0,
@@ -560,6 +573,8 @@ impl SettingsDialog {
         self.open = true;
         self.open_list = None;
         self.pending_focus = true;
+        self.discarding = false;
+        self.opened = Some(FormValues::of(&self.collect(cx)));
         self.visible_section = 0;
         self.body_scroll.scroll_to_item(0);
         cx.notify();
@@ -578,6 +593,8 @@ impl SettingsDialog {
         self.open = false;
         self.open_list = None;
         self.pending_focus = false;
+        self.discarding = false;
+        self.opened = None;
         self.status = None;
         self.editor = None;
         self.editor_events = None;
@@ -806,6 +823,38 @@ impl SettingsDialog {
         self.close(cx);
     }
 
+    /// Whether closing now would throw away a change made on the form.
+    ///
+    /// The fields the form edits, against what they were filled with: the
+    /// rest of the settings — the window's geometry above all, which moves
+    /// whenever the window does — is not the form's to have changed.
+    pub fn is_dirty(&self, cx: &App) -> bool {
+        self.open
+            && self
+                .opened
+                .as_ref()
+                .is_some_and(|opened| *opened != FormValues::of(&self.collect(cx)))
+    }
+
+    /// What Cancel, `Escape` and the backdrop mean: close without saving —
+    /// once the user has said the changes may go, when there are any.
+    fn request_close(&mut self, cx: &mut Context<Self>) {
+        if self.is_dirty(cx) {
+            self.discarding = true;
+            self.pending_prompt_focus = true;
+            cx.notify();
+            return;
+        }
+        self.dismiss(cx);
+    }
+
+    /// Takes "discard your changes?" down and goes back to the form.
+    fn keep_editing(&mut self, cx: &mut Context<Self>) {
+        self.discarding = false;
+        self.pending_focus = true;
+        cx.notify();
+    }
+
     /// `Tab`: move focus to the next control. gpui's tab ring wraps on its own.
     fn focus_next(&mut self, _: &FocusNext, window: &mut Window, cx: &mut Context<Self>) {
         self.close_lists(cx);
@@ -861,6 +910,10 @@ impl SettingsDialog {
     /// wins and calls this. [`SettingsDialog::on_key_down`] is the fallback for
     /// a dispatch that lets the key through instead.
     pub fn escape(&mut self, cx: &mut Context<Self>) {
+        if self.discarding {
+            self.keep_editing(cx);
+            return;
+        }
         if let Some(editor) = self.editor.clone() {
             editor.update(cx, |editor, cx| editor.cancel(cx));
             return;
@@ -876,7 +929,7 @@ impl SettingsDialog {
                 return;
             }
         }
-        self.dismiss(cx);
+        self.request_close(cx);
     }
 
     /// `Escape` dismisses the dialog from anywhere inside it.
@@ -1015,6 +1068,12 @@ impl SettingsDialog {
     /// field, and two views claiming the focus in one frame would leave it
     /// wherever the second one happened to run.
     fn apply_pending_focus(&mut self, window: &mut Window, cx: &mut Context<Self>) {
+        if self.discarding {
+            if std::mem::take(&mut self.pending_prompt_focus) {
+                window.focus(&self.prompt_focus, cx);
+            }
+            return;
+        }
         if !self.pending_focus || self.editor.is_some() {
             return;
         }
@@ -1483,7 +1542,7 @@ impl SettingsDialog {
                             .on_click({
                                 let this = this.clone();
                                 move |_, _window, cx| {
-                                    this.update(cx, |dialog, cx| dialog.dismiss(cx));
+                                    this.update(cx, |dialog, cx| dialog.request_close(cx));
                                 }
                             }),
                     )
@@ -1538,12 +1597,24 @@ impl Render for SettingsDialog {
         // A click on the backdrop backs out of whatever is in front: the editor
         // while one is open, otherwise the dialog itself. Anything else would
         // discard an unsaved palette by way of a stray click.
+        let discard = self.discarding.then(|| {
+            let (keep, gone) = (cx.entity(), cx.entity());
+            prompt::discard(
+                "settings-discard",
+                &self.prompt_focus,
+                ts!("prompt.discard_settings"),
+                move |_window, cx| keep.update(cx, |dialog, cx| dialog.keep_editing(cx)),
+                move |_window, cx| gone.update(cx, |dialog, cx| dialog.dismiss(cx)),
+                cx,
+            )
+        });
         let on_dismiss = {
             let this = cx.entity();
             move |_window: &mut Window, cx: &mut App| {
                 this.update(cx, |dialog, cx| match dialog.editor.clone() {
                     Some(editor) => editor.update(cx, |editor, cx| editor.cancel(cx)),
-                    None => dialog.dismiss(cx),
+                    None if dialog.discarding => dialog.keep_editing(cx),
+                    None => dialog.request_close(cx),
                 });
             }
         };
@@ -1559,6 +1630,13 @@ impl Render for SettingsDialog {
             .track_focus(&self.focus_handle)
             .on_action(cx.listener(Self::focus_next))
             .on_action(cx.listener(Self::focus_prev))
+            // `Ctrl+S` here saves the settings, rather than the template tab
+            // the shell's own binding would have saved behind the backdrop.
+            .on_action(cx.listener(|dialog, _: &SaveDialog, _window, cx| {
+                if dialog.editor.is_none() && !dialog.discarding {
+                    dialog.save(cx);
+                }
+            }))
             .on_key_down(cx.listener(Self::on_key_down))
             // The body's bar is answered from here: gpui hands a drag move to
             // every listener of that type wherever it sits, and the body scrolls
@@ -1587,6 +1665,49 @@ impl Render for SettingsDialog {
                 body,
                 on_dismiss,
             ))
+            .children(discard)
+    }
+}
+
+/// The settings the form edits, and nothing else — what
+/// [`SettingsDialog::is_dirty`] compares.
+#[derive(Clone, PartialEq)]
+struct FormValues {
+    theme: String,
+    editor_theme: String,
+    editor_theme_follows_ui: bool,
+    editor_word_wrap: bool,
+    language: Option<String>,
+    editor_font_family: Option<String>,
+    overwrite_policy: OverwritePolicy,
+    titlebar: TitlebarStyle,
+    background_blur: bool,
+    background_opacity: f32,
+    ui_font_size: f32,
+    editor_font_size: f32,
+    jvm_heap_mb: u32,
+    jvm_extra_args: Vec<String>,
+}
+
+impl FormValues {
+    /// The form's share of `settings`.
+    fn of(settings: &AppSettings) -> Self {
+        Self {
+            theme: settings.theme.clone(),
+            editor_theme: settings.editor_theme.clone(),
+            editor_theme_follows_ui: settings.editor_theme_follows_ui,
+            editor_word_wrap: settings.editor_word_wrap,
+            language: settings.language.clone(),
+            editor_font_family: settings.editor_font_family.clone(),
+            overwrite_policy: settings.overwrite_policy,
+            titlebar: settings.window.titlebar,
+            background_blur: settings.window.background_blur,
+            background_opacity: settings.window.background_opacity,
+            ui_font_size: settings.ui_font_size,
+            editor_font_size: settings.editor_font_size,
+            jvm_heap_mb: settings.jvm_heap_mb,
+            jvm_extra_args: settings.jvm_extra_args.clone(),
+        }
     }
 }
 

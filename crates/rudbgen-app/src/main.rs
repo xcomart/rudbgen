@@ -23,6 +23,7 @@ mod maven;
 mod palette;
 mod pane_item;
 mod preview_pane;
+mod prompt;
 mod sample_db;
 mod settings_dialog;
 mod template_pane;
@@ -40,8 +41,10 @@ actions!(
     [
         /// Leaves the application.
         Quit,
-        /// Opens the connection dialog.
+        /// Opens the connection dialog on a new, empty profile.
         NewConnection,
+        /// Opens the connection dialog on the saved profiles, to edit them.
+        ManageConnections,
         /// Opens the settings dialog.
         OpenSettings,
         /// Opens the about box.
@@ -74,7 +77,38 @@ actions!(
         EditAbbreviations,
         /// Opens the jdbgen import wizard.
         ImportJdbgen,
+        /// Brings the work tab right of the one on top to the front.
+        NextTab,
+        /// Brings the work tab left of the one on top to the front.
+        PrevTab,
+        /// Closes the work tab on top, asking first when it holds edits.
+        CloseTab,
+        /// Moves the keyboard onto the work area's tab strip.
+        FocusTabs,
+        /// Moves the caret to the next problem of the template on top.
+        NextDiagnostic,
+        /// Moves the caret to the previous problem of the template on top.
+        PrevDiagnostic,
+        /// Adds the template on top to the connection's generation list.
+        AddToGeneration,
+        /// Answers the question a prompt is asking with its default button.
+        ///
+        /// Bound to `Enter` inside a prompt only; see `prompt::PROMPT_CONTEXT`.
+        ConfirmDialog,
+        /// Saves whatever the dialog on top is editing (`Ctrl+S` inside it).
+        SaveDialog,
+        /// Adds a blank profile inside the connection dialog (`Ctrl+N` there).
+        NewProfile,
     ]
+);
+
+/// Brings the work tab at the zero-based index carried by the action to the
+/// front.
+#[derive(Clone, PartialEq, Default, Debug, gpui::Action)]
+#[action(namespace = rudbgen, no_json)]
+struct SelectTab(
+    /// Zero-based index of the tab, counted along the strip.
+    usize,
 );
 
 mod workspace;

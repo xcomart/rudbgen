@@ -44,6 +44,10 @@ impl Workspace {
                 let file = pane.read(cx).path().to_path_buf();
                 workspace.render_template_preview(file, source.clone(), *table, cx);
             }
+            TemplatePaneEvent::AddToGeneration => {
+                let file = pane.read(cx).path().to_path_buf();
+                workspace.add_to_generation(file, cx);
+            }
         });
         let title = opened.read(cx).title();
         self.templates.push(opened);
@@ -216,6 +220,7 @@ impl Workspace {
             pane.update(cx, |pane, cx| pane.set_choices(choices.clone(), cx));
         }
         self.refresh_palette(cx);
+        self.refresh_generation_marks(cx);
     }
 
     /// Rebuilds the palette from the model and the profile.
@@ -451,6 +456,208 @@ impl Workspace {
 
     // --- the tab strip ----------------------------------------------------
 
+    /// Whether the work area — and so its tab strip — is what the body shows.
+    pub(super) fn work_area_showing(&self) -> bool {
+        matches!(self.connection, ConnectionState::Open { .. }) || self.has_templates()
+    }
+
+    /// Brings the tab at `index` to the front.
+    ///
+    /// The tab that was on top is about to stop being rendered, so whatever
+    /// inside it held the keyboard has to give it up in the same update
+    /// (Appendix A) — and a template that has just come to the front asks for
+    /// it back on the frame that draws it. Unless the keyboard is on the strip
+    /// itself, walking it with the arrows: then it stays there.
+    pub(super) fn activate_tab(
+        &mut self,
+        index: usize,
+        window: &mut Window,
+        cx: &mut Context<Self>,
+    ) {
+        if !self.pane.activate(index) {
+            return;
+        }
+        self.tab_menu = None;
+        if !self.tabs_focus.is_focused(window) {
+            self.focus_shell(window, cx);
+            if let Some(at) = self.active_template(cx) {
+                self.templates[at]
+                    .clone()
+                    .update(cx, |pane, cx| pane.request_focus(cx));
+            }
+        }
+        self.refresh_templates(cx);
+        cx.notify();
+    }
+
+    /// The next tab (or the previous one), wrapping at either end.
+    pub(super) fn cycle_tab(&mut self, forward: bool, window: &mut Window, cx: &mut Context<Self>) {
+        if !self.work_area_showing() {
+            return;
+        }
+        let count = self.pane.items().len();
+        if count < 2 {
+            return;
+        }
+        let active = self.pane.active_index();
+        let next = if forward {
+            (active + 1) % count
+        } else {
+            (active + count - 1) % count
+        };
+        self.activate_tab(next, window, cx);
+    }
+
+    /// Whether the tab on top can be closed: anything but the Generate tab.
+    pub(super) fn can_close_active_tab(&self) -> bool {
+        self.work_area_showing() && !matches!(self.pane.active(), Some(PaneItem::Generate) | None)
+    }
+
+    /// Whether the template on top could join the connection's list: one is
+    /// open on top, a connection is, and the list does not have it yet.
+    pub(super) fn can_add_to_generation(&self, cx: &App) -> bool {
+        matches!(self.connection, ConnectionState::Open { .. })
+            && self.active_template(cx).is_some_and(|index| {
+                let file = self.templates[index].read(cx).path();
+                !self.generate.read(cx).lists_template(file)
+            })
+    }
+
+    /// Adds `file` to the connection's generation list, ticked — the template
+    /// tab's way into a run, rather than *Add template…* and a file picker
+    /// that opens wherever the platform last left it.
+    pub(super) fn add_to_generation(&mut self, file: PathBuf, cx: &mut Context<Self>) {
+        if !matches!(self.connection, ConnectionState::Open { .. }) {
+            return;
+        }
+        self.generate
+            .update(cx, |pane, cx| pane.add_template_file(file, cx));
+        self.refresh_generation_marks(cx);
+        cx.notify();
+    }
+
+    /// Tells every template tab whether its file is in the connection's list,
+    /// which is what its header's *Add to generation list* follows.
+    pub(super) fn refresh_generation_marks(&mut self, cx: &mut Context<Self>) {
+        let connected = matches!(self.connection, ConnectionState::Open { .. });
+        for pane in self.templates.clone() {
+            let listed = connected.then(|| {
+                let file = pane.read(cx).path().to_path_buf();
+                self.generate.read(cx).lists_template(&file)
+            });
+            pane.update(cx, |pane, cx| pane.set_listed(listed, cx));
+        }
+    }
+
+    /// Closes the tabs at `indices`, the ones with unsaved edits asking one by
+    /// one, as their own close buttons would. A Cancel on any of them stops
+    /// the rest.
+    pub(super) fn close_tabs(
+        &mut self,
+        indices: &[usize],
+        window: &mut Window,
+        cx: &mut Context<Self>,
+    ) {
+        self.pending_closes = indices
+            .iter()
+            .filter_map(|index| self.pane.get(*index).cloned())
+            .filter(|item| !matches!(item, PaneItem::Generate))
+            .collect();
+        self.continue_closing(window, cx);
+    }
+
+    /// Closes queued tabs until one asks or none is left.
+    pub(super) fn continue_closing(&mut self, window: &mut Window, cx: &mut Context<Self>) {
+        while let Some(item) = self.pending_closes.first().cloned() {
+            self.pending_closes.remove(0);
+            let Some(index) = self.pane.items().iter().position(|tab| tab.same_tab(&item)) else {
+                continue;
+            };
+            self.request_close_tab(index, window, cx);
+            if self.closing.is_some() {
+                return;
+            }
+        }
+    }
+
+    /// The right-click menu of the tab at `index`.
+    ///
+    /// The three closes rudbman's strips have — this one, the others, the ones
+    /// to its right — then what is only a template's: its path, and the way
+    /// into the connection's list. The Generate tab is the one tab no close
+    /// takes, so its own row is grayed and the others leave it standing.
+    pub(super) fn render_tab_menu(&self, cx: &mut Context<Self>) -> Option<AnyElement> {
+        let (index, position) = self.tab_menu?;
+        let item = self.pane.get(index)?.clone();
+        let count = self.pane.items().len();
+        let closable = |at: usize| !matches!(self.pane.get(at), Some(PaneItem::Generate) | None);
+        let others: Vec<usize> = (0..count)
+            .filter(|at| *at != index && closable(*at))
+            .collect();
+        let right: Vec<usize> = (index + 1..count).filter(|at| closable(*at)).collect();
+        let this = cx.entity();
+        let close = |victims: Vec<usize>| {
+            let this = this.clone();
+            move |window: &mut Window, cx: &mut App| {
+                this.update(cx, |workspace, cx| {
+                    workspace.tab_menu = None;
+                    workspace.close_tabs(&victims, window, cx);
+                });
+            }
+        };
+        let mut entries = vec![
+            MenuEntry::new(ts!("context.close_tab"))
+                .shortcut(format!("{}+W", menu_rows::SHORTCUT_MODIFIER))
+                .disabled(!closable(index))
+                .on_activate(close(vec![index])),
+            MenuEntry::new(ts!("context.close_others"))
+                .disabled(others.is_empty())
+                .on_activate(close(others)),
+            MenuEntry::new(ts!("context.close_right"))
+                .disabled(right.is_empty())
+                .on_activate(close(right)),
+        ];
+        if let PaneItem::Template { file, .. } = &item {
+            let path = file.display().to_string();
+            let listed = self.generate.read(cx).lists_template(file);
+            let connected = matches!(self.connection, ConnectionState::Open { .. });
+            let (copy, add, file) = (this.clone(), this.clone(), file.clone());
+            entries.push(MenuEntry::separator());
+            entries.push(MenuEntry::new(ts!("context.copy_path")).on_activate(
+                move |_window, cx| {
+                    cx.write_to_clipboard(gpui::ClipboardItem::new_string(path.clone()));
+                    copy.update(cx, |workspace, cx| {
+                        workspace.tab_menu = None;
+                        cx.notify();
+                    });
+                },
+            ));
+            entries.push(
+                MenuEntry::new(ts!("menu.add_to_generation"))
+                    .disabled(!connected || listed)
+                    .on_activate(move |_window, cx| {
+                        let file = file.clone();
+                        add.update(cx, |workspace, cx| {
+                            workspace.tab_menu = None;
+                            workspace.add_to_generation(file, cx);
+                        });
+                    }),
+            );
+        }
+        Some(
+            rugpui::ContextMenu::new("tab-context")
+                .position(position)
+                .entries(entries)
+                .on_dismiss(move |_window, cx| {
+                    this.update(cx, |workspace, cx| {
+                        workspace.tab_menu = None;
+                        cx.notify();
+                    });
+                })
+                .into_any_element(),
+        )
+    }
+
     /// Closes the tab at `index`, asking first when it holds unsaved edits.
     pub(super) fn request_close_tab(
         &mut self,
@@ -474,6 +681,9 @@ impl Workspace {
                     .is_some_and(|at| self.templates[at].read(cx).is_dirty(cx));
                 if dirty {
                     self.closing = Some(index);
+                    // The question takes the keyboard, so `Enter` saves rather
+                    // than breaking a line in the buffer it is asking about.
+                    window.focus(&self.prompt_focus, cx);
                     cx.notify();
                 } else {
                     self.close_tab(index, window, cx);
@@ -524,6 +734,7 @@ impl Workspace {
                 // a disconnect waiting on it stops here with it.
                 self.closing = None;
                 self.disconnecting = false;
+                self.pending_closes.clear();
                 cx.notify();
                 return;
             }
@@ -531,6 +742,8 @@ impl Workspace {
         self.close_tab(index, window, cx);
         if self.disconnecting {
             self.continue_disconnect(window, cx);
+        } else {
+            self.continue_closing(window, cx);
         }
     }
 
@@ -539,7 +752,8 @@ impl Workspace {
     pub(super) fn cancel_close(&mut self, window: &mut Window, cx: &mut Context<Self>) {
         self.closing = None;
         self.disconnecting = false;
-        self.focus_shell(window, cx);
+        self.pending_closes.clear();
+        self.return_focus(window, cx);
         cx.notify();
     }
 
@@ -586,7 +800,10 @@ impl Workspace {
         // asked for another connection, or disconnected — and its answer is no
         // longer about the state the window is in.
         let ConnectionState::Connecting {
-            profile, driver, ..
+            profile,
+            driver,
+            remember,
+            ..
         } = std::mem::replace(&mut self.connection, ConnectionState::Idle)
         else {
             if let Ok(session) = outcome {
@@ -622,6 +839,40 @@ impl Workspace {
                     })
                     .detach();
                 }
+                // The password the window asked for, now that it has worked.
+                // Off the UI thread, as every keychain call is: a locked one
+                // puts a prompt of its own up.
+                if let Some(password) = remember {
+                    let id = profile.id;
+                    let written = cx.background_spawn(async move {
+                        rudbgen_core::SecretStore::set(
+                            id,
+                            rudbgen_core::SecretSlot::Connection,
+                            &password,
+                        )
+                    });
+                    cx.spawn(async move |this, cx| {
+                        let Err(error) = written.await else {
+                            return;
+                        };
+                        log::warn!("the password could not be kept in the keychain: {error:#}");
+                        this.update(cx, |workspace, cx| {
+                            workspace.connection_notice = Some(ts!(
+                                "connect.keychain_failed_connected",
+                                error = format!("{error:#}")
+                            ));
+                            cx.notify();
+                        })
+                        .ok();
+                    })
+                    .detach();
+                }
+                // The welcome screen marks it next time.
+                let mut settings = app_settings::current(cx);
+                if settings.last_connection != Some(profile.id) {
+                    settings.last_connection = Some(profile.id);
+                    app_settings::replace(settings, cx);
+                }
                 ConnectionState::Open {
                     profile,
                     driver,
@@ -630,9 +881,22 @@ impl Workspace {
             }
             Err(error) => {
                 log::warn!("could not connect to {}: {error}", profile.name);
+                // A refused password is answered here, where the user is,
+                // rather than with a message about a dialog to go and open.
+                if error.is_authentication() && !driver.no_auth {
+                    self.ask_password(
+                        (*profile).clone(),
+                        (*driver).clone(),
+                        Some(ts!("password.refused")),
+                        cx,
+                    );
+                }
+                let port = profile.tunnel.as_ref().map_or(22, |tunnel| tunnel.port);
                 ConnectionState::Failed {
-                    profile,
                     message: error.message().into(),
+                    hint: connection_dialog::error_hint(&error),
+                    host_key: connection_dialog::HostKey::of(&error, port).map(Box::new),
+                    profile,
                 }
             }
         };

@@ -48,6 +48,7 @@ use rugpui::{
 
 use crate::i18n::ts;
 use crate::icons;
+use crate::{SaveDialog, prompt};
 
 /// Width of the dialog panel.
 const DIALOG_WIDTH: f32 = 720.;
@@ -69,6 +70,10 @@ const ABBR_WIDTH: f32 = 170.;
 
 /// Width of the table-name picker beside a whole-name row's abbreviation.
 const PICKER_WIDTH: f32 = 92.;
+
+/// Key context of the dialog's root, which `Ctrl+S` is bound in (see the
+/// workspace's `bind_shortcuts`).
+pub(crate) const KEY_CONTEXT: &str = "AbbreviationDialog";
 
 /// What the dialog tells the shell about.
 pub enum AbbreviationDialogEvent {
@@ -127,6 +132,12 @@ pub struct AbbreviationDialog {
     scroll: ScrollHandle,
     /// Whether the table's overlay scroll indicator is on screen.
     scrollbar: ScrollbarState,
+    /// Whether "discard your edits?" is up over the table.
+    discarding: bool,
+    /// The box that question is drawn in; see [`prompt::body`].
+    prompt_focus: FocusHandle,
+    /// Whether the question should take the keyboard on the next frame.
+    pending_prompt_focus: bool,
 }
 
 impl AbbreviationDialog {
@@ -146,6 +157,9 @@ impl AbbreviationDialog {
             picker_scroll: ScrollHandle::new(),
             scroll: ScrollHandle::new(),
             scrollbar: ScrollbarState::new(),
+            discarding: false,
+            prompt_focus: cx.focus_handle(),
+            pending_prompt_focus: false,
         }
     }
 
@@ -204,7 +218,43 @@ impl AbbreviationDialog {
         self.open = false;
         self.pending_focus = false;
         self.picker = None;
+        self.discarding = false;
         self.rows.clear();
+        cx.notify();
+    }
+
+    /// Whether closing now would throw away an edit: a rule typed, changed,
+    /// switched or removed, or the switch above them flipped.
+    ///
+    /// Against the store the draft was filled from, with the blank rows
+    /// dropped the way a save drops them — the trailing empty row is not an
+    /// edit, and neither is a rule typed and then cleared again.
+    pub fn is_dirty(&self, cx: &App) -> bool {
+        self.open && self.drafted_store(cx) != self.store
+    }
+
+    /// Whether "discard your edits?" is up.
+    #[cfg(test)]
+    pub fn is_discarding(&self) -> bool {
+        self.discarding
+    }
+
+    /// What Cancel, `Escape` and the backdrop mean: close — once the user has
+    /// said the edits may go, when there are any.
+    fn request_close(&mut self, cx: &mut Context<Self>) {
+        if self.is_dirty(cx) {
+            self.discarding = true;
+            self.pending_prompt_focus = true;
+            cx.notify();
+            return;
+        }
+        self.dismiss(cx);
+    }
+
+    /// Takes "discard your edits?" down and goes back to the table.
+    fn keep_editing(&mut self, cx: &mut Context<Self>) {
+        self.discarding = false;
+        self.pending_focus = true;
         cx.notify();
     }
 
@@ -216,11 +266,15 @@ impl AbbreviationDialog {
 
     /// `Escape` from anywhere inside: closes the picker first, the dialog next.
     pub fn escape(&mut self, cx: &mut Context<Self>) {
+        if self.discarding {
+            self.keep_editing(cx);
+            return;
+        }
         if self.picker.take().is_some() {
             cx.notify();
             return;
         }
-        self.dismiss(cx);
+        self.request_close(cx);
     }
 
     /// The table names the whole-name picker offers.
@@ -434,6 +488,12 @@ impl AbbreviationDialog {
 
     /// Moves focus into the dialog when it opens, so `Escape` reaches it.
     fn apply_pending_focus(&mut self, window: &mut Window, cx: &mut Context<Self>) {
+        if self.discarding {
+            if std::mem::take(&mut self.pending_prompt_focus) {
+                window.focus(&self.prompt_focus, cx);
+            }
+            return;
+        }
         if !self.pending_focus {
             return;
         }
@@ -756,12 +816,16 @@ impl Render for AbbreviationDialog {
             .items_center()
             .justify_end()
             .gap(px(8.))
-            .child(Button::new("abbr-cancel", ts!("common.cancel")).on_click({
-                let this = this.clone();
-                move |_, _window, cx| {
-                    this.update(cx, |dialog, cx| dialog.dismiss(cx));
-                }
-            }))
+            .child(
+                Button::new("abbr-cancel", ts!("common.cancel"))
+                    .variant(ButtonVariant::Secondary)
+                    .on_click({
+                        let this = this.clone();
+                        move |_, _window, cx| {
+                            this.update(cx, |dialog, cx| dialog.request_close(cx));
+                        }
+                    }),
+            )
             .child(
                 Button::new("abbr-save", ts!("common.save"))
                     .variant(ButtonVariant::Primary)
@@ -799,13 +863,33 @@ impl Render for AbbreviationDialog {
             }
         };
 
+        let discard = self.discarding.then(|| {
+            let (keep, gone) = (cx.entity(), cx.entity());
+            prompt::discard(
+                "abbr-discard",
+                &self.prompt_focus,
+                ts!("prompt.discard_rules"),
+                move |_window, cx| keep.update(cx, |dialog, cx| dialog.keep_editing(cx)),
+                move |_window, cx| gone.update(cx, |dialog, cx| dialog.dismiss(cx)),
+                cx,
+            )
+        });
+
         div()
             .id("abbreviation-dialog")
+            .key_context(KEY_CONTEXT)
             .absolute()
             .inset_0()
             .size_full()
             .track_focus(&self.focus_handle)
             .on_key_down(cx.listener(Self::on_key_down))
+            // `Ctrl+S` here saves the rules, rather than the template tab the
+            // shell's own binding would have saved behind the backdrop.
+            .on_action(cx.listener(|dialog, _: &SaveDialog, _window, cx| {
+                if !dialog.discarding {
+                    dialog.save(cx);
+                }
+            }))
             .on_drag_move::<DraggedThumb>(cx.listener(
                 |dialog, event: &DragMoveEvent<DraggedThumb>, _window, cx| {
                     dialog.drag_scrollbar(event, cx);
@@ -830,6 +914,7 @@ impl Render for AbbreviationDialog {
                 body,
                 on_dismiss,
             ))
+            .children(discard)
     }
 }
 

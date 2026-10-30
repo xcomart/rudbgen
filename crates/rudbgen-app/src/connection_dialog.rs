@@ -65,6 +65,8 @@ use crate::driver_manager::{DriverManager, DriverManagerEvent, TestTarget};
 use crate::generate_pane::read_modify_write;
 use crate::i18n::ts;
 use crate::icons;
+use crate::prompt;
+use crate::{NewProfile, SaveDialog};
 
 /// Width of the dialog panel.
 ///
@@ -98,6 +100,9 @@ pub(crate) const ROW_SELECTOR: &str = "profile-row:";
 pub(crate) type ProfileContextHandler =
     std::rc::Rc<dyn Fn(Uuid, Point<Pixels>, &mut Window, &mut App)>;
 
+/// What a saved-profile row carries after its name; see [`profile_rows`].
+pub(crate) type ProfileTrailing<'a> = dyn Fn(&ConnectionProfile) -> Option<gpui::AnyElement> + 'a;
+
 /// Folder disclosure controls used by the connection dialog.
 pub(crate) struct ProfileFolderControls<'a> {
     collapsed: &'a HashSet<String>,
@@ -105,6 +110,12 @@ pub(crate) struct ProfileFolderControls<'a> {
 }
 
 type FolderToggleHandler = std::rc::Rc<dyn Fn(&str, &mut App)>;
+
+/// Key context of the dialog's root, which `Ctrl+N` and `Ctrl+S` are bound in
+/// (see the workspace's `bind_shortcuts`): inside the dialog they mean a new
+/// profile and a save, where the shell behind it would read them as reopening
+/// the dialog and saving a template.
+pub(crate) const KEY_CONTEXT: &str = "ConnectionDialog";
 
 /// The dialog's two scrolling surfaces and the id of each one's overlay bar.
 const SCROLLBARS: [(&str, Surface); 2] = [
@@ -156,6 +167,8 @@ mod tab {
     pub const USERNAME: isize = 150;
     /// Password.
     pub const PASSWORD: isize = 155;
+    /// "Remember password".
+    pub const REMEMBER: isize = 156;
     /// Driver property key/value rows.
     pub const PROPS: isize = 160;
     /// Keep-alive toggle.
@@ -208,6 +221,11 @@ mod tab {
 pub enum ConnectionDialogEvent {
     /// The user asked to open this profile. The shell connects and opens a tab;
     /// the dialog has already saved it.
+    ///
+    /// The secrets typed into the form go with it, taken through
+    /// [`ConnectionDialog::take_handoff`]: a profile that does not remember
+    /// its password has none in the keychain to read back, and one whose
+    /// keychain write just failed has a stale one there.
     Connect(Box<ConnectionProfile>),
     /// The dialog was dismissed.
     Dismissed,
@@ -230,15 +248,68 @@ enum Level {
 /// machine-in-the-middle looks like, and offering a one-click "trust it anyway"
 /// for that would defeat the whole point of storing the key in the first place.
 /// Editing `known_hosts` by hand is the deliberate act that case deserves.
-struct PendingHostKey {
+///
+/// Shared with the shell, whose welcome screen offers the same button when a
+/// connection opened from the list fails on the same question.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub(crate) struct HostKey {
     /// The bastion, as the profile names it.
-    host: String,
+    pub host: String,
     /// Its SSH port.
-    port: u16,
+    pub port: u16,
     /// The key algorithm, e.g. `ssh-ed25519`.
-    algorithm: String,
+    pub algorithm: String,
     /// The OpenSSH-style SHA-256 fingerprint.
-    fingerprint: String,
+    pub fingerprint: String,
+}
+
+impl HostKey {
+    /// The key `error` asks about, when it is an unknown one — never a
+    /// changed one (see above). `port` is the profile's bastion port.
+    pub(crate) fn of(error: &ConnectError, port: u16) -> Option<Self> {
+        match error {
+            ConnectError::HostKeyUnknown {
+                host,
+                fingerprint,
+                algorithm,
+            } => Some(Self {
+                host: host.clone(),
+                port,
+                algorithm: algorithm.clone(),
+                fingerprint: fingerprint.clone(),
+            }),
+            _ => None,
+        }
+    }
+
+    /// Writes the key to `known_hosts`.
+    pub(crate) fn trust(&self) -> anyhow::Result<()> {
+        connection::trust_host_key(&self.host, self.port, &self.algorithm, &self.fingerprint)
+    }
+}
+
+/// What the form held when it was last filled or saved, which every question
+/// about unsaved edits is a comparison against.
+///
+/// The secrets are in it because they are on the form and in no profile: a
+/// password retyped is an edit as much as a host is.
+#[derive(Clone, PartialEq)]
+struct FormSnapshot {
+    /// The profile the form describes.
+    profile: ConnectionProfile,
+    /// The database password field.
+    password: String,
+    /// The tunnel password or passphrase field.
+    tunnel_secret: String,
+}
+
+/// What [`ConnectionDialog::connect`] hands the shell along with the profile.
+pub(crate) struct Handoff {
+    /// The secrets as they were typed.
+    pub credentials: Credentials,
+    /// Something the user has to hear about the save that went with it — that
+    /// the keychain refused the password — or `None`.
+    pub warning: Option<SharedString>,
 }
 
 /// One driver property row, as the form holds it.
@@ -318,11 +389,33 @@ pub struct ConnectionDialog {
     /// and cannot put a dialog up and wait, so an unknown key fails the attempt
     /// and the fingerprint arrives here instead — where a dialog *is* allowed to
     /// take its time (§9.3).
-    pending_host_key: Option<PendingHostKey>,
+    pending_host_key: Option<HostKey>,
     /// The test connection in flight, if any. Dropping it abandons the task.
     test: Option<Task<()>>,
     /// Whether the delete confirmation is showing.
     confirming: bool,
+    /// Whether the form's secrets are to be kept in the keychain.
+    remember_password: bool,
+    /// What the form held when it was last filled or saved; see
+    /// [`ConnectionDialog::is_dirty`].
+    baseline: Option<FormSnapshot>,
+    /// The blank profile the dialog made for the user to fill in, while it is
+    /// still as blank as it was made.
+    ///
+    /// It sits in [`Self::edited`] like any unsaved profile, but closing over
+    /// it loses nothing anybody typed, so it is no reason to ask.
+    pristine_new: Option<Uuid>,
+    /// Whether "discard your edits?" is up over the form.
+    discarding: bool,
+    /// The box that question is drawn in — this dialog's, or the driver
+    /// editor's, which is drawn from here; see [`prompt::body`].
+    prompt_focus: FocusHandle,
+    /// Whether one of the two questions was up on the last frame, which is how
+    /// the frame that puts one up — and the one that takes it down — moves the
+    /// keyboard.
+    prompt_up: bool,
+    /// The secrets the last Connect typed, until the shell takes them.
+    handoff: Option<Handoff>,
     /// Focus of the dialog root.
     focus_handle: FocusHandle,
     /// Whether focus should move into the form on the next render.
@@ -370,12 +463,32 @@ pub struct ConnectionDialog {
 impl ConnectionDialog {
     /// Builds the dialog. Nothing is read from disk until it is opened.
     pub fn new(cx: &mut Context<Self>) -> Self {
-        let field = |cx: &mut Context<Self>, placeholder: &str, index: isize| {
-            let placeholder = SharedString::from(placeholder.to_owned());
-            cx.new(move |cx| TextInput::new(cx).placeholder(placeholder).tab_index(index))
+        // `Enter` in any one-line field connects, as the primary button does.
+        let weak = cx.weak_entity();
+        let field = {
+            let weak = weak.clone();
+            move |cx: &mut Context<Self>, placeholder: &str, index: isize| {
+                let placeholder = SharedString::from(placeholder.to_owned());
+                let weak = weak.clone();
+                cx.new(move |cx| {
+                    TextInput::new(cx)
+                        .placeholder(placeholder)
+                        .tab_index(index)
+                        .on_submit(submit(weak))
+                })
+            }
         };
-        let secret = |cx: &mut Context<Self>, index: isize| {
-            cx.new(move |cx| TextInput::new(cx).masked(true).tab_index(index))
+        let secret = {
+            let weak = weak.clone();
+            move |cx: &mut Context<Self>, index: isize| {
+                let weak = weak.clone();
+                cx.new(move |cx| {
+                    TextInput::new(cx)
+                        .masked(true)
+                        .tab_index(index)
+                        .on_submit(submit(weak))
+                })
+            }
         };
 
         // Every placeholder is a sample value — a host name, a port, a
@@ -403,6 +516,13 @@ impl ConnectionDialog {
             pending_host_key: None,
             test: None,
             confirming: false,
+            remember_password: true,
+            baseline: None,
+            pristine_new: None,
+            discarding: false,
+            prompt_focus: cx.focus_handle(),
+            prompt_up: false,
+            handoff: None,
             focus_handle: cx.focus_handle(),
             pending_focus: false,
             list_scroll: ScrollHandle::new(),
@@ -444,9 +564,21 @@ impl ConnectionDialog {
         self.open_showing(None, cx);
     }
 
+    /// Shows the dialog on a blank profile of its own, the saved ones listed
+    /// beside it — what *New connection…* means.
+    pub fn open_new(&mut self, cx: &mut Context<Self>) {
+        self.open_showing(None, cx);
+        // Over whatever `open_showing` picked: that one was only ever filled
+        // in to be left, and leaving an untouched profile records nothing.
+        if self.pristine_new.is_none() {
+            self.add_profile(cx);
+        }
+    }
+
     /// The whole of both, differing only in which profile the form opens over.
     fn open_showing(&mut self, wanted: Option<Uuid>, cx: &mut Context<Self>) {
         self.reload(cx);
+        self.pristine_new = None;
         self.selected = profile_to_show(&self.store, wanted);
         if self.selected.is_none() {
             self.add_profile(cx);
@@ -457,10 +589,57 @@ impl ConnectionDialog {
         self.status = None;
         self.pending_host_key = None;
         self.confirming = false;
+        self.discarding = false;
         self.manager = None;
         self.manager_events = None;
         self.pending_focus = true;
         cx.notify();
+    }
+
+    /// Whether closing now would throw away something typed: an edit to the
+    /// profile on the form, an edit left on another one, a profile added or
+    /// duplicated and never saved.
+    ///
+    /// The blank profile the dialog made itself is not one, while it is still
+    /// blank — and neither is an edit made to the form and then undone.
+    pub fn is_dirty(&self, cx: &App) -> bool {
+        if !self.open {
+            return false;
+        }
+        let elsewhere = self
+            .edited
+            .iter()
+            .any(|id| Some(*id) != self.selected && Some(*id) != self.pristine_new);
+        let selected_unsaved = self
+            .selected
+            .is_some_and(|id| self.edited.contains(&id) && Some(id) != self.pristine_new);
+        elsewhere || selected_unsaved || self.form_changed(cx)
+    }
+
+    /// Whether the form differs from what it was filled with.
+    fn form_changed(&self, cx: &App) -> bool {
+        self.baseline
+            .as_ref()
+            .is_some_and(|baseline| *baseline != self.snapshot(cx))
+    }
+
+    /// What the form holds now.
+    fn snapshot(&self, cx: &App) -> FormSnapshot {
+        FormSnapshot {
+            profile: self.collect(cx),
+            password: text(&self.password_input, cx),
+            tunnel_secret: text(&self.tunnel_secret_input, cx),
+        }
+    }
+
+    /// Takes the form as it stands as the state nothing has been changed from.
+    fn mark_clean(&mut self, cx: &App) {
+        self.baseline = Some(self.snapshot(cx));
+    }
+
+    /// The secrets and the warning the last Connect left for the shell.
+    pub(crate) fn take_handoff(&mut self) -> Option<Handoff> {
+        self.handoff.take()
     }
 
     /// Whether the dialog is visible.
@@ -483,6 +662,9 @@ impl ConnectionDialog {
         self.status = None;
         self.pending_host_key = None;
         self.confirming = false;
+        self.discarding = false;
+        self.baseline = None;
+        self.pristine_new = None;
         self.manager = None;
         self.manager_events = None;
         self.driver_list_open = false;
@@ -550,7 +732,7 @@ impl ConnectionDialog {
         // The password is read from the keychain, not from the file, and only
         // when a saved profile is selected — a profile that has never been saved
         // has no keychain entry to read.
-        let password = if self.store.get(profile.id).is_some() {
+        let password = if self.store.get(profile.id).is_some() && profile.save_secret {
             SecretStore::get(profile.id, SecretSlot::Connection)
                 .unwrap_or_default()
                 .unwrap_or_default()
@@ -558,6 +740,7 @@ impl ConnectionDialog {
             String::new()
         };
         set_text(&self.password_input, password, cx);
+        self.remember_password = profile.save_secret;
 
         self.keep_alive_enabled = profile.keep_alive.is_some();
         let keep_alive = profile.keep_alive.clone().unwrap_or_default();
@@ -583,7 +766,7 @@ impl ConnectionDialog {
             },
             cx,
         );
-        let tunnel_secret = if self.store.get(profile.id).is_some() {
+        let tunnel_secret = if self.store.get(profile.id).is_some() && profile.save_secret {
             SecretStore::get(profile.id, SecretSlot::Tunnel)
                 .unwrap_or_default()
                 .unwrap_or_default()
@@ -612,6 +795,7 @@ impl ConnectionDialog {
         // saying so up front is what stops the first keystroke in a port field
         // from throwing it away.
         self.url_overridden = !profile.url.is_empty() && profile.url != self.assembled_url(cx);
+        self.mark_clean(cx);
         cx.notify();
     }
 
@@ -631,16 +815,19 @@ impl ConnectionDialog {
     /// One key/value pair of driver properties.
     fn new_prop_row(&self, index: usize, cx: &mut Context<Self>) -> PropRow {
         let base = tab::PROPS + (index as isize) * 2;
+        let (key, value) = (cx.weak_entity(), cx.weak_entity());
         PropRow {
             key: cx.new(move |cx| {
                 TextInput::new(cx)
                     .placeholder(ts!("connect.prop_key"))
                     .tab_index(base)
+                    .on_submit(submit(key))
             }),
             value: cx.new(move |cx| {
                 TextInput::new(cx)
                     .placeholder(ts!("connect.prop_value"))
                     .tab_index(base + 1)
+                    .on_submit(submit(value))
             }),
         }
     }
@@ -665,10 +852,12 @@ impl ConnectionDialog {
             }
             let placeholder = placeholder_for(name);
             let tab_index = tab::URL_PART + index as isize;
+            let weak = cx.weak_entity();
             let input = cx.new(move |cx| {
                 TextInput::new(cx)
                     .placeholder(placeholder)
                     .tab_index(tab_index)
+                    .on_submit(submit(weak))
             });
             // A driver's own default port is a better starting point than an
             // empty field: it is right nearly every time and it says what the
@@ -731,6 +920,7 @@ impl ConnectionDialog {
         profile.color = self.color.as_ref().map(ToString::to_string);
         profile.url = text(&self.url_input, cx);
         profile.username = text(&self.username_input, cx);
+        profile.save_secret = self.remember_password;
 
         profile.props = self
             .props
@@ -784,6 +974,15 @@ impl ConnectionDialog {
         let tunnel_secret = self
             .tunnel_enabled
             .then(|| text(&self.tunnel_secret_input, cx));
+        let remember = profile.save_secret;
+        // A profile that stopped remembering has its entries taken out, so
+        // the keychain holds nothing the form says it does not keep; one that
+        // never did has nothing there to take.
+        let forget = !remember
+            && self
+                .baseline
+                .as_ref()
+                .is_none_or(|baseline| baseline.profile.save_secret);
         rudbkit_core::save::save_connection(
             &profile.name,
             &profile.url,
@@ -803,6 +1002,15 @@ impl ConnectionDialog {
                 Ok(())
             },
             || {
+                if !remember {
+                    // Best effort: the keychain is not to be written for this
+                    // profile at all, and one that cannot be reached to have an
+                    // old entry removed must not keep the profile from saving.
+                    if forget && let Err(error) = SecretStore::delete_all(profile.id) {
+                        log::warn!("could not remove the secrets of {}: {error:#}", profile.id);
+                    }
+                    return Ok(());
+                }
                 write_secret(profile.id, SecretSlot::Connection, &password)?;
                 if let Some(secret) = tunnel_secret {
                     write_secret(profile.id, SecretSlot::Tunnel, &secret)?;
@@ -811,7 +1019,18 @@ impl ConnectionDialog {
             },
         )?;
         self.selected = Some(profile.id);
+        self.pristine_new = None;
+        self.mark_clean(cx);
         Ok(profile)
+    }
+
+    /// The secrets on the form, as a connection would be opened with them.
+    fn typed_credentials(&self, cx: &App) -> Credentials {
+        Credentials::typed(
+            Some(text(&self.password_input, cx)),
+            self.tunnel_enabled
+                .then(|| text(&self.tunnel_secret_input, cx)),
+        )
     }
 
     fn saved(
@@ -852,8 +1071,49 @@ impl ConnectionDialog {
 
     /// Saves, then asks the shell to open the profile.
     fn connect(&mut self, cx: &mut Context<Self>) {
+        let credentials = self.typed_credentials(cx);
         let result = self.persist(cx);
-        self.saved(result, true, cx);
+        self.connect_after(result, credentials, cx);
+    }
+
+    /// What a Connect does once its save has been tried.
+    ///
+    /// A keychain that would not take the password is not a reason to stay:
+    /// the profile is on disk by then — the store is written first — and the
+    /// password is on the form, so the connection opens with what was typed
+    /// and the shell is told to say the keychain refused it. Anything else a
+    /// save can fail on is the form's to fix, and keeps the dialog up.
+    fn connect_after(
+        &mut self,
+        result: Result<ConnectionProfile, SaveError>,
+        credentials: Credentials,
+        cx: &mut Context<Self>,
+    ) {
+        match result {
+            Err(SaveError::Secret(error)) => {
+                log::warn!("connecting without the password in the keychain: {error:#}");
+                let profile = self.collect(cx);
+                self.handoff = Some(Handoff {
+                    credentials,
+                    warning: Some(ts!(
+                        "connect.keychain_failed_connected",
+                        error = format!("{error:#}")
+                    )),
+                });
+                cx.emit(ConnectionDialogEvent::Connect(Box::new(profile)));
+                self.close(cx);
+                cx.notify();
+            }
+            result => {
+                if result.is_ok() {
+                    self.handoff = Some(Handoff {
+                        credentials,
+                        warning: None,
+                    });
+                }
+                self.saved(result, true, cx);
+            }
+        }
     }
 
     /// Opens a session with what the form currently holds, pings it, closes it.
@@ -916,19 +1176,10 @@ impl ConnectionDialog {
             Err(error) => {
                 // An unknown key is the one failure the user can clear from
                 // here; a changed one deliberately gets no button.
-                self.pending_host_key = match &error {
-                    ConnectError::HostKeyUnknown {
-                        host,
-                        fingerprint,
-                        algorithm,
-                    } => Some(PendingHostKey {
-                        host: host.clone(),
-                        port: self.collect(cx).tunnel.map_or(22, |tunnel| tunnel.port),
-                        algorithm: algorithm.clone(),
-                        fingerprint: fingerprint.clone(),
-                    }),
-                    _ => None,
-                };
+                self.pending_host_key = HostKey::of(
+                    &error,
+                    self.collect(cx).tunnel.map_or(22, |tunnel| tunnel.port),
+                );
                 let message = error.message();
                 let hint = error_hint(&error);
                 self.report(
@@ -954,23 +1205,39 @@ impl ConnectionDialog {
         if self.selected == Some(id) {
             return;
         }
-        // Edits are kept in memory so that flicking between two profiles does
-        // not discard a half-typed one; only `save` writes the file.
-        let edited = self.collect(cx);
-        if !edited.name.trim().is_empty() {
-            if self.store.get(edited.id) != Some(&edited) {
-                self.edited.insert(edited.id);
-            }
-            self.store.upsert(edited);
-        }
+        self.stash_form(cx);
         self.selected = Some(id);
         self.confirming = false;
         self.status = None;
         self.fill_form(cx);
     }
 
+    /// Keeps the edits on the form in the list, for the profile the form is
+    /// about to be filled from to replace it.
+    ///
+    /// Edits are kept in memory so that flicking between two profiles — or
+    /// pressing New over a half-typed one — does not discard anything; only
+    /// `save` writes the file.
+    fn stash_form(&mut self, cx: &mut Context<Self>) {
+        if self.selected.is_none() {
+            return;
+        }
+        let edited = self.collect(cx);
+        if !edited.name.trim().is_empty() {
+            if self.store.get(edited.id) != Some(&edited) {
+                self.edited.insert(edited.id);
+                // Typed into, so no longer the blank the dialog made.
+                if self.pristine_new == Some(edited.id) {
+                    self.pristine_new = None;
+                }
+            }
+            self.store.upsert(edited);
+        }
+    }
+
     /// Adds a blank profile and selects it.
     fn add_profile(&mut self, cx: &mut Context<Self>) {
+        self.stash_form(cx);
         let driver_id = self
             .drivers
             .drivers()
@@ -991,6 +1258,9 @@ impl ConnectionDialog {
         self.status = None;
         self.fill_form(cx);
         self.refresh_url(cx);
+        // The assembled URL is the driver's default, not something typed.
+        self.mark_clean(cx);
+        self.pristine_new = Some(id);
         self.pending_focus = true;
         cx.notify();
     }
@@ -1001,6 +1271,7 @@ impl ConnectionDialog {
     /// id, and duplicating a credential without being asked to is not something
     /// a connection editor should do quietly.
     fn duplicate_profile(&mut self, cx: &mut Context<Self>) {
+        self.stash_form(cx);
         let mut profile = self.collect(cx);
         profile.id = Uuid::new_v4();
         profile.name = ts!("connect.copy_name", name = profile.name).to_string();
@@ -1042,6 +1313,9 @@ impl ConnectionDialog {
             log::warn!("could not remove the secrets of {id}: {error:#}");
         }
         self.edited.remove(&id);
+        if self.pristine_new == Some(id) {
+            self.pristine_new = None;
+        }
         self.store = keep_unsaved(written, &self.store, &self.edited);
         self.load_error = None;
         self.selected = self.store.connections().first().map(|profile| profile.id);
@@ -1118,8 +1392,23 @@ impl ConnectionDialog {
             cx.notify();
             return;
         }
+        if self.discarding {
+            self.keep_editing(cx);
+            return;
+        }
         if self.confirming {
             self.confirming = false;
+            cx.notify();
+            return;
+        }
+        self.request_close(cx);
+    }
+
+    /// What Cancel, `Escape` and a press on the backdrop all mean: close —
+    /// once the user has said the edits may go, when there are any.
+    fn request_close(&mut self, cx: &mut Context<Self>) {
+        if self.is_dirty(cx) {
+            self.discarding = true;
             cx.notify();
             return;
         }
@@ -1127,8 +1416,53 @@ impl ConnectionDialog {
         self.close(cx);
     }
 
+    /// Takes "discard your edits?" down and goes back to the form.
+    fn keep_editing(&mut self, cx: &mut Context<Self>) {
+        self.discarding = false;
+        self.pending_focus = true;
+        cx.notify();
+    }
+
+    /// `Ctrl+N` inside the dialog: a new profile beside the others, as the
+    /// New button makes one.
+    fn new_profile_action(&mut self, _: &NewProfile, _window: &mut Window, cx: &mut Context<Self>) {
+        if self.manager.is_some() || self.discarding || self.test.is_some() {
+            return;
+        }
+        self.add_profile(cx);
+    }
+
+    /// `Ctrl+S` inside the dialog: saves whichever form is on screen.
+    fn save_action(&mut self, _: &SaveDialog, _window: &mut Window, cx: &mut Context<Self>) {
+        if self.discarding || self.test.is_some() {
+            return;
+        }
+        match self.manager.clone() {
+            Some(manager) => manager.update(cx, |manager, cx| manager.save_draft(cx)),
+            None => self.save(cx),
+        }
+    }
+
     /// Moves focus into the name field when the dialog opens.
     fn apply_pending_focus(&mut self, window: &mut Window, cx: &mut Context<Self>) {
+        let up = self.discarding
+            || self
+                .manager
+                .as_ref()
+                .is_some_and(|manager| manager.read(cx).is_discarding());
+        let was_up = std::mem::replace(&mut self.prompt_up, up);
+        if up {
+            if !was_up {
+                window.focus(&self.prompt_focus, cx);
+            }
+            return;
+        }
+        if was_up && self.manager.is_some() {
+            // Back to the driver editor, which keeps no field of its own to
+            // hand the keyboard to; the dialog's root is inside its tab ring.
+            window.focus(&self.focus_handle, cx);
+            return;
+        }
         if !self.pending_focus || self.manager.is_some() {
             return;
         }
@@ -1249,12 +1583,20 @@ impl ConnectionDialog {
             self.store.connections(),
             self.selected,
             chrome,
-            move |id, _window, cx| {
-                this.update(cx, |dialog, cx| dialog.select(id, cx));
+            // A second press of the same row connects to it, as the Connect
+            // button would — the row is already selected by the first.
+            move |id, clicks, _window, cx| {
+                this.update(cx, |dialog, cx| {
+                    dialog.select(id, cx);
+                    if clicks >= 2 && dialog.test.is_none() {
+                        dialog.connect(cx);
+                    }
+                });
             },
             // No menu here: the form beside the list is already open on the
             // selected profile, so every command a menu would carry is a
             // control the user can see.
+            None,
             None,
             Some(ProfileFolderControls {
                 collapsed: &self.collapsed_folders,
@@ -1760,6 +2102,21 @@ impl ConnectionDialog {
         let behavior = self.render_behavior(cx);
         let tunnel = self.render_tunnel(chrome, cx);
         let no_auth = self.current_driver().is_some_and(|driver| driver.no_auth);
+        // Under the password, and for the tunnel's secret too: one profile,
+        // one answer to whether its secrets live in the keychain. Off, nothing
+        // is written there and the window asks for the password on connect.
+        let remember = {
+            let this = cx.entity();
+            Checkbox::new("connect-remember", ts!("connect.remember_password"))
+                .checked(self.remember_password)
+                .tab_index(tab::REMEMBER)
+                .on_toggle(move |checked, _window, cx| {
+                    this.update(cx, |dialog, cx| {
+                        dialog.remember_password = checked;
+                        cx.notify();
+                    });
+                })
+        };
 
         div()
             .relative()
@@ -1799,6 +2156,7 @@ impl ConnectionDialog {
                             ts!("connect.password"),
                             self.password_input.clone(),
                         ))
+                        .child(form_row(SharedString::default(), remember))
                     })
                     .child(form_row(ts!("connect.props"), props))
                     .child(section(ts!("connect.section.behavior"), chrome, behavior))
@@ -1998,10 +2356,7 @@ impl ConnectionDialog {
                         ts!("common.cancel"),
                         ButtonVariant::Secondary,
                         tab::CANCEL,
-                        |dialog, cx| {
-                            cx.emit(ConnectionDialogEvent::Dismissed);
-                            dialog.close(cx);
-                        },
+                        Self::request_close,
                     ))
                     .child(button(
                         "connect-save",
@@ -2099,13 +2454,49 @@ impl Render for ConnectionDialog {
                 this.update(cx, |dialog, cx| dialog.escape(cx));
             }
         };
+        let discard = if self.discarding {
+            let (keep, gone) = (cx.entity(), cx.entity());
+            Some(prompt::discard(
+                "connect-discard",
+                &self.prompt_focus,
+                ts!("prompt.discard_connections"),
+                move |_window, cx| keep.update(cx, |dialog, cx| dialog.keep_editing(cx)),
+                move |_window, cx| {
+                    gone.update(cx, |dialog, cx| {
+                        cx.emit(ConnectionDialogEvent::Dismissed);
+                        dialog.close(cx);
+                    });
+                },
+                cx,
+            ))
+        } else {
+            // The driver editor's question, drawn from here so that it covers
+            // the window rather than only the panel the editor is inside.
+            self.manager
+                .clone()
+                .filter(|manager| manager.read(cx).is_discarding())
+                .map(|manager| {
+                    let keep = manager.clone();
+                    prompt::discard(
+                        "driver-discard",
+                        &self.prompt_focus,
+                        ts!("prompt.discard_drivers"),
+                        move |_window, cx| keep.update(cx, |manager, cx| manager.keep_editing(cx)),
+                        move |_window, cx| manager.update(cx, |manager, cx| manager.discard(cx)),
+                        cx,
+                    )
+                })
+        };
 
         div()
             .id("connection-dialog")
+            .key_context(KEY_CONTEXT)
             .absolute()
             .inset_0()
             .size_full()
             .track_focus(&self.focus_handle)
+            .on_action(cx.listener(Self::new_profile_action))
+            .on_action(cx.listener(Self::save_action))
             .on_drag_move::<DraggedThumb>(cx.listener(
                 |dialog, event: &DragMoveEvent<DraggedThumb>, _window, cx| {
                     dialog.drag_scrollbar(event, cx);
@@ -2130,6 +2521,31 @@ impl Render for ConnectionDialog {
                 body,
                 on_dismiss,
             ))
+            .children(discard)
+    }
+}
+
+/// What `Enter` in one of the form's fields does: connect, as the primary
+/// button does.
+///
+/// Deferred for the settings dialog's reason: the field is still leased by
+/// gpui while its own submit runs, and a connect reads every field back.
+fn submit(dialog: gpui::WeakEntity<ConnectionDialog>) -> impl Fn(&str, &mut Window, &mut App) {
+    move |_, _window, cx| {
+        let dialog = dialog.clone();
+        cx.defer(move |cx| {
+            dialog
+                .update(cx, |dialog, cx| {
+                    if dialog.open
+                        && dialog.manager.is_none()
+                        && !dialog.discarding
+                        && dialog.test.is_none()
+                    {
+                        dialog.connect(cx);
+                    }
+                })
+                .ok();
+        });
     }
 }
 
@@ -2165,19 +2581,26 @@ fn profile_to_show(store: &ConnectionStore, wanted: Option<Uuid>) -> Option<Uuid
 ///
 /// `selected` marks the row the dialog is editing; a list with no selection to
 /// show — the welcome screen's — passes `None`. `on_click` is handed the
-/// profile's id, which is all either caller needs: the dialog selects it, the
-/// shell opens a connection on it.
+/// profile's id and how many presses the click was, which is all either caller
+/// needs: the dialog selects it and connects on a double click, the shell opens
+/// a connection on it.
 ///
 /// `on_context` is the right-click, and only the welcome screen passes one.
 /// The dialog's own list gets no menu: everything such a menu would offer —
 /// edit this profile, delete it — is the form standing beside the row, already
 /// open on whatever is selected.
+///
+/// `trailing` is what a row carries after its name, and again only the welcome
+/// screen has anything to put there: the driver a profile opens through, or —
+/// for the one being opened — the spinner and the button that stops it. The
+/// dialog's list is a column beside a form that already says both.
 pub(crate) fn profile_rows(
     profiles: &[ConnectionProfile],
     selected: Option<Uuid>,
     chrome: &Theme,
-    on_click: impl Fn(Uuid, &mut Window, &mut App) + Clone + 'static,
+    on_click: impl Fn(Uuid, usize, &mut Window, &mut App) + Clone + 'static,
     on_context: Option<ProfileContextHandler>,
+    trailing: Option<&ProfileTrailing<'_>>,
     folders: Option<ProfileFolderControls<'_>>,
 ) -> Vec<gpui::AnyElement> {
     let mut groups: Vec<(Option<String>, Vec<&ConnectionProfile>)> = Vec::new();
@@ -2272,6 +2695,7 @@ pub(crate) fn profile_rows(
                 });
             let on_click = on_click.clone();
             let on_context = on_context.clone();
+            let after = trailing.and_then(|trailing| trailing(profile));
             rows.push(
                 div()
                     .id(("profile-row", index))
@@ -2308,7 +2732,10 @@ pub(crate) fn profile_rows(
                             .text_color(chrome.text)
                             .child(name),
                     )
-                    .on_click(move |_, window, cx| on_click(id, window, cx))
+                    .children(after)
+                    .on_click(move |event: &gpui::ClickEvent, window, cx| {
+                        on_click(id, event.click_count(), window, cx)
+                    })
                     // Taken on the press, as every right-click in the shell is:
                     // a menu that waited for the release would lag the gesture
                     // here and nowhere else. The press is swallowed so that it
@@ -2445,7 +2872,7 @@ fn decompose(template: &str, url: &str) -> Option<Vec<(String, String)>> {
 /// Only the classes worth a hint get one: `28` is the user's password, `08` is
 /// the address, and a driver failure is the JAR. Everything else is left to the
 /// driver's own message, which is usually better than anything invented here.
-fn error_hint(error: &ConnectError) -> Option<SharedString> {
+pub(crate) fn error_hint(error: &ConnectError) -> Option<SharedString> {
     if error.is_authentication() {
         return Some(ts!("connect.hint_auth"));
     }

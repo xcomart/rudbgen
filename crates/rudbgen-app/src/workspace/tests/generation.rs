@@ -232,6 +232,7 @@ fn a_real_database_writes_the_files_the_status_bar_promised(cx: &mut gpui::TestA
         output_dir: Some(out.path().to_path_buf()),
         author: "comart".to_string(),
         custom_vars: vec![("package".to_string(), "com.abc.sample".to_string())],
+        ..GenerationProfile::default()
     };
 
     let driver = connection::h2::driver();
@@ -437,13 +438,28 @@ fn ticked_h2_window(
     statements: &[&str],
     out: &std::path::Path,
 ) -> gpui::WindowHandle<Workspace> {
-    use rudbgen_core::{GenerationProfile, TemplateRef};
-    use rudbgen_jdbc::StatementSpec;
-
     let template = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
         .join("../../templates/java_model.java")
         .canonicalize()
         .expect("the shipped template is in the repository");
+    h2_window(cx, name, statements, out, template, Vec::new(), true)
+}
+
+/// The window [`ticked_h2_window`] opens, with the template, the ticks the
+/// profile was saved with, and whether the whole schema is ticked afterwards
+/// all the caller's.
+pub(super) fn h2_window(
+    cx: &mut gpui::TestAppContext,
+    name: &str,
+    statements: &[&str],
+    out: &std::path::Path,
+    template: std::path::PathBuf,
+    selected_tables: Vec<rudbgen_core::TableName>,
+    tick_all: bool,
+) -> gpui::WindowHandle<Workspace> {
+    use rudbgen_core::{GenerationProfile, TemplateRef};
+    use rudbgen_jdbc::StatementSpec;
+
     let mut profile = connection::h2::profile(name);
     profile.generation = GenerationProfile {
         templates: vec![TemplateRef {
@@ -455,6 +471,7 @@ fn ticked_h2_window(
         output_dir: Some(out.to_path_buf()),
         author: "comart".to_string(),
         custom_vars: vec![("package".to_string(), "com.abc.sample".to_string())],
+        selected_tables,
     };
     let driver = connection::h2::driver();
     let session = connection::connect(
@@ -517,6 +534,9 @@ fn ticked_h2_window(
         })
         .expect("the window is open");
     cx.run_until_parked();
+    if !tick_all {
+        return window;
+    }
     window
         .update(cx, |workspace, _window, cx| {
             workspace.explorer.update(cx, |explorer, cx| {
@@ -536,7 +556,7 @@ fn ticked_h2_window(
 /// The two tables the tests below generate from: an album with a comment —
 /// which the reader copies off the explorer's row rather than reading — and an
 /// artist without one.
-const ALBUM_AND_ARTIST: [&str; 3] = [
+pub(super) const ALBUM_AND_ARTIST: [&str; 3] = [
     "create table T_SAMPLE_ARTIST (ARTIST_ID integer not null, NAME varchar(80) not null, constraint PK_ARTIST primary key (ARTIST_ID))",
     "create table T_SAMPLE_ALBUM (ALBUM_ID integer not null, TITLE varchar(120), constraint PK_ALBUM primary key (ALBUM_ID))",
     "comment on table T_SAMPLE_ALBUM is 'an album'",

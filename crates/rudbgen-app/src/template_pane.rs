@@ -282,6 +282,9 @@ pub enum TemplatePaneEvent {
         /// Index into the choices the shell last set.
         table: usize,
     },
+    /// The header's *Add to generation list*: this file should join the open
+    /// connection's template list.
+    AddToGeneration,
 }
 
 /// The completion popup, while it is up.
@@ -344,6 +347,13 @@ pub struct TemplatePane {
     /// itself: the focus handle belongs to an element that has not been drawn
     /// yet. The flag is consumed by the first render after it is set.
     pending_focus: bool,
+    /// Whether the file is in the open connection's template list: `None`
+    /// with nothing connected, which is when the header has no way in to
+    /// offer.
+    listed: Option<bool>,
+    /// The problem `F8` last moved the caret to, which the next press counts
+    /// on from.
+    diagnostic_cursor: Option<usize>,
     /// The debounce in flight, dropped — and so canceled — by the next edit.
     _debounce: Option<Task<()>>,
     /// Keeps the editor's subscription alive.
@@ -431,6 +441,8 @@ impl TemplatePane {
             context_menu: None,
             tab_menu: None,
             pending_focus: true,
+            listed: None,
+            diagnostic_cursor: None,
             _debounce: None,
             _editor_events: editor_events,
             _scroll_events: scroll_events,
@@ -942,11 +954,52 @@ impl TemplatePane {
         self.request_render(cx);
     }
 
+    /// Whether the header offers *Add to generation list*: `Some(false)` is a
+    /// connection open and this file not in its list yet.
+    pub fn set_listed(&mut self, listed: Option<bool>, cx: &mut Context<Self>) {
+        if self.listed != listed {
+            self.listed = listed;
+            cx.notify();
+        }
+    }
+
+    /// `F8` and `Shift+F8`: the next problem after the caret, or the one
+    /// before it, wrapping round at either end.
+    ///
+    /// Counted from the caret rather than from the last jump, so a press after
+    /// the user has moved on starts from where they now are.
+    pub fn step_diagnostic(&mut self, forward: bool, window: &mut Window, cx: &mut Context<Self>) {
+        if self.diagnostics.is_empty() {
+            return;
+        }
+        let caret = self.editor.read(cx).caret();
+        let mut order: Vec<usize> = (0..self.diagnostics.len()).collect();
+        order.sort_by_key(|index| self.diagnostics[*index].offset);
+        let next = if forward {
+            order
+                .iter()
+                .copied()
+                .find(|index| self.diagnostics[*index].offset > caret)
+                .or_else(|| order.first().copied())
+        } else {
+            order
+                .iter()
+                .rev()
+                .copied()
+                .find(|index| self.diagnostics[*index].offset < caret)
+                .or_else(|| order.last().copied())
+        };
+        if let Some(index) = next {
+            self.jump_to(index, window, cx);
+        }
+    }
+
     /// Moves the caret to a diagnostic and gives the buffer the keyboard.
     fn jump_to(&mut self, index: usize, window: &mut Window, cx: &mut Context<Self>) {
         let Some(diagnostic) = self.diagnostics.get(index) else {
             return;
         };
+        self.diagnostic_cursor = Some(index);
         let offset = diagnostic.offset;
         self.editor
             .update(cx, |editor, cx| editor.move_to(offset, cx));
@@ -1104,8 +1157,23 @@ impl TemplatePane {
         let save = cx.entity();
         let toggle = cx.entity();
         let tabs = cx.entity();
+        let add = cx.entity();
         let open = self.preview_open;
         let tab_menu_open = self.tab_menu.is_some();
+        // The way from a template being written to a run that uses it, when a
+        // connection is open and its list does not have this file yet — which
+        // is exactly the state a template made with *New template…* is in.
+        let add_button = (self.listed == Some(false)).then(|| {
+            Button::new(
+                "template-add-to-generation",
+                ts!("template.add_to_generation"),
+            )
+            .variant(ButtonVariant::Secondary)
+            .compact()
+            .on_click(move |_, _window, cx| {
+                add.update(cx, |_, cx| cx.emit(TemplatePaneEvent::AddToGeneration));
+            })
+        });
 
         div()
             .flex()
@@ -1165,6 +1233,7 @@ impl TemplatePane {
                         width = self.tab_width(cx).to_string()
                     )),
             )
+            .children(add_button)
             .child(
                 Button::new("template-save", ts!("common.save"))
                     .variant(ButtonVariant::Secondary)
@@ -1329,6 +1398,16 @@ impl TemplatePane {
                     .py(px(2.))
                     .rounded_md()
                     .cursor_pointer()
+                    // A stop in the tab ring, so the list can be walked
+                    // without the mouse; `Enter` on a row is a click on it,
+                    // which jumps.
+                    .tab_index(0)
+                    .border_1()
+                    .border_color(gpui::transparent_black())
+                    .focus(|style| style.border_color(theme.accent))
+                    .when(self.diagnostic_cursor == Some(index), |row| {
+                        row.bg(theme.surface_active)
+                    })
                     .hover(|style| style.bg(theme.surface_hover))
                     .on_click(cx.listener(move |pane, _, window, cx| {
                         pane.jump_to(index, window, cx);

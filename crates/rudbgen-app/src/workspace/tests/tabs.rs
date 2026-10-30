@@ -204,3 +204,106 @@ fn the_preview_tab_is_retitled_in_place(cx: &mut gpui::TestAppContext) {
         })
         .expect("the window is open");
 }
+
+/// A window with two template tabs open over real files, and the Generate
+/// tab in front of them.
+fn two_templates(
+    cx: &mut gpui::TestAppContext,
+) -> (tempfile::TempDir, gpui::WindowHandle<Workspace>) {
+    cx.update(|cx| {
+        app_settings::init(cx);
+        rugpui::init(cx);
+        rugpui_editor::init(cx);
+    });
+    silence_the_update_check();
+    let dir = tempfile::tempdir().expect("tempdir");
+    let window = cx.add_window(|window, cx| Workspace::new(TitlebarStyle::Custom, window, cx));
+    window
+        .update(cx, |workspace, _window, cx| {
+            for name in ["a.java", "b.java"] {
+                let file = dir.path().join(name);
+                std::fs::write(&file, "class A {}\n").expect("the template is written");
+                workspace.open_template(file, cx);
+            }
+            assert!(workspace.pane.activate(0));
+        })
+        .expect("the window is open");
+    (dir, window)
+}
+
+/// `Ctrl+PageDown` and `Ctrl+PageUp` walk the strip and wrap at its ends; the
+/// numbered chords go straight to a tab.
+#[gpui::test]
+fn the_tab_keys_walk_the_strip(cx: &mut gpui::TestAppContext) {
+    let (_dir, window) = two_templates(cx);
+    window
+        .update(cx, |workspace, window, cx| {
+            workspace.next_tab_action(&NextTab, window, cx);
+            assert_eq!(workspace.pane.active_index(), 1);
+            workspace.next_tab_action(&NextTab, window, cx);
+            assert_eq!(workspace.pane.active_index(), 2);
+            workspace.next_tab_action(&NextTab, window, cx);
+            assert_eq!(workspace.pane.active_index(), 0, "the end did not wrap");
+            workspace.prev_tab_action(&PrevTab, window, cx);
+            assert_eq!(workspace.pane.active_index(), 2, "the start did not wrap");
+            workspace.select_tab_action(&SelectTab(1), window, cx);
+            assert_eq!(workspace.pane.active_index(), 1);
+            // A digit past the strip is nothing to go to.
+            workspace.select_tab_action(&SelectTab(8), window, cx);
+            assert_eq!(workspace.pane.active_index(), 1);
+        })
+        .expect("the window is open");
+}
+
+/// `Ctrl+W` closes the tab on top through the same door as its close button:
+/// a template with edits asks, and the Generate tab is never taken.
+#[gpui::test]
+fn close_tab_asks_and_spares_the_generate_tab(cx: &mut gpui::TestAppContext) {
+    let (_dir, window) = two_templates(cx);
+    window
+        .update(cx, |workspace, window, cx| {
+            workspace.close_tab_action(&CloseTab, window, cx);
+            assert_eq!(workspace.pane.items().len(), 3, "the Generate tab closed");
+
+            workspace.select_tab_action(&SelectTab(1), window, cx);
+            let at = workspace.active_template(cx).expect("a template is on top");
+            workspace.templates[at].update(cx, |pane, cx| pane.insert("// edit\n", window, cx));
+            workspace.close_tab_action(&CloseTab, window, cx);
+            assert!(workspace.closing.is_some(), "the edit was not asked about");
+            workspace.cancel_close(window, cx);
+            assert_eq!(workspace.pane.items().len(), 3);
+        })
+        .expect("the window is open");
+}
+
+/// The tab menu's *Close other tabs* closes the clean ones at once and asks
+/// about the one with edits, carrying on once that is answered — and leaves
+/// the Generate tab standing.
+#[gpui::test]
+fn close_others_asks_about_each_edited_tab(cx: &mut gpui::TestAppContext) {
+    let (_dir, window) = two_templates(cx);
+    window
+        .update(cx, |workspace, window, cx| {
+            let Some(PaneItem::Template { file, .. }) = workspace.pane.get(2).cloned() else {
+                panic!("the second template is not where it was opened");
+            };
+            let at = workspace
+                .template_index(&file, cx)
+                .expect("the second template is open");
+            workspace.templates[at].update(cx, |pane, cx| pane.insert("// edit\n", window, cx));
+            workspace.close_tabs(&[0, 1, 2], window, cx);
+            assert!(
+                workspace.closing.is_some(),
+                "the edited tab was not asked about"
+            );
+            assert_eq!(
+                workspace.pane.items().len(),
+                2,
+                "the clean tab is still open"
+            );
+            workspace.answer_close(false, window, cx);
+            assert_eq!(workspace.pane.items().len(), 1);
+            assert!(matches!(workspace.pane.get(0), Some(PaneItem::Generate)));
+        })
+        .expect("the window is open");
+}

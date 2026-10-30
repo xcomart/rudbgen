@@ -295,6 +295,7 @@ mod tests {
             output_dir: Some(PathBuf::from("/out")),
             author: "comart".to_string(),
             custom_vars: vec![("package".to_string(), "com.abc".to_string())],
+            ..GenerationProfile::default()
         };
 
         let plan = Plan::from_profile(&profile, Vec::new()).expect("a profile with an output dir");

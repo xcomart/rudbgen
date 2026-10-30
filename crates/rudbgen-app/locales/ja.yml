@@ -26,6 +26,7 @@ explorer:
   menu_invert: 選択を反転
   menu_inspect: インスペクターで開く
   menu_refresh: 再読み込み
+  missing: "データベースに存在しなくなったため、選択を外しました: %{names}"
 
 inspector:
   title: インスペクター
@@ -136,6 +137,10 @@ connect:
   # 理由はドライバー・踏み台・JVM のもので、翻訳しません。
   could_not_open: "%{name} を開けませんでした。"
   tunnel_ended: "SSH トンネルが終了しました: %{reason}"
+  remember_password: "パスワードを記憶"
+  keychain_failed_connected: "接続しましたが、パスワードをキーチェーンに保存できませんでした: %{error}"
+  edit_connection: "接続を編集…"
+  retry: "再試行"
 
 driver:
   title: ドライバー
@@ -234,6 +239,13 @@ menu:
   mac:
     new_connection: 新規接続…
     quit: rudbgen を終了
+  manage_connections: "接続の管理…"
+  add_to_generation: "生成リストに追加"
+  close_tab: "タブを閉じる"
+  next_tab: "次のタブ"
+  prev_tab: "前のタブ"
+  next_diagnostic: "次の問題"
+  prev_diagnostic: "前の問題"
 
 titlebar:
   no_connection: 接続なし
@@ -242,6 +254,7 @@ titlebar:
   disconnect: 切断
   connecting: "%{name} — 接続中…"
   tip_menu: メニュー
+  cancel_connecting: "接続を中止"
 
 welcome:
   tagline: データベースを指定し、テーブルとテンプレートを選ぶと、コードを書き出します。
@@ -314,6 +327,23 @@ generate:
   blocked_templates: テンプレートを 1 つ以上選んでください。
   blocked_output: 先に出力ディレクトリを選んでください。
   blocked_running: すでに実行中です。
+  set_choose: "セットを選択…"
+  no_templates_sets: "テンプレートがまだありません。テンプレートセットから始めるか、自分で追加してください:"
+  use_set: "「%{name}」を使う"
+  column_name: "名前"
+  column_file: "テンプレートファイル"
+  column_output: "出力ファイル名"
+  tip_output: "テーブルごとに出力先の下へ書き出すファイルです。フォルダーも含められます。例: ${package.replace('.','/')}/${name.suffix.pascal}.java"
+  undo: "元に戻す"
+  undo_replaced: "一覧をセット「%{set}」に置き換えました。"
+  undo_removed: "「%{name}」を一覧から外しました。"
+  overwrite: "既存のファイル"
+  overwrite_default: "設定の既定値です。すべての実行はここから始まります。"
+  overwrite_once: "次の実行だけに使い、その後は設定の既定値に戻ります。"
+  all_connections: "(すべての接続)"
+  rendering: "レンダリング中…"
+  dry_into: "%{dir} の下に %{count} 件のファイルを書き出します"
+  dry_no_output: "出力先がまだ未設定のため、一時フォルダーを基準に表示しています。そのためすべて新規と表示されます。"
 
 progress:
   title: 生成中…
@@ -343,6 +373,7 @@ summary:
   skip: スキップ
   overwrite_all: すべて上書き
   skip_all: すべてスキップ
+  warnings: "警告"
 
 about:
   title: rudbgen について
@@ -499,6 +530,7 @@ template:
   close_title: 未保存の変更
   close_question: "%{file} には未保存の変更があります。"
   discard: 保存しない
+  add_to_generation: "生成リストに追加"
 
 diagnostics:
   title: 問題 (%{count})
@@ -683,7 +715,7 @@ import:
   written: "接続 %{connections} 件、ドライバー %{drivers} 件、テンプレートセット %{sets} 件、略語規則 %{rules} 件をインポートしました。"
   nothing_written: 何もインポートしませんでした。
   skipped: "名前が使われていたため見送りました: %{names}"
-  no_keychain: "キーチェーンに入れられなかったため、次の接続はパスワードなしで保存しました: %{names}。開くときに尋ねます。"
+  no_keychain: "キーチェーンに入れられなかったため、次の接続はパスワードなしで保存しました: %{names}。開いたときにデータベースがパスワードなしの接続を拒否すると、rudbgen がパスワードを尋ねます。"
   load_failed: "インポート先のファイルを読み込めなかったため、何もインポートしませんでした: %{error}。そのファイルを修正するか移動してから、もう一度インポートしてください。"
   not_saved: "ファイルに書き込めなかったため、保存されていません: %{errors}"
   wrong_password: この設定のマスターパスワードではありません。
@@ -701,3 +733,32 @@ import:
   path_jar: ドライバー JAR
   path_template: テンプレートファイル
   path_output: 出力ディレクトリ
+
+context:
+  connect: "接続"
+  edit: "編集…"
+  delete: "削除…"
+  close_tab: "タブを閉じる"
+  close_others: "他のタブを閉じる"
+  close_right: "右側のタブを閉じる"
+  copy_path: "パスをコピー"
+
+password:
+  title: "パスワード"
+  question: "%{name} のパスワードを入力してください。"
+  refused: "データベースがパスワードを拒否しました。"
+
+prompt:
+  discard_title: "未保存の変更"
+  keep_editing: "編集を続ける"
+  discard: "変更を破棄"
+  discard_connections: "接続に未保存の変更があります。破棄しますか？"
+  discard_drivers: "ドライバーに未保存の変更があります。破棄しますか？"
+  discard_rules: "略語規則に未保存の変更があります。破棄しますか？"
+  discard_settings: "設定に未保存の変更があります。破棄しますか？"
+
+unsaved:
+  title: "未保存のテンプレート"
+  question: "次のテンプレートに未保存の変更があります: %{names}。実行はタブの内容ではなく、保存済みのファイルを読みます。"
+  save_and_run: "保存して実行"
+  run_without_saving: "保存せずに実行"

@@ -26,6 +26,7 @@ explorer:
   menu_invert: 선택 반전
   menu_inspect: 인스펙터에서 열기
   menu_refresh: 새로 고침
+  missing: "데이터베이스에 더 이상 없어 선택을 해제했습니다: %{names}"
 
 inspector:
   title: 인스펙터
@@ -136,6 +137,10 @@ connect:
   # 원인은 드라이버나 배스천, JVM의 것이라 번역하지 않습니다.
   could_not_open: "%{name}을(를) 열지 못했습니다."
   tunnel_ended: "SSH 터널이 끊어졌습니다: %{reason}"
+  remember_password: "비밀번호 기억"
+  keychain_failed_connected: "연결했지만 비밀번호를 키체인에 저장하지 못했습니다: %{error}"
+  edit_connection: "연결 편집…"
+  retry: "다시 시도"
 
 driver:
   title: 드라이버
@@ -234,6 +239,13 @@ menu:
   mac:
     new_connection: 새 연결…
     quit: rudbgen 종료
+  manage_connections: "연결 관리…"
+  add_to_generation: "생성 목록에 추가"
+  close_tab: "탭 닫기"
+  next_tab: "다음 탭"
+  prev_tab: "이전 탭"
+  next_diagnostic: "다음 문제"
+  prev_diagnostic: "이전 문제"
 
 titlebar:
   no_connection: 연결 없음
@@ -241,6 +253,7 @@ titlebar:
   disconnect: 연결 끊기
   connecting: "%{name} — 연결 중…"
   tip_menu: 메뉴
+  cancel_connecting: "연결 취소"
 
 welcome:
   tagline: 데이터베이스를 지정하고 테이블과 템플릿을 고르면 코드를 만들어 냅니다.
@@ -314,6 +327,23 @@ generate:
   blocked_templates: 템플릿을 하나 이상 선택하세요.
   blocked_output: 출력 디렉터리를 먼저 고르세요.
   blocked_running: 이미 실행 중입니다.
+  set_choose: "세트 선택…"
+  no_templates_sets: "아직 템플릿이 없습니다. 템플릿 세트로 시작하거나 직접 추가하세요:"
+  use_set: "“%{name}” 사용"
+  column_name: "이름"
+  column_file: "템플릿 파일"
+  column_output: "출력 파일 이름"
+  tip_output: "테이블마다 출력 위치 아래에 쓸 파일입니다. 폴더도 넣을 수 있습니다. 예: ${package.replace('.','/')}/${name.suffix.pascal}.java"
+  undo: "실행 취소"
+  undo_replaced: "목록을 세트 “%{set}”(으)로 바꿨습니다."
+  undo_removed: "목록에서 “%{name}”을(를) 제거했습니다."
+  overwrite: "기존 파일"
+  overwrite_default: "설정의 기본값이며, 모든 실행이 여기서 시작합니다."
+  overwrite_once: "다음 실행에만 적용하며, 그 뒤에는 설정의 기본값으로 돌아갑니다."
+  all_connections: "(모든 연결)"
+  rendering: "렌더링 중…"
+  dry_into: "%{dir} 아래에 파일 %{count}개를 씁니다"
+  dry_no_output: "아직 출력 디렉터리를 고르지 않아 임시 위치 기준으로 보여 주며, 그래서 모든 파일이 새 파일로 표시됩니다."
 
 progress:
   title: 생성 중…
@@ -343,6 +373,7 @@ summary:
   skip: 건너뛰기
   overwrite_all: 모두 덮어쓰기
   skip_all: 모두 건너뛰기
+  warnings: "경고"
 
 about:
   title: rudbgen 정보
@@ -499,6 +530,7 @@ template:
   close_title: 저장하지 않은 변경 사항
   close_question: "%{file}에 아직 저장하지 않은 변경 사항이 있습니다."
   discard: 저장 안 함
+  add_to_generation: "생성 목록에 추가"
 
 diagnostics:
   title: 문제 (%{count})
@@ -683,7 +715,7 @@ import:
   written: "연결 %{connections}개, 드라이버 %{drivers}개, 템플릿 세트 %{sets}개, 약어 규칙 %{rules}개를 가져왔습니다."
   nothing_written: 가져온 것이 없습니다.
   skipped: "이름이 겹쳐 건너뛰었습니다: %{names}"
-  no_keychain: "키체인에 넣지 못해 다음 연결은 비밀번호 없이 저장했습니다: %{names}. 열 때 다시 묻습니다."
+  no_keychain: "키체인에 넣지 못해 다음 연결은 비밀번호 없이 저장했습니다: %{names}. 연결을 열 때 데이터베이스가 비밀번호 없이 거부하면 rudbgen이 비밀번호를 묻습니다."
   load_failed: "가져온 내용을 넣을 파일을 읽지 못해 아무것도 가져오지 않았습니다: %{error}. 그 파일을 고치거나 옮긴 뒤 다시 가져오세요."
   not_saved: "파일을 쓰지 못해 저장되지 않았습니다: %{errors}"
   wrong_password: 이 설정의 마스터 비밀번호가 아닙니다.
@@ -701,3 +733,32 @@ import:
   path_jar: 드라이버 JAR
   path_template: 템플릿 파일
   path_output: 출력 디렉터리
+
+context:
+  connect: "연결"
+  edit: "편집…"
+  delete: "삭제…"
+  close_tab: "탭 닫기"
+  close_others: "다른 탭 모두 닫기"
+  close_right: "오른쪽 탭 모두 닫기"
+  copy_path: "경로 복사"
+
+password:
+  title: "비밀번호"
+  question: "%{name}의 비밀번호를 입력하세요."
+  refused: "데이터베이스가 비밀번호를 거부했습니다."
+
+prompt:
+  discard_title: "저장하지 않은 변경 사항"
+  keep_editing: "계속 편집"
+  discard: "변경 사항 버리기"
+  discard_connections: "연결에 저장하지 않은 변경 사항이 있습니다. 버릴까요?"
+  discard_drivers: "드라이버에 저장하지 않은 변경 사항이 있습니다. 버릴까요?"
+  discard_rules: "약어 규칙에 저장하지 않은 변경 사항이 있습니다. 버릴까요?"
+  discard_settings: "설정에 저장하지 않은 변경 사항이 있습니다. 버릴까요?"
+
+unsaved:
+  title: "저장하지 않은 템플릿"
+  question: "다음 템플릿에 저장하지 않은 변경 사항이 있습니다: %{names}. 실행은 탭의 내용이 아니라 저장된 파일을 읽습니다."
+  save_and_run: "저장 후 실행"
+  run_without_saving: "저장하지 않고 실행"

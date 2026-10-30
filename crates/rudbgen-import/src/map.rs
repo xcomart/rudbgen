@@ -447,6 +447,7 @@ fn map_connection(
             ),
             author: conn.author.clone().unwrap_or_default(),
             custom_vars: conn.custom_vars.clone(),
+            ..GenerationProfile::default()
         },
         ..ConnectionProfile::default()
     };

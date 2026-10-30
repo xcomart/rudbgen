@@ -12,6 +12,23 @@ impl Workspace {
         cx.notify();
     }
 
+    /// Puts the keyboard back where the user was working once a dialog or a
+    /// question has gone: the template on top when there is one, which is
+    /// where the `Ctrl+G` or the close button that put the dialog up was
+    /// pressed from, and the shell otherwise.
+    ///
+    /// The shell first, in the same update, for [`Workspace::focus_shell`]'s
+    /// reason: the dialog's own handle is about to stop being drawn. The
+    /// editor takes the keyboard back on the frame that draws it.
+    pub(super) fn return_focus(&mut self, window: &mut Window, cx: &mut Context<Self>) {
+        self.focus_shell(window, cx);
+        if let Some(at) = self.active_template(cx) {
+            self.templates[at]
+                .clone()
+                .update(cx, |pane, cx| pane.request_focus(cx));
+        }
+    }
+
     // --- dialogs ----------------------------------------------------------
 
     /// Whether any modal is on screen.
@@ -25,6 +42,10 @@ impl Workspace {
     /// asked for, and it must not land on top of something the user opened.
     pub(super) fn dialog_open(&self, cx: &App) -> bool {
         self.closing.is_some()
+            || self.unsaved_run.is_some()
+            || self.deleting_profile.is_some()
+            || self.password_prompt.is_some()
+            || self.generate.read(cx).prompt_open()
             || self.about.read(cx).is_open()
             || self.settings.read(cx).is_open()
             || self.update.read(cx).is_open()
@@ -49,30 +70,46 @@ impl Workspace {
     /// announcement floating over the window — except while it is installing,
     /// when its own `close` refuses and the swap is allowed to finish; see
     /// [`UpdateDialog::close`].
+    ///
+    /// The same goes for every dialog holding something that would be lost:
+    /// a draft with edits in it, an import half way through. Those are left
+    /// up, and [`Workspace::overlays_closed`] tells the caller that its own
+    /// dialog must not open over them. The shortcuts never get this far while
+    /// a dialog is up (see [`Workspace::shortcut_blocked`]); this is for the
+    /// paths that are not a shortcut.
     pub(super) fn close_overlays(&mut self, window: &mut Window, cx: &mut Context<Self>) {
         self.close_template_menus(cx);
+        self.close_context_menus(cx);
         self.menu_open = false;
         // A question nobody answered is a question withdrawn: the tab stays
-        // open with its edits, which is the safe half of both answers.
+        // open with its edits, which is the safe half of both answers — and
+        // the same holds for every other question the shell asks.
         self.closing = None;
+        self.unsaved_run = None;
+        self.deleting_profile = None;
+        self.password_prompt = None;
+        self.generate
+            .update(cx, |pane, cx| pane.withdraw_prompts(cx));
         if self.about.read(cx).is_open() {
             self.about.update(cx, |dialog, cx| dialog.close(cx));
         }
-        if self.settings.read(cx).is_open() {
+        if self.settings.read(cx).is_open() && !self.settings.read(cx).is_dirty(cx) {
             self.settings.update(cx, |dialog, cx| dialog.close(cx));
             self.apply_preview(window, cx);
         }
         if self.update.read(cx).is_open() {
             self.update.update(cx, |dialog, cx| dialog.close(cx));
         }
-        if self.connection_dialog.read(cx).is_open() {
+        if self.connection_dialog.read(cx).is_open()
+            && !self.connection_dialog.read(cx).is_dirty(cx)
+        {
             self.connection_dialog
                 .update(cx, |dialog, cx| dialog.close(cx));
         }
-        if self.abbreviations.read(cx).is_open() {
+        if self.abbreviations.read(cx).is_open() && !self.abbreviations.read(cx).is_dirty(cx) {
             self.abbreviations.update(cx, |dialog, cx| dialog.close(cx));
         }
-        if self.import.read(cx).is_open() {
+        if self.import.read(cx).is_open() && !self.import.read(cx).is_busy() {
             self.import.update(cx, |dialog, cx| dialog.close(cx));
         }
         // A run in flight is the one overlay a command may not take the screen
@@ -83,9 +120,18 @@ impl Workspace {
         }
     }
 
+    /// Clears the screen for a dialog about to open, and answers whether it
+    /// may: not while [`Workspace::close_overlays`] had to leave one up.
+    pub(super) fn overlays_closed(&mut self, window: &mut Window, cx: &mut Context<Self>) -> bool {
+        self.close_overlays(window, cx);
+        !self.dialog_open(cx)
+    }
+
     /// Opens the about dialog, closing whatever else was showing.
     pub(super) fn open_about(&mut self, window: &mut Window, cx: &mut Context<Self>) {
-        self.close_overlays(window, cx);
+        if !self.overlays_closed(window, cx) {
+            return;
+        }
         self.about.update(cx, |dialog, cx| dialog.open(cx));
         cx.notify();
     }
@@ -103,7 +149,9 @@ impl Workspace {
         if self.update.read(cx).is_busy() {
             return;
         }
-        self.close_overlays(window, cx);
+        if !self.overlays_closed(window, cx) {
+            return;
+        }
         self.update.update(cx, |dialog, cx| dialog.start_check(cx));
         cx.notify();
     }
@@ -123,7 +171,9 @@ impl Workspace {
     /// cannot be read opens the editor empty and unable to save, since saving
     /// that would replace every rule in it.
     pub(super) fn open_abbreviations(&mut self, window: &mut Window, cx: &mut Context<Self>) {
-        self.close_overlays(window, cx);
+        if !self.overlays_closed(window, cx) {
+            return;
+        }
         let pane = self.generate.read(cx);
         let store = match pane.abbreviations_error() {
             None => Ok(pane.abbreviations().clone()),
@@ -157,7 +207,9 @@ impl Workspace {
     /// configuration copied from another machine, and the reason the command is
     /// never grayed out.
     pub(super) fn open_import(&mut self, window: &mut Window, cx: &mut Context<Self>) {
-        self.close_overlays(window, cx);
+        if !self.overlays_closed(window, cx) {
+            return;
+        }
         let path = self.jdbgen_config.clone().unwrap_or_else(|| {
             rudbgen_import::data_dir()
                 .unwrap_or_default()
@@ -192,9 +244,23 @@ impl Workspace {
         self.apply_settings(window, cx);
     }
 
-    /// Opens the connection dialog over the profile that is open, if one is.
-    pub(super) fn open_connection_dialog(&mut self, window: &mut Window, cx: &mut Context<Self>) {
-        self.close_overlays(window, cx);
+    /// Opens the connection dialog through one of its three doors.
+    ///
+    /// *New connection…* opens it on a blank profile, which is what the words
+    /// promise: opening it over a saved one, as it used to, had a user who
+    /// changed the name and the URL of what looked like a new form save over
+    /// the profile they were looking at. *Manage connections…* opens it over
+    /// the profile that is open — or the first saved one — to edit, and the
+    /// welcome list's *Edit…* over the row it was pressed on.
+    pub(super) fn open_connection_dialog(
+        &mut self,
+        door: ConnectionDoor,
+        window: &mut Window,
+        cx: &mut Context<Self>,
+    ) {
+        if !self.overlays_closed(window, cx) {
+            return;
+        }
         // What the driver editor's custom-query **Test** runs against when the
         // driver being edited is the one this session was opened through.
         let session = self.connection.session().map(|connected| {
@@ -209,9 +275,13 @@ impl Workspace {
         let at = self.connection.profile().map(|profile| profile.id);
         self.connection_dialog.update(cx, |dialog, cx| {
             dialog.set_open_session(session);
-            match at {
-                Some(id) => dialog.open_at(id, cx),
-                None => dialog.open(cx),
+            match door {
+                ConnectionDoor::New => dialog.open_new(cx),
+                ConnectionDoor::Edit(id) => dialog.open_at(id, cx),
+                ConnectionDoor::Manage => match at {
+                    Some(id) => dialog.open_at(id, cx),
+                    None => dialog.open(cx),
+                },
             }
         });
         cx.notify();
@@ -221,13 +291,56 @@ impl Workspace {
 
     /// Opens a session for `profile`, replacing whatever was open.
     ///
+    /// `credentials` are the secrets the caller already has — what the
+    /// connection dialog's form held — and `None` reads them from the keychain
+    /// on the way. A profile that keeps no password has none there to read, so
+    /// for one of those the window asks first (see
+    /// [`Workspace::ask_password`]), and the session that is open stays open
+    /// until the question is answered.
+    ///
     /// Everything that blocks — the keychain read, the tunnel, `JNI_CreateJavaVM`
     /// on the first connection of the run, `OPEN_SESSION` — happens on a
     /// background task, so the window stays live while a database that is not
     /// answering takes its time about saying so.
-    pub(super) fn connect_to(&mut self, profile: ConnectionProfile, cx: &mut Context<Self>) {
-        self.close_session();
+    pub(super) fn connect_to(
+        &mut self,
+        profile: ConnectionProfile,
+        credentials: Option<Credentials>,
+        _window: &mut Window,
+        cx: &mut Context<Self>,
+    ) {
+        let Some(driver) = self.driver_of(&profile, cx) else {
+            return;
+        };
+        if credentials.is_none() && !profile.save_secret && !driver.no_auth {
+            self.ask_password(profile, driver, None, cx);
+            return;
+        }
+        self.start_connect(profile, driver, credentials, None, cx);
+    }
 
+    /// Opens `profile` with `credentials` in hand, keeping `remember` in the
+    /// keychain once the database has accepted it.
+    pub(super) fn connect_with(
+        &mut self,
+        profile: ConnectionProfile,
+        credentials: Credentials,
+        remember: Option<String>,
+        cx: &mut Context<Self>,
+    ) {
+        let Some(driver) = self.driver_of(&profile, cx) else {
+            return;
+        };
+        self.start_connect(profile, driver, Some(credentials), remember, cx);
+    }
+
+    /// The driver definition `profile` names, or the failure that says there
+    /// is none — closing the session that was open, as the attempt would have.
+    fn driver_of(
+        &mut self,
+        profile: &ConnectionProfile,
+        cx: &mut Context<Self>,
+    ) -> Option<DriverDef> {
         let drivers = match DriverStore::load() {
             Ok(drivers) => drivers,
             Err(error) => {
@@ -235,15 +348,33 @@ impl Workspace {
                 DriverStore::default()
             }
         };
-        let Some(driver) = drivers.get(&profile.driver_id).cloned() else {
-            let message = ts!("connect.no_driver", driver = profile.driver_id.clone());
-            self.connection = ConnectionState::Failed {
-                profile: Box::new(profile),
-                message,
-            };
-            cx.notify();
-            return;
+        if let Some(driver) = drivers.get(&profile.driver_id).cloned() {
+            return Some(driver);
+        }
+        self.close_session();
+        let message = ts!("connect.no_driver", driver = profile.driver_id.clone());
+        self.connection = ConnectionState::Failed {
+            profile: Box::new(profile.clone()),
+            message,
+            hint: None,
+            host_key: None,
         };
+        self.reset_panels(cx);
+        cx.notify();
+        None
+    }
+
+    /// The attempt itself, once there is a driver and a way to the secrets.
+    pub(super) fn start_connect(
+        &mut self,
+        profile: ConnectionProfile,
+        driver: DriverDef,
+        credentials: Option<Credentials>,
+        remember: Option<String>,
+        cx: &mut Context<Self>,
+    ) {
+        self.close_session();
+        self.connection_notice = None;
 
         let settings = app_settings::current(cx);
         let opening = profile.clone();
@@ -258,7 +389,21 @@ impl Workspace {
             // Read here rather than on the UI thread: a keychain that is locked
             // puts a system prompt up, and waiting for that on the UI thread
             // would freeze the window behind it.
-            let credentials = Credentials::read(&opening);
+            //
+            // A profile that keeps nothing there is not looked up at all — a
+            // locked keychain would prompt to be unlocked for nothing — and a
+            // typed database password with a tunnel under it still takes the
+            // tunnel's own secret from there.
+            let credentials = match credentials {
+                Some(mut typed) => {
+                    if typed.tunnel.is_none() && opening.tunnel.is_some() && opening.save_secret {
+                        typed.tunnel = Credentials::read(&opening).tunnel;
+                    }
+                    typed
+                }
+                None if !opening.save_secret => Credentials::typed(None, None),
+                None => Credentials::read(&opening),
+            };
             connection::connect(&opening, &driver, &credentials, &settings)
         });
         let task = cx.spawn(async move |this, cx| {
@@ -270,6 +415,7 @@ impl Workspace {
         self.connection = ConnectionState::Connecting {
             profile: Box::new(profile),
             driver: Box::new(definition),
+            remember,
             _task: task,
         };
         cx.notify();

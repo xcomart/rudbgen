@@ -439,6 +439,12 @@ pub struct DriverManager {
     status_is_error: bool,
     /// Whether the delete confirmation is showing.
     confirming: bool,
+    /// The drivers as `drivers.json` last held them, which every question
+    /// about unsaved edits is a comparison against.
+    saved: Vec<DriverDef>,
+    /// Whether "discard your edits?" is up; the connection dialog draws it,
+    /// over the whole window rather than inside the panel this is drawn in.
+    discarding: bool,
     /// Focus of the manager's root.
     focus_handle: FocusHandle,
     /// Scroll of the driver list.
@@ -493,6 +499,21 @@ impl DriverManager {
         let field = |cx: &mut Context<Self>, placeholder: SharedString, index: isize| {
             cx.new(move |cx| TextInput::new(cx).placeholder(placeholder).tab_index(index))
         };
+        // `Enter` in the coordinate field fetches it, as the button beside it
+        // does — deferred, because the field is still leased while its own
+        // submit runs and the download reads the form back.
+        let weak = cx.weak_entity();
+        let maven_input = cx.new(move |cx| {
+            TextInput::new(cx)
+                .placeholder(SharedString::from("org.postgresql:postgresql:42.7.4"))
+                .tab_index(tab::MAVEN)
+                .on_submit(move |_, _window, cx| {
+                    let weak = weak.clone();
+                    cx.defer(move |cx| {
+                        weak.update(cx, |manager, cx| manager.download(cx)).ok();
+                    });
+                })
+        });
 
         let (store, status) = match DriverStore::load() {
             Ok(store) => (store, None),
@@ -508,7 +529,10 @@ impl DriverManager {
 
         // The placeholders are examples, and every one of them is a value a
         // driver actually uses; none of them is a word, so none is translated.
+        let saved = store.drivers().to_vec();
         let mut manager = Self {
+            saved,
+            discarding: false,
             store,
             selected,
             download: None,
@@ -530,7 +554,7 @@ impl DriverManager {
             ),
             port_input: field(cx, "5432".into(), tab::PORT),
             dialect_input: field(cx, "postgres".into(), tab::DIALECT),
-            maven_input: field(cx, "org.postgresql:postgresql:42.7.4".into(), tab::MAVEN),
+            maven_input,
             // `fill_form`, called below, seeds the text and the read-only
             // state from the selected driver; nothing here depends on which
             // one that is.
@@ -592,14 +616,18 @@ impl DriverManager {
     /// The JAR list is not a field and is written directly, so it is left alone
     /// here.
     fn collect(&mut self, cx: &App) {
-        let Some(id) = self.selected.clone() else {
-            return;
-        };
-        let Some(existing) = self.store.get(&id).cloned() else {
-            return;
-        };
+        if let Some(driver) = self.form_driver(cx) {
+            self.store.upsert(driver);
+        }
+    }
+
+    /// The selected driver as the fields describe it, without writing it
+    /// anywhere.
+    fn form_driver(&self, cx: &App) -> Option<DriverDef> {
+        let id = self.selected.clone()?;
+        let existing = self.store.get(&id).cloned()?;
         let port = text(&self.port_input, cx);
-        self.store.upsert(DriverDef {
+        Some(DriverDef {
             name: text(&self.name_input, cx),
             class: text(&self.class_input, cx),
             url_template: text(&self.url_template_input, cx),
@@ -625,7 +653,52 @@ impl DriverManager {
                 queries
             },
             ..existing
-        });
+        })
+    }
+
+    /// Whether closing now would throw away an edit: to a field, to a JAR
+    /// list, to a query's switch, or a driver added since the last save.
+    pub fn is_dirty(&self, cx: &App) -> bool {
+        let mut store = self.store.clone();
+        if let Some(driver) = self.form_driver(cx) {
+            store.upsert(driver);
+        }
+        store.drivers() != self.saved.as_slice()
+    }
+
+    /// Whether "discard your edits?" is up.
+    pub fn is_discarding(&self) -> bool {
+        self.discarding
+    }
+
+    /// What Close, `Escape` and the backdrop mean: back to the connection
+    /// form — once the user has said the edits may go, when there are any.
+    pub fn request_close(&mut self, cx: &mut Context<Self>) {
+        if self.is_dirty(cx) {
+            self.discarding = true;
+            cx.notify();
+            return;
+        }
+        cx.emit(DriverManagerEvent::Dismissed);
+    }
+
+    /// Takes "discard your edits?" down and goes back to the form.
+    pub fn keep_editing(&mut self, cx: &mut Context<Self>) {
+        self.discarding = false;
+        cx.notify();
+    }
+
+    /// Throws the edits away and goes back to the connection form.
+    pub fn discard(&mut self, cx: &mut Context<Self>) {
+        self.discarding = false;
+        cx.emit(DriverManagerEvent::Dismissed);
+    }
+
+    /// `Ctrl+S`: what Save does.
+    pub fn save_draft(&mut self, cx: &mut Context<Self>) {
+        if !self.discarding {
+            self.save(cx);
+        }
     }
 
     /// Turns one of the four custom queries on or off.
@@ -732,6 +805,7 @@ impl DriverManager {
             );
             return;
         }
+        self.saved = self.store.drivers().to_vec();
         cx.emit(DriverManagerEvent::Changed);
     }
 
@@ -942,6 +1016,10 @@ impl DriverManager {
 
     /// `Escape`, one layer at a time.
     pub fn escape(&mut self, cx: &mut Context<Self>) {
+        if self.discarding {
+            self.keep_editing(cx);
+            return;
+        }
         if self.confirming {
             self.confirming = false;
             cx.notify();
@@ -957,7 +1035,7 @@ impl DriverManager {
             self.cancel_download(cx);
             return;
         }
-        cx.emit(DriverManagerEvent::Dismissed);
+        self.request_close(cx);
     }
 
     /// The two overlay bars, as they stand.
@@ -1981,9 +2059,7 @@ impl DriverManager {
                             .on_click({
                                 let this = this.clone();
                                 move |_, _window, cx| {
-                                    this.update(cx, |_manager, cx| {
-                                        cx.emit(DriverManagerEvent::Dismissed);
-                                    });
+                                    this.update(cx, |manager, cx| manager.request_close(cx));
                                 }
                             }),
                     )

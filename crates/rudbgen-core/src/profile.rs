@@ -303,6 +303,26 @@ pub struct GenerationProfile {
     /// the lookup in the app layer; nothing here rejects them, since a
     /// half-typed duplicate is a normal state of a table being edited.
     pub custom_vars: Vec<(String, String)>,
+    /// The tables ticked in the explorer when this connection was last open,
+    /// which the next connection to it ticks again.
+    ///
+    /// Names rather than anything read from the database: a table dropped
+    /// since is simply not found, and the explorer says so rather than
+    /// generating from it.
+    pub selected_tables: Vec<TableName>,
+}
+
+/// A table as a tick names it: the catalog and the schema it is in — either
+/// empty where the product has none — and its own name.
+#[derive(Debug, Default, Clone, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
+#[serde(default)]
+pub struct TableName {
+    /// The catalog, empty when the product has none.
+    pub catalog: String,
+    /// The schema, empty when the product has none.
+    pub schema: String,
+    /// The table name as the database reports it.
+    pub name: String,
 }
 
 /// A single saved database connection.
@@ -330,6 +350,14 @@ pub struct ConnectionProfile {
     pub url: String,
     /// Login user on the database.
     pub username: String,
+    /// Whether the profile's secrets — the database password and the tunnel's
+    /// — are kept in the OS keychain.
+    ///
+    /// On unless the user turned it off, which is also what a profile written
+    /// before the switch existed loads as: its password is already in the
+    /// keychain. Off, nothing is ever written there for this profile and the
+    /// window asks for the password every time the connection is opened.
+    pub save_secret: bool,
     /// Driver-specific connection properties.
     ///
     /// Sorted, so that a saved file does not churn between runs. Values may be
@@ -361,6 +389,7 @@ impl Default for ConnectionProfile {
             driver_id: String::new(),
             url: String::new(),
             username: String::new(),
+            save_secret: true,
             props: BTreeMap::new(),
             keep_alive: None,
             tunnel: None,
@@ -417,6 +446,7 @@ impl fmt::Debug for ConnectionProfile {
             .field("driver_id", &self.driver_id)
             .field("url", &MaskedUrl(&self.url))
             .field("username", &self.username)
+            .field("save_secret", &self.save_secret)
             .field("props", &MaskedProps(&self.props))
             .field("keep_alive", &self.keep_alive)
             .field("tunnel", &self.tunnel)
@@ -1844,6 +1874,7 @@ mod tests {
                 ("package".to_string(), "com.abc.x".to_string()),
                 ("author_email".to_string(), "a@example.com".to_string()),
             ],
+            ..GenerationProfile::default()
         };
 
         let mut store = ConnectionStore::default();

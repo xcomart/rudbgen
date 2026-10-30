@@ -159,6 +159,7 @@ pub(super) fn app_menus() -> Vec<Menu> {
             name: ts!("menu.connection"),
             items: vec![
                 MenuItem::action(ts!("menu.mac.new_connection"), NewConnection),
+                MenuItem::action(ts!("menu.manage_connections"), ManageConnections),
                 MenuItem::separator(),
                 MenuItem::action(ts!("menu.import_jdbgen"), ImportJdbgen),
             ],
@@ -170,9 +171,13 @@ pub(super) fn app_menus() -> Vec<Menu> {
                 MenuItem::action(ts!("menu.new_template"), NewTemplate),
                 MenuItem::action(ts!("menu.open_template"), OpenTemplate),
                 MenuItem::action(ts!("menu.save_template"), SaveTemplate),
+                MenuItem::action(ts!("menu.add_to_generation"), AddToGeneration),
                 MenuItem::separator(),
                 MenuItem::action(ts!("menu.toggle_live_preview"), ToggleLivePreview),
                 MenuItem::action(ts!("menu.trigger_completion"), TriggerCompletion),
+                MenuItem::separator(),
+                MenuItem::action(ts!("menu.next_diagnostic"), NextDiagnostic),
+                MenuItem::action(ts!("menu.prev_diagnostic"), PrevDiagnostic),
             ],
             disabled: false,
         },
@@ -181,6 +186,10 @@ pub(super) fn app_menus() -> Vec<Menu> {
             items: vec![
                 MenuItem::action(ts!("menu.toggle_explorer"), ToggleExplorer),
                 MenuItem::action(ts!("menu.toggle_inspector"), ToggleInspector),
+                MenuItem::separator(),
+                MenuItem::action(ts!("menu.next_tab"), NextTab),
+                MenuItem::action(ts!("menu.prev_tab"), PrevTab),
+                MenuItem::action(ts!("menu.close_tab"), CloseTab),
             ],
             disabled: false,
         },
@@ -223,13 +232,14 @@ pub(super) fn bind_shortcuts(cx: &mut App) {
         // The panel on the other edge, on the letter it starts with. Nothing
         // else in the shell claims it, and no editor does either.
         KeyBinding::new(&format!("{modifier}-i"), ToggleInspector, Some(KEY_CONTEXT)),
-        // The one chord the run gets. `Ctrl+G` is "go" in every generator that
-        // has ever had a shortcut for it, and no editor claims it — where
-        // `Ctrl+R` would be a find-and-replace inside a template tab.
-        // The other two commands are deliberately unbound: they are one press
-        // of a button away, and a chord for each would take three from the
-        // editor for a command nobody repeats.
-        KeyBinding::new(&format!("{modifier}-g"), Generate, Some(KEY_CONTEXT)),
+        // The chord the run gets: `F5`, which runs the thing in every IDE and
+        // means nothing to a template editor. `Ctrl+G` used to be it, and is
+        // "go to line" in VS Code, JetBrains and Sublime — so a habit pressed
+        // inside a template wrote the whole run's files. The other two
+        // commands are deliberately unbound: they are one press of a button
+        // away, and a chord for each would take more from the editor for a
+        // command nobody repeats.
+        KeyBinding::new("f5", Generate, Some(KEY_CONTEXT)),
         // The template tab's three. `Ctrl+S` is the one chord an editor may
         // not claim for itself — it means "write this file" everywhere — and
         // the editor deliberately binds neither it nor `Ctrl+Space`, which is
@@ -242,8 +252,70 @@ pub(super) fn bind_shortcuts(cx: &mut App) {
             Some(KEY_CONTEXT),
         ),
         KeyBinding::new("ctrl-space", TriggerCompletion, Some(KEY_CONTEXT)),
+        // The second way to the popup, for the desktops whose input method
+        // takes `Ctrl+Space` for itself — most Korean, Japanese and Chinese
+        // ones, and macOS's input-source switch. `Alt+/` is the completion
+        // chord of the editors that already had to work around that.
+        KeyBinding::new("alt-/", TriggerCompletion, Some(KEY_CONTEXT)),
         KeyBinding::new("escape", DismissDialog, Some(KEY_CONTEXT)),
+        // The template's problems, one after another, as every IDE walks
+        // them.
+        KeyBinding::new("f8", NextDiagnostic, Some(KEY_CONTEXT)),
+        KeyBinding::new("shift-f8", PrevDiagnostic, Some(KEY_CONTEXT)),
+        // The work tabs. `Ctrl+PageDown`/`PageUp` and `Ctrl+Tab` on every
+        // platform, as browsers have them; the template editor binds neither,
+        // and the strip's own focused keys — the arrows, and the reorder on
+        // `Ctrl+Shift+PageUp`/`PageDown` — are in its own context.
+        KeyBinding::new("ctrl-pagedown", NextTab, Some(KEY_CONTEXT)),
+        KeyBinding::new("ctrl-pageup", PrevTab, Some(KEY_CONTEXT)),
+        KeyBinding::new("ctrl-tab", NextTab, Some(KEY_CONTEXT)),
+        KeyBinding::new("ctrl-shift-tab", PrevTab, Some(KEY_CONTEXT)),
+        KeyBinding::new(&format!("{modifier}-w"), CloseTab, Some(KEY_CONTEXT)),
+        // A way onto the strip itself, where the arrows walk it and `Delete`
+        // closes: `F6`, the key that moves between the regions of a window
+        // in browsers and on Windows. The template editor would otherwise
+        // keep the keyboard, `Tab` included, for itself.
+        KeyBinding::new("f6", FocusTabs, Some(KEY_CONTEXT)),
+        // Inside a question, `Enter` is its default answer; see `prompt`.
+        KeyBinding::new("enter", ConfirmDialog, Some(prompt::PROMPT_CONTEXT)),
+        // Inside the dialogs that edit something, `Ctrl+S` saves that and
+        // `Ctrl+N` makes a new profile — gpui matches these deeper contexts
+        // ahead of the shell's, which would read the same chords as "save the
+        // template behind the backdrop" and "reopen this dialog".
+        KeyBinding::new(
+            &format!("{modifier}-s"),
+            SaveDialog,
+            Some(connection_dialog::KEY_CONTEXT),
+        ),
+        KeyBinding::new(
+            &format!("{modifier}-n"),
+            NewProfile,
+            Some(connection_dialog::KEY_CONTEXT),
+        ),
+        KeyBinding::new(
+            &format!("{modifier}-s"),
+            SaveDialog,
+            Some(crate::abbreviation_dialog::KEY_CONTEXT),
+        ),
+        KeyBinding::new(
+            &format!("{modifier}-s"),
+            SaveDialog,
+            Some(crate::settings_dialog::KEY_CONTEXT),
+        ),
     ]);
+    // `Ctrl+Shift+G` beside `F5` off macOS, for a keyboard without an easy
+    // function row; on macOS `Cmd+Shift+G` is the find bar's "previous".
+    if !cfg!(target_os = "macos") {
+        cx.bind_keys([KeyBinding::new("ctrl-shift-g", Generate, Some(KEY_CONTEXT))]);
+    }
+    // The first nine tabs by number, as a browser has them.
+    cx.bind_keys((0..9).map(|index| {
+        KeyBinding::new(
+            &format!("{modifier}-{}", index + 1),
+            SelectTab(index),
+            Some(KEY_CONTEXT),
+        )
+    }));
 }
 
 /// Copies the shipped templates into the configuration directory, offers the

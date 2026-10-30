@@ -602,32 +602,49 @@ impl TreeSource for ExplorerSource {
             _ => None,
         };
 
+        // The whole row says what it is on hover — the name a narrow panel
+        // cut short, and the comment beside it — because both are cut, and
+        // the name is the one the user is choosing by.
+        let tip = match id {
+            NodeId::Table(key) => Some(match &remarks {
+                Some(remarks) => SharedString::from(format!("{} — {remarks}", key.qualified())),
+                None => SharedString::from(key.qualified()),
+            }),
+            _ => None,
+        };
+
         div()
+            .id(("explorer-row", info.index))
             .flex()
             .flex_row()
             .items_center()
             .gap(px(6.))
             .min_w_0()
+            .when_some(tip, |row, tip| row.tooltip(tooltip_label(tip)))
             .children(tick)
             .child(rugpui_shell::icon(mark, px(14.), chrome.text_muted))
             .child(
+                // As wide as the name needs and no wider, and shrinking only
+                // once the comment beside it has given up all of its room.
                 div()
-                    .flex_1()
-                    .min_w_0()
+                    .flex_initial()
+                    .min_w(px(24.))
                     .truncate()
                     .text_size(px(12.))
                     .when(info.selected, |label| label.text_color(chrome.text))
                     .child(label),
             )
             .children(remarks.map(|remarks| {
+                // The comment gives way first: a hundred times the name's
+                // shrink, so the name keeps its width until this is gone.
                 div()
-                    .id(("explorer-remarks", info.index))
-                    .flex_none()
+                    .flex_initial()
+                    .flex_shrink(100.)
+                    .min_w_0()
                     .max_w(px(120.))
                     .truncate()
                     .text_size(px(10.))
                     .text_color(chrome.text_muted)
-                    .tooltip(tooltip_label(remarks.clone()))
                     .child(remarks)
             }))
             .into_any_element()
@@ -688,6 +705,17 @@ pub struct Explorer {
     /// give it yet. The tick is remembered here and made good the moment the
     /// tables land; see [`Explorer::deliver_tables`].
     pending_ticks: BTreeSet<SchemaKey>,
+    /// Ticks put back from the profile ([`Explorer::restore_selection`]) that
+    /// no table list has confirmed yet.
+    ///
+    /// They name tables of a database that may have changed since, so the
+    /// schemas they are in are asked for as soon as the schemas are known,
+    /// and a name the list no longer has is unticked and reported rather than
+    /// handed to a run that would only fail to read it.
+    unverified: BTreeSet<TableKey>,
+    /// Ticks put back that turned out to name a table that is gone, for the
+    /// line under the filter that says so.
+    missing: Vec<TableKey>,
     focus_handle: FocusHandle,
     /// Keeps the tree's subscription alive.
     _events: Subscription,
@@ -753,6 +781,8 @@ impl Explorer {
             filter,
             menu: None,
             pending_ticks: BTreeSet::new(),
+            unverified: BTreeSet::new(),
+            missing: Vec::new(),
             focus_handle: cx.focus_handle(),
             _events: events,
             _filter_events: filter_events,
@@ -786,12 +816,51 @@ impl Explorer {
         outcome: Result<Vec<Schema>, SharedString>,
         cx: &mut Context<Self>,
     ) {
+        // The schemas holding a tick put back from the profile, which have to
+        // be listed to confirm it; see `unverified`.
+        let to_verify: Vec<SchemaKey> = match &outcome {
+            Ok(schemas) => schemas
+                .iter()
+                .map(SchemaKey::of)
+                .filter(|key| {
+                    self.unverified
+                        .iter()
+                        .any(|table| table.catalog == key.catalog && table.schema == key.schema)
+                })
+                .collect(),
+            Err(_) => Vec::new(),
+        };
         self.update_source(cx, |source| {
             source.schemas = match outcome {
                 Ok(schemas) => Fetch::Loaded(schemas),
                 Err(message) => Fetch::Failed(message),
             };
         });
+        for key in to_verify {
+            let listed = matches!(
+                self.tree.read(cx).source().tables.get(&key),
+                Some(Fetch::Loading) | Some(Fetch::Loaded(_))
+            );
+            if !listed {
+                self.request_tables(key, cx);
+            }
+        }
+    }
+
+    /// Ticks `keys` again — the tables ticked the last time this connection
+    /// was open — and confirms each against its schema's list as the lists
+    /// arrive.
+    pub fn restore_selection(&mut self, keys: BTreeSet<TableKey>, cx: &mut Context<Self>) {
+        self.missing.clear();
+        self.unverified = keys.clone();
+        self.update_source(cx, |source| source.selection = keys);
+        cx.emit(ExplorerEvent::SelectionChanged);
+    }
+
+    /// The ticks put back that named a table that is gone.
+    #[cfg(test)]
+    pub fn missing(&self) -> &[TableKey] {
+        &self.missing
     }
 
     /// Records what one schema's table fetch produced, or why it failed.
@@ -805,7 +874,32 @@ impl Explorer {
         outcome: Result<Vec<TableRef>, SharedString>,
         cx: &mut Context<Self>,
     ) {
+        // Every tick put back for this schema is settled by its list: kept if
+        // the table is in it, unticked and reported if it is not. A list that
+        // could not be read settles nothing.
+        let mut gone = Vec::new();
+        if let Ok(tables) = &outcome {
+            let listed: BTreeSet<TableKey> = tables.iter().map(TableKey::of).collect();
+            let (settled, still): (BTreeSet<TableKey>, BTreeSet<TableKey>) =
+                std::mem::take(&mut self.unverified)
+                    .into_iter()
+                    .partition(|table| table.catalog == key.catalog && table.schema == key.schema);
+            self.unverified = still;
+            gone = settled
+                .into_iter()
+                .filter(|table| !listed.contains(table))
+                .collect();
+        }
         self.update_source(cx, |source| source.set_tables(key.clone(), outcome));
+        if !gone.is_empty() {
+            self.update_source(cx, |source| {
+                for table in &gone {
+                    source.selection.remove(table);
+                }
+            });
+            self.missing.extend(gone);
+            cx.emit(ExplorerEvent::SelectionChanged);
+        }
         if self.pending_ticks.remove(&key) {
             let members = self.tree.read(cx).source().visible_keys(&key);
             if !members.is_empty() {
@@ -823,6 +917,8 @@ impl Explorer {
     pub fn reset(&mut self, cx: &mut Context<Self>) {
         self.menu = None;
         self.pending_ticks.clear();
+        self.unverified.clear();
+        self.missing.clear();
         self.update_source(cx, ExplorerSource::clear);
         self.filter.update(cx, |input, cx| input.clear(cx));
         cx.emit(ExplorerEvent::SelectionChanged);
@@ -1131,6 +1227,51 @@ impl Explorer {
     }
 }
 
+impl Explorer {
+    /// The line that says which of the ticks put back named a table that is
+    /// gone, and so were taken off.
+    fn render_missing(&self, chrome: &Theme, cx: &mut Context<Self>) -> Option<AnyElement> {
+        if self.missing.is_empty() {
+            return None;
+        }
+        let names: Vec<String> = self.missing.iter().map(TableKey::qualified).collect();
+        let this = cx.entity();
+        Some(
+            div()
+                .flex()
+                .flex_row()
+                .flex_none()
+                .items_start()
+                .gap(px(6.))
+                .px(px(8.))
+                .py(px(4.))
+                .border_b_1()
+                .border_color(chrome.border)
+                .debug_selector(|| "explorer-missing".to_string())
+                .child(
+                    div()
+                        .flex_1()
+                        .min_w_0()
+                        .text_size(px(11.))
+                        .text_color(chrome.danger)
+                        .child(ts!("explorer.missing", names = names.join(", "))),
+                )
+                .child(
+                    rugpui::Button::new("explorer-missing-dismiss", ts!("common.close"))
+                        .variant(rugpui::ButtonVariant::Ghost)
+                        .compact()
+                        .on_click(move |_, _window, cx| {
+                            this.update(cx, |explorer, cx| {
+                                explorer.missing.clear();
+                                cx.notify();
+                            });
+                        }),
+                )
+                .into_any_element(),
+        )
+    }
+}
+
 impl EventEmitter<ExplorerEvent> for Explorer {}
 
 impl Focusable for Explorer {
@@ -1185,6 +1326,7 @@ impl Render for Explorer {
                     .child(ts!("explorer.title")),
             )
             .child(header)
+            .children(self.render_missing(&chrome, cx))
             .child(match failure {
                 // In place of the tree, not under it: a tree drawing nothing
                 // beside a message saying why is one state, and it reads as one.

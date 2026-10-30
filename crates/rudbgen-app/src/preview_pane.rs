@@ -20,8 +20,8 @@ use gpui::{
     SharedString, Window, div, prelude::*, px,
 };
 use rugpui::{
-    DraggedThumb, Scrollbar, ScrollbarAxis, ScrollbarState, Select, hide_later, hide_now,
-    scroll_to, scrolled, theme,
+    Button, ButtonVariant, DraggedThumb, Scrollbar, ScrollbarAxis, ScrollbarState, Select, Spinner,
+    hide_later, hide_now, scroll_to, scrolled, theme, tooltip_label,
 };
 use rugpui_editor::EditorView;
 
@@ -51,6 +51,10 @@ pub enum PreviewEvent {
         /// Index into the ticked templates.
         template: usize,
     },
+    /// The dry run on screen is what was wanted: write it.
+    Generate,
+    /// Stop the dry run that is rendering.
+    Cancel,
 }
 
 /// Which of the two shapes the tab is showing.
@@ -97,6 +101,16 @@ pub struct PreviewPane {
     diagnostics: Vec<SharedString>,
     /// Why nothing could be rendered, when nothing could.
     error: Option<SharedString>,
+    /// Where a dry run's files would go, which its list shows them under; or
+    /// `None` while no output directory is chosen and they are shown under a
+    /// temporary one instead.
+    output_dir: Option<PathBuf>,
+    /// Whether a dry run is rendering, which the tab says rather than keeping
+    /// the last one's list on screen as though it were the answer.
+    rendering: bool,
+    /// Whether the run that would write what is shown could start now; the
+    /// dry run's own Generate button follows it.
+    can_generate: bool,
     /// The rendered text, read-only.
     text: Entity<EditorView>,
     /// Vertical scroll of the text.
@@ -121,6 +135,9 @@ impl PreviewPane {
             selected: 0,
             diagnostics: Vec::new(),
             error: None,
+            output_dir: None,
+            rendering: false,
+            can_generate: false,
             text: cx.new(|cx| {
                 EditorView::new(cx)
                     .read_only(true)
@@ -188,14 +205,50 @@ impl PreviewPane {
         cx.notify();
     }
 
-    /// Shows a whole dry run.
+    /// Says a dry run is rendering, until [`PreviewPane::show_dry_run`]
+    /// brings what it made.
+    pub fn begin_dry_run(&mut self, cx: &mut Context<Self>) {
+        self.kind = PreviewKind::DryRun;
+        self.rendering = true;
+        self.files.clear();
+        self.diagnostics.clear();
+        self.error = None;
+        self.selected = 0;
+        self.show_selected(cx);
+        cx.notify();
+    }
+
+    /// Whether a dry run is rendering.
+    pub fn is_rendering(&self) -> bool {
+        self.rendering
+    }
+
+    /// Takes the "rendering" state down, for a dry run that was canceled.
+    pub fn end_dry_run(&mut self, cx: &mut Context<Self>) {
+        if std::mem::take(&mut self.rendering) {
+            cx.notify();
+        }
+    }
+
+    /// Whether the dry run's Generate button is live; the shell's answer.
+    pub fn set_can_generate(&mut self, can: bool, cx: &mut Context<Self>) {
+        if self.can_generate != can {
+            self.can_generate = can;
+            cx.notify();
+        }
+    }
+
+    /// Shows a whole dry run, its files listed under `output_dir`.
     pub fn show_dry_run(
         &mut self,
         files: Vec<PreviewFile>,
         diagnostics: Vec<SharedString>,
+        output_dir: Option<PathBuf>,
         cx: &mut Context<Self>,
     ) {
         self.kind = PreviewKind::DryRun;
+        self.rendering = false;
+        self.output_dir = output_dir;
         self.files = files;
         self.selected = 0;
         self.diagnostics = diagnostics;
@@ -206,6 +259,7 @@ impl PreviewPane {
 
     /// Shows why nothing could be rendered.
     pub fn show_error(&mut self, message: SharedString, cx: &mut Context<Self>) {
+        self.rendering = false;
         self.files.clear();
         self.diagnostics.clear();
         self.error = Some(message);
@@ -237,6 +291,8 @@ impl PreviewPane {
         self.files.clear();
         self.diagnostics.clear();
         self.error = None;
+        self.rendering = false;
+        self.output_dir = None;
         self.tables.clear();
         self.templates.clear();
         self.table_index = 0;
@@ -392,8 +448,19 @@ impl PreviewPane {
             .map(|(index, file)| {
                 let this = cx.entity();
                 let active = index == selected;
+                let full = SharedString::from(file.path.display().to_string());
+                // Under the output directory, the part that tells two files
+                // apart; and when even that does not fit, its front is what
+                // goes, because the file name is at the end.
+                let shown = self
+                    .output_dir
+                    .as_ref()
+                    .and_then(|dir| file.path.strip_prefix(dir).ok())
+                    .map(|relative| SharedString::from(relative.display().to_string()))
+                    .unwrap_or_else(|| full.clone());
                 div()
                     .id(("preview-file", index))
+                    .tooltip(tooltip_label(full))
                     .flex()
                     .flex_row()
                     .items_center()
@@ -417,10 +484,12 @@ impl PreviewPane {
                         div()
                             .flex_1()
                             .min_w_0()
-                            .truncate()
+                            .overflow_hidden()
+                            .whitespace_nowrap()
+                            .text_ellipsis_start()
                             .text_size(px(11.))
                             .text_color(theme.text)
-                            .child(SharedString::from(file.path.display().to_string())),
+                            .child(shown),
                     )
                     .child(
                         div()
@@ -485,12 +554,78 @@ impl Render for PreviewPane {
 
         let header = match self.kind {
             PreviewKind::Single => Some(self.render_header(cx).into_any_element()),
+            PreviewKind::DryRun if self.rendering => {
+                // Said rather than left to the last run's list: a dry run of a
+                // whole schema takes long enough to look like nothing happened.
+                let cancel = cx.entity();
+                Some(
+                    div()
+                        .flex()
+                        .flex_row()
+                        .items_center()
+                        .gap(px(8.))
+                        .child(Spinner::new("preview-rendering").size(px(14.)))
+                        .child(
+                            div()
+                                .flex_1()
+                                .text_size(px(12.))
+                                .text_color(theme.text_muted)
+                                .child(ts!("generate.rendering")),
+                        )
+                        .child(
+                            Button::new("preview-cancel", ts!("common.cancel"))
+                                .variant(ButtonVariant::Secondary)
+                                .compact()
+                                .on_click(move |_, _window, cx| {
+                                    cancel.update(cx, |_, cx| cx.emit(PreviewEvent::Cancel));
+                                }),
+                        )
+                        .into_any_element(),
+                )
+            }
             PreviewKind::DryRun => {
                 let bar = self
                     .bar()
                     .on_hover(cx.listener(|pane, hovered: &bool, _window, cx| {
                         pane.hover_scrollbar(*hovered, cx);
                     }));
+                let generate = cx.entity();
+                // What the list is a dry run *of*: the files a generate would
+                // write, and the button that writes them, so the step after
+                // looking is not a trip back to the Generate tab.
+                let summary = div()
+                    .flex()
+                    .flex_row()
+                    .items_center()
+                    .gap(px(8.))
+                    .w_full()
+                    .min_w_0()
+                    .child(
+                        div()
+                            .flex_1()
+                            .min_w_0()
+                            .text_size(px(11.))
+                            .text_color(theme.text_muted)
+                            .child(match &self.output_dir {
+                                Some(dir) => ts!(
+                                    "generate.dry_into",
+                                    count = self.files.len(),
+                                    dir = dir.display().to_string()
+                                ),
+                                // Every row reads "new" then, because nothing
+                                // is ever in a folder made up for the purpose.
+                                None => ts!("generate.dry_no_output"),
+                            }),
+                    )
+                    .child(
+                        Button::new("preview-generate", ts!("generate.run"))
+                            .variant(ButtonVariant::Primary)
+                            .compact()
+                            .disabled(!self.can_generate || self.output_dir.is_none())
+                            .on_click(move |_, _window, cx| {
+                                generate.update(cx, |_, cx| cx.emit(PreviewEvent::Generate));
+                            }),
+                    );
                 Some(
                     // The bar hangs off this wrapper rather than the pane root:
                     // the thumb is measured against the scrolling box, which is
@@ -498,14 +633,24 @@ impl Render for PreviewPane {
                     // the diagnostics and the text below it and never reach the
                     // list's own bottom.
                     div()
-                        .relative()
                         .flex()
                         .flex_col()
                         .flex_none()
+                        .gap(px(6.))
                         .w_full()
                         .min_w_0()
-                        .child(self.render_file_list(cx))
-                        .children(bar.render(&theme))
+                        .child(summary)
+                        .child(
+                            div()
+                                .relative()
+                                .flex()
+                                .flex_col()
+                                .flex_none()
+                                .w_full()
+                                .min_w_0()
+                                .child(self.render_file_list(cx))
+                                .children(bar.render(&theme)),
+                        )
                         .into_any_element(),
                 )
             }

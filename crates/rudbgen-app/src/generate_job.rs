@@ -21,15 +21,17 @@ use std::sync::mpsc::{Sender, channel};
 use futures::StreamExt;
 use futures::channel::mpsc::{UnboundedSender, unbounded};
 use gpui::{
-    App, Context, EventEmitter, ScrollHandle, SharedString, Task, Window, div, prelude::*, px,
+    App, Context, EventEmitter, FocusHandle, ScrollHandle, SharedString, Task, Window, div,
+    prelude::*, px,
 };
 use rudbgen_core::OverwritePolicy;
 use rudbgen_gen::{
     CancelHandle, CancelToken, Decision, FileStatus, Outcome, Overwrite, Plan, Progress, generate,
 };
-use rugpui::{Button, ButtonVariant, modal, theme};
+use rugpui::{Button, ButtonVariant, editor_theme, modal, theme};
 
 use crate::i18n::ts;
+use crate::prompt;
 
 /// How many lines of the run's log are kept.
 ///
@@ -118,13 +120,23 @@ pub struct GenerationJob {
     output_dir: Option<PathBuf>,
     /// Vertical scroll of the log, and of the summary's lists.
     scroll: ScrollHandle,
+    /// The box every stage's dialog is drawn in, which takes the keyboard
+    /// whenever a new one goes up.
+    ///
+    /// Without it the keyboard stays wherever it was when the run was asked
+    /// for — usually a template editor, dimmed behind the dialog — and `Enter`
+    /// pressed at the question lands in the buffer instead of on a button.
+    focus_handle: FocusHandle,
+    /// Whether [`GenerationJob::focus_handle`] should take the keyboard on the
+    /// next frame; set by every change of stage that puts a new dialog up.
+    pending_focus: bool,
     /// Reads the run thread's channel; dropped when the dialog closes.
     _pump: Option<Task<()>>,
 }
 
 impl GenerationJob {
     /// A dialog that is not showing.
-    pub fn new(_cx: &mut Context<Self>) -> Self {
+    pub fn new(cx: &mut Context<Self>) -> Self {
         Self {
             stage: Stage::Idle,
             log: Vec::new(),
@@ -132,6 +144,8 @@ impl GenerationJob {
             loading: 0,
             output_dir: None,
             scroll: ScrollHandle::new(),
+            focus_handle: cx.focus_handle(),
+            pending_focus: false,
             _pump: None,
         }
     }
@@ -159,9 +173,15 @@ impl GenerationJob {
     }
 
     /// Whether the run is blocked on the overwrite question.
-    #[cfg(test)]
     pub fn is_asking(&self) -> bool {
         matches!(self.stage, Stage::Asking { .. })
+    }
+
+    /// Puts the overwrite question up as a run would, for a test to answer.
+    #[cfg(test)]
+    pub fn ask_for_test(&mut self, path: PathBuf, reply: Sender<Decision>, cx: &mut Context<Self>) {
+        self.stage = Stage::Running { done: 1, total: 2 };
+        self.receive(RunMessage::Ask { path, reply }, cx);
     }
 
     /// How many tables the reading phase has described, while it is on screen.
@@ -199,6 +219,7 @@ impl GenerationJob {
         self.cancel = None;
         self.output_dir = None;
         self._pump = None;
+        self.pending_focus = true;
         cx.notify();
         self.loading
     }
@@ -226,10 +247,15 @@ impl GenerationJob {
     /// dialog, so the loading stage they share with a generate ends by simply
     /// going away. Refuses to touch anything but a load, so it can never pull a
     /// running job off the screen.
+    ///
+    /// The dialog held the keyboard, so its going is announced like any other
+    /// close: a focus handle left on a box that is no longer drawn takes every
+    /// shortcut in the window with it.
     pub fn finish_loading(&mut self, cx: &mut Context<Self>) {
         if matches!(self.stage, Stage::Loading { .. }) {
             self.stage = Stage::Idle;
             self.log.clear();
+            cx.emit(JobEvent::Closed);
             cx.notify();
         }
     }
@@ -238,6 +264,7 @@ impl GenerationJob {
     pub fn refuse(&mut self, message: SharedString, cx: &mut Context<Self>) {
         self.stage = Stage::Refused(message);
         self.cancel = None;
+        self.pending_focus = true;
         cx.notify();
     }
 
@@ -249,6 +276,7 @@ impl GenerationJob {
     pub fn start(&mut self, plan: Plan, policy: OverwritePolicy, cx: &mut Context<Self>) {
         let total = plan.total();
         self.stage = Stage::Running { done: 0, total };
+        self.pending_focus = true;
         self.output_dir = Some(plan.output_dir.clone());
         self.note(ts!("progress.started", count = total), cx);
 
@@ -304,6 +332,7 @@ impl GenerationJob {
                     done,
                     total,
                 };
+                self.pending_focus = true;
                 self.note(ts!("progress.conflict", path = name), cx);
             }
         }
@@ -340,6 +369,7 @@ impl GenerationJob {
             Progress::Finished(outcome) => {
                 self.cancel = None;
                 self.stage = Stage::Summary(Box::new(outcome));
+                self.pending_focus = true;
                 cx.notify();
             }
         }
@@ -355,10 +385,19 @@ impl GenerationJob {
     }
 
     /// Appends one line to the log, dropping the oldest once it is full.
+    ///
+    /// The box follows the newest line for as long as the user leaves it at
+    /// the bottom — a run of fifty files otherwise looks stuck on its first
+    /// screenful — and stays put once they have scrolled up to read something,
+    /// which a box that jumped back down on every file would make impossible.
     fn note(&mut self, line: SharedString, cx: &mut Context<Self>) {
+        let following = at_bottom(&self.scroll);
         self.log.push(line);
         if self.log.len() > LOG_LIMIT {
             self.log.remove(0);
+        }
+        if following {
+            self.scroll.scroll_to_bottom();
         }
         cx.notify();
     }
@@ -450,7 +489,9 @@ impl GenerationJob {
             "generation-progress",
             ts!("progress.title"),
             px(DIALOG_WIDTH),
-            div()
+            // `Enter` answers nothing here: the one button stops the run, and
+            // a key pressed out of habit must not do that.
+            prompt::body(&self.focus_handle, |_window, _cx| {})
                 .flex()
                 .flex_col()
                 .gap(px(10.))
@@ -492,13 +533,15 @@ impl GenerationJob {
                         .text_color(theme.text_muted)
                         .children(lines.into_iter().map(|line| div().child(line))),
                 )
-                .child(div().flex().flex_row().justify_end().child(
-                    Button::new("generation-cancel", ts!("common.cancel")).on_click(
-                        move |_, _window, cx| {
-                            this.update(cx, |job, cx| job.cancel(cx));
-                        },
+                .child(
+                    div().flex().flex_row().justify_end().child(
+                        Button::new("generation-cancel", ts!("common.cancel"))
+                            .variant(ButtonVariant::Secondary)
+                            .on_click(move |_, _window, cx| {
+                                this.update(cx, |job, cx| job.cancel(cx));
+                            }),
                     ),
-                )),
+                ),
             // The backdrop does not dismiss a running job: there is nothing to
             // dismiss it to, and a click that quietly abandoned a run half way
             // through would be the worst answer of the three.
@@ -512,6 +555,7 @@ impl GenerationJob {
         let theme = theme(cx);
         let shown = SharedString::from(path.display().to_string());
         let this = cx.entity();
+        let default = cx.entity();
         let answer = |label: SharedString, decision: Decision, id: &'static str, primary: bool| {
             let this = this.clone();
             Button::new(id, label)
@@ -529,63 +573,69 @@ impl GenerationJob {
             "generation-conflict",
             ts!("summary.conflict_title"),
             px(DIALOG_WIDTH),
-            div()
-                .flex()
-                .flex_col()
-                .gap(px(12.))
-                .child(
-                    div()
-                        .text_size(px(12.))
-                        .text_color(theme.text)
-                        .child(ts!("summary.conflict_body")),
-                )
-                .child(
-                    div()
-                        .p(px(8.))
-                        .rounded_md()
-                        .bg(theme.surface)
-                        .text_size(px(11.))
-                        .text_color(theme.text_muted)
-                        .child(shown),
-                )
-                .child(
-                    div()
-                        .flex()
-                        .flex_row()
-                        .flex_wrap()
-                        .justify_end()
-                        .gap(px(6.))
-                        .child(answer(
-                            ts!("summary.overwrite"),
-                            Decision::Overwrite,
-                            "conflict-overwrite",
-                            true,
-                        ))
-                        .child(answer(
-                            ts!("summary.skip"),
-                            Decision::Skip,
-                            "conflict-skip",
-                            false,
-                        ))
-                        .child(answer(
-                            ts!("summary.overwrite_all"),
-                            Decision::OverwriteAll,
-                            "conflict-overwrite-all",
-                            false,
-                        ))
-                        .child(answer(
-                            ts!("summary.skip_all"),
-                            Decision::SkipAll,
-                            "conflict-skip-all",
-                            false,
-                        ))
-                        .child(answer(
-                            ts!("common.cancel"),
-                            Decision::Cancel,
-                            "conflict-cancel",
-                            false,
-                        )),
-                ),
+            // `Enter` is the highlighted answer, Overwrite: the question only
+            // comes up under the *ask* policy, where replacing the file is
+            // what a regeneration is for. `Escape` is Cancel, which the shell
+            // routes (see `Workspace::dismiss_dialog_action`).
+            prompt::body(&self.focus_handle, move |_window, cx| {
+                default.update(cx, |job, cx| job.answer(Decision::Overwrite, cx));
+            })
+            .flex()
+            .flex_col()
+            .gap(px(12.))
+            .child(
+                div()
+                    .text_size(px(12.))
+                    .text_color(theme.text)
+                    .child(ts!("summary.conflict_body")),
+            )
+            .child(
+                div()
+                    .p(px(8.))
+                    .rounded_md()
+                    .bg(theme.surface)
+                    .text_size(px(11.))
+                    .text_color(theme.text_muted)
+                    .child(shown),
+            )
+            .child(
+                div()
+                    .flex()
+                    .flex_row()
+                    .flex_wrap()
+                    .justify_end()
+                    .gap(px(6.))
+                    .child(answer(
+                        ts!("summary.overwrite"),
+                        Decision::Overwrite,
+                        "conflict-overwrite",
+                        true,
+                    ))
+                    .child(answer(
+                        ts!("summary.skip"),
+                        Decision::Skip,
+                        "conflict-skip",
+                        false,
+                    ))
+                    .child(answer(
+                        ts!("summary.overwrite_all"),
+                        Decision::OverwriteAll,
+                        "conflict-overwrite-all",
+                        false,
+                    ))
+                    .child(answer(
+                        ts!("summary.skip_all"),
+                        Decision::SkipAll,
+                        "conflict-skip-all",
+                        false,
+                    ))
+                    .child(answer(
+                        ts!("common.cancel"),
+                        Decision::Cancel,
+                        "conflict-cancel",
+                        false,
+                    )),
+            ),
             |_window, _cx| {},
         )
         .into_any_element()
@@ -594,9 +644,11 @@ impl GenerationJob {
     /// The result summary: what was written, what was skipped, what failed.
     fn render_summary(&self, outcome: &Outcome, cx: &mut Context<Self>) -> gpui::AnyElement {
         let theme = theme(cx);
+        let warning = editor_theme(cx).warning;
         let this = cx.entity();
         let closing = cx.entity();
         let opening = cx.entity();
+        let default = cx.entity();
 
         let section = |title: SharedString, lines: Vec<SharedString>, color: gpui::Hsla| {
             (!lines.is_empty()).then(|| {
@@ -638,6 +690,19 @@ impl GenerationJob {
             })
             .collect();
 
+        // Every unknown field, with the pair it turned up in: a count alone
+        // sends the user back to a dry run to find out which template it was.
+        let warnings: Vec<SharedString> = outcome
+            .diagnostics
+            .iter()
+            .map(|diagnostic| {
+                SharedString::from(format!(
+                    "{} × {}: {}",
+                    diagnostic.table, diagnostic.template, diagnostic.warning.message
+                ))
+            })
+            .collect();
+
         let headline = if outcome.canceled {
             ts!("summary.canceled")
         } else if outcome.failed.is_empty() {
@@ -650,69 +715,72 @@ impl GenerationJob {
             "generation-summary",
             ts!("summary.title"),
             px(DIALOG_WIDTH),
-            div()
-                .flex()
-                .flex_col()
-                .gap(px(10.))
-                .min_h_0()
-                .child(
-                    div()
-                        .text_size(px(13.))
-                        .text_color(if outcome.failed.is_empty() {
-                            theme.text
-                        } else {
-                            theme.danger
-                        })
-                        .child(headline),
-                )
-                .child(
-                    div()
-                        .text_size(px(12.))
-                        .text_color(theme.text_muted)
-                        .child(ts!(
-                            "summary.counts",
-                            written = outcome.written.len(),
-                            skipped = outcome.skipped.len(),
-                            failed = outcome.failed.len(),
-                            warnings = outcome.diagnostics.len()
-                        )),
-                )
-                .child(
-                    div()
-                        .id("generation-summary-lists")
-                        .track_scroll(&self.scroll)
-                        .flex()
-                        .flex_col()
-                        .gap(px(8.))
-                        .min_h_0()
-                        .max_h(px(240.))
-                        .overflow_y_scroll()
-                        .children(section(ts!("summary.written"), written, theme.success))
-                        .children(section(ts!("summary.skipped"), skipped, theme.text_muted))
-                        .children(section(ts!("summary.failed"), failed, theme.danger)),
-                )
-                .child(
-                    div()
-                        .flex()
-                        .flex_row()
-                        .justify_end()
-                        .gap(px(8.))
-                        .child(
-                            Button::new("summary-open", ts!("summary.open_output"))
-                                .variant(ButtonVariant::Secondary)
-                                .disabled(self.output_dir.is_none())
-                                .on_click(move |_, _window, cx| {
-                                    opening.update(cx, |job, cx| job.open_output(cx));
-                                }),
-                        )
-                        .child(
-                            Button::new("summary-close", ts!("common.close"))
-                                .variant(ButtonVariant::Primary)
-                                .on_click(move |_, _window, cx| {
-                                    closing.update(cx, |job, cx| job.close(cx));
-                                }),
-                        ),
-                ),
+            prompt::body(&self.focus_handle, move |_window, cx| {
+                default.update(cx, |job, cx| job.close(cx));
+            })
+            .flex()
+            .flex_col()
+            .gap(px(10.))
+            .min_h_0()
+            .child(
+                div()
+                    .text_size(px(13.))
+                    .text_color(if outcome.failed.is_empty() {
+                        theme.text
+                    } else {
+                        theme.danger
+                    })
+                    .child(headline),
+            )
+            .child(
+                div()
+                    .text_size(px(12.))
+                    .text_color(theme.text_muted)
+                    .child(ts!(
+                        "summary.counts",
+                        written = outcome.written.len(),
+                        skipped = outcome.skipped.len(),
+                        failed = outcome.failed.len(),
+                        warnings = outcome.diagnostics.len()
+                    )),
+            )
+            .child(
+                div()
+                    .id("generation-summary-lists")
+                    .track_scroll(&self.scroll)
+                    .flex()
+                    .flex_col()
+                    .gap(px(8.))
+                    .min_h_0()
+                    .max_h(px(240.))
+                    .overflow_y_scroll()
+                    .children(section(ts!("summary.written"), written, theme.success))
+                    .children(section(ts!("summary.skipped"), skipped, theme.text_muted))
+                    .children(section(ts!("summary.failed"), failed, theme.danger))
+                    .children(section(ts!("summary.warnings"), warnings, warning)),
+            )
+            .child(
+                div()
+                    .flex()
+                    .flex_row()
+                    .justify_end()
+                    .gap(px(8.))
+                    .child(
+                        Button::new("summary-open", ts!("summary.open_output"))
+                            .variant(ButtonVariant::Secondary)
+                            .disabled(self.output_dir.is_none())
+                            .on_click(move |_, _window, cx| {
+                                opening.update(cx, |job, cx| job.open_output(cx));
+                            }),
+                    )
+                    .child(
+                        Button::new("summary-close", ts!("common.close"))
+                            .variant(ButtonVariant::Primary)
+                            .on_click(move |_, _window, cx| {
+                                closing.update(cx, |job, cx| job.close(cx));
+                            }),
+                    ),
+            ),
             move |_window, cx| {
                 this.update(cx, |job, cx| job.close(cx));
             },
@@ -725,29 +793,32 @@ impl GenerationJob {
         let theme = theme(cx);
         let this = cx.entity();
         let dismiss = cx.entity();
+        let default = cx.entity();
         modal(
             "generation-refused",
             ts!("summary.title"),
             px(DIALOG_WIDTH),
-            div()
-                .flex()
-                .flex_col()
-                .gap(px(12.))
-                .child(
-                    div()
-                        .text_size(px(12.))
-                        .text_color(theme.danger)
-                        .child(message.clone()),
-                )
-                .child(
-                    div().flex().flex_row().justify_end().child(
-                        Button::new("refused-close", ts!("common.close"))
-                            .variant(ButtonVariant::Primary)
-                            .on_click(move |_, _window, cx| {
-                                this.update(cx, |job, cx| job.close(cx));
-                            }),
-                    ),
+            prompt::body(&self.focus_handle, move |_window, cx| {
+                default.update(cx, |job, cx| job.close(cx));
+            })
+            .flex()
+            .flex_col()
+            .gap(px(12.))
+            .child(
+                div()
+                    .text_size(px(12.))
+                    .text_color(theme.danger)
+                    .child(message.clone()),
+            )
+            .child(
+                div().flex().flex_row().justify_end().child(
+                    Button::new("refused-close", ts!("common.close"))
+                        .variant(ButtonVariant::Primary)
+                        .on_click(move |_, _window, cx| {
+                            this.update(cx, |job, cx| job.close(cx));
+                        }),
                 ),
+            ),
             move |_window, cx| {
                 dismiss.update(cx, |job, cx| job.close(cx));
             },
@@ -759,7 +830,13 @@ impl GenerationJob {
 impl EventEmitter<JobEvent> for GenerationJob {}
 
 impl Render for GenerationJob {
-    fn render(&mut self, _window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
+    fn render(&mut self, window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
+        // Here rather than where the stage changed: the box that holds the
+        // handle is only on screen from this frame on.
+        if self.pending_focus && self.is_open() {
+            self.pending_focus = false;
+            window.focus(&self.focus_handle, cx);
+        }
         match &self.stage {
             Stage::Idle => div().into_any_element(),
             Stage::Loading { done, total } | Stage::Running { done, total } => {
@@ -780,6 +857,13 @@ impl Render for GenerationJob {
             }
         }
     }
+}
+
+/// Whether a scrolling box is showing its last line — or has not been laid out
+/// yet, which is where a log that has only just started is.
+fn at_bottom(scroll: &ScrollHandle) -> bool {
+    let max = scroll.max_offset().y;
+    max <= px(0.) || -scroll.offset().y >= max - px(4.)
 }
 
 /// Turns the saved policy into the run's, with the *ask* case wired to the

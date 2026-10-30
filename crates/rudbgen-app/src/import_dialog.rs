@@ -563,6 +563,12 @@ impl ImportDialog {
         self.open
     }
 
+    /// Whether a background step is running — decrypting the file, or writing
+    /// the stores and the keychain — which nothing may close the wizard over.
+    pub fn is_busy(&self) -> bool {
+        matches!(self.stage, Stage::Opening | Stage::Importing)
+    }
+
     /// Hides the wizard without emitting an event.
     pub fn close(&mut self, cx: &mut Context<Self>) {
         self.open = false;
@@ -584,7 +590,7 @@ impl ImportDialog {
     /// Ignored while a background step is running: half an import is not a
     /// state the wizard can be left in, and both steps are seconds long.
     pub fn escape(&mut self, cx: &mut Context<Self>) {
-        if matches!(self.stage, Stage::Opening | Stage::Importing) {
+        if self.is_busy() {
             return;
         }
         self.dismiss(cx);

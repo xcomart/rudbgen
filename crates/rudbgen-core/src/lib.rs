@@ -57,7 +57,7 @@ pub use paths::{
 };
 pub use profile::{
     ConnectionProfile, ConnectionStore, CustomQueries, CustomQuery, CustomQueryKind, DriverDef,
-    DriverStore, GenerationProfile, KeepAlive, TemplateRef, TunnelAuth, TunnelConfig,
+    DriverStore, GenerationProfile, KeepAlive, TableName, TemplateRef, TunnelAuth, TunnelConfig,
 };
 pub use secrets::{SecretSlot, SecretStore, init as init_secrets};
 pub use settings::{AppSettings, OverwritePolicy, TitlebarStyle, WindowState};

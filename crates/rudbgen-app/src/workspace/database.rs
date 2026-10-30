@@ -7,7 +7,9 @@ impl Workspace {
     ///
     /// Called by every connect and every disconnect. The ticks go with the
     /// rest: a tick names a table of *that* database, and carrying one across
-    /// to another server would be a set of names that happen to match.
+    /// to another server would be a set of names that happen to match. The
+    /// profile keeps its own, though, and a connection that opens ticks them
+    /// again — its own database's tables, confirmed against its own lists.
     pub(super) fn reset_panels(&mut self, cx: &mut Context<Self>) {
         self.connection_epoch = self.connection_epoch.wrapping_add(1);
         self.explorer.update(cx, |explorer, cx| explorer.reset(cx));
@@ -35,12 +37,35 @@ impl Workspace {
         // The panel edits whatever connection is now open — and nothing at all
         // while none is, which is what keeps a debounced save from writing into
         // a profile the window has already left.
+        //
+        // From the file rather than from the profile the state carries: the
+        // panel has been saving into `connections.json` since that copy was
+        // taken — the ticks above all — and a reconnection after a tunnel
+        // broke would otherwise load the profile as it was an hour ago.
         match self.connection.profile() {
             Some(profile) => {
                 let id = profile.id;
-                let generation = profile.generation.clone();
+                let generation = load_profiles()
+                    .get(id)
+                    .map(|saved| saved.generation.clone())
+                    .unwrap_or_else(|| profile.generation.clone());
                 self.generate
                     .update(cx, |pane, cx| pane.load(id, &generation, cx));
+                // The tables ticked the last time, ticked again — on an open
+                // session only, where the explorer can confirm them.
+                if matches!(self.connection, ConnectionState::Open { .. }) {
+                    let keys = generation
+                        .selected_tables
+                        .iter()
+                        .map(|table| TableKey {
+                            catalog: table.catalog.clone(),
+                            schema: table.schema.clone(),
+                            name: table.name.clone(),
+                        })
+                        .collect();
+                    self.explorer
+                        .update(cx, |explorer, cx| explorer.restore_selection(keys, cx));
+                }
             }
             None => self.generate.update(cx, |pane, cx| pane.reset(cx)),
         }
@@ -214,6 +239,8 @@ impl Workspace {
         self.connection = ConnectionState::Failed {
             profile,
             message: ts!("connect.tunnel_ended", reason = reason),
+            hint: None,
+            host_key: None,
         };
         self.reset_panels(cx);
         cx.notify();
@@ -253,8 +280,35 @@ impl Workspace {
 
     /// Opens the settings dialog, closing whatever else was showing.
     pub(super) fn open_settings(&mut self, window: &mut Window, cx: &mut Context<Self>) {
-        self.close_overlays(window, cx);
+        if !self.overlays_closed(window, cx) {
+            return;
+        }
         self.settings.update(cx, |dialog, cx| dialog.open(cx));
         cx.notify();
+    }
+}
+
+impl Workspace {
+    /// Hands the explorer's ticks to the Generate tab, which keeps them in the
+    /// profile for the next connection to tick again.
+    pub(super) fn remember_ticks(&mut self, cx: &mut Context<Self>) {
+        if !matches!(self.connection, ConnectionState::Open { .. }) {
+            return;
+        }
+        let ticks: Vec<rudbgen_core::TableName> = self
+            .explorer
+            .read(cx)
+            .selection(cx)
+            .into_iter()
+            .map(|key| rudbgen_core::TableName {
+                catalog: key.catalog,
+                schema: key.schema,
+                name: key.name,
+            })
+            .collect();
+        self.generate.update(cx, |pane, cx| {
+            pane.set_ticks(ticks, cx);
+            pane.flush(cx);
+        });
     }
 }

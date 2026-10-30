@@ -268,6 +268,10 @@ fn close_tab_asks_and_spares_the_generate_tab(cx: &mut gpui::TestAppContext) {
             workspace.select_tab_action(&SelectTab(1), window, cx);
             let at = workspace.active_template(cx).expect("a template is on top");
             workspace.templates[at].update(cx, |pane, cx| pane.insert("// edit\n", window, cx));
+            // The edit is on the list a quit would ask about.
+            let lost = workspace.unsaved_work(cx);
+            assert_eq!(lost.templates.len(), 1);
+            assert!(!lost.is_empty());
             workspace.close_tab_action(&CloseTab, window, cx);
             assert!(workspace.closing.is_some(), "the edit was not asked about");
             workspace.cancel_close(window, cx);

@@ -523,6 +523,24 @@ struct PasswordPrompt {
     reason: Option<SharedString>,
 }
 
+/// What quitting now would lose; see [`Workspace::unsaved_work`].
+#[derive(Debug, Default, PartialEq, Eq)]
+struct UnsavedWork {
+    /// The template tabs with unsaved edits, by title.
+    templates: Vec<SharedString>,
+    /// Whether a generate is still writing files.
+    run: bool,
+    /// Whether a dialog holds a changed draft, or an import is half done.
+    draft: bool,
+}
+
+impl UnsavedWork {
+    /// Whether there is nothing to lose.
+    fn is_empty(&self) -> bool {
+        self.templates.is_empty() && !self.run && !self.draft
+    }
+}
+
 /// What a profile is called on screen.
 ///
 /// The name the user gave it, and the URL when they have not given one yet: a
@@ -790,6 +808,12 @@ impl Workspace {
             // debounce; written now, or lost with the process.
             workspace.generate.update(cx, |pane, cx| pane.flush(cx));
             workspace.remember_ticks(cx);
+            // Nothing stops the quit from here yet — that question is the
+            // window's close guard's to ask — but what it cost goes on record.
+            let lost = workspace.unsaved_work(cx);
+            if !lost.is_empty() {
+                log::warn!("quitting with work that was not saved: {lost:?}");
+            }
             workspace.close_session();
             if !wait_for_closes(&workspace.closing_sessions) {
                 log::warn!("quitting with a session that has not finished closing");

@@ -120,6 +120,28 @@ impl Workspace {
         }
     }
 
+    /// What quitting now would lose: the template tabs with unsaved edits, by
+    /// title, whether a generate is still writing, and whether a dialog holds
+    /// a changed draft.
+    ///
+    /// The list a quit or a window close asks about before it goes; nothing
+    /// in it is an error, only something the user may not want to lose.
+    pub(super) fn unsaved_work(&self, cx: &App) -> UnsavedWork {
+        UnsavedWork {
+            templates: self
+                .templates
+                .iter()
+                .filter(|pane| pane.read(cx).is_dirty(cx))
+                .map(|pane| pane.read(cx).title())
+                .collect(),
+            run: self.job.read(cx).is_busy(),
+            draft: self.connection_dialog.read(cx).is_dirty(cx)
+                || self.settings.read(cx).is_dirty(cx)
+                || self.abbreviations.read(cx).is_dirty(cx)
+                || self.import.read(cx).is_busy(),
+        }
+    }
+
     /// Clears the screen for a dialog about to open, and answers whether it
     /// may: not while [`Workspace::close_overlays`] had to leave one up.
     pub(super) fn overlays_closed(&mut self, window: &mut Window, cx: &mut Context<Self>) -> bool {

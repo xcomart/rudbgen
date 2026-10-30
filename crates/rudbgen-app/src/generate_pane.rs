@@ -2012,6 +2012,74 @@ mod tests {
         }
     }
 
+    /// A removed row and a list a set replaced both come back with Undo; a
+    /// set picked over an empty list leaves nothing to undo.
+    #[gpui::test]
+    fn removing_a_row_and_replacing_the_list_can_be_undone(cx: &mut gpui::TestAppContext) {
+        cx.update(|cx| {
+            crate::app_settings::init(cx);
+            rugpui::init(cx);
+        });
+        let pane = cx.new(GeneratePane::new);
+        pane.update(cx, |pane, cx| {
+            let set = TemplateSet::new("Set".to_string(), vec![reference("from set", true)]);
+            let id = set.id;
+            pane.sets.upsert(set);
+
+            pane.apply_set(id, cx);
+            assert!(pane.undo.is_none(), "an empty list had something to undo");
+
+            pane.rebuild(
+                &GenerationProfile {
+                    templates: vec![reference("first", true), reference("second", false)],
+                    ..Default::default()
+                },
+                cx,
+            );
+            pane.remove_template(0, cx);
+            assert_eq!(pane.collect(cx).templates, vec![reference("second", false)]);
+            pane.undo(cx);
+            assert_eq!(
+                pane.collect(cx).templates,
+                vec![reference("first", true), reference("second", false)]
+            );
+
+            pane.apply_set(id, cx);
+            assert_eq!(
+                pane.collect(cx).templates,
+                vec![reference("from set", true)]
+            );
+            pane.undo(cx);
+            assert_eq!(
+                pane.collect(cx).templates,
+                vec![reference("first", true), reference("second", false)],
+                "the hand-made list did not come back"
+            );
+        });
+    }
+
+    /// The overwrite choice made on the tab lasts one run; the next one
+    /// starts from the settings again.
+    #[gpui::test]
+    fn the_overwrite_choice_is_for_one_run(cx: &mut gpui::TestAppContext) {
+        cx.update(|cx| {
+            crate::app_settings::init(cx);
+            rugpui::init(cx);
+        });
+        let pane = cx.new(GeneratePane::new);
+        pane.update(cx, |pane, cx| {
+            let default = crate::app_settings::current(cx).overwrite_policy;
+            let other = if default == OverwritePolicy::Skip {
+                OverwritePolicy::Overwrite
+            } else {
+                OverwritePolicy::Skip
+            };
+            pane.overwrite = Some(other);
+            assert_eq!(pane.take_overwrite(cx), other);
+            assert_eq!(pane.take_overwrite(cx), default);
+        });
+    }
+
     #[gpui::test]
     fn tab_follows_template_rows_and_reaches_remove(cx: &mut gpui::TestAppContext) {
         cx.update(|cx| {

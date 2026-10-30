@@ -3074,6 +3074,89 @@ mod tests {
 
     use super::*;
 
+    /// The blank profile the dialog makes for itself is no reason to ask
+    /// anything; one typed into is, and the question keeps the draft.
+    #[gpui::test]
+    fn only_a_changed_draft_asks_before_it_goes(cx: &mut gpui::TestAppContext) {
+        let dialog = cx.new(ConnectionDialog::new);
+        dialog.update(cx, |dialog, cx| {
+            dialog.open = true;
+            dialog.add_profile(cx);
+            assert!(!dialog.is_dirty(cx), "a blank profile reads as edited");
+            dialog.request_close(cx);
+            assert!(!dialog.open, "an untouched form did not close");
+        });
+        let dialog = cx.new(ConnectionDialog::new);
+        dialog.update(cx, |dialog, cx| {
+            dialog.open = true;
+            dialog.add_profile(cx);
+            set_text(&dialog.name_input, "staging", cx);
+            assert!(dialog.is_dirty(cx));
+            dialog.escape(cx);
+            assert!(dialog.open, "Escape threw the draft away");
+            assert!(dialog.discarding);
+            // The second Escape takes the question back, not the form.
+            dialog.escape(cx);
+            assert!(dialog.open);
+            assert!(!dialog.discarding);
+            assert_eq!(text(&dialog.name_input, cx), "staging");
+            // An edit undone is no edit.
+            set_text(&dialog.name_input, ts!("connect.new_name"), cx);
+            assert!(!dialog.is_dirty(cx));
+        });
+    }
+
+    /// A keychain that will not take the password does not keep Connect from
+    /// connecting: the profile is on disk by then, the password is on the
+    /// form, and the shell is handed both with a warning to show.
+    #[gpui::test]
+    fn a_keychain_that_refuses_the_password_still_connects(cx: &mut gpui::TestAppContext) {
+        use std::{cell::Cell, rc::Rc};
+        let connected = Rc::new(Cell::new(false));
+        let dialog = cx.new(ConnectionDialog::new);
+        let subscription = cx.update(|cx| {
+            let connected = connected.clone();
+            cx.subscribe(&dialog, move |_, event, _| {
+                if matches!(event, ConnectionDialogEvent::Connect(_)) {
+                    connected.set(true);
+                }
+            })
+        });
+        dialog.update(cx, |dialog, cx| {
+            dialog.open = true;
+            dialog.add_profile(cx);
+            set_text(&dialog.password_input, "hunter2", cx);
+            let credentials = dialog.typed_credentials(cx);
+            dialog.connect_after(
+                Err(SaveError::Secret(anyhow::anyhow!("locked"))),
+                credentials,
+                cx,
+            );
+            assert!(!dialog.open, "the dialog stayed up over a saved profile");
+            let handoff = dialog.take_handoff().expect("the secrets were handed on");
+            assert_eq!(handoff.credentials.password.as_deref(), Some("hunter2"));
+            assert!(handoff.warning.is_some(), "the refusal went unsaid");
+        });
+        assert!(connected.get());
+        drop(subscription);
+    }
+
+    /// *Remember password* is the profile's: off, it is saved off.
+    #[gpui::test]
+    fn remember_password_is_saved_with_the_profile(cx: &mut gpui::TestAppContext) {
+        let dialog = cx.new(ConnectionDialog::new);
+        dialog.update(cx, |dialog, cx| {
+            dialog.add_profile(cx);
+            assert!(
+                dialog.collect(cx).save_secret,
+                "a new profile forgets by default"
+            );
+            dialog.remember_password = false;
+            assert!(!dialog.collect(cx).save_secret);
+            assert!(dialog.form_changed(cx));
+        });
+    }
+
     /// The names in `store`, in list order.
     fn names(store: &ConnectionStore) -> Vec<&str> {
         store

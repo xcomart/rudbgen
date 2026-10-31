@@ -1223,7 +1223,7 @@ impl DriverManager {
             .flex()
             .flex_col()
             .flex_none()
-            .w(px(LIST_WIDTH))
+            .w(rugpui::scaled(LIST_WIDTH, cx))
             .min_h_0()
             .child(
                 div()
@@ -1233,7 +1233,7 @@ impl DriverManager {
                     .flex_col()
                     .gap(px(2.))
                     .min_h_0()
-                    .max_h(px(BODY_MAX_HEIGHT))
+                    .max_h(rugpui::scaled(BODY_MAX_HEIGHT, cx))
                     .overflow_y_scroll()
                     .smooth_scroll(&self.list_scroll)
                     .restrict_scroll_to_axis()
@@ -1929,7 +1929,7 @@ impl DriverManager {
                     .flex_col()
                     .gap(px(10.))
                     .min_h_0()
-                    .max_h(px(BODY_MAX_HEIGHT))
+                    .max_h(rugpui::scaled(BODY_MAX_HEIGHT, cx))
                     .overflow_y_scroll()
                     .smooth_scroll(&self.body_scroll)
                     .restrict_scroll_to_axis()
@@ -2212,7 +2212,7 @@ fn test_value(
                 .text_color(chrome.text_muted)
                 .child(name),
         )
-        .child(div().w(px(110.)).child(input))
+        .child(div().w(rugpui::scaled(110., cx)).child(input))
 }
 
 /// What a custom-query row is called.

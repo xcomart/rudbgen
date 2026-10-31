@@ -1342,7 +1342,7 @@ impl Render for ImportDialog {
                             .flex()
                             .flex_col()
                             .min_h_0()
-                            .max_h(px(BODY_MAX_HEIGHT))
+                            .max_h(rugpui::scaled(BODY_MAX_HEIGHT, cx))
                             .overflow_y_scroll()
                             .smooth_scroll(&self.scroll)
                             .restrict_scroll_to_axis()
@@ -1393,7 +1393,7 @@ impl Render for ImportDialog {
             .child(modal(
                 "import-modal",
                 ts!("import.title"),
-                px(DIALOG_WIDTH),
+                rugpui::scaled(DIALOG_WIDTH, cx),
                 body,
                 on_dismiss,
             ))

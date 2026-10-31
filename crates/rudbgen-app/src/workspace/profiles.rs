@@ -179,7 +179,7 @@ impl Workspace {
             rugpui::modal(
                 "password-prompt",
                 ts!("password.title"),
-                px(400.),
+                rugpui::scaled(400., cx),
                 div()
                     .flex()
                     .flex_col()
@@ -414,7 +414,7 @@ impl Workspace {
             rugpui::modal(
                 "profile-delete",
                 ts!("connect.delete"),
-                px(400.),
+                rugpui::scaled(400., cx),
                 div()
                     .flex()
                     .flex_col()

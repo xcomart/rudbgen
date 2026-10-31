@@ -389,7 +389,7 @@ impl PreviewPane {
                     .selected(chosen_table)
                     .placeholder(ts!("generate.preview_table"))
                     .open(self.table_open)
-                    .width(px(CHOICE_WIDTH))
+                    .width(rugpui::scaled(CHOICE_WIDTH, cx))
                     .on_select(move |index, _text, _window, cx| {
                         table.update(cx, |pane, cx| {
                             pane.table_open = false;
@@ -415,7 +415,7 @@ impl PreviewPane {
                     .selected(chosen_template)
                     .placeholder(ts!("generate.preview_template"))
                     .open(self.template_open)
-                    .width(px(CHOICE_WIDTH))
+                    .width(rugpui::scaled(CHOICE_WIDTH, cx))
                     .on_select(move |index, _text, _window, cx| {
                         template.update(cx, |pane, cx| {
                             pane.template_open = false;
@@ -509,7 +509,7 @@ impl PreviewPane {
                     .child(
                         div()
                             .flex_none()
-                            .w(px(70.))
+                            .w(rugpui::scaled(70., cx))
                             .text_size(rugpui::TextSize::Xs.size(cx))
                             .text_color(theme.text_muted)
                             .child(ts!("generate.dry_bytes", bytes = file.content.len())),
@@ -564,7 +564,7 @@ impl Render for PreviewPane {
                         .flex_row()
                         .items_center()
                         .gap(px(8.))
-                        .child(Spinner::new("preview-rendering").size(px(14.)))
+                        .child(Spinner::new("preview-rendering").size(rugpui::scaled(14., cx)))
                         .child(
                             div()
                                 .flex_1()

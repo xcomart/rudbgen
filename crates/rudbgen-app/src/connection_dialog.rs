@@ -1603,7 +1603,7 @@ impl ConnectionDialog {
             .flex()
             .flex_col()
             .flex_none()
-            .w(px(LIST_WIDTH))
+            .w(rugpui::scaled(LIST_WIDTH, cx))
             .min_h_0()
             .child(
                 div()
@@ -1613,7 +1613,7 @@ impl ConnectionDialog {
                     .flex_col()
                     .gap(px(1.))
                     .min_h_0()
-                    .max_h(px(BODY_MAX_HEIGHT))
+                    .max_h(rugpui::scaled(BODY_MAX_HEIGHT, cx))
                     .overflow_y_scroll()
                     .smooth_scroll(&self.list_scroll)
                     .restrict_scroll_to_axis()
@@ -1637,7 +1637,7 @@ impl ConnectionDialog {
             div()
                 .id(("connect-color", index))
                 .flex_none()
-                .size(px(18.))
+                .size(rugpui::scaled(18., cx))
                 .rounded_full()
                 .cursor_pointer()
                 .bg(fill)
@@ -1991,7 +1991,7 @@ impl ConnectionDialog {
                         .child(
                             div()
                                 .flex_none()
-                                .w(px(72.))
+                                .w(rugpui::scaled(72., cx))
                                 .child(self.tunnel_port_input.clone()),
                         ),
                 ))
@@ -2023,7 +2023,7 @@ impl ConnectionDialog {
                         .child(
                             div()
                                 .flex_none()
-                                .w(px(72.))
+                                .w(rugpui::scaled(72., cx))
                                 .child(self.tunnel_remote_port_input.clone()),
                         ),
                 ))
@@ -2080,7 +2080,7 @@ impl ConnectionDialog {
                 .child(
                     div()
                         .flex_none()
-                        .w(px(72.))
+                        .w(rugpui::scaled(72., cx))
                         .child(self.keep_alive_interval_input.clone()),
                 )
                 .child(
@@ -2139,7 +2139,7 @@ impl ConnectionDialog {
                     .flex_col()
                     .gap(px(10.))
                     .min_h_0()
-                    .max_h(px(BODY_MAX_HEIGHT))
+                    .max_h(rugpui::scaled(BODY_MAX_HEIGHT, cx))
                     .overflow_y_scroll()
                     .smooth_scroll(&self.body_scroll)
                     .restrict_scroll_to_axis()
@@ -2577,13 +2577,19 @@ impl Render for ConnectionDialog {
                 }),
             )
             .child(
-                modal("connect-modal", title, px(DIALOG_WIDTH), body, on_dismiss)
-                    // With edits on the form a press beside the dialog is no answer:
-                    // `Escape` and Cancel ask before the draft goes, a stray click
-                    // does nothing.
-                    .dismiss_guard(move |reason, _window, _cx| {
-                        !(dirty && matches!(reason, rugpui::DismissReason::Backdrop))
-                    }),
+                modal(
+                    "connect-modal",
+                    title,
+                    rugpui::scaled(DIALOG_WIDTH, cx),
+                    body,
+                    on_dismiss,
+                )
+                // With edits on the form a press beside the dialog is no answer:
+                // `Escape` and Cancel ask before the draft goes, a stray click
+                // does nothing.
+                .dismiss_guard(move |reason, _window, _cx| {
+                    !(dirty && matches!(reason, rugpui::DismissReason::Backdrop))
+                }),
             )
             .children(discard)
     }
@@ -2711,7 +2717,7 @@ pub(crate) fn profile_rows(
                             .focus(|style| style.border_color(chrome.accent))
                             .child(
                                 gpui::svg()
-                                    .size(px(12.))
+                                    .size(rugpui::scaled(12., cx))
                                     .flex_none()
                                     .text_color(chrome.text_muted)
                                     .path(if collapsed {
@@ -2754,7 +2760,7 @@ pub(crate) fn profile_rows(
                     div()
                         .flex_none()
                         .w(px(3.))
-                        .h(px(16.))
+                        .h(rugpui::scaled(16., cx))
                         .rounded_full()
                         .bg(color)
                 });

@@ -1514,7 +1514,7 @@ impl SettingsDialog {
                             .flex_col()
                             .min_h_0()
                             .gap(px(14.))
-                            .max_h(px(BODY_MAX_HEIGHT))
+                            .max_h(rugpui::scaled(BODY_MAX_HEIGHT, cx))
                             .overflow_y_scroll()
                             .smooth_scroll(&self.body_scroll)
                             .restrict_scroll_to_axis()
@@ -1696,13 +1696,19 @@ impl Render for SettingsDialog {
                 }),
             )
             .child(
-                modal("settings-modal", title, px(DIALOG_WIDTH), body, on_dismiss)
-                    // With edits on the form a press beside the dialog is no answer:
-                    // `Escape` and Cancel ask before the draft goes, a stray click
-                    // does nothing.
-                    .dismiss_guard(move |reason, _window, _cx| {
-                        !(dirty && matches!(reason, rugpui::DismissReason::Backdrop))
-                    }),
+                modal(
+                    "settings-modal",
+                    title,
+                    rugpui::scaled(DIALOG_WIDTH, cx),
+                    body,
+                    on_dismiss,
+                )
+                // With edits on the form a press beside the dialog is no answer:
+                // `Escape` and Cancel ask before the draft goes, a stray click
+                // does nothing.
+                .dismiss_guard(move |reason, _window, _cx| {
+                    !(dirty && matches!(reason, rugpui::DismissReason::Backdrop))
+                }),
             )
             .children(discard)
     }

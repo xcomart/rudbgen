@@ -36,8 +36,8 @@
 
 use gpui::{
     App, Context, DragMoveEvent, Entity, EventEmitter, FocusHandle, Focusable, IntoElement,
-    KeyDownEvent, MouseButton, MouseUpEvent, Render, ScrollHandle, SharedString, Subscription,
-    Window, div, prelude::*, px,
+    KeyDownEvent, MouseButton, MouseUpEvent, Pixels, Render, ScrollHandle, SharedString,
+    Subscription, Window, div, prelude::*, px,
 };
 use rudbgen_core::{AbbreviationRule, AbbreviationStore};
 use rugpui::SmoothScrollExt;
@@ -563,13 +563,13 @@ impl AbbreviationDialog {
 
     /// The column headings of the table.
     fn render_head(&self, chrome: &Theme, cx: &App) -> impl IntoElement + use<> {
-        let cell = |width: Option<f32>, label: SharedString| {
+        let cell = |width: Option<Pixels>, label: SharedString| {
             let base = div()
                 .flex_none()
                 .text_size(rugpui::TextSize::Xs.size(cx))
                 .text_color(chrome.text_muted);
             match width {
-                Some(width) => base.w(px(width)).child(label),
+                Some(width) => base.w(width).child(label),
                 None => base.flex_1().min_w_0().child(label),
             }
         };
@@ -578,15 +578,22 @@ impl AbbreviationDialog {
             .flex_row()
             .items_center()
             .gap(px(6.))
-            .child(cell(Some(APPLY_WIDTH), ts!("abbr.column_apply")))
-            .child(cell(Some(WHOLE_WIDTH), ts!("abbr.column_whole")))
             .child(cell(
-                Some(ABBR_WIDTH + PICKER_WIDTH + 6.),
+                Some(rugpui::scaled(APPLY_WIDTH, cx)),
+                ts!("abbr.column_apply"),
+            ))
+            .child(cell(
+                Some(rugpui::scaled(WHOLE_WIDTH, cx)),
+                ts!("abbr.column_whole"),
+            ))
+            // The field and its picker, and the gap between them.
+            .child(cell(
+                Some(rugpui::scaled(ABBR_WIDTH, cx) + rugpui::scaled(PICKER_WIDTH, cx) + px(6.)),
                 ts!("abbr.column_abbreviation"),
             ))
             .child(cell(None, ts!("abbr.column_replacement")))
             // The delete glyph's column, which has no heading of its own.
-            .child(div().flex_none().size(px(22.)))
+            .child(div().flex_none().size(rugpui::scaled(22., cx)))
     }
 
     /// One rule row.
@@ -634,7 +641,7 @@ impl AbbreviationDialog {
             .items_center()
             .gap(px(6.))
             .child(
-                div().w(px(APPLY_WIDTH)).flex_none().child(
+                div().w(rugpui::scaled(APPLY_WIDTH, cx)).flex_none().child(
                     Checkbox::new(("abbr-enabled", index), SharedString::default())
                         .checked(row.enabled)
                         .on_toggle({
@@ -646,7 +653,7 @@ impl AbbreviationDialog {
                 ),
             )
             .child(
-                div().w(px(WHOLE_WIDTH)).flex_none().child(
+                div().w(rugpui::scaled(WHOLE_WIDTH, cx)).flex_none().child(
                     Checkbox::new(("abbr-whole", index), SharedString::default())
                         .checked(row.whole_name)
                         .on_toggle({
@@ -664,7 +671,7 @@ impl AbbreviationDialog {
                     .flex_none()
                     .items_center()
                     .gap(px(6.))
-                    .w(px(ABBR_WIDTH + PICKER_WIDTH + 6.))
+                    .w(rugpui::scaled(ABBR_WIDTH, cx) + rugpui::scaled(PICKER_WIDTH, cx) + px(6.))
                     .child(
                         div()
                             .flex_1()
@@ -680,7 +687,7 @@ impl AbbreviationDialog {
                     .children(picker.map(|select| {
                         div()
                             .debug_selector(move || format!("abbr-picker-{index}"))
-                            .w(px(PICKER_WIDTH))
+                            .w(rugpui::scaled(PICKER_WIDTH, cx))
                             .flex_none()
                             .child(select)
                     })),
@@ -695,7 +702,7 @@ impl AbbreviationDialog {
                     .flex_none()
                     .items_center()
                     .justify_center()
-                    .size(px(22.))
+                    .size(rugpui::scaled(22., cx))
                     .rounded_md()
                     .text_size(rugpui::TextSize::Sm.size(cx))
                     .text_color(chrome.icon)
@@ -767,7 +774,7 @@ impl Render for AbbreviationDialog {
                     .flex_col()
                     .gap(px(4.))
                     .min_h_0()
-                    .max_h(px(TABLE_MAX_HEIGHT))
+                    .max_h(rugpui::scaled(TABLE_MAX_HEIGHT, cx))
                     .overflow_y_scroll()
                     .smooth_scroll(&self.scroll)
                     .restrict_scroll_to_axis()
@@ -904,7 +911,7 @@ impl Render for AbbreviationDialog {
                 modal(
                     "abbr-modal",
                     ts!("abbr.title"),
-                    px(DIALOG_WIDTH),
+                    rugpui::scaled(DIALOG_WIDTH, cx),
                     body,
                     on_dismiss,
                 )

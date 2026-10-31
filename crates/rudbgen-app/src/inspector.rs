@@ -269,8 +269,11 @@ impl Inspector {
                 },
                 cx,
             );
+            // At the interface size the panel opens with; a column the user
+            // has resized since keeps the width they gave it.
+            let scale = rugpui::ui_scale(cx);
             for (index, width) in COLUMN_WIDTHS.iter().enumerate() {
-                grid.set_column_width(index, *width, cx);
+                grid.set_column_width(index, *width * scale, cx);
             }
             grid
         });
@@ -541,12 +544,16 @@ impl Inspector {
             .px(px(10.))
             .border_b_1()
             .border_color(chrome.border)
-            .child(rugpui_shell::icon(mark, px(14.), chrome.text_muted))
+            .child(rugpui_shell::icon(
+                mark,
+                rugpui::scaled(14., cx),
+                chrome.text_muted,
+            ))
             .child(
                 div()
                     .id("inspector-name")
                     .flex_none()
-                    .max_w(px(180.))
+                    .max_w(rugpui::scaled(180., cx))
                     .truncate()
                     .text_size(rugpui::TextSize::Sm.size(cx))
                     .text_color(chrome.text)
@@ -584,7 +591,7 @@ impl Inspector {
                     .flex_none()
                     .items_center()
                     .justify_center()
-                    .size(px(24.))
+                    .size(rugpui::scaled(24., cx))
                     .rounded_md()
                     .tooltip(rugpui::tooltip_label(ts!("inspector.refresh")))
                     .when(can_refresh, |button| {
@@ -598,7 +605,7 @@ impl Inspector {
                     })
                     .child(rugpui_shell::icon(
                         icons::REFRESH,
-                        px(16.),
+                        rugpui::scaled(16., cx),
                         if can_refresh {
                             chrome.icon
                         } else {

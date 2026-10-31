@@ -1315,7 +1315,7 @@ impl TemplatePane {
                             .selected(chosen)
                             .placeholder(ts!("template.preview_table"))
                             .open(self.choice_open)
-                            .width(px(CHOICE_WIDTH))
+                            .width(rugpui::scaled(CHOICE_WIDTH, cx))
                             .on_select(move |index, _text, _window, cx| {
                                 select.update(cx, |pane, cx| {
                                     pane.choice_open = false;
@@ -1421,7 +1421,7 @@ impl TemplatePane {
                     .child(
                         div()
                             .flex_none()
-                            .w(px(64.))
+                            .w(rugpui::scaled(64., cx))
                             .text_size(rugpui::TextSize::Xs.size(cx))
                             .text_color(color)
                             .child(ts!(
@@ -1493,7 +1493,7 @@ impl TemplatePane {
                     .items_center()
                     .gap(px(6.))
                     .px(px(8.))
-                    .h(px(POPUP_ROW_HEIGHT))
+                    .h(rugpui::scaled(POPUP_ROW_HEIGHT, cx))
                     .cursor_pointer()
                     .when(active, |row| row.bg(theme.surface_hover))
                     .hover(|style| style.bg(theme.surface_hover))
@@ -1545,7 +1545,7 @@ impl TemplatePane {
             .occlude()
             .flex()
             .flex_col()
-            .w(px(POPUP_WIDTH))
+            .w(rugpui::scaled(POPUP_WIDTH, cx))
             .py(px(2.))
             .rounded_md()
             .bg(theme.surface)

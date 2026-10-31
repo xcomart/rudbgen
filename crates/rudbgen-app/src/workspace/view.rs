@@ -312,7 +312,7 @@ impl Workspace {
             .child(
                 div()
                     .flex_none()
-                    .size(px(STATUS_DOT))
+                    .size(rugpui::scaled(STATUS_DOT, cx))
                     .rounded_full()
                     .bg(self.connection.dot(&theme)),
             )
@@ -324,7 +324,7 @@ impl Workspace {
                     .options(options)
                     .selected(selected)
                     .open(self.connection_list_open)
-                    .width(px(CONNECTION_SELECT_WIDTH))
+                    .width(rugpui::scaled(CONNECTION_SELECT_WIDTH, cx))
                     .on_select(move |index, _text, window, cx| {
                         this.update(cx, |workspace, cx| {
                             workspace.connection_list_open = false;
@@ -874,7 +874,7 @@ impl Workspace {
         rugpui::modal(
             "template-close",
             ts!("template.close_title"),
-            px(400.),
+            rugpui::scaled(400., cx),
             div()
                 .flex()
                 .flex_col()
@@ -974,6 +974,8 @@ impl Workspace {
         };
         let cancel = cx.entity();
         let detail_size = rugpui::TextSize::Xs.size(cx);
+        let spinner_size = rugpui::scaled(12., cx);
+        let driver_width = rugpui::scaled(140., cx);
         let trailing = move |profile: &ConnectionProfile| -> Option<AnyElement> {
             if connecting == Some(profile.id) {
                 let cancel = cancel.clone();
@@ -984,7 +986,7 @@ impl Workspace {
                         .flex_none()
                         .items_center()
                         .gap(px(6.))
-                        .child(rugpui::Spinner::new(("welcome-spinner", 0usize)).size(px(12.)))
+                        .child(rugpui::Spinner::new(("welcome-spinner", 0usize)).size(spinner_size))
                         .child(
                             Button::new("welcome-cancel-connect", ts!("common.cancel"))
                                 .variant(ButtonVariant::Secondary)
@@ -1008,7 +1010,7 @@ impl Workspace {
             Some(
                 div()
                     .flex_none()
-                    .max_w(px(140.))
+                    .max_w(driver_width)
                     .truncate()
                     .text_size(detail_size)
                     .text_color(theme.text_muted)
@@ -1048,7 +1050,7 @@ impl Workspace {
             .flex()
             .flex_col()
             .gap(px(6.))
-            .w(px(WELCOME_WIDTH))
+            .w(rugpui::scaled(WELCOME_WIDTH, cx))
             .child(
                 div()
                     .text_size(rugpui::TextSize::Xs.size(cx))
@@ -1076,7 +1078,7 @@ impl Workspace {
             )
             .child(
                 div()
-                    .w(px(WELCOME_WIDTH))
+                    .w(rugpui::scaled(WELCOME_WIDTH, cx))
                     .text_size(rugpui::TextSize::Body.size(cx))
                     .text_color(theme.text_muted)
                     .child(ts!("welcome.tagline")),
@@ -1086,7 +1088,7 @@ impl Workspace {
                     .flex()
                     .flex_col()
                     .gap(px(6.))
-                    .w(px(WELCOME_WIDTH))
+                    .w(rugpui::scaled(WELCOME_WIDTH, cx))
                     .child(
                         div()
                             .id(WELCOME_NEW_SELECTOR)
@@ -1216,7 +1218,7 @@ impl Workspace {
                 .flex()
                 .flex_col()
                 .gap(px(6.))
-                .w(px(WELCOME_WIDTH))
+                .w(rugpui::scaled(WELCOME_WIDTH, cx))
                 .p(px(8.))
                 .rounded_md()
                 .bg(theme.surface)

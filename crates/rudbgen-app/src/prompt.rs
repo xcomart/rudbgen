@@ -42,7 +42,7 @@ pub(crate) fn discard(
     modal(
         id,
         ts!("prompt.discard_title"),
-        px(380.),
+        rugpui::scaled(380., cx),
         div()
             .flex()
             .flex_col()

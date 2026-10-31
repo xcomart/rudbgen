@@ -453,7 +453,7 @@ impl ExplorerSource {
             .flex_none()
             .items_center()
             .justify_center()
-            .size(px(TICK_SIZE))
+            .size(rugpui::scaled(TICK_SIZE, cx))
             .rounded_sm()
             .border_1()
             .border_color(border)
@@ -623,13 +623,17 @@ impl TreeSource for ExplorerSource {
             .min_w_0()
             .when_some(tip, |row, tip| row.tooltip(tooltip_label(tip)))
             .children(tick)
-            .child(rugpui_shell::icon(mark, px(14.), chrome.text_muted))
+            .child(rugpui_shell::icon(
+                mark,
+                rugpui::scaled(14., cx),
+                chrome.text_muted,
+            ))
             .child(
                 // As wide as the name needs and no wider, and shrinking only
                 // once the comment beside it has given up all of its room.
                 div()
                     .flex_initial()
-                    .min_w(px(24.))
+                    .min_w(rugpui::scaled(24., cx))
                     .truncate()
                     .text_size(rugpui::TextSize::Sm.size(cx))
                     .when(info.selected, |label| label.text_color(chrome.text))
@@ -642,7 +646,7 @@ impl TreeSource for ExplorerSource {
                     .flex_initial()
                     .flex_shrink(100.)
                     .min_w_0()
-                    .max_w(px(120.))
+                    .max_w(rugpui::scaled(120., cx))
                     .truncate()
                     .text_size(rugpui::scaled(10., cx))
                     .text_color(chrome.text_muted)

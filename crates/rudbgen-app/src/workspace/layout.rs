@@ -248,10 +248,12 @@ impl Workspace {
             // Use the shipped PNG so the title bar preserves the icon's
             // colors on every platform instead of tinting its alpha mask.
             let icon = (!cfg!(target_os = "macos")).then(|| {
-                let icon = img(icons::APP_ICON).size(px(16.)).flex_none();
+                let icon = img(icons::APP_ICON)
+                    .size(rugpui::scaled(16., cx))
+                    .flex_none();
                 if !titlebar_active {
                     div()
-                        .size(px(16.))
+                        .size(rugpui::scaled(16., cx))
                         .flex_none()
                         .opacity(0.55)
                         .child(icon)

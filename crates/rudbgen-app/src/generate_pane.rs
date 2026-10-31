@@ -1619,7 +1619,7 @@ impl GeneratePane {
                     .options(options)
                     .selected(selected)
                     .open(self.set_open)
-                    .width(px(SET_WIDTH))
+                    .width(rugpui::scaled(SET_WIDTH, cx))
                     .on_select(move |index, _text, _window, cx| {
                         this.update(cx, |pane, cx| {
                             pane.set_open = false;
@@ -1737,16 +1737,21 @@ impl GeneratePane {
                 .w_full()
                 .min_w_0()
                 // The checkbox's column, and the two glyphs' at the end.
-                .child(div().flex_none().w(px(16.)))
-                .child(heading(ts!("generate.column_name")).w(px(150.)).flex_none())
+                .child(div().flex_none().w(rugpui::scaled(16., cx)))
+                .child(
+                    heading(ts!("generate.column_name"))
+                        .w(rugpui::scaled(150., cx))
+                        .flex_none(),
+                )
                 .child(heading(ts!("generate.column_file")).flex_1().min_w_0())
                 .child(
                     heading(ts!("generate.column_output"))
                         .flex_1()
                         .flex_grow(2.)
-                        .min_w(px(OUT_MIN_WIDTH)),
+                        .min_w(rugpui::scaled(OUT_MIN_WIDTH, cx)),
                 )
-                .child(div().flex_none().w(px(50.)))
+                // Two glyph boxes and the gap between them.
+                .child(div().flex_none().w(rugpui::scaled(22., cx) * 2. + px(6.)))
         });
 
         let undo = self.undo.as_ref().map(|undo| {
@@ -1849,7 +1854,12 @@ impl GeneratePane {
                         tick.update(cx, |pane, cx| pane.toggle_template(index, checked, cx));
                     }),
             )
-            .child(div().w(px(150.)).flex_none().child(row.name.clone()))
+            .child(
+                div()
+                    .w(rugpui::scaled(150., cx))
+                    .flex_none()
+                    .child(row.name.clone()),
+            )
             .child(
                 // The file, and the second way into its tab: a double click on
                 // the row opens what the pencil beside it opens. A *single*
@@ -1889,7 +1899,7 @@ impl GeneratePane {
                     .debug_selector(move || format!("generate-out-{index}"))
                     .flex_1()
                     .flex_grow(2.)
-                    .min_w(px(OUT_MIN_WIDTH))
+                    .min_w(rugpui::scaled(OUT_MIN_WIDTH, cx))
                     .tooltip(tooltip_label(ts!("generate.tip_output")))
                     .child(row.out.clone()),
             )
@@ -1899,13 +1909,14 @@ impl GeneratePane {
                 // the configuration directory before opening it.
                 div()
                     .id(("generate-edit", index))
+                    .debug_selector(move || format!("generate-edit-{index}"))
                     .tab_index(0)
                     .focus(|style| style.bg(theme.surface_active).text_color(theme.accent))
                     .flex()
                     .flex_none()
                     .items_center()
                     .justify_center()
-                    .size(px(22.))
+                    .size(rugpui::scaled(22., cx))
                     .rounded_md()
                     .text_size(rugpui::TextSize::Sm.size(cx))
                     .text_color(theme.icon)
@@ -1929,7 +1940,7 @@ impl GeneratePane {
                     .flex_none()
                     .items_center()
                     .justify_center()
-                    .size(px(22.))
+                    .size(rugpui::scaled(22., cx))
                     .rounded_md()
                     .text_size(rugpui::TextSize::Sm.size(cx))
                     .text_color(theme.icon)
@@ -1944,7 +1955,7 @@ impl GeneratePane {
     }
 
     /// The custom variable table.
-    fn render_vars(&self) -> impl IntoElement + use<> {
+    fn render_vars(&self, cx: &App) -> impl IntoElement + use<> {
         let rows: Vec<_> = self
             .vars
             .iter()
@@ -1958,7 +1969,12 @@ impl GeneratePane {
                     .gap(px(6.))
                     .w_full()
                     .min_w_0()
-                    .child(div().w(px(150.)).flex_none().child(row.key.clone()))
+                    .child(
+                        div()
+                            .w(rugpui::scaled(150., cx))
+                            .flex_none()
+                            .child(row.key.clone()),
+                    )
                     .child(div().flex_1().min_w_0().child(row.value.clone()))
             })
             .collect();
@@ -2034,7 +2050,7 @@ impl GeneratePane {
         modal(
             "generate-set-name",
             ts!("generate.save_as_set"),
-            px(360.),
+            rugpui::scaled(360., cx),
             div()
                 .flex()
                 .flex_col()
@@ -2102,7 +2118,7 @@ impl GeneratePane {
         modal(
             "generate-delete-set",
             ts!("generate.delete_set"),
-            px(360.),
+            rugpui::scaled(360., cx),
             div()
                 .flex()
                 .flex_col()
@@ -2175,7 +2191,7 @@ impl GeneratePane {
         modal(
             "generate-export-set",
             ts!("generate.export_title"),
-            px(420.),
+            rugpui::scaled(420., cx),
             div()
                 .flex()
                 .flex_col()
@@ -2321,7 +2337,7 @@ impl GeneratePane {
         modal(
             "generate-import-set",
             ts!("generate.import_title"),
-            px(440.),
+            rugpui::scaled(440., cx),
             div()
                 .flex()
                 .flex_col()
@@ -2524,7 +2540,7 @@ impl Render for GeneratePane {
                     .child(heading(ts!("generate.options")))
                     .child(labeled(ts!("generate.output_dir"), output, cx))
                     .child(labeled(ts!("generate.author"), self.author.clone(), cx))
-                    .child(labeled(ts!("generate.variables"), self.render_vars(), cx))
+                    .child(labeled(ts!("generate.variables"), self.render_vars(cx), cx))
                     .child(labeled(ts!("generate.overwrite"), overwrite, cx))
                     .child(self.render_abbreviations(cx))
                     .children(
@@ -2675,7 +2691,7 @@ fn labeled(label: SharedString, control: impl IntoElement, cx: &App) -> impl Int
         .child(
             div()
                 .flex_none()
-                .w(px(LABEL_WIDTH))
+                .w(rugpui::scaled(LABEL_WIDTH, cx))
                 .pt(px(6.))
                 .text_size(rugpui::TextSize::Sm.size(cx))
                 .child(label),
@@ -3406,6 +3422,55 @@ mod tests {
         assert!(
             (gained - px(400. * 2. / 3.)).abs() < px(2.),
             "the field did not grow with the window: {widths:?}"
+        );
+    }
+
+    #[gpui::test]
+    fn the_interface_size_grows_the_glyph_boxes_and_the_set_selector(
+        cx: &mut gpui::TestAppContext,
+    ) {
+        cx.update(|cx| {
+            crate::app_settings::init(cx);
+            rugpui::init(cx);
+        });
+        let window = cx.add_window(|_, cx| {
+            let mut pane = GeneratePane::new(cx);
+            pane.rebuild(
+                &GenerationProfile {
+                    templates: vec![reference("first", true)],
+                    ..Default::default()
+                },
+                cx,
+            );
+            pane
+        });
+        let mut cx = gpui::VisualTestContext::from_window(window.into(), cx);
+        cx.simulate_resize(gpui::size(px(1200.), px(800.)));
+        let measure = |scale: f32, cx: &mut gpui::VisualTestContext| {
+            cx.update(|_, cx| rugpui::set_ui_scale(scale, cx));
+            cx.run_until_parked();
+            let edit = cx
+                .debug_bounds("generate-edit-0")
+                .expect("the edit glyph is drawn")
+                .size;
+            let sets = cx
+                .debug_bounds("generate-sets")
+                .expect("the set row is drawn")
+                .size;
+            (edit, sets)
+        };
+
+        let (edit, sets) = measure(1.0, &mut cx);
+        assert_eq!(
+            edit,
+            gpui::size(px(22.), px(22.)),
+            "the default size is unchanged"
+        );
+        let (large, large_sets) = measure(1.5, &mut cx);
+        assert_eq!(large, gpui::size(px(33.), px(33.)));
+        assert!(
+            large_sets.height > sets.height,
+            "the set row grows with its selector: {sets:?} -> {large_sets:?}"
         );
     }
 

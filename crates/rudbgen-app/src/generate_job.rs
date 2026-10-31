@@ -480,7 +480,7 @@ impl GenerationJob {
         modal(
             "generation-progress",
             ts!("progress.title"),
-            px(DIALOG_WIDTH),
+            rugpui::scaled(DIALOG_WIDTH, cx),
             div()
                 .flex()
                 .flex_col()
@@ -568,7 +568,7 @@ impl GenerationJob {
         modal(
             "generation-conflict",
             ts!("summary.conflict_title"),
-            px(DIALOG_WIDTH),
+            rugpui::scaled(DIALOG_WIDTH, cx),
             div()
                 .flex()
                 .flex_col()
@@ -719,7 +719,7 @@ impl GenerationJob {
         modal(
             "generation-summary",
             ts!("summary.title"),
-            px(DIALOG_WIDTH),
+            rugpui::scaled(DIALOG_WIDTH, cx),
             div()
                 .flex()
                 .flex_col()
@@ -755,7 +755,7 @@ impl GenerationJob {
                         .flex_col()
                         .gap(px(8.))
                         .min_h_0()
-                        .max_h(px(240.))
+                        .max_h(rugpui::scaled(240., cx))
                         .overflow_y_scroll()
                         .children(section(ts!("summary.written"), written, theme.success))
                         .children(section(ts!("summary.skipped"), skipped, theme.text_muted))
@@ -805,7 +805,7 @@ impl GenerationJob {
         modal(
             "generation-refused",
             ts!("summary.title"),
-            px(DIALOG_WIDTH),
+            rugpui::scaled(DIALOG_WIDTH, cx),
             div()
                 .flex()
                 .flex_col()

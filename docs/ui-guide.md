@@ -489,8 +489,10 @@ theme directory), the interface language, the fonts, the Java heap the embedded
 JVM starts with and its extra arguments, the window chrome, and the default
 overwrite policy. The language changes live — there is nothing to restart.
 **Interface size** scales the whole window — every label, list, tab, menu,
-dialog and bar, not only the text fields — from its default of 14, previewed as
-you type it.
+dialog and bar, not only the text fields, and the icons, checkboxes, glyph
+buttons and fixed columns along with the text they sit beside — from its
+default of 14, previewed as you type it. Borders, gaps and the template
+editor's own font size stay as they are.
 <kbd>Ctrl</kbd>+<kbd>S</kbd> saves; closing with changes on the form asks first.
 
 While any dialog is up, the window's own shortcuts stand down: a chord pressed

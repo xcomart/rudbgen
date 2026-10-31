@@ -113,7 +113,7 @@ impl Workspace {
         rugpui::modal(
             "unsaved-run",
             ts!("unsaved.title"),
-            px(440.),
+            rugpui::scaled(440., cx),
             div()
                 .flex()
                 .flex_col()

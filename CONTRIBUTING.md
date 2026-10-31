@@ -132,12 +132,17 @@ MariaDB, SQL Server, Oracle and Db2 URLs and credentials, and
 start creates its database and takes several minutes before it reports healthy;
 its tests are the ones named `db2_*`. Use disposable test databases: the suites
 create and drop objects. rudbgen and rudbman use the same local test ports, so
-run their Compose environments one at a time. Both files also sit in a
-`docker/` directory, which Compose takes as the project name, so `up` in one
-replaces the other's container of the same service rather than failing, and
-hands it the other's anonymous volume: Db2 then finds rudbman's setup already
-done and creates no `RUDBGEN` database. Give this stack a project of its own,
-`docker compose -p rudbgen -f docker/compose.yml ...`, to keep the two apart.
+run their Compose environments one at a time. Both compose files sit in a
+`docker/` directory and share service names, so each sets its own project name
+(`name: rudbgen` here, `name: rudbman` there); without it Compose took both as
+the project `docker`, and `up` in one replaced the other's container of the
+same service and handed it the other's anonymous volume. A container created
+before the name was set, without `-p rudbgen`, still belongs to the project
+`docker`, and its fixed `container_name` makes `up` fail with
+`The container name "/rudbgen-test-postgres" is already in use` until you
+remove it with `docker rm rudbgen-test-postgres` (or whichever name the error
+gives). Its test data goes with it; Db2 creates its database again on the next
+start. One created with `-p rudbgen` is already in the right project.
 
 SQLite needs no Docker server. After downloading the drivers, set
 `RUDBGEN_TEST_SQLITE_URL` to `jdbc:sqlite:/absolute/path/to/a/test.db` in a

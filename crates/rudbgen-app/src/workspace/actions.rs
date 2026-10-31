@@ -275,9 +275,9 @@ impl Workspace {
         if self.close_context_menus(cx) {
             return;
         }
-        // The Generate tab's own two questions — the name of a set, and
-        // whether to delete one — are drawn inside the tab, and so are not
-        // anywhere on this list unless the tab is asked.
+        // The Generate tab's own questions — the name of a set, whether to
+        // delete one, exporting or importing one — are drawn inside the tab,
+        // and so are not anywhere on this list unless the tab is asked.
         if self.generate.update(cx, |pane, cx| pane.escape(cx)) {
             self.return_focus(window, cx);
             return;

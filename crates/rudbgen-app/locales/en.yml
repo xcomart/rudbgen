@@ -486,6 +486,40 @@ generate:
   dry_into: "%{count} files would be written under %{dir}"
   dry_no_output: "No output directory is chosen yet: the paths are shown under a temporary one, so every file reads new."
   added_to_list: "Added “%{name}” to the generation list."
+  # The `⋯` beside the set buttons and its two rows. A set file is one JSON
+  # file holding a set and the contents of its templates.
+  set_more: "More set actions"
+  export_set: "Export set…"
+  import_set: "Import set…"
+  export_title: "Export set"
+  export_summary: "“%{name}” and the contents of its %{count} templates go into one file."
+  export_vars: "Include this connection's custom variables (%{count})"
+  # Opens the save dialog, hence the ellipsis.
+  export_button: "Export…"
+  export_done: "Exported “%{name}” to %{path}."
+  export_failed: "The set could not be exported: %{error}"
+  import_select: "Choose a template set file"
+  import_title: "Import set"
+  import_button: "Import"
+  import_summary: "%{count} templates: %{names}"
+  import_folder: "The template files are written to a new folder: %{dir}"
+  # The imported set is put on the list as picking it would, with Undo.
+  import_applies: "The set then replaces this connection's template list; Undo brings the old list back."
+  import_vars: "Add the custom variables this connection does not have yet (%{count})"
+  # The import's name is a set's: the set is replaced, its files are not.
+  import_overwrite_note: "This replaces the set “%{name}” with the imported one. The old set's template files stay where they are."
+  import_done: "Imported “%{name}”: %{count} templates in %{dir}."
+  import_failed: "“%{file}” could not be imported: %{error}"
+  import_write_failed: "The templates could not be written: %{error}"
+  # Why a set file could not be made, read or written. `%{error}` is the
+  # system's own words and is not translated.
+  bundle_read_template: "The template “%{template}” could not be read from %{path}: %{error}"
+  bundle_not_utf8: "The template “%{template}” (%{path}) is not UTF-8 text."
+  bundle_not_a_set: "This file is not a rudbgen template set."
+  bundle_newer: "This set was written by a newer rudbgen (format %{version}). Update rudbgen to import it."
+  bundle_empty: "This set holds no templates."
+  bundle_too_large: "The file is larger than %{limit} MiB, too large to be a template set."
+  bundle_io: "%{path}: %{error}"
 
 # The progress dialog of a run (D11). Every line here is one row of its log,
 # so they are worded as a log is: lower case, no full stop.

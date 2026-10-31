@@ -223,6 +223,8 @@ known_hosts
 
 `GenerationProfile { templates: Vec<TemplateRef { name, file, out_template, selected }>, output_dir: Option, author, custom_vars: Vec<(String, String)> }` (a list of pairs, in the order the user typed them) lives inside `ConnectionProfile`. Paths are stored relative to the config dir when below it, absolute otherwise (jdbgen's rule; the install-dir fallback goes — a Rust binary has no `templates/` beside it).
 
+A set leaves the machine as a **bundle** (`rudbgen_core::TemplateBundle`, `*.rudbgen-set.json`): `{ format: "rudbgen-template-set", version: 1, name, templates: [{ name, file, out_template, selected, content }], variables? }` — the set with each template's UTF-8 body in place of its path, and optionally the exporting connection's custom variables. JSON rather than an archive because templates are UTF-8 text by rule. `version` moves only for a change an older reader would misread, and a newer one is refused. Importing writes the bodies into a **new** directory under `templates/` (named after the set, numbered when taken, created with a call that fails if it exists), with file names reduced to one portable component — a bundle is outside input — and removes that directory again if anything after it fails.
+
 Secrets: `SecretSlot::Connection` for the database password, stored under the profile id, and `SecretSlot::Tunnel` for the bastion, under `<profile-id>:tunnel`. The URL and user name are **not** secrets here (they were encrypted in jdbgen only because the master password existed); `MaskedUrl` still keeps inline credentials out of logs.
 
 ---

@@ -97,6 +97,12 @@ Written against jdbgen, because that is what most of this is for:
   jdbgen took only lower case and silently read `${ELSE}` as a field.
   ![The template editor with its live preview](docs/screenshots/template-editor.png)
   ![Completion offering the model's fields, each with what it renders to](docs/screenshots/completion.png)
+- **Template sets travel as one file.** jdbgen's presets named template files
+  by path, which meant nothing on the next computer. *Export set…* writes a set
+  together with its templates' contents — and, if you like, the connection's
+  custom variables — into a single `*.rudbgen-set.json`; *Import set…* puts the
+  templates in a new folder of their own, never over an existing file, saves
+  the set and puts it on the list.
 - **An abbreviation rules editor.** The four-column table jdbgen kept in its
   configuration window, with a trailing empty row, a table-name picker for
   whole-name rules, and a refusal to save two rules that would silently become

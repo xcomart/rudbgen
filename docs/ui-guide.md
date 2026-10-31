@@ -235,6 +235,20 @@ written.
   of the set the list came from: keep that name and the button reads
   **Overwrite**, which replaces that set with the list as it now stands — same
   place in the selector — while any other name is saved as a new set.
+- **⋯ beside the set buttons** — moves a set between machines.
+  **Export set…** (available while the list is a saved set) writes one
+  `*.rudbgen-set.json` file holding the set and the *contents* of its
+  templates, so it means the same on another computer; tick *Include this
+  connection's custom variables* to take `${package}` and its like along.
+  A template that cannot be read, or is not UTF-8, is named and nothing is
+  written. **Import set…** reads such a file and asks under which name to save
+  the set — a name a set already has reads **Overwrite**, as above, though the
+  old set's template files are left alone. The templates are written into a
+  new folder of their own under `templates/` (`templates/Java + MyBatis (2)`
+  when the first is taken), so nothing on disk is written over; the set then
+  replaces the connection's list, with **Undo**, and its custom variables can
+  be added — only the ones the connection does not have, so a value you set
+  keeps winning.
 - **The template list** — one row per template under the column headings: a
   tick, its name, its file, the **output name template** that names the file it
   writes, and buttons to edit or remove it. Removing a row can be undone the
@@ -503,9 +517,9 @@ top while the tab strip has the keyboard. In an open menu the arrows,
 <kbd>Home</kbd>/<kbd>End</kbd> and typed letters move the highlight and
 <kbd>Enter</kbd> runs the row.
 
-Short notices — a template added to the generation list, a path copied, a
-password the keychain would not keep, a connection list that could not be
-written — appear for a moment above the status bar; an error stays until you
+Short notices — a template added to the generation list, a set exported or
+imported, a path copied, a password the keychain would not keep, a connection
+list that could not be written — appear for a moment above the status bar; an error stays until you
 close it.
 
 Eight languages ship: English, Korean, Japanese, Simplified Chinese, German,

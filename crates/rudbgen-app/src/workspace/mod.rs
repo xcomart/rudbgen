@@ -60,10 +60,12 @@
 pub(crate) use bootstrap::editor_theme_for;
 
 use crate::{
-    CheckUpdates, DismissDialog, DryRun, EditAbbreviations, Generate, ImportJdbgen, NewConnection,
-    NewTemplate, OpenSettings, OpenTemplate, Preview, Quit, SaveTemplate, ShowAbout,
-    ToggleExplorer, ToggleInspector, ToggleLivePreview, TriggerCompletion, app_settings,
-    builtin_templates, connection, generate_pane, i18n, icons, palette, sample_db,
+    AddToGeneration, CheckUpdates, CloseTab, DismissDialog, DryRun, EditAbbreviations, FocusTabs,
+    Generate, ImportJdbgen, ManageConnections, NewConnection, NewProfile, NewTemplate,
+    NextDiagnostic, NextTab, OpenSettings, OpenTemplate, PrevDiagnostic, PrevTab, Preview, Quit,
+    SaveDialog, SaveTemplate, SelectTab, ShowAbout, ToggleExplorer, ToggleInspector,
+    ToggleLivePreview, TriggerCompletion, app_settings, builtin_templates, connection,
+    generate_pane, i18n, icons, palette, sample_db,
 };
 
 mod actions;
@@ -75,6 +77,7 @@ mod database;
 mod dialogs;
 mod generation;
 mod layout;
+mod profiles;
 mod templates;
 mod view;
 #[cfg(test)]
@@ -89,8 +92,8 @@ use gpui::{
     WindowBounds, WindowControlArea, WindowOptions, div, img, prelude::*, px,
 };
 use rudbgen_core::{
-    AppSettings, ConnectionProfile, ConnectionStore, DriverDef, DriverStore, TemplateSetStore,
-    TitlebarStyle, WindowState,
+    AppSettings, ConnectionProfile, ConnectionStore, DriverDef, DriverStore, SecretStore,
+    TemplateSetStore, TitlebarStyle, WindowState,
 };
 use rudbgen_gen::{Plan, TemplateSpec};
 use rudbgen_meta::{MetaReader, Table};
@@ -101,7 +104,7 @@ use rugpui::{
     set_editor_theme, set_theme, set_window_tint, theme, tooltip_label,
 };
 use rugpui_shell::{
-    AboutDialog, AboutDialogEvent, AppIdentity, Pane, UpdateDialog, UpdateDialogEvent,
+    AboutDialog, AboutDialogEvent, AppIdentity, CloseGuard, Pane, UpdateDialog, UpdateDialogEvent,
     apply_caption_theme, chrome, menu_rows, update,
 };
 
@@ -109,8 +112,8 @@ use crate::abbreviation_dialog::{AbbreviationDialog, AbbreviationDialogEvent};
 use crate::connection::{
     Closing, ConnectError, Connected, Credentials, SessionHandle, wait_for_closes,
 };
-use crate::connection_dialog::{ConnectionDialog, ConnectionDialogEvent};
-use crate::explorer::{Explorer, ExplorerEvent, SchemaKey, TableKey};
+use crate::connection_dialog::{self, ConnectionDialog, ConnectionDialogEvent};
+use crate::explorer::{Explorer, ExplorerEvent, Landing, SchemaKey, TableKey};
 use crate::generate_job::{GenerationJob, JobEvent};
 use crate::generate_pane::{Blocker, GeneratePane, GeneratePaneEvent};
 use crate::i18n::ts;
@@ -136,6 +139,33 @@ enum RunKind {
     /// Render one pair and show its text.
     Preview,
 }
+
+/// Which door the connection dialog is opened through; see
+/// [`Workspace::open_connection_dialog`].
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+enum ConnectionDoor {
+    /// *New connection…*: a blank profile.
+    New,
+    /// *Manage connections…*: the profile that is open, or the first one.
+    Manage,
+    /// The welcome list's *Edit…*: the profile it was pressed on.
+    Edit(uuid::Uuid),
+}
+
+/// How the menus write the chord that starts a generate.
+///
+/// `F5`, the key every IDE runs with, on every platform; `Ctrl+Shift+G` beside
+/// it off macOS, where `Cmd+Shift+G` is the find bar's "previous". `Ctrl+G`
+/// used to be it, and is the editor's "go to line" in everything a template
+/// author has used before — a habit that wrote a whole run's files.
+const GENERATE_HINT: &str = "F5";
+
+/// How the menus write the second chord that opens the completion popup.
+///
+/// `Ctrl+Space` stays, and is what the docs lead with; but it is the input
+/// method's toggle on most Korean, Japanese and Chinese desktops and the input
+/// source switch on macOS, and those take it before the window sees it.
+const COMPLETION_HINT: &str = "Alt+/";
 
 /// Key context the shell's own shortcuts are scoped to.
 const KEY_CONTEXT: &str = "Workspace";
@@ -408,6 +438,9 @@ enum ConnectionState {
         /// metadata read has to use the four custom queries (D9) the session
         /// was actually opened with.
         driver: Box<DriverDef>,
+        /// A password typed into the window's own question with *Remember
+        /// password* ticked, to go into the keychain once it has worked.
+        remember: Option<String>,
         /// Dropped — and so abandoned — when the state is replaced.
         _task: Task<()>,
     },
@@ -430,6 +463,12 @@ enum ConnectionState {
         profile: Box<ConnectionProfile>,
         /// [`ConnectError::message`], already rendered.
         message: SharedString,
+        /// What the failure suggests doing about it, when its class says
+        /// anything (see `connection_dialog::error_hint`).
+        hint: Option<SharedString>,
+        /// A bastion key nothing has trusted yet, which the welcome screen's
+        /// banner offers to trust — the one failure a button can clear.
+        host_key: Option<Box<connection_dialog::HostKey>>,
     },
 }
 
@@ -464,6 +503,39 @@ impl ConnectionState {
             ConnectionState::Open { .. } => theme.success,
             ConnectionState::Failed { .. } => theme.danger,
         }
+    }
+}
+
+/// The password a connection is waiting on: a question the window puts up
+/// when a profile keeps none, or when the database refused the one it had.
+struct PasswordPrompt {
+    /// The profile being opened.
+    profile: Box<ConnectionProfile>,
+    /// The driver definition it is opened through, as the attempt resolved it.
+    driver: Box<DriverDef>,
+    /// What to type into; masked.
+    input: Entity<rugpui::TextInput>,
+    /// Whether the password is to be kept in the keychain once it works.
+    remember: bool,
+    /// Why the question is being asked again, when it is.
+    reason: Option<SharedString>,
+}
+
+/// What quitting now would lose; see [`Workspace::unsaved_work`].
+#[derive(Debug, Default, PartialEq, Eq)]
+struct UnsavedWork {
+    /// The template tabs with unsaved edits, by title.
+    templates: Vec<SharedString>,
+    /// Whether a generate is still writing files.
+    run: bool,
+    /// Whether a dialog holds a changed draft, or an import is half done.
+    draft: bool,
+}
+
+impl UnsavedWork {
+    /// Whether there is nothing to lose.
+    fn is_empty(&self) -> bool {
+        self.templates.is_empty() && !self.run && !self.draft
     }
 }
 
@@ -582,11 +654,37 @@ struct Workspace {
     palette: Entity<VariablePalette>,
     /// The tab a close is waiting on an answer about, when one is.
     closing: Option<usize>,
+    /// A run waiting on "save the templates first?", and what it is.
+    unsaved_run: Option<RunKind>,
+    /// The welcome row whose *Delete…* is waiting on a confirmation.
+    deleting_profile: Option<uuid::Uuid>,
+    /// The password a connection is waiting on, while the question is up.
+    password_prompt: Option<PasswordPrompt>,
+    /// Something the user has to hear once the session being opened is open
+    /// — that the keychain refused its password — said in a toast then, and
+    /// dropped if the session never opens.
+    connection_notice: Option<SharedString>,
+    /// The button the shell's own questions put the keyboard on — Save before
+    /// closing, *Save and run*, Cancel before deleting a connection. One
+    /// handle, because only one of them is ever up.
+    prompt_focus: FocusHandle,
+    /// The work area's tab strip, for the keyboard to reach it by
+    /// ([`FocusTabs`]); see [`TabBar::focus_handle`].
+    tabs_focus: FocusHandle,
+    /// The tab whose right-click menu is open, and where.
+    tab_menu: Option<(usize, Point<Pixels>)>,
+    /// The welcome row whose right-click menu is open, and where.
+    profile_menu: Option<(uuid::Uuid, Point<Pixels>)>,
     /// A disconnect is putting the template tabs away first, and goes on
     /// with the next one once [`Workspace::closing`] is answered.
     disconnecting: bool,
+    /// Tabs a menu's *Close others* or *Close to the right* still has to
+    /// close, once [`Workspace::closing`] is answered.
+    pending_closes: Vec<PaneItem>,
     /// The progress dialog, the overwrite question and the summary (D11).
     job: Entity<GenerationJob>,
+    /// Stops the dry run that is rendering, while one is.
+    dry_run_cancel: Option<rudbgen_gen::CancelHandle>,
     /// The work area's tab strip.
     ///
     /// A [`Pane`] rather than a [`rugpui_shell::PaneTree`]: there is one pane,
@@ -632,6 +730,16 @@ struct Workspace {
     update: Entity<UpdateDialog>,
     /// Whether the help menu is showing.
     menu_open: bool,
+    /// Whether it was opened from the keyboard (`F10`), and so opens on its
+    /// first row.
+    menu_by_keyboard: bool,
+    /// Whether the tab menu was opened from the keyboard.
+    tab_menu_by_keyboard: bool,
+    /// Whether the welcome row's menu was opened from the keyboard.
+    profile_menu_by_keyboard: bool,
+    /// Where the tab strip was drawn last, for a menu opened on it from the
+    /// keyboard to hang from.
+    tabs_bounds: std::rc::Rc<std::cell::Cell<gpui::Bounds<Pixels>>>,
     /// Title bar style currently *on the window*.
     ///
     /// Starts as the style the window was created with. Not read from the
@@ -664,6 +772,9 @@ struct Workspace {
     _palette_events: Subscription,
     /// Keeps the generation dialog's subscription alive.
     _job_events: Subscription,
+    /// The question a close, a quit or an update's restart asks while there
+    /// is work it would lose; drawn last, over every other overlay.
+    close_guard: Entity<CloseGuard>,
     /// Closes the session before the process winds down.
     _quit: Subscription,
     /// Records the window's placement as it is moved and resized.
@@ -701,7 +812,17 @@ impl Workspace {
         // cannot get past. The closes run on threads of their own; the quit
         // waits for them here, but only for so long — a close that hangs on a
         // server that is gone must not keep the application from leaving.
-        let quit = cx.on_app_quit(|workspace: &mut Workspace, _cx| {
+        let quit = cx.on_app_quit(|workspace: &mut Workspace, cx| {
+            // The Generate tab's last edit may still be waiting out its
+            // debounce; written now, or lost with the process.
+            workspace.generate.update(cx, |pane, cx| pane.flush(cx));
+            workspace.remember_ticks(cx);
+            // The close guard asked before the quit got here; what the user
+            // chose to leave behind goes on record.
+            let lost = workspace.unsaved_work(cx);
+            if !lost.is_empty() {
+                log::warn!("quitting with work that was not saved: {lost:?}");
+            }
             workspace.close_session();
             if !wait_for_closes(&workspace.closing_sessions) {
                 log::warn!("quitting with a session that has not finished closing");
@@ -711,6 +832,27 @@ impl Workspace {
 
         let update = cx.new(UpdateDialog::new);
         let update_events = cx.subscribe_in(&update, window, Self::on_update_event);
+
+        // The window's close guard: the caption's close, the platform's, a
+        // quit and an update's restart all ask it first, and it asks the user
+        // only when `unsaved_lines` names something. *Save all* writes the
+        // template tabs; a run and a dialog's draft are not things it can
+        // save, so they stay on the list until the user deals with them.
+        let lines = cx.weak_entity();
+        let saving = cx.weak_entity();
+        let close_guard = cx.new(|cx| {
+            CloseGuard::new(window, cx, move |_intent, _window, cx| {
+                lines
+                    .read_with(cx, |workspace, cx| workspace.unsaved_lines(cx))
+                    .unwrap_or_default()
+            })
+            .with_save_all(move |_window, cx| {
+                let saved = saving
+                    .update(cx, |workspace, cx| workspace.save_all_templates(cx))
+                    .unwrap_or(false);
+                Task::ready(saved)
+            })
+        });
 
         Self::start_background_work(cx);
 
@@ -789,8 +931,18 @@ impl Workspace {
             template_events: Vec::new(),
             palette,
             closing: None,
+            unsaved_run: None,
+            deleting_profile: None,
+            password_prompt: None,
+            connection_notice: None,
+            prompt_focus: cx.focus_handle(),
+            tabs_focus: cx.focus_handle(),
+            tab_menu: None,
+            profile_menu: None,
             disconnecting: false,
+            pending_closes: Vec::new(),
             job,
+            dry_run_cancel: None,
             pane,
             pane_menu_open: false,
             tab_drop: TabDropState::new(),
@@ -801,6 +953,10 @@ impl Workspace {
             inspector_width: layout.inspector_width,
             update,
             menu_open: false,
+            menu_by_keyboard: false,
+            tab_menu_by_keyboard: false,
+            profile_menu_by_keyboard: false,
+            tabs_bounds: std::rc::Rc::default(),
             titlebar,
             _about_events: about_events,
             _settings_events: settings_events,
@@ -814,6 +970,7 @@ impl Workspace {
             _preview_events: preview_events,
             _palette_events: palette_events,
             _job_events: job_events,
+            close_guard,
             _quit: quit,
             _bounds: bounds,
             _button_layout: button_layout,

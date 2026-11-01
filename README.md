@@ -44,12 +44,15 @@ Written against jdbgen, because that is what most of this is for:
   password with a master password you had to type at every start. rudbgen puts
   the password — and an SSH key passphrase — in the operating system's own
   keychain, and stores nothing secret on disk. There is nothing to remember and
-  nothing to lose.
+  nothing to lose — and where the keychain is not to be used, untick *Remember
+  password* and rudbgen asks for it on every connect.
 - **A schema explorer with a checkbox on every row.** Catalog → schema → table,
-  fetched lazily, with jdbgen's contains-filter over it and a views toggle. The
-  ticked set survives filtering, collapsing and refreshing — it is only cleared
-  by a new connection — and a schema's three-state box acts on the rows you can
-  actually see.
+  fetched lazily and opened on connect onto the database and schema the
+  connection landed in, with jdbgen's contains-filter over it and a views toggle. The
+  ticked set survives filtering, collapsing and refreshing, is kept with the
+  connection and ticked again the next time it opens — a table that has gone in
+  the meantime is unticked and named — and a schema's three-state box acts on
+  the rows you can actually see.
 - **A table inspector**: columns, the primary key **in key order**, foreign keys
   in *both* directions, and indexes. jdbgen had a Table View modal and neither
   foreign keys nor indexes at all.
@@ -89,11 +92,18 @@ Written against jdbgen, because that is what most of this is for:
   you pick, gutter marks for parse errors and for **unknown fields** — jdbgen's
   way of finding a typo like `${nmae}` was to read the generated file — a
   clickable variable palette of every field the model offers, and completion on
-  <kbd>Ctrl</kbd>+<kbd>Space</kbd>. `${ENDIF}`, `${Else}` and the rest of the
+  <kbd>Ctrl</kbd>+<kbd>Space</kbd> (or <kbd>Alt</kbd>+<kbd>/</kbd> where an input
+  method takes that). `${ENDIF}`, `${Else}` and the rest of the
   block keywords work in any case, as every other statement name always did —
   jdbgen took only lower case and silently read `${ELSE}` as a field.
   ![The template editor with its live preview](docs/screenshots/template-editor.png)
   ![Completion offering the model's fields, each with what it renders to](docs/screenshots/completion.png)
+- **Template sets travel as one file.** jdbgen's presets named template files
+  by path, which meant nothing on the next computer. *Export set…* writes a set
+  together with its templates' contents — and, if you like, the connection's
+  custom variables — into a single `*.rudbgen-set.json`; *Import set…* puts the
+  templates in a new folder of their own, never over an existing file, saves
+  the set and puts it on the list.
 - **An abbreviation rules editor.** The four-column table jdbgen kept in its
   configuration window, with a trailing empty row, a table-name picker for
   whole-name rules, and a refusal to save two rules that would silently become

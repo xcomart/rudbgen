@@ -9,6 +9,12 @@ impl Workspace {
     /// generation profile, and a run has to use what is on screen rather than
     /// what the debounce has got round to writing.
     pub(super) fn start_run(&mut self, kind: RunKind, cx: &mut Context<Self>) {
+        // The buttons are disabled while a run is going, but the shortcut is
+        // not a button: a second press would start a second run over the first
+        // one's dialog, and Cancel would then reach only the second.
+        if self.job.read(cx).is_busy() {
+            return;
+        }
         self.generate.update(cx, |pane, cx| pane.flush(cx));
 
         // A preview and a dry run write nothing, so a missing output directory
@@ -22,6 +28,160 @@ impl Workspace {
             return;
         }
 
+        // A run reads its templates from their files, and the live preview
+        // beside an edited one renders its buffer: running over a ticked
+        // template with unsaved edits would write something other than what
+        // the user has just been looking at. So the question comes first.
+        if !self.unsaved_run_templates(cx).is_empty() {
+            self.unsaved_run = Some(kind);
+            cx.notify();
+            return;
+        }
+        self.read_and_run(kind, cx);
+    }
+
+    /// The open template tabs a run would read the saved file of instead of
+    /// what is in them: ticked in the Generate tab, and with unsaved edits.
+    pub(super) fn unsaved_run_templates(&self, cx: &App) -> Vec<usize> {
+        let ticked: Vec<PathBuf> = self
+            .generate
+            .read(cx)
+            .collect(cx)
+            .templates
+            .iter()
+            .filter(|template| template.selected)
+            .map(|template| generate_pane::resolve_template(&template.file))
+            .collect();
+        self.templates
+            .iter()
+            .enumerate()
+            .filter(|(_, pane)| {
+                let pane = pane.read(cx);
+                pane.is_dirty(cx) && ticked.iter().any(|file| file == pane.path())
+            })
+            .map(|(index, _)| index)
+            .collect()
+    }
+
+    /// Answers "save the templates first?": `Some(true)` saves them and runs,
+    /// `Some(false)` runs from the files as they are, `None` runs nothing.
+    ///
+    /// A save that fails stops the run there, with the tab showing why — the
+    /// same rule a failed save before closing a tab follows.
+    pub(super) fn answer_unsaved_run(
+        &mut self,
+        save: Option<bool>,
+        window: &mut Window,
+        cx: &mut Context<Self>,
+    ) {
+        let Some(kind) = self.unsaved_run.take() else {
+            return;
+        };
+        self.return_focus(window, cx);
+        cx.notify();
+        let Some(save) = save else {
+            return;
+        };
+        if save {
+            for index in self.unsaved_run_templates(cx) {
+                let pane = self.templates[index].clone();
+                if !pane.update(cx, |pane, cx| pane.save(cx)) {
+                    self.retitle_templates(cx);
+                    return;
+                }
+            }
+            self.retitle_templates(cx);
+        }
+        self.read_and_run(kind, cx);
+    }
+
+    /// "Save the templates first?", with the names it is asking about.
+    pub(super) fn render_unsaved_run_prompt(&self, cx: &mut Context<Self>) -> AnyElement {
+        let theme = theme(cx);
+        let names: Vec<String> = self
+            .unsaved_run_templates(cx)
+            .into_iter()
+            .map(|index| self.templates[index].read(cx).title().to_string())
+            .collect();
+        let (save, plain, cancel, dismissed, default) = (
+            cx.entity(),
+            cx.entity(),
+            cx.entity(),
+            cx.entity(),
+            cx.entity(),
+        );
+        rugpui::modal(
+            "unsaved-run",
+            ts!("unsaved.title"),
+            rugpui::scaled(440., cx),
+            div()
+                .flex()
+                .flex_col()
+                .gap(px(14.))
+                .child(
+                    div()
+                        .text_size(rugpui::TextSize::Sm.size(cx))
+                        .text_color(theme.text)
+                        .child(ts!("unsaved.question", names = names.join(", "))),
+                )
+                .child(
+                    div()
+                        .flex()
+                        .flex_row()
+                        .flex_wrap()
+                        .justify_end()
+                        .gap(px(8.))
+                        .child(
+                            Button::new("unsaved-cancel", ts!("common.cancel"))
+                                .variant(ButtonVariant::Secondary)
+                                .on_click(move |_, window, cx| {
+                                    cancel.update(cx, |workspace, cx| {
+                                        workspace.answer_unsaved_run(None, window, cx);
+                                    });
+                                }),
+                        )
+                        .child(
+                            Button::new("unsaved-plain", ts!("unsaved.run_without_saving"))
+                                .variant(ButtonVariant::Secondary)
+                                .on_click(move |_, window, cx| {
+                                    plain.update(cx, |workspace, cx| {
+                                        workspace.answer_unsaved_run(Some(false), window, cx);
+                                    });
+                                }),
+                        )
+                        .child(
+                            Button::new("unsaved-save", ts!("unsaved.save_and_run"))
+                                .variant(ButtonVariant::Primary)
+                                .focus_handle(&self.prompt_focus)
+                                .on_click(move |_, window, cx| {
+                                    save.update(cx, |workspace, cx| {
+                                        workspace.answer_unsaved_run(Some(true), window, cx);
+                                    });
+                                }),
+                        ),
+                ),
+            move |window, cx| {
+                dismissed.update(cx, |workspace, cx| {
+                    workspace.answer_unsaved_run(None, window, cx);
+                });
+            },
+        )
+        // *Save and run* holds the keyboard and is what `Enter` answers.
+        .initial_focus(&self.prompt_focus)
+        .on_confirm(move |window, cx| {
+            default.update(cx, |workspace, cx| {
+                workspace.answer_unsaved_run(Some(true), window, cx);
+            });
+        })
+        .into_any_element()
+    }
+
+    /// The run itself, once nothing stands in its way: reads the tables the
+    /// inspector has not described yet, then hands them to [`Self::run_with`].
+    pub(super) fn read_and_run(&mut self, kind: RunKind, cx: &mut Context<Self>) {
+        if self.job.read(cx).is_busy() {
+            return;
+        }
         let keys: Vec<TableKey> = self.explorer.read(cx).selection(cx).into_iter().collect();
         // Every ticked table, with the ones the inspector has already described
         // filled in. Walking the tree is what usually fills them, so a generate
@@ -55,7 +215,8 @@ impl Workspace {
         let Some((handle, driver, epoch)) = self.meta_context() else {
             return;
         };
-        self.job
+        let ticket = self
+            .job
             .update(cx, |job, cx| job.begin_loading(missing, cx));
         cx.spawn(async move |this, cx| {
             let mut tables: Vec<Table> = Vec::with_capacity(cached.len());
@@ -63,6 +224,14 @@ impl Workspace {
                 if let Some(table) = slot {
                     tables.push(table);
                     continue;
+                }
+                // Checked before every read, because a read that has started
+                // cannot be stopped: Cancel saves the ones not yet asked for.
+                let wanted = this
+                    .update(cx, |workspace, cx| workspace.load_wanted(ticket, epoch, cx))
+                    .unwrap_or(false);
+                if !wanted {
+                    return;
                 }
                 let reference = references[index].clone();
                 let key = keys[index].clone();
@@ -79,18 +248,29 @@ impl Workspace {
                 match read {
                     Ok(table) => {
                         let name = table.name.clone();
-                        this.update(cx, |workspace, cx| {
-                            workspace
-                                .inspector
-                                .update(cx, |panel, _cx| panel.remember(key, table.clone()));
-                            workspace.job.update(cx, |job, cx| job.loaded(&name, cx));
-                        })
-                        .ok();
+                        let wanted = this
+                            .update(cx, |workspace, cx| {
+                                if !workspace.load_wanted(ticket, epoch, cx) {
+                                    return false;
+                                }
+                                workspace
+                                    .inspector
+                                    .update(cx, |panel, _cx| panel.remember(key, table.clone()));
+                                workspace.job.update(cx, |job, cx| job.loaded(&name, cx));
+                                true
+                            })
+                            .unwrap_or(false);
+                        if !wanted {
+                            return;
+                        }
                         tables.push(table);
                     }
                     Err(message) => {
                         let table = keys[index].qualified();
                         this.update(cx, |workspace, cx| {
+                            if !workspace.load_wanted(ticket, epoch, cx) {
+                                return;
+                            }
                             workspace.job.update(cx, |job, cx| {
                                 job.refuse(
                                     ts!("generate.read_failed", table = table, reason = message),
@@ -104,17 +284,32 @@ impl Workspace {
                 }
             }
             this.update(cx, |workspace, cx| {
-                // The session went away while the tables were being read; the
-                // answers describe a database the window has already left.
-                if workspace.connection_epoch != epoch {
-                    workspace.job.update(cx, |job, cx| job.finish_loading(cx));
-                    return;
+                if workspace.load_wanted(ticket, epoch, cx) {
+                    workspace.run_with(kind, tables, cx);
                 }
-                workspace.run_with(kind, tables, cx);
             })
             .ok();
         })
         .detach();
+    }
+
+    /// Whether the tables the reading phase `ticket` is fetching are still
+    /// wanted.
+    ///
+    /// They are not once the dialog's Cancel took the phase down or a later
+    /// phase replaced it, and then there is nothing to do. Nor are they once
+    /// the session went away while they were being read — the answers describe
+    /// a database the window has already left — and then the dialog is still
+    /// up, so it is taken down here.
+    fn load_wanted(&mut self, ticket: u64, epoch: u64, cx: &mut Context<Self>) -> bool {
+        if !self.job.read(cx).is_loading(ticket) {
+            return false;
+        }
+        if self.connection_epoch != epoch {
+            self.job.update(cx, |job, cx| job.finish_loading(cx));
+            return false;
+        }
+        true
     }
 
     /// Runs `kind` over tables that are all in hand.
@@ -130,7 +325,8 @@ impl Workspace {
 
         match kind {
             RunKind::Generate => {
-                let policy = app_settings::current(cx).overwrite_policy;
+                // The Generate tab's choice for this one run, or the default.
+                let policy = self.generate.update(cx, |pane, cx| pane.take_overwrite(cx));
                 self.job.update(cx, |job, cx| job.start(plan, policy, cx));
             }
             RunKind::DryRun => {
@@ -169,17 +365,28 @@ impl Workspace {
     }
 
     /// Renders every pair into memory and shows the file list.
+    ///
+    /// The tab says it is rendering meanwhile, with a Cancel that stops the
+    /// render at the next pair — a whole schema's worth takes long enough to
+    /// look like nothing happened.
     pub(super) fn dry_run(&mut self, plan: Plan, cx: &mut Context<Self>) {
         self.open_preview_tab(cx);
+        let output_dir = self.generate.read(cx).output_dir(cx);
+        let token = rudbgen_gen::CancelToken::new();
+        self.dry_run_cancel = Some(token.handle());
+        self.preview.update(cx, |pane, cx| pane.begin_dry_run(cx));
+        self.retitle_preview(cx);
         cx.spawn(async move |this, cx| {
             let outcome = cx
                 .background_executor()
-                .spawn(async move {
-                    let cancel = rudbgen_gen::CancelToken::new();
-                    rudbgen_gen::dry_run(&plan, &cancel, &|_| {})
-                })
+                .spawn(async move { rudbgen_gen::dry_run(&plan, &token, &|_| {}) })
                 .await;
             this.update(cx, |workspace, cx| {
+                workspace.dry_run_cancel = None;
+                // Canceled, and so not the answer to anything any more.
+                if !workspace.preview.read(cx).is_rendering() {
+                    return;
+                }
                 let files: Vec<PreviewFile> = outcome
                     .files
                     .iter()
@@ -203,13 +410,22 @@ impl Workspace {
                     SharedString::from(format!("{}: {}", failure.template, failure.message))
                 }));
                 workspace.preview.update(cx, |pane, cx| {
-                    pane.show_dry_run(files, notes, cx);
+                    pane.show_dry_run(files, notes, output_dir, cx);
                 });
                 workspace.retitle_preview(cx);
             })
             .ok();
         })
         .detach();
+    }
+
+    /// The dry run tab's Cancel: stops the render and takes the tab's
+    /// "rendering" down.
+    pub(super) fn cancel_dry_run(&mut self, cx: &mut Context<Self>) {
+        if let Some(handle) = self.dry_run_cancel.take() {
+            handle.cancel();
+        }
+        self.preview.update(cx, |pane, cx| pane.end_dry_run(cx));
     }
 
     /// Renders one pair into the Preview tab.

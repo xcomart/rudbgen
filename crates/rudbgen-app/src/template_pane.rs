@@ -282,6 +282,9 @@ pub enum TemplatePaneEvent {
         /// Index into the choices the shell last set.
         table: usize,
     },
+    /// The header's *Add to generation list*: this file should join the open
+    /// connection's template list.
+    AddToGeneration,
 }
 
 /// The completion popup, while it is up.
@@ -335,6 +338,9 @@ pub struct TemplatePane {
     completion: Option<Completion>,
     /// Pointer position of the source editor's context menu.
     context_menu: Option<Point<Pixels>>,
+    /// Whether that menu was opened from the keyboard, and so opens on its
+    /// first row.
+    context_by_keyboard: bool,
     /// Where the header's tab width menu hangs from, while it is up.
     tab_menu: Option<Point<Pixels>>,
     /// Whether the buffer should take the keyboard on the next frame.
@@ -344,6 +350,13 @@ pub struct TemplatePane {
     /// itself: the focus handle belongs to an element that has not been drawn
     /// yet. The flag is consumed by the first render after it is set.
     pending_focus: bool,
+    /// Whether the file is in the open connection's template list: `None`
+    /// with nothing connected, which is when the header has no way in to
+    /// offer.
+    listed: Option<bool>,
+    /// The problem `F8` last moved the caret to, which the next press counts
+    /// on from.
+    diagnostic_cursor: Option<usize>,
     /// The debounce in flight, dropped — and so canceled — by the next edit.
     _debounce: Option<Task<()>>,
     /// Keeps the editor's subscription alive.
@@ -383,6 +396,7 @@ impl TemplatePane {
                 pane.choice_open = false;
                 pane.tab_menu = None;
                 pane.context_menu = Some(*position);
+                pane.context_by_keyboard = false;
                 cx.notify();
             }
             _ => {}
@@ -429,8 +443,11 @@ impl TemplatePane {
             items: Vec::new(),
             completion: None,
             context_menu: None,
+            context_by_keyboard: false,
             tab_menu: None,
             pending_focus: true,
+            listed: None,
+            diagnostic_cursor: None,
             _debounce: None,
             _editor_events: editor_events,
             _scroll_events: scroll_events,
@@ -726,6 +743,7 @@ impl TemplatePane {
         Some(
             ContextMenu::new("template-context")
                 .position(position)
+                .highlight_first(self.context_by_keyboard)
                 .entries(menu_rows::entries(self.editor_rows(cx)))
                 .on_dismiss(move |_window, cx| {
                     this.update(cx, |pane, cx| {
@@ -942,11 +960,52 @@ impl TemplatePane {
         self.request_render(cx);
     }
 
+    /// Whether the header offers *Add to generation list*: `Some(false)` is a
+    /// connection open and this file not in its list yet.
+    pub fn set_listed(&mut self, listed: Option<bool>, cx: &mut Context<Self>) {
+        if self.listed != listed {
+            self.listed = listed;
+            cx.notify();
+        }
+    }
+
+    /// `F8` and `Shift+F8`: the next problem after the caret, or the one
+    /// before it, wrapping round at either end.
+    ///
+    /// Counted from the caret rather than from the last jump, so a press after
+    /// the user has moved on starts from where they now are.
+    pub fn step_diagnostic(&mut self, forward: bool, window: &mut Window, cx: &mut Context<Self>) {
+        if self.diagnostics.is_empty() {
+            return;
+        }
+        let caret = self.editor.read(cx).caret();
+        let mut order: Vec<usize> = (0..self.diagnostics.len()).collect();
+        order.sort_by_key(|index| self.diagnostics[*index].offset);
+        let next = if forward {
+            order
+                .iter()
+                .copied()
+                .find(|index| self.diagnostics[*index].offset > caret)
+                .or_else(|| order.first().copied())
+        } else {
+            order
+                .iter()
+                .rev()
+                .copied()
+                .find(|index| self.diagnostics[*index].offset < caret)
+                .or_else(|| order.last().copied())
+        };
+        if let Some(index) = next {
+            self.jump_to(index, window, cx);
+        }
+    }
+
     /// Moves the caret to a diagnostic and gives the buffer the keyboard.
     fn jump_to(&mut self, index: usize, window: &mut Window, cx: &mut Context<Self>) {
         let Some(diagnostic) = self.diagnostics.get(index) else {
             return;
         };
+        self.diagnostic_cursor = Some(index);
         let offset = diagnostic.offset;
         self.editor
             .update(cx, |editor, cx| editor.move_to(offset, cx));
@@ -1104,8 +1163,23 @@ impl TemplatePane {
         let save = cx.entity();
         let toggle = cx.entity();
         let tabs = cx.entity();
+        let add = cx.entity();
         let open = self.preview_open;
         let tab_menu_open = self.tab_menu.is_some();
+        // The way from a template being written to a run that uses it, when a
+        // connection is open and its list does not have this file yet — which
+        // is exactly the state a template made with *New template…* is in.
+        let add_button = (self.listed == Some(false)).then(|| {
+            Button::new(
+                "template-add-to-generation",
+                ts!("template.add_to_generation"),
+            )
+            .variant(ButtonVariant::Secondary)
+            .compact()
+            .on_click(move |_, _window, cx| {
+                add.update(cx, |_, cx| cx.emit(TemplatePaneEvent::AddToGeneration));
+            })
+        });
 
         div()
             .flex()
@@ -1124,14 +1198,14 @@ impl TemplatePane {
                     .flex_1()
                     .min_w_0()
                     .truncate()
-                    .text_size(px(11.))
+                    .text_size(rugpui::TextSize::Xs.size(cx))
                     .text_color(theme.text_muted)
                     .child(SharedString::from(self.path.display().to_string())),
             )
             .children(dirty.then(|| {
                 div()
                     .flex_none()
-                    .text_size(px(11.))
+                    .text_size(rugpui::TextSize::Xs.size(cx))
                     .text_color(theme.accent)
                     .child(ts!("template.unsaved"))
             }))
@@ -1143,10 +1217,10 @@ impl TemplatePane {
                     .flex_none()
                     .items_center()
                     .justify_center()
-                    .h(px(20.))
+                    .h(rugpui::scaled(20., cx))
                     .px(px(8.))
                     .rounded_md()
-                    .text_size(px(11.))
+                    .text_size(rugpui::TextSize::Xs.size(cx))
                     .text_color(if tab_menu_open {
                         theme.text
                     } else {
@@ -1165,6 +1239,7 @@ impl TemplatePane {
                         width = self.tab_width(cx).to_string()
                     )),
             )
+            .children(add_button)
             .child(
                 Button::new("template-save", ts!("common.save"))
                     .variant(ButtonVariant::Secondary)
@@ -1183,10 +1258,10 @@ impl TemplatePane {
                     .flex_none()
                     .items_center()
                     .justify_center()
-                    .h(px(20.))
+                    .h(rugpui::scaled(20., cx))
                     .px(px(8.))
                     .rounded_md()
-                    .text_size(px(11.))
+                    .text_size(rugpui::TextSize::Xs.size(cx))
                     .text_color(if open { theme.text } else { theme.text_muted })
                     .cursor_pointer()
                     .hover(|style| style.bg(theme.surface_hover))
@@ -1240,7 +1315,7 @@ impl TemplatePane {
                             .selected(chosen)
                             .placeholder(ts!("template.preview_table"))
                             .open(self.choice_open)
-                            .width(px(CHOICE_WIDTH))
+                            .width(rugpui::scaled(CHOICE_WIDTH, cx))
                             .on_select(move |index, _text, _window, cx| {
                                 select.update(cx, |pane, cx| {
                                     pane.choice_open = false;
@@ -1261,7 +1336,7 @@ impl TemplatePane {
                             .flex_1()
                             .min_w_0()
                             .truncate()
-                            .text_size(px(11.))
+                            .text_size(rugpui::TextSize::Xs.size(cx))
                             .text_color(theme.text_muted)
                             .child(path)
                     })),
@@ -1277,7 +1352,7 @@ impl TemplatePane {
                     .min_w_0()
                     .w_full()
                     .p(px(12.))
-                    .text_size(px(12.))
+                    .text_size(rugpui::TextSize::Sm.size(cx))
                     .text_color(theme.text_muted)
                     .child(note.clone())
                     .into_any_element(),
@@ -1329,6 +1404,16 @@ impl TemplatePane {
                     .py(px(2.))
                     .rounded_md()
                     .cursor_pointer()
+                    // A stop in the tab ring, so the list can be walked
+                    // without the mouse; `Enter` on a row is a click on it,
+                    // which jumps.
+                    .tab_index(0)
+                    .border_1()
+                    .border_color(gpui::transparent_black())
+                    .focus(|style| style.border_color(theme.accent))
+                    .when(self.diagnostic_cursor == Some(index), |row| {
+                        row.bg(theme.surface_active)
+                    })
                     .hover(|style| style.bg(theme.surface_hover))
                     .on_click(cx.listener(move |pane, _, window, cx| {
                         pane.jump_to(index, window, cx);
@@ -1336,8 +1421,8 @@ impl TemplatePane {
                     .child(
                         div()
                             .flex_none()
-                            .w(px(64.))
-                            .text_size(px(11.))
+                            .w(rugpui::scaled(64., cx))
+                            .text_size(rugpui::TextSize::Xs.size(cx))
                             .text_color(color)
                             .child(ts!(
                                 "diagnostics.at",
@@ -1350,7 +1435,7 @@ impl TemplatePane {
                             .flex_1()
                             .min_w_0()
                             .truncate()
-                            .text_size(px(11.))
+                            .text_size(rugpui::TextSize::Xs.size(cx))
                             .text_color(theme.text)
                             .child(diagnostic.message.clone()),
                     )
@@ -1364,7 +1449,7 @@ impl TemplatePane {
             .flex_none()
             .w_full()
             .min_w_0()
-            .h(px(DIAGNOSTICS_HEIGHT))
+            .h(rugpui::scaled(DIAGNOSTICS_HEIGHT, cx))
             .gap(px(1.))
             .py(px(4.))
             .overflow_y_scroll()
@@ -1375,7 +1460,7 @@ impl TemplatePane {
                 div()
                     .px(px(8.))
                     .pb(px(2.))
-                    .text_size(px(10.))
+                    .text_size(rugpui::scaled(10., cx))
                     .text_color(theme.text_muted)
                     .child(ts!("diagnostics.title", count = self.diagnostics.len())),
             )
@@ -1408,7 +1493,7 @@ impl TemplatePane {
                     .items_center()
                     .gap(px(6.))
                     .px(px(8.))
-                    .h(px(POPUP_ROW_HEIGHT))
+                    .h(rugpui::scaled(POPUP_ROW_HEIGHT, cx))
                     .cursor_pointer()
                     .when(active, |row| row.bg(theme.surface_hover))
                     .hover(|style| style.bg(theme.surface_hover))
@@ -1422,7 +1507,7 @@ impl TemplatePane {
                         div()
                             .flex_none()
                             .font_family(mono.clone())
-                            .text_size(px(11.))
+                            .text_size(rugpui::TextSize::Xs.size(cx))
                             .text_color(theme.text)
                             .child(item.name.clone()),
                     )
@@ -1431,7 +1516,7 @@ impl TemplatePane {
                             .flex_1()
                             .min_w_0()
                             .truncate()
-                            .text_size(px(10.))
+                            .text_size(rugpui::scaled(10., cx))
                             .text_color(theme.text_muted)
                             .child(item.description.clone()),
                     )
@@ -1451,7 +1536,7 @@ impl TemplatePane {
             .pt(px(2.))
             .border_t_1()
             .border_color(theme.border)
-            .text_size(px(10.))
+            .text_size(rugpui::scaled(10., cx))
             .text_color(theme.text_muted)
             .child(ts!("completion.hint"))
             .children((hidden > 0).then(|| div().child(ts!("completion.more", count = hidden))));
@@ -1460,7 +1545,7 @@ impl TemplatePane {
             .occlude()
             .flex()
             .flex_col()
-            .w(px(POPUP_WIDTH))
+            .w(rugpui::scaled(POPUP_WIDTH, cx))
             .py(px(2.))
             .rounded_md()
             .bg(theme.surface)
@@ -1519,7 +1604,7 @@ impl Render for TemplatePane {
                 .h_full()
                 .min_h_0()
                 .p(px(16.))
-                .text_size(px(12.))
+                .text_size(rugpui::TextSize::Sm.size(cx))
                 .text_color(theme.danger)
                 .child(failure.clone())
                 .into_any_element();
@@ -1589,7 +1674,7 @@ impl Render for TemplatePane {
                     .flex_none()
                     .px(px(10.))
                     .py(px(4.))
-                    .text_size(px(11.))
+                    .text_size(rugpui::TextSize::Xs.size(cx))
                     .text_color(theme.danger)
                     .child(message)
             }))
@@ -1606,6 +1691,19 @@ impl Render for TemplatePane {
             .children((!self.diagnostics.is_empty()).then(|| self.render_diagnostics(cx)))
             .children(self.render_completion(cx))
             .children(self.render_context_menu(cx))
+            // `Shift+F10` and the Menu key: the editor's menu, at the caret —
+            // the one place a keyboard user is looking.
+            .on_action(
+                cx.listener(|pane, _: &rugpui::OpenContextMenu, _window, cx| {
+                    let caret = pane.editor.read(cx).caret_bounds();
+                    let Some(caret) = caret else {
+                        return;
+                    };
+                    pane.context_menu = Some(caret.bottom_left());
+                    pane.context_by_keyboard = true;
+                    cx.notify();
+                }),
+            )
             .children(self.render_tab_menu(cx))
             .into_any_element()
     }

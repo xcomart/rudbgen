@@ -260,6 +260,23 @@ on CI's other two platforms, which only CI can say — and CI's three-platform
 Nothing in `docs/` is marked *next release* any more: the
 [user interface guide](ui-guide.md) describes every surface §4 asks for.
 
+**The usability review of 2026-10-30** (workspace `USABILITY_REVIEW.md`) is
+applied on the app side: dialogs that edit something ask before dropping a
+changed draft and save on `Ctrl+S`; every question takes the keyboard, `Enter`
+its default answer (`prompt.rs`); window shortcuts stand down under a dialog;
+Generate moved from `Ctrl+G` to `F5` (`Ctrl+Shift+G` off macOS); the tab strip
+has keys, a focus handle and a context menu; *New connection* opens a blank
+profile and *Manage connections* the saved ones; the welcome list uses the
+dialog's rows with a context menu; failed connections offer the hint, *Trust
+this key*, *Edit connection* and *Retry*; *Remember password* is per profile;
+ticks are kept per profile; a run over unsaved template tabs asks first. The
+shared halves from rugpui 877d8ac are wired in: the close guard on window close,
+quit and the update's restart; the modal dismiss guard and initial focus; `F10`
+and `Shift+F10` menus; middle-click tab close; toasts; the interface size as
+the UI scale; fitted form labels; and the template pickers starting in
+`<config>/templates`. The screenshots predate this
+round and were not recaptured: doing so needs the GUI on a display.
+
 Decisions taken along the way, written down so they are not mistaken for
 oversights:
 

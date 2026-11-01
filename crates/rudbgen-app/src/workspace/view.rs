@@ -2,52 +2,6 @@
 
 use super::*;
 
-/// One row of the welcome screen's saved list, which opens the session it
-/// names.
-///
-/// A press connects rather than opening the editor: the list is the way *in*,
-/// and a saved connection that asks to be confirmed before it opens is a
-/// dialog nobody wanted. Editing one is the connection dialog's job, which the
-/// title bar and `Ctrl+N` both reach.
-pub(super) fn profile_row(
-    index: usize,
-    name: &str,
-    driver: &str,
-    theme: &Theme,
-    on_click: impl Fn(&gpui::ClickEvent, &mut Window, &mut App) + 'static,
-) -> AnyElement {
-    div()
-        .id(("profile-row", index))
-        .flex()
-        .flex_row()
-        .items_center()
-        .gap(px(8.))
-        .px(px(6.))
-        .py(px(5.))
-        .rounded_md()
-        .cursor_pointer()
-        .hover(|style| style.bg(theme.surface_hover))
-        .on_click(on_click)
-        .child(
-            div()
-                .flex_1()
-                .min_w_0()
-                .truncate()
-                .text_size(px(12.))
-                .text_color(theme.text)
-                .child(SharedString::from(name.to_owned())),
-        )
-        .child(
-            div()
-                .flex_none()
-                .truncate()
-                .text_size(px(11.))
-                .text_color(theme.text_muted)
-                .child(SharedString::from(driver.to_owned())),
-        )
-        .into_any_element()
-}
-
 /// A box that centers its content while it fits and scrolls it when it does not.
 ///
 /// The two halves of that are what the shape is for: `my_auto` on a `flex_none`
@@ -149,6 +103,24 @@ impl Render for Workspace {
                 .inset_0()
                 .child(self.render_close_prompt(index, cx))
         });
+        let unsaved_run = self.unsaved_run.map(|_| {
+            div()
+                .absolute()
+                .inset_0()
+                .child(self.render_unsaved_run_prompt(cx))
+        });
+        let password = self
+            .render_password_prompt(cx)
+            .map(|prompt| div().absolute().inset_0().child(prompt));
+        let deleting = self
+            .render_delete_profile_prompt(cx)
+            .map(|prompt| div().absolute().inset_0().child(prompt));
+        let tab_menu = self.render_tab_menu(cx);
+        let profile_menu = self.render_profile_menu(cx);
+        // The dry run tab's Generate follows the run buttons' rule.
+        let can_generate = self.can_generate(cx);
+        self.preview
+            .update(cx, |pane, cx| pane.set_can_generate(can_generate, cx));
 
         // With client-side decorations the compositor stops drawing the drop
         // shadow along with the frame, so the window has to bring its own: the
@@ -222,6 +194,17 @@ impl Render for Workspace {
                 }),
             )
             .on_action(cx.listener(Self::new_connection_action))
+            .on_action(cx.listener(Self::manage_connections_action))
+            .on_action(cx.listener(Self::next_tab_action))
+            .on_action(cx.listener(Self::prev_tab_action))
+            .on_action(cx.listener(Self::select_tab_action))
+            .on_action(cx.listener(Self::close_tab_action))
+            .on_action(cx.listener(Self::focus_tabs_action))
+            .on_action(cx.listener(Self::next_diagnostic_action))
+            .on_action(cx.listener(Self::prev_diagnostic_action))
+            .on_action(cx.listener(Self::add_to_generation_action))
+            .on_action(cx.listener(Self::open_app_menu_action))
+            .on_action(cx.listener(Self::open_context_menu_action))
             .on_action(cx.listener(Self::open_settings_action))
             .on_action(cx.listener(Self::show_about_action))
             .on_action(cx.listener(Self::check_updates_action))
@@ -250,7 +233,21 @@ impl Render for Workspace {
             // Last, so a run that is asking about a file is answered before
             // anything else on screen.
             .children(job)
-            .children(closing);
+            .children(closing)
+            .children(unsaved_run)
+            .children(password)
+            .children(deleting)
+            // The right-click menus paint over everything, dialogs included,
+            // and dismiss themselves on the next press.
+            .children(tab_menu)
+            .children(profile_menu)
+            // The close guard's question, over everything else; and the
+            // toasts above the status bar, over that.
+            .child(self.close_guard.clone())
+            .child(
+                rugpui_shell::toast_stack()
+                    .bottom_inset(rugpui::scaled(STATUS_BAR_HEIGHT, cx) + px(8.)),
+            );
 
         let Some(tiling) = tiling else {
             // A server-decorated window: the compositor frames and shadows it,
@@ -279,9 +276,15 @@ impl Workspace {
         let names: Vec<SharedString> = self.profiles.connections().iter().map(label_of).collect();
         let count = names.len();
         let connected = matches!(self.connection, ConnectionState::Open { .. });
+        let connecting = matches!(self.connection, ConnectionState::Connecting { .. });
         let mut options = names;
+        // The one row past the profiles: what can be done about the session
+        // as it stands — let go of an open one, or give up on one that is
+        // still opening and may never answer.
         if connected {
             options.push(ts!("titlebar.disconnect"));
+        } else if connecting {
+            options.push(ts!("titlebar.cancel_connecting"));
         }
 
         // The label follows the state rather than the store: a profile that is
@@ -309,7 +312,7 @@ impl Workspace {
             .child(
                 div()
                     .flex_none()
-                    .size(px(STATUS_DOT))
+                    .size(rugpui::scaled(STATUS_DOT, cx))
                     .rounded_full()
                     .bg(self.connection.dot(&theme)),
             )
@@ -321,17 +324,23 @@ impl Workspace {
                     .options(options)
                     .selected(selected)
                     .open(self.connection_list_open)
-                    .width(px(CONNECTION_SELECT_WIDTH))
+                    .width(rugpui::scaled(CONNECTION_SELECT_WIDTH, cx))
                     .on_select(move |index, _text, window, cx| {
                         this.update(cx, |workspace, cx| {
                             workspace.connection_list_open = false;
-                            match workspace.profiles.connections().get(index).cloned() {
-                                Some(profile) => workspace.connect_to(profile, cx),
+                            match workspace.profiles.connections().get(index).map(|p| p.id) {
+                                // The profile already open is no reason to
+                                // reconnect; see `open_profile`.
+                                Some(id) => workspace.open_profile(id, window, cx),
                                 // Past the end of the list is the
-                                // "Disconnect" row.
+                                // "Disconnect" row, or "Cancel connecting".
+                                None if index == count && connecting => {
+                                    workspace.cancel_connecting(cx);
+                                }
                                 None if index == count => workspace.request_disconnect(window, cx),
                                 None => {}
                             }
+                            cx.notify();
                         });
                     })
                     .on_open_change(move |open, _window, cx| {
@@ -363,6 +372,10 @@ impl Workspace {
             MenuEntry::new(ts!("menu.new_connection"))
                 .shortcut(format!("{}+N", menu_rows::SHORTCUT_MODIFIER))
                 .on_activate(|window, cx| window.dispatch_action(Box::new(NewConnection), cx)),
+            // The same dialog over the saved profiles, to edit them: two doors
+            // with two names, so that *New* never opens over one of them.
+            MenuEntry::new(ts!("menu.manage_connections"))
+                .on_activate(|window, cx| window.dispatch_action(Box::new(ManageConnections), cx)),
             MenuEntry::new(ts!("menu.settings"))
                 .shortcut(format!("{}+,", menu_rows::SHORTCUT_MODIFIER))
                 .on_activate(|window, cx| window.dispatch_action(Box::new(OpenSettings), cx)),
@@ -394,6 +407,20 @@ impl Workspace {
                 .shortcut(format!("{}+Shift+P", menu_rows::SHORTCUT_MODIFIER))
                 .disabled(self.active_template(cx).is_none())
                 .on_activate(|window, cx| window.dispatch_action(Box::new(ToggleLivePreview), cx)),
+            // The menu's own way to the popup, for a desktop whose input
+            // method takes `Ctrl+Space` before the window sees it; the hint
+            // names the chord no input method claims.
+            MenuEntry::new(ts!("menu.trigger_completion"))
+                .shortcut(COMPLETION_HINT)
+                .disabled(self.active_template(cx).is_none())
+                .on_activate(|window, cx| window.dispatch_action(Box::new(TriggerCompletion), cx)),
+            MenuEntry::new(ts!("menu.add_to_generation"))
+                .disabled(!self.can_add_to_generation(cx))
+                .on_activate(|window, cx| window.dispatch_action(Box::new(AddToGeneration), cx)),
+            MenuEntry::new(ts!("menu.close_tab"))
+                .shortcut(format!("{}+W", menu_rows::SHORTCUT_MODIFIER))
+                .disabled(!self.can_close_active_tab())
+                .on_activate(|window, cx| window.dispatch_action(Box::new(CloseTab), cx)),
             MenuEntry::separator(),
             // The three run commands, in the order the Generate tab draws them.
             // Each is grayed exactly when the button is, and for the reason the
@@ -405,7 +432,7 @@ impl Workspace {
                 .disabled(!self.can_render(cx))
                 .on_activate(|window, cx| window.dispatch_action(Box::new(DryRun), cx)),
             MenuEntry::new(ts!("menu.generate"))
-                .shortcut(format!("{}+G", menu_rows::SHORTCUT_MODIFIER))
+                .shortcut(GENERATE_HINT)
                 .disabled(!self.can_generate(cx))
                 .on_activate(|window, cx| window.dispatch_action(Box::new(Generate), cx)),
             MenuEntry::new(ts!("menu.abbreviations"))
@@ -431,6 +458,12 @@ impl Workspace {
 
         MenuButton::new("app-menu")
             .tooltip(ts!("titlebar.tip_menu"))
+            // A stop in the tab ring, opened by `Enter`, `Space` or `Down` —
+            // and by `F10` from anywhere (`open_app_menu_action`) — on its
+            // first row: the one list of every command, reachable without
+            // the pointer.
+            .tab_index(0)
+            .highlight_first(self.menu_by_keyboard)
             .open(self.menu_open)
             .entries(entries)
             .on_open_change(move |open, _window, cx| {
@@ -688,8 +721,11 @@ impl Workspace {
         let menu = cx.entity();
         let reorder = cx.entity();
         let over = cx.entity();
+        let context = cx.entity();
 
+        let bounds = self.tabs_bounds.clone();
         div()
+            .relative()
             .flex()
             .flex_none()
             .w_full()
@@ -697,8 +733,14 @@ impl Workspace {
             .border_b_1()
             .border_color(theme.border)
             .child(
+                gpui::canvas(move |drawn, _, _| bounds.set(drawn), |_, _, _, _| {})
+                    .absolute()
+                    .size_full(),
+            )
+            .child(
                 TabBar::new("work-tabs")
                     .tabs(tabs)
+                    .focus_handle(&self.tabs_focus)
                     .active(self.pane.active_index())
                     .scroll_handle(self.pane.scroll_handle())
                     .menu_open(self.pane_menu_open)
@@ -717,21 +759,15 @@ impl Workspace {
                     })
                     .on_select(move |index, window, cx| {
                         select.update(cx, |workspace, cx| {
-                            if !workspace.pane.activate(index) {
-                                return;
-                            }
-                            // The tab that was on top is about to stop being
-                            // rendered, so whatever inside it held the keyboard
-                            // has to give it up in the same update (Appendix A)
-                            // — and a template that has just come to the front
-                            // asks for it back on the frame that draws it.
-                            workspace.focus_shell(window, cx);
-                            if let Some(at) = workspace.active_template(cx) {
-                                workspace.templates[at]
-                                    .clone()
-                                    .update(cx, |pane, cx| pane.request_focus(cx));
-                            }
-                            workspace.refresh_templates(cx);
+                            workspace.activate_tab(index, window, cx);
+                        });
+                    })
+                    .on_context_menu(move |index, position, _window, cx| {
+                        context.update(cx, |workspace, cx| {
+                            workspace.close_template_menus(cx);
+                            workspace.profile_menu = None;
+                            workspace.tab_menu = Some((index, position));
+                            workspace.tab_menu_by_keyboard = false;
                             cx.notify();
                         });
                     })
@@ -833,18 +869,19 @@ impl Workspace {
         let discard = cx.entity();
         let cancel = cx.entity();
         let dismissed = cx.entity();
+        let default = cx.entity();
 
         rugpui::modal(
             "template-close",
             ts!("template.close_title"),
-            px(400.),
+            rugpui::scaled(400., cx),
             div()
                 .flex()
                 .flex_col()
                 .gap(px(14.))
                 .child(
                     div()
-                        .text_size(px(12.))
+                        .text_size(rugpui::TextSize::Sm.size(cx))
                         .text_color(theme.text)
                         .child(ts!("template.close_question", file = title)),
                 )
@@ -855,13 +892,13 @@ impl Workspace {
                         .justify_end()
                         .gap(px(8.))
                         .child(
-                            Button::new("template-close-cancel", ts!("common.cancel")).on_click(
-                                move |_, window, cx| {
+                            Button::new("template-close-cancel", ts!("common.cancel"))
+                                .variant(ButtonVariant::Secondary)
+                                .on_click(move |_, window, cx| {
                                     cancel.update(cx, |workspace, cx| {
                                         workspace.cancel_close(window, cx);
                                     });
-                                },
-                            ),
+                                }),
                         )
                         .child(
                             Button::new("template-close-discard", ts!("template.discard"))
@@ -875,6 +912,7 @@ impl Workspace {
                         .child(
                             Button::new("template-close-save", ts!("common.save"))
                                 .variant(ButtonVariant::Primary)
+                                .focus_handle(&self.prompt_focus)
                                 .on_click(move |_, window, cx| {
                                     save.update(cx, |workspace, cx| {
                                         workspace.answer_close(true, window, cx);
@@ -888,6 +926,12 @@ impl Workspace {
                 });
             },
         )
+        // `Enter` saves, the highlighted answer, which holds the keyboard;
+        // `Escape` is Cancel, which the shell routes (`dismiss_dialog_action`).
+        .initial_focus(&self.prompt_focus)
+        .on_confirm(move |window, cx| {
+            default.update(cx, |workspace, cx| workspace.answer_close(true, window, cx));
+        })
         .into_any_element()
     }
 
@@ -898,44 +942,14 @@ impl Workspace {
     /// has not arrived say so on hover rather than by silence.
     pub(super) fn render_welcome(&self, theme: &Theme, cx: &mut Context<Self>) -> AnyElement {
         let profiles = self.profiles.connections();
-        // A failed attempt is reported here as well as on the status bar: the
-        // welcome screen is what the window goes back to when a connection does
-        // not open, and a bar 400 pixels below the button that was pressed is
-        // not where the answer is looked for.
-        let failure = match &self.connection {
-            ConnectionState::Failed { profile, message } => Some(
-                div()
-                    .flex()
-                    .flex_col()
-                    .gap(px(2.))
-                    .w(px(WELCOME_WIDTH))
-                    .p(px(8.))
-                    .rounded_md()
-                    .bg(theme.surface)
-                    .border_1()
-                    .border_color(theme.danger)
-                    .child(
-                        div()
-                            .text_size(px(12.))
-                            .text_color(theme.danger)
-                            .child(ts!("connect.could_not_open", name = label_of(profile))),
-                    )
-                    .child(
-                        div()
-                            .text_size(px(11.))
-                            .text_color(theme.text_muted)
-                            .child(message.clone()),
-                    ),
-            ),
-            _ => None,
-        };
+        let failure = self.render_failure(theme, cx);
 
         // A first run has nothing saved and no habit of the chord yet, so the
         // line under the buttons is left out; once something is saved it
         // carries the shortcut that skips the button instead.
         let hint = (!profiles.is_empty()).then(|| {
             div()
-                .text_size(px(11.))
+                .text_size(rugpui::TextSize::Xs.size(cx))
                 .text_color(theme.text_muted)
                 .child(ts!(
                     "welcome.hint",
@@ -943,36 +957,112 @@ impl Workspace {
                 ))
         });
 
+        // The dialog's own rows — folders, color tags, a stop in the tab
+        // ring — so a profile is recognized the same way on both. A press
+        // opens it; a second press of the same row is a double click and
+        // opens nothing more.
+        let drivers = match DriverStore::load() {
+            Ok(drivers) => drivers,
+            Err(error) => {
+                log::error!("could not read drivers.json: {error:#}");
+                DriverStore::default()
+            }
+        };
+        let connecting = match &self.connection {
+            ConnectionState::Connecting { profile, .. } => Some(profile.id),
+            _ => None,
+        };
+        let cancel = cx.entity();
+        let detail_size = rugpui::TextSize::Xs.size(cx);
+        let spinner_size = rugpui::scaled(12., cx);
+        let driver_width = rugpui::scaled(140., cx);
+        let trailing = move |profile: &ConnectionProfile| -> Option<AnyElement> {
+            if connecting == Some(profile.id) {
+                let cancel = cancel.clone();
+                return Some(
+                    div()
+                        .flex()
+                        .flex_row()
+                        .flex_none()
+                        .items_center()
+                        .gap(px(6.))
+                        .child(rugpui::Spinner::new(("welcome-spinner", 0usize)).size(spinner_size))
+                        .child(
+                            Button::new("welcome-cancel-connect", ts!("common.cancel"))
+                                .variant(ButtonVariant::Secondary)
+                                .compact()
+                                .on_click(move |_, _window, cx| {
+                                    cx.stop_propagation();
+                                    cancel.update(cx, |workspace, cx| {
+                                        workspace.cancel_connecting(cx);
+                                    });
+                                }),
+                        )
+                        .into_any_element(),
+                );
+            }
+            // The driver's name, as the dialog's picker shows it, rather than
+            // the id `drivers.json` files it under.
+            let name = drivers
+                .get(&profile.driver_id)
+                .map(|driver| driver.name.clone())
+                .unwrap_or_else(|| profile.driver_id.clone());
+            Some(
+                div()
+                    .flex_none()
+                    .max_w(driver_width)
+                    .truncate()
+                    .text_size(detail_size)
+                    .text_color(theme.text_muted)
+                    .child(SharedString::from(name))
+                    .into_any_element(),
+            )
+        };
+        let open = cx.entity();
+        let menu = cx.entity();
+        // The connection that was open last carries the selection's fill, so
+        // the usual one is found at a glance; nothing opens it but a press.
+        let last = app_settings::current(cx)
+            .last_connection
+            .filter(|id| self.profiles.get(*id).is_some());
+        let rows = connection_dialog::profile_rows(
+            profiles,
+            last,
+            cx,
+            move |id, clicks, window, cx| {
+                if clicks > 1 {
+                    return;
+                }
+                open.update(cx, |workspace, cx| workspace.open_profile(id, window, cx));
+            },
+            Some(std::rc::Rc::new(
+                move |id, position, keyboard, _window, cx| {
+                    menu.update(cx, |workspace, cx| {
+                        workspace.open_profile_menu(id, position, keyboard, cx);
+                    });
+                },
+            )),
+            Some(&trailing),
+            None,
+        );
+
         let saved = div()
             .flex()
             .flex_col()
             .gap(px(6.))
-            .w(px(WELCOME_WIDTH))
-            .child(div().text_size(px(11.)).text_color(theme.text_muted).child(
-                if profiles.is_empty() {
-                    ts!("welcome.empty")
-                } else {
-                    ts!("welcome.saved")
-                },
-            ))
-            .when(!profiles.is_empty(), |list| {
-                list.child(div().flex().flex_col().gap(px(1.)).children(
-                    profiles.iter().enumerate().map(|(index, profile)| {
-                        let id = profile.id;
-                        profile_row(
-                            index,
-                            &profile.name,
-                            &profile.driver_id,
-                            theme,
-                            cx.listener(move |workspace, _, _window, cx| {
-                                let Some(profile) = workspace.profiles.get(id).cloned() else {
-                                    return;
-                                };
-                                workspace.connect_to(profile, cx);
-                            }),
-                        )
+            .w(rugpui::scaled(WELCOME_WIDTH, cx))
+            .child(
+                div()
+                    .text_size(rugpui::TextSize::Xs.size(cx))
+                    .text_color(theme.text_muted)
+                    .child(if profiles.is_empty() {
+                        ts!("welcome.empty")
+                    } else {
+                        ts!("welcome.saved")
                     }),
-                ))
+            )
+            .when(!rows.is_empty(), |list| {
+                list.child(div().flex().flex_col().gap(px(1.)).children(rows))
             });
 
         let content = div()
@@ -982,14 +1072,14 @@ impl Workspace {
             .gap(px(14.))
             .child(
                 div()
-                    .text_size(px(30.))
+                    .text_size(rugpui::scaled(30., cx))
                     .text_color(theme.text)
                     .child(APP_NAME),
             )
             .child(
                 div()
-                    .w(px(WELCOME_WIDTH))
-                    .text_size(px(13.))
+                    .w(rugpui::scaled(WELCOME_WIDTH, cx))
+                    .text_size(rugpui::TextSize::Body.size(cx))
                     .text_color(theme.text_muted)
                     .child(ts!("welcome.tagline")),
             )
@@ -998,13 +1088,17 @@ impl Workspace {
                     .flex()
                     .flex_col()
                     .gap(px(6.))
-                    .w(px(WELCOME_WIDTH))
+                    .w(rugpui::scaled(WELCOME_WIDTH, cx))
                     .child(
                         div()
                             .id(WELCOME_NEW_SELECTOR)
                             .debug_selector(|| WELCOME_NEW_SELECTOR.to_string())
                             .child(
                                 Button::new("welcome-new", ts!("welcome.new_connection"))
+                                    // A translation longer than the column is cut with
+                                    // an ellipsis and shown whole on hover, rather than
+                                    // running out of the button.
+                                    .truncate(true)
                                     .variant(ButtonVariant::Primary)
                                     .full_width(true)
                                     .tab_index(WELCOME_FIRST_TAB)
@@ -1025,6 +1119,11 @@ impl Workspace {
                             .debug_selector(|| WELCOME_IMPORT_SELECTOR.to_string())
                             .child(
                                 Button::new("welcome-import", ts!("welcome.import_jdbgen"))
+                                    // A translation longer than the column is cut with
+                                    // an ellipsis and shown whole on hover, rather than
+                                    // running out of the button.
+                                    .truncate(true)
+                                    .variant(ButtonVariant::Secondary)
                                     .full_width(true)
                                     .tab_index(WELCOME_FIRST_TAB + 1)
                                     .on_click(|_, window, cx| {
@@ -1039,6 +1138,11 @@ impl Workspace {
                             .debug_selector(|| WELCOME_TEMPLATE_SELECTOR.to_string())
                             .child(
                                 Button::new("welcome-template", ts!("welcome.open_template"))
+                                    // A translation longer than the column is cut with
+                                    // an ellipsis and shown whole on hover, rather than
+                                    // running out of the button.
+                                    .truncate(true)
+                                    .variant(ButtonVariant::Secondary)
                                     .full_width(true)
                                     .tab_index(WELCOME_FIRST_TAB + 2)
                                     .on_click(|_, window, cx| {
@@ -1056,6 +1160,125 @@ impl Workspace {
         centered_scroll(WELCOME_STATE, &self.welcome_scroll, bar, theme, content).into_any_element()
     }
 
+    /// The banner a failed attempt leaves on the welcome screen.
+    ///
+    /// The welcome screen is what the window goes back to when a connection
+    /// does not open, and a bar 400 pixels below the row that was pressed is
+    /// not where the answer is looked for. It carries the way on as well as the
+    /// reason: what the failure's class suggests, the key to trust when that
+    /// is what stopped it, and the two buttons that are the next step either
+    /// way — the dialog over this profile, and the same attempt again.
+    pub(super) fn render_failure(
+        &self,
+        theme: &Theme,
+        cx: &mut Context<Self>,
+    ) -> Option<AnyElement> {
+        let ConnectionState::Failed {
+            profile,
+            message,
+            hint,
+            host_key,
+        } = &self.connection
+        else {
+            return None;
+        };
+        let id = profile.id;
+        let (edit, retry, trust) = (cx.entity(), cx.entity(), cx.entity());
+        let key = host_key.as_ref().map(|key| {
+            div()
+                .flex()
+                .flex_col()
+                .gap(px(4.))
+                .child(
+                    div()
+                        .text_size(rugpui::TextSize::Xs.size(cx))
+                        .text_color(theme.text)
+                        .child(ts!(
+                            "connect.host_key_question",
+                            host = key.host.clone(),
+                            algorithm = key.algorithm.clone(),
+                            fingerprint = key.fingerprint.clone()
+                        )),
+                )
+                .child(
+                    div().flex().flex_row().child(
+                        Button::new("welcome-trust-key", ts!("connect.trust_host_key"))
+                            .variant(ButtonVariant::Secondary)
+                            .compact()
+                            .on_click(move |_, _window, cx| {
+                                trust.update(cx, |workspace, cx| {
+                                    workspace.trust_failed_host_key(cx)
+                                });
+                            }),
+                    ),
+                )
+        });
+        Some(
+            div()
+                .flex()
+                .flex_col()
+                .gap(px(6.))
+                .w(rugpui::scaled(WELCOME_WIDTH, cx))
+                .p(px(8.))
+                .rounded_md()
+                .bg(theme.surface)
+                .border_1()
+                .border_color(theme.danger)
+                .debug_selector(|| "welcome-failure".to_string())
+                .child(
+                    div()
+                        .text_size(rugpui::TextSize::Sm.size(cx))
+                        .text_color(theme.danger)
+                        .child(ts!("connect.could_not_open", name = label_of(profile))),
+                )
+                .child(
+                    div()
+                        .text_size(rugpui::TextSize::Xs.size(cx))
+                        .text_color(theme.text_muted)
+                        .child(message.clone()),
+                )
+                .children(hint.clone().map(|hint| {
+                    div()
+                        .text_size(rugpui::TextSize::Xs.size(cx))
+                        .text_color(theme.text)
+                        .child(hint)
+                }))
+                .children(key)
+                .child(
+                    div()
+                        .flex()
+                        .flex_row()
+                        .justify_end()
+                        .gap(px(6.))
+                        .child(
+                            Button::new("welcome-edit-failed", ts!("connect.edit_connection"))
+                                .variant(ButtonVariant::Secondary)
+                                .compact()
+                                .on_click(move |_, window, cx| {
+                                    edit.update(cx, |workspace, cx| {
+                                        workspace.open_connection_dialog(
+                                            ConnectionDoor::Edit(id),
+                                            window,
+                                            cx,
+                                        );
+                                    });
+                                }),
+                        )
+                        .child(
+                            Button::new("welcome-retry", ts!("connect.retry"))
+                                .variant(ButtonVariant::Primary)
+                                .compact()
+                                .on_click(move |_, window, cx| {
+                                    retry.update(cx, |workspace, cx| {
+                                        workspace.retry_connection(window, cx);
+                                    });
+                                }),
+                        ),
+                )
+                .into_any_element(),
+        )
+    }
+
     /// Renders the bottom status bar.
     ///
     /// The layout is the one the architecture document asks for: the connection
@@ -1071,7 +1294,7 @@ impl Workspace {
             .flex_none()
             .items_center()
             .gap(px(14.))
-            .h(px(STATUS_BAR_HEIGHT))
+            .h(rugpui::scaled(STATUS_BAR_HEIGHT, cx))
             .px(px(10.))
             // The bar is inert, so a press on it must not move the keyboard.
             // Without this the workspace root's `track_focus` would claim the
@@ -1080,7 +1303,7 @@ impl Workspace {
             .bg(theme.surface)
             .border_t_1()
             .border_color(theme.border)
-            .text_size(px(11.))
+            .text_size(rugpui::TextSize::Xs.size(cx))
             .text_color(theme.text_muted)
             .child(
                 div()

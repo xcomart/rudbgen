@@ -21,13 +21,14 @@ use std::sync::mpsc::{Sender, channel};
 use futures::StreamExt;
 use futures::channel::mpsc::{UnboundedSender, unbounded};
 use gpui::{
-    App, Context, EventEmitter, ScrollHandle, SharedString, Task, Window, div, prelude::*, px,
+    App, Context, EventEmitter, FocusHandle, ScrollHandle, SharedString, Task, Window, div,
+    prelude::*, px,
 };
 use rudbgen_core::OverwritePolicy;
 use rudbgen_gen::{
     CancelHandle, CancelToken, Decision, FileStatus, Outcome, Overwrite, Plan, Progress, generate,
 };
-use rugpui::{Button, ButtonVariant, modal, theme};
+use rugpui::{Button, ButtonVariant, editor_theme, modal, theme};
 
 use crate::i18n::ts;
 
@@ -106,23 +107,42 @@ pub struct GenerationJob {
     log: Vec<SharedString>,
     /// Stops the run at the next file boundary.
     cancel: Option<CancelHandle>,
+    /// Which table-reading phase is on screen, counted up by every
+    /// [`GenerationJob::begin_loading`].
+    ///
+    /// The reads are the shell's and nothing here can stop one half way, so
+    /// each one asks [`GenerationJob::is_loading`] with the ticket it was given
+    /// before it goes on. A phase that was canceled — or replaced by a later
+    /// one — answers no, and its reads drop what they found.
+    loading: u64,
     /// Where the files went, for the summary's one button.
     output_dir: Option<PathBuf>,
     /// Vertical scroll of the log, and of the summary's lists.
     scroll: ScrollHandle,
+    /// The button each stage's dialog puts the keyboard on as it goes up:
+    /// Overwrite on the question, Close on the summary and the refusal.
+    ///
+    /// Without one the keyboard stays wherever it was when the run was asked
+    /// for — usually a template editor, dimmed behind the dialog — and `Enter`
+    /// pressed at the question lands in the buffer instead of on a button.
+    /// The progress dialog takes the keyboard onto its own panel instead,
+    /// where `Enter` answers nothing.
+    default_focus: FocusHandle,
     /// Reads the run thread's channel; dropped when the dialog closes.
     _pump: Option<Task<()>>,
 }
 
 impl GenerationJob {
     /// A dialog that is not showing.
-    pub fn new(_cx: &mut Context<Self>) -> Self {
+    pub fn new(cx: &mut Context<Self>) -> Self {
         Self {
             stage: Stage::Idle,
             log: Vec::new(),
             cancel: None,
+            loading: 0,
             output_dir: None,
             scroll: ScrollHandle::new(),
+            default_focus: cx.focus_handle(),
             _pump: None,
         }
     }
@@ -150,9 +170,24 @@ impl GenerationJob {
     }
 
     /// Whether the run is blocked on the overwrite question.
-    #[cfg(test)]
     pub fn is_asking(&self) -> bool {
         matches!(self.stage, Stage::Asking { .. })
+    }
+
+    /// Puts the overwrite question up as a run would, for a test to answer.
+    #[cfg(test)]
+    pub fn ask_for_test(&mut self, path: PathBuf, reply: Sender<Decision>, cx: &mut Context<Self>) {
+        self.stage = Stage::Running { done: 1, total: 2 };
+        self.receive(RunMessage::Ask { path, reply }, cx);
+    }
+
+    /// How many tables the reading phase has described, while it is on screen.
+    #[cfg(test)]
+    pub fn tables_read(&self) -> Option<usize> {
+        match self.stage {
+            Stage::Loading { done, .. } => Some(done),
+            _ => None,
+        }
     }
 
     /// Why the run was refused, if it was.
@@ -171,13 +206,27 @@ impl GenerationJob {
     /// because reading twenty tables over a slow link takes longer than
     /// rendering them, and a dialog that says nothing for ten seconds looks
     /// stuck.
-    pub fn begin_loading(&mut self, total: usize, cx: &mut Context<Self>) {
+    ///
+    /// Returns the phase's ticket, for the reads to check with
+    /// [`GenerationJob::is_loading`].
+    pub fn begin_loading(&mut self, total: usize, cx: &mut Context<Self>) -> u64 {
+        self.loading += 1;
         self.stage = Stage::Loading { done: 0, total };
         self.log.clear();
         self.cancel = None;
         self.output_dir = None;
         self._pump = None;
         cx.notify();
+        self.loading
+    }
+
+    /// Whether the table-reading phase `ticket` is still the one on screen.
+    ///
+    /// No once its Cancel was pressed, and no once a later phase began: either
+    /// way nobody is waiting for its tables any more, and a run started from
+    /// them would be one the user did not ask for.
+    pub fn is_loading(&self, ticket: u64) -> bool {
+        matches!(self.stage, Stage::Loading { .. }) && self.loading == ticket
     }
 
     /// One more table has been described.
@@ -194,10 +243,15 @@ impl GenerationJob {
     /// dialog, so the loading stage they share with a generate ends by simply
     /// going away. Refuses to touch anything but a load, so it can never pull a
     /// running job off the screen.
+    ///
+    /// The dialog held the keyboard, so its going is announced like any other
+    /// close: a focus handle left on a box that is no longer drawn takes every
+    /// shortcut in the window with it.
     pub fn finish_loading(&mut self, cx: &mut Context<Self>) {
         if matches!(self.stage, Stage::Loading { .. }) {
             self.stage = Stage::Idle;
             self.log.clear();
+            cx.emit(JobEvent::Closed);
             cx.notify();
         }
     }
@@ -323,10 +377,19 @@ impl GenerationJob {
     }
 
     /// Appends one line to the log, dropping the oldest once it is full.
+    ///
+    /// The box follows the newest line for as long as the user leaves it at
+    /// the bottom — a run of fifty files otherwise looks stuck on its first
+    /// screenful — and stays put once they have scrolled up to read something,
+    /// which a box that jumped back down on every file would make impossible.
     fn note(&mut self, line: SharedString, cx: &mut Context<Self>) {
+        let following = at_bottom(&self.scroll);
         self.log.push(line);
         if self.log.len() > LOG_LIMIT {
             self.log.remove(0);
+        }
+        if following {
+            self.scroll.scroll_to_bottom();
         }
         cx.notify();
     }
@@ -336,14 +399,29 @@ impl GenerationJob {
     /// While the run is blocked on an overwrite question there is no next file
     /// boundary to reach, so the question is answered with
     /// [`Decision::Cancel`], which is what unblocks it.
+    ///
+    /// While the tables are still being read there is no run to stop and no
+    /// file written to list, so the dialog simply goes. The reads that are
+    /// still out find their phase over through [`GenerationJob::is_loading`]
+    /// and start nothing.
     pub fn cancel(&mut self, cx: &mut Context<Self>) {
+        match std::mem::replace(&mut self.stage, Stage::Idle) {
+            Stage::Loading { .. } => {
+                self.log.clear();
+                cx.emit(JobEvent::Closed);
+                cx.notify();
+                return;
+            }
+            Stage::Asking {
+                reply, done, total, ..
+            } => {
+                reply.send(Decision::Cancel).ok();
+                self.stage = Stage::Running { done, total };
+            }
+            stage => self.stage = stage,
+        }
         if let Some(handle) = self.cancel.take() {
             handle.cancel();
-        }
-        if let Stage::Asking { reply, .. } =
-            std::mem::replace(&mut self.stage, Stage::Running { done: 0, total: 0 })
-        {
-            reply.send(Decision::Cancel).ok();
         }
         self.note(ts!("progress.canceling"), cx);
     }
@@ -402,7 +480,7 @@ impl GenerationJob {
         modal(
             "generation-progress",
             ts!("progress.title"),
-            px(DIALOG_WIDTH),
+            rugpui::scaled(DIALOG_WIDTH, cx),
             div()
                 .flex()
                 .flex_col()
@@ -423,7 +501,7 @@ impl GenerationJob {
                 )
                 .child(
                     div()
-                        .text_size(px(12.))
+                        .text_size(rugpui::TextSize::Sm.size(cx))
                         .text_color(theme.text_muted)
                         .child(ts!("progress.count", done = done, total = total)),
                 )
@@ -434,29 +512,35 @@ impl GenerationJob {
                         .flex()
                         .flex_col()
                         .gap(px(2.))
-                        .h(px(LOG_HEIGHT))
+                        .h(rugpui::scaled(LOG_HEIGHT, cx))
                         .p(px(8.))
                         .overflow_y_scroll()
                         .rounded_md()
                         .bg(theme.surface)
                         .border_1()
                         .border_color(theme.border)
-                        .text_size(px(11.))
+                        .text_size(rugpui::TextSize::Xs.size(cx))
                         .text_color(theme.text_muted)
                         .children(lines.into_iter().map(|line| div().child(line))),
                 )
-                .child(div().flex().flex_row().justify_end().child(
-                    Button::new("generation-cancel", ts!("common.cancel")).on_click(
-                        move |_, _window, cx| {
-                            this.update(cx, |job, cx| job.cancel(cx));
-                        },
+                .child(
+                    div().flex().flex_row().justify_end().child(
+                        Button::new("generation-cancel", ts!("common.cancel"))
+                            .variant(ButtonVariant::Secondary)
+                            .on_click(move |_, _window, cx| {
+                                this.update(cx, |job, cx| job.cancel(cx));
+                            }),
                     ),
-                )),
-            // The backdrop does not dismiss a running job: there is nothing to
-            // dismiss it to, and a click that quietly abandoned a run half way
-            // through would be the worst answer of the three.
+                ),
             |_window, _cx| {},
         )
+        // The backdrop does not dismiss a running job: there is nothing to
+        // dismiss it to, and a click that quietly abandoned a run half way
+        // through would be the worst answer of the three. The panel takes the
+        // keyboard, where `Enter` answers nothing: the one button stops the
+        // run, and a key pressed out of habit must not do that.
+        .backdrop_dismisses(false)
+        .autofocus(true)
         .into_any_element()
     }
 
@@ -465,6 +549,8 @@ impl GenerationJob {
         let theme = theme(cx);
         let shown = SharedString::from(path.display().to_string());
         let this = cx.entity();
+        let default = cx.entity();
+        let focus = self.default_focus.clone();
         let answer = |label: SharedString, decision: Decision, id: &'static str, primary: bool| {
             let this = this.clone();
             Button::new(id, label)
@@ -473,6 +559,7 @@ impl GenerationJob {
                 } else {
                     ButtonVariant::Secondary
                 })
+                .when(primary, |button| button.focus_handle(&focus))
                 .on_click(move |_, _window, cx| {
                     this.update(cx, |job, cx| job.answer(decision, cx));
                 })
@@ -481,14 +568,14 @@ impl GenerationJob {
         modal(
             "generation-conflict",
             ts!("summary.conflict_title"),
-            px(DIALOG_WIDTH),
+            rugpui::scaled(DIALOG_WIDTH, cx),
             div()
                 .flex()
                 .flex_col()
                 .gap(px(12.))
                 .child(
                     div()
-                        .text_size(px(12.))
+                        .text_size(rugpui::TextSize::Sm.size(cx))
                         .text_color(theme.text)
                         .child(ts!("summary.conflict_body")),
                 )
@@ -497,7 +584,7 @@ impl GenerationJob {
                         .p(px(8.))
                         .rounded_md()
                         .bg(theme.surface)
-                        .text_size(px(11.))
+                        .text_size(rugpui::TextSize::Xs.size(cx))
                         .text_color(theme.text_muted)
                         .child(shown),
                 )
@@ -541,15 +628,27 @@ impl GenerationJob {
                 ),
             |_window, _cx| {},
         )
+        // `Enter` is the highlighted answer, Overwrite, which holds the
+        // keyboard: the question only comes up under the *ask* policy, where
+        // replacing the file is what a regeneration is for. `Escape` is
+        // Cancel, which the shell routes (see `dismiss_dialog_action`); the
+        // backdrop is no answer at all.
+        .initial_focus(&self.default_focus)
+        .on_confirm(move |_window, cx| {
+            default.update(cx, |job, cx| job.answer(Decision::Overwrite, cx));
+        })
+        .backdrop_dismisses(false)
         .into_any_element()
     }
 
     /// The result summary: what was written, what was skipped, what failed.
     fn render_summary(&self, outcome: &Outcome, cx: &mut Context<Self>) -> gpui::AnyElement {
         let theme = theme(cx);
+        let warning = editor_theme(cx).warning;
         let this = cx.entity();
         let closing = cx.entity();
         let opening = cx.entity();
+        let default = cx.entity();
 
         let section = |title: SharedString, lines: Vec<SharedString>, color: gpui::Hsla| {
             (!lines.is_empty()).then(|| {
@@ -557,10 +656,15 @@ impl GenerationJob {
                     .flex()
                     .flex_col()
                     .gap(px(2.))
-                    .child(div().text_size(px(12.)).text_color(color).child(title))
+                    .child(
+                        div()
+                            .text_size(rugpui::TextSize::Sm.size(cx))
+                            .text_color(color)
+                            .child(title),
+                    )
                     .children(lines.into_iter().map(|line| {
                         div()
-                            .text_size(px(11.))
+                            .text_size(rugpui::TextSize::Xs.size(cx))
                             .text_color(theme.text_muted)
                             .child(line)
                     }))
@@ -591,6 +695,19 @@ impl GenerationJob {
             })
             .collect();
 
+        // Every unknown field, with the pair it turned up in: a count alone
+        // sends the user back to a dry run to find out which template it was.
+        let warnings: Vec<SharedString> = outcome
+            .diagnostics
+            .iter()
+            .map(|diagnostic| {
+                SharedString::from(format!(
+                    "{} × {}: {}",
+                    diagnostic.table, diagnostic.template, diagnostic.warning.message
+                ))
+            })
+            .collect();
+
         let headline = if outcome.canceled {
             ts!("summary.canceled")
         } else if outcome.failed.is_empty() {
@@ -602,7 +719,7 @@ impl GenerationJob {
         modal(
             "generation-summary",
             ts!("summary.title"),
-            px(DIALOG_WIDTH),
+            rugpui::scaled(DIALOG_WIDTH, cx),
             div()
                 .flex()
                 .flex_col()
@@ -610,7 +727,7 @@ impl GenerationJob {
                 .min_h_0()
                 .child(
                     div()
-                        .text_size(px(13.))
+                        .text_size(rugpui::TextSize::Body.size(cx))
                         .text_color(if outcome.failed.is_empty() {
                             theme.text
                         } else {
@@ -620,7 +737,7 @@ impl GenerationJob {
                 )
                 .child(
                     div()
-                        .text_size(px(12.))
+                        .text_size(rugpui::TextSize::Sm.size(cx))
                         .text_color(theme.text_muted)
                         .child(ts!(
                             "summary.counts",
@@ -638,11 +755,12 @@ impl GenerationJob {
                         .flex_col()
                         .gap(px(8.))
                         .min_h_0()
-                        .max_h(px(240.))
+                        .max_h(rugpui::scaled(240., cx))
                         .overflow_y_scroll()
                         .children(section(ts!("summary.written"), written, theme.success))
                         .children(section(ts!("summary.skipped"), skipped, theme.text_muted))
-                        .children(section(ts!("summary.failed"), failed, theme.danger)),
+                        .children(section(ts!("summary.failed"), failed, theme.danger))
+                        .children(section(ts!("summary.warnings"), warnings, warning)),
                 )
                 .child(
                     div()
@@ -661,6 +779,7 @@ impl GenerationJob {
                         .child(
                             Button::new("summary-close", ts!("common.close"))
                                 .variant(ButtonVariant::Primary)
+                                .focus_handle(&self.default_focus)
                                 .on_click(move |_, _window, cx| {
                                     closing.update(cx, |job, cx| job.close(cx));
                                 }),
@@ -670,6 +789,10 @@ impl GenerationJob {
                 this.update(cx, |job, cx| job.close(cx));
             },
         )
+        .initial_focus(&self.default_focus)
+        .on_confirm(move |_window, cx| {
+            default.update(cx, |job, cx| job.close(cx));
+        })
         .into_any_element()
     }
 
@@ -678,17 +801,18 @@ impl GenerationJob {
         let theme = theme(cx);
         let this = cx.entity();
         let dismiss = cx.entity();
+        let default = cx.entity();
         modal(
             "generation-refused",
             ts!("summary.title"),
-            px(DIALOG_WIDTH),
+            rugpui::scaled(DIALOG_WIDTH, cx),
             div()
                 .flex()
                 .flex_col()
                 .gap(px(12.))
                 .child(
                     div()
-                        .text_size(px(12.))
+                        .text_size(rugpui::TextSize::Sm.size(cx))
                         .text_color(theme.danger)
                         .child(message.clone()),
                 )
@@ -696,6 +820,7 @@ impl GenerationJob {
                     div().flex().flex_row().justify_end().child(
                         Button::new("refused-close", ts!("common.close"))
                             .variant(ButtonVariant::Primary)
+                            .focus_handle(&self.default_focus)
                             .on_click(move |_, _window, cx| {
                                 this.update(cx, |job, cx| job.close(cx));
                             }),
@@ -705,6 +830,10 @@ impl GenerationJob {
                 dismiss.update(cx, |job, cx| job.close(cx));
             },
         )
+        .initial_focus(&self.default_focus)
+        .on_confirm(move |_window, cx| {
+            default.update(cx, |job, cx| job.close(cx));
+        })
         .into_any_element()
     }
 }
@@ -733,6 +862,13 @@ impl Render for GenerationJob {
             }
         }
     }
+}
+
+/// Whether a scrolling box is showing its last line — or has not been laid out
+/// yet, which is where a log that has only just started is.
+fn at_bottom(scroll: &ScrollHandle) -> bool {
+    let max = scroll.max_offset().y;
+    max <= px(0.) || -scroll.offset().y >= max - px(4.)
 }
 
 /// Turns the saved policy into the run's, with the *ask* case wired to the
@@ -803,5 +939,60 @@ mod tests {
         assert_eq!(path, Path::new("/tmp/model.java"));
         reply.send(Decision::SkipAll).expect("the run is waiting");
         assert_eq!(asking.join().expect("the run thread"), Decision::SkipAll);
+    }
+
+    #[gpui::test]
+    fn cancel_while_the_tables_are_read_takes_the_dialog_down(cx: &mut gpui::TestAppContext) {
+        let job = cx.new(GenerationJob::new);
+        let closed = std::rc::Rc::new(std::cell::Cell::new(0));
+        cx.update(|cx| {
+            let closed = closed.clone();
+            cx.subscribe(&job, move |_, event: &JobEvent, _| match event {
+                JobEvent::Closed => closed.set(closed.get() + 1),
+            })
+            .detach();
+        });
+
+        let ticket = job.update(cx, |job, cx| job.begin_loading(3, cx));
+        assert!(job.read_with(cx, |job, _| job.is_loading(ticket)));
+
+        // There is no run to stop and no file to list, so nothing is left on
+        // screen to be stuck behind — the dialog is gone, not busy.
+        job.update(cx, |job, cx| job.cancel(cx));
+        cx.run_until_parked();
+        job.read_with(cx, |job, _| {
+            assert!(!job.is_open(), "the dialog stayed up");
+            assert!(!job.is_busy(), "a canceled load still blocks the window");
+            assert!(!job.is_loading(ticket), "the reads were not told to stop");
+        });
+        assert_eq!(closed.get(), 1, "the keyboard was not handed back");
+
+        // A read of the canceled phase that comes back late must not take a
+        // later phase for its own.
+        let next = job.update(cx, |job, cx| job.begin_loading(1, cx));
+        job.read_with(cx, |job, _| {
+            assert!(job.is_loading(next));
+            assert!(!job.is_loading(ticket));
+        });
+    }
+
+    #[gpui::test]
+    fn cancel_on_the_question_answers_it_and_keeps_the_bar(cx: &mut gpui::TestAppContext) {
+        let job = cx.new(GenerationJob::new);
+        let (reply, answer) = channel();
+        job.update(cx, |job, cx| {
+            job.stage = Stage::Asking {
+                path: PathBuf::from("/tmp/model.java"),
+                reply,
+                done: 3,
+                total: 5,
+            };
+            job.cancel(cx);
+        });
+        assert_eq!(answer.recv().expect("the run is waiting"), Decision::Cancel);
+        job.read_with(cx, |job, _| {
+            assert!(job.is_busy(), "the run is still winding down");
+            assert_eq!(job.counts(), (3, 5), "the bar went back to nothing");
+        });
     }
 }

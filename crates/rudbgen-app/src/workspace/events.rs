@@ -66,7 +66,16 @@ impl Workspace {
                 self.profiles = load_profiles();
                 let profile = (**profile).clone();
                 self.focus_shell(window, cx);
-                self.connect_to(profile, cx);
+                let handoff = dialog.update(cx, |dialog, _cx| dialog.take_handoff());
+                match handoff {
+                    // The form's own secrets: the profile may keep none in the
+                    // keychain, or the keychain may just have refused them.
+                    Some(handoff) => {
+                        self.connect_with(profile, handoff.credentials, None, cx);
+                        self.connection_notice = handoff.warning;
+                    }
+                    None => self.connect_to(profile, None, window, cx),
+                }
             }
             ConnectionDialogEvent::Dismissed => {
                 dialog.update(cx, |dialog, cx| dialog.close(cx));
@@ -160,27 +169,15 @@ impl Workspace {
             }
             UpdateDialogEvent::Installed(_) => {
                 // The new build is on disk and the restart is the
-                // application's to perform: `cx.restart()` spawns a watcher
-                // that waits for this pid to exit and starts rudbgen again
-                // from the same path, which by then holds what was
-                // installed. The dialog stays on screen — the process is
+                // application's to perform — through the close guard, so a
+                // template with unsaved edits or a run still writing is asked
+                // about first, exactly as a quit would ask. The shell's
+                // `proceed` points the restart at `restart_path()`, the path
+                // as it stood before the install renamed the running image
+                // aside. The dialog stays on screen meanwhile: the process is
                 // about to go, and closing it first would flash the window
                 // back into view for a fraction of a second.
-                //
-                // The path has to be pointed at explicitly: `install`
-                // renames the running image aside and writes the new build
-                // under the old name, and on Linux `current_exe()` follows
-                // the *inode* into the renamed-away copy, so a bare
-                // `cx.restart()` would come back up on the build that was
-                // just replaced. `restart_path()` is the path as it stood
-                // before anything moved, taken by `init_process_identity`
-                // at the top of `main`; where the platform never answered
-                // one, leaving `set_restart_path` uncalled is gpui's own
-                // default and behaves the same as before this build.
-                if let Some(path) = rugpui_shell::restart_path() {
-                    cx.set_restart_path(path);
-                }
-                cx.restart();
+                rugpui_shell::request_restart(window, cx);
             }
             UpdateDialogEvent::Dismissed => {
                 dialog.update(cx, |dialog, cx| dialog.close(cx));
@@ -202,6 +199,31 @@ impl Workspace {
             // The status bar counts the ticks, and so does the list of
             // tables a live preview may be rendered against.
             ExplorerEvent::SelectionChanged => {
+                if matches!(self.connection, ConnectionState::Open { .. }) {
+                    let ticks = self
+                        .explorer
+                        .read(cx)
+                        .selection(cx)
+                        .into_iter()
+                        .map(|key| rudbgen_core::TableName {
+                            catalog: key.catalog,
+                            schema: key.schema,
+                            name: key.name,
+                        })
+                        .collect();
+                    self.generate
+                        .update(cx, |pane, cx| pane.set_ticks(ticks, cx));
+                }
+                self.refresh_templates(cx);
+                cx.notify();
+            }
+            // The descriptions the inspector holds are from before the
+            // refresh. Dropping them makes the next run read its tables
+            // again, and the live previews rendered from them are redrawn
+            // the same way — `refresh_templates` hands every tab its choices,
+            // which re-renders it, reading as it goes.
+            ExplorerEvent::Refreshed => {
+                self.inspector.update(cx, |panel, cx| panel.refresh_all(cx));
                 self.refresh_templates(cx);
                 cx.notify();
             }
@@ -245,8 +267,11 @@ impl Workspace {
         match event {
             GeneratePaneEvent::Changed => {
                 // The palette lists the custom variables, so a variable
-                // typed into the Generate tab has to reach it.
+                // typed into the Generate tab has to reach it — and the
+                // template tabs follow the list, for their *Add to
+                // generation list*.
                 self.refresh_palette(cx);
+                self.refresh_generation_marks(cx);
                 cx.notify();
             }
             GeneratePaneEvent::EditTemplate(file) => {
@@ -269,6 +294,8 @@ impl Workspace {
             PreviewEvent::Reselect { table, template } => {
                 self.render_preview(*table, *template, cx);
             }
+            PreviewEvent::Generate => self.start_run(RunKind::Generate, cx),
+            PreviewEvent::Cancel => self.cancel_dry_run(cx),
         }
     }
 
@@ -292,7 +319,7 @@ impl Workspace {
         cx: &mut Context<Self>,
     ) {
         match event {
-            JobEvent::Closed => self.focus_shell(window, cx),
+            JobEvent::Closed => self.return_focus(window, cx),
         }
     }
 }

@@ -29,6 +29,15 @@
 //! place, which [`store_set`] decides; the prompt opens on the name of the set
 //! the list came from, so writing an edited list back over its set is one
 //! click.
+//!
+//! The `⋯` beside the set buttons moves a set between machines: *Export set…*
+//! packs the set the list matches, with its templates' bodies and optionally
+//! this connection's custom variables, into one
+//! [`TemplateBundle`](rudbgen_core::TemplateBundle) file, and *Import set…*
+//! writes a bundle's templates into a new folder under `<config>/templates`,
+//! saves the set under the name the prompt shows — the same overwrite rule as
+//! *Save as set…* — and puts it on the list, with the list it replaced kept
+//! for *Undo*.
 
 use std::path::{Path, PathBuf};
 
@@ -37,17 +46,18 @@ use gpui::{
     SharedString, Subscription, Task, Window, div, prelude::*, px,
 };
 use rudbgen_core::{
-    AbbreviationStore, ConnectionStore, GenerationProfile, TemplateRef, TemplateSet,
-    TemplateSetStore, config_dir,
+    AbbreviationStore, BundleError, ConnectionStore, GenerationProfile, OverwritePolicy, TableName,
+    TemplateBundle, TemplateRef, TemplateSet, TemplateSetStore, config_dir,
 };
 use rugpui::{
-    Button, ButtonVariant, Checkbox, Scrollbar, ScrollbarAxis, ScrollbarState, Select, TextInput,
-    Theme, form_row, hide_later, hide_now, modal, scroll_to, scrolled, theme, tooltip_label,
+    Button, ButtonVariant, Checkbox, MenuButton, MenuEntry, Scrollbar, ScrollbarAxis,
+    ScrollbarState, Segmented, Select, TextInput, Theme, form_row, hide_later, hide_now, modal,
+    scroll_to, scrolled, theme, tooltip_label,
 };
 use uuid::Uuid;
 
 use crate::i18n::ts;
-use crate::icons;
+use crate::{app_settings, icons};
 
 /// How long the panel waits after the last edit before writing
 /// `connections.json`.
@@ -302,6 +312,31 @@ struct TemplateRow {
     _subs: [Subscription; 2],
 }
 
+/// The last change to the template list that one click can take back.
+///
+/// The list is saved half a second after every change and has no history of
+/// its own, so the two changes that throw rows away — picking a set over an
+/// edited list, and the ✕ beside a row — leave this behind, and a line above
+/// the list offers it until the next change of the same kind replaces it.
+enum Undo {
+    /// A set replaced this list, and this is what it was.
+    Replaced {
+        /// The rows as they stood.
+        templates: Vec<TemplateRef>,
+        /// The set the list had come from, for the "Save as set…" prompt.
+        origin: Option<Uuid>,
+        /// The set that replaced it, for the line that says so.
+        set: SharedString,
+    },
+    /// This row was removed from this position.
+    Removed {
+        /// Where it was.
+        index: usize,
+        /// What it was.
+        template: TemplateRef,
+    },
+}
+
 /// One row of the custom variable table.
 struct VarRow {
     /// The variable's name.
@@ -310,6 +345,26 @@ struct VarRow {
     value: Entity<TextInput>,
     /// Keeps the two observers above alive.
     _subs: [Subscription; 2],
+}
+
+/// The *Export set…* question.
+struct ExportPrompt {
+    /// The set being exported.
+    set: Uuid,
+    /// Whether this connection's custom variables go into the file too.
+    with_vars: bool,
+    /// Why the last press of *Export…* wrote nothing.
+    error: Option<SharedString>,
+}
+
+/// The *Import set…* question, over a bundle already read.
+struct ImportPrompt {
+    /// What the file held.
+    bundle: TemplateBundle,
+    /// Whether the variables this connection lacks are added to it.
+    with_vars: bool,
+    /// Why the last press of *Import* wrote nothing.
+    error: Option<SharedString>,
 }
 
 /// The Generate tab.
@@ -359,6 +414,37 @@ pub struct GeneratePane {
     origin_set: Option<Uuid>,
     /// The set the delete-confirmation prompt is up for, if any.
     deleting_set: Option<Uuid>,
+    /// The delete confirmation's Cancel, which holds the keyboard while it is
+    /// up: deleting a set cannot be taken back, so it is the answer that
+    /// needs a deliberate press.
+    prompt_focus: FocusHandle,
+    /// Whether the set row's `⋯` menu is showing.
+    set_menu_open: bool,
+    /// The *Export set…* question, while it is up.
+    exporting: Option<ExportPrompt>,
+    /// The export question's *Export…*, which holds the keyboard while it is
+    /// up: nothing is written until the save dialog behind it is answered, so
+    /// it is the safe default.
+    export_focus: FocusHandle,
+    /// The *Import set…* question, while it is up.
+    importing: Option<ImportPrompt>,
+    /// The name the import files the set under.
+    import_name: Entity<TextInput>,
+    /// What the last list change that lost rows can be taken back to.
+    undo: Option<Undo>,
+    /// The overwrite policy for the next generate, when it is not the one the
+    /// settings start every run from.
+    ///
+    /// Not part of the profile and not saved: the settings hold the default,
+    /// this is the exception for one run, and it goes back to the default as
+    /// soon as that run has started (see [`GeneratePane::take_overwrite`]).
+    overwrite: Option<OverwritePolicy>,
+    /// The tables ticked in the explorer, which the profile keeps for the next
+    /// connection to tick again (see [`GeneratePane::set_ticks`]).
+    ///
+    /// Not drawn here — the ticks are the explorer's — but saved with the rest
+    /// of the profile, through the same debounce and the same diff.
+    ticks: Vec<TableName>,
     /// Vertical scroll of the panel.
     scroll: ScrollHandle,
     /// Whether the panel's overlay scroll indicator is on screen.
@@ -377,7 +463,42 @@ impl GeneratePane {
             cx.new(|cx| TextInput::new(cx).placeholder(ts!("generate.output_placeholder")));
         let author =
             cx.new(|cx| TextInput::new(cx).placeholder(ts!("generate.author_placeholder")));
-        let set_name = cx.new(|cx| TextInput::new(cx).placeholder(ts!("generate.set_name")));
+        // `Enter` in the name saves the set, as the prompt's button does —
+        // deferred, because the field is still leased while its own submit
+        // runs and the save reads it back.
+        let weak = cx.weak_entity();
+        let set_name = cx.new(|cx| {
+            TextInput::new(cx)
+                .placeholder(ts!("generate.set_name"))
+                .on_submit(move |text, _window, cx| {
+                    let (weak, name) = (weak.clone(), text.to_owned());
+                    cx.defer(move |cx| {
+                        weak.update(cx, |pane, cx| {
+                            if pane.naming_set {
+                                pane.save_as_set(name, cx);
+                            }
+                        })
+                        .ok();
+                    });
+                })
+        });
+        // `Enter` in the import's name imports, the same way.
+        let weak = cx.weak_entity();
+        let import_name = cx.new(|cx| {
+            TextInput::new(cx)
+                .placeholder(ts!("generate.set_name"))
+                .on_submit(move |_text, _window, cx| {
+                    let weak = weak.clone();
+                    cx.defer(move |cx| {
+                        weak.update(cx, |pane, cx| {
+                            if pane.importing.is_some() {
+                                pane.import_set(cx);
+                            }
+                        })
+                        .ok();
+                    });
+                })
+        });
         let subs = vec![
             cx.observe(&output, |pane, _, cx| pane.touch(cx)),
             cx.observe(&author, |pane, _, cx| pane.touch(cx)),
@@ -385,6 +506,11 @@ impl GeneratePane {
             // so the panel redraws as the name is typed.
             cx.observe(&set_name, |pane, _, cx| {
                 if pane.naming_set {
+                    cx.notify();
+                }
+            }),
+            cx.observe(&import_name, |pane, _, cx| {
+                if pane.importing.is_some() {
                     cx.notify();
                 }
             }),
@@ -407,6 +533,15 @@ impl GeneratePane {
             set_name,
             origin_set: None,
             deleting_set: None,
+            prompt_focus: cx.focus_handle(),
+            set_menu_open: false,
+            exporting: None,
+            export_focus: cx.focus_handle(),
+            importing: None,
+            import_name,
+            undo: None,
+            overwrite: None,
+            ticks: Vec::new(),
             scroll: ScrollHandle::new(),
             scrollbar: ScrollbarState::new(),
             _debounce: None,
@@ -444,6 +579,10 @@ impl GeneratePane {
             }
         };
         self.origin_set = matching_set(&self.sets.sets, &profile.templates);
+        self.undo = None;
+        self.overwrite = None;
+        self.ticks = profile.selected_tables.clone();
+        self.withdraw_prompts(cx);
         self.rebuild(profile, cx);
     }
 
@@ -452,8 +591,85 @@ impl GeneratePane {
         self.profile_id = None;
         self.saved = GenerationProfile::default();
         self.origin_set = None;
+        self.undo = None;
+        self.overwrite = None;
+        self.ticks.clear();
         self._debounce = None;
+        self.withdraw_prompts(cx);
         self.rebuild(&GenerationProfile::default(), cx);
+    }
+
+    /// Whether one of the panel's questions — the name of a set, whether to
+    /// delete one, exporting or importing one — is up.
+    pub fn prompt_open(&self) -> bool {
+        self.naming_set
+            || self.deleting_set.is_some()
+            || self.exporting.is_some()
+            || self.importing.is_some()
+    }
+
+    /// `Escape`, for whatever the panel has stacked over itself: the set list
+    /// or its `⋯` menu, then any question. Answers whether there was anything
+    /// to take down.
+    pub fn escape(&mut self, cx: &mut Context<Self>) -> bool {
+        if self.set_open {
+            self.set_open = false;
+        } else if self.set_menu_open {
+            self.set_menu_open = false;
+        } else if self.naming_set {
+            self.naming_set = false;
+        } else if self.deleting_set.is_some() {
+            self.deleting_set = None;
+        } else if self.exporting.is_some() {
+            self.exporting = None;
+        } else if self.importing.is_some() {
+            self.importing = None;
+        } else {
+            return false;
+        }
+        cx.notify();
+        true
+    }
+
+    /// Takes every question, the set list and its menu down, unanswered.
+    pub fn withdraw_prompts(&mut self, cx: &mut Context<Self>) {
+        if self.prompt_open() || self.set_open || self.set_menu_open {
+            self.naming_set = false;
+            self.deleting_set = None;
+            self.exporting = None;
+            self.importing = None;
+            self.set_open = false;
+            self.set_menu_open = false;
+            cx.notify();
+        }
+    }
+
+    /// The overwrite policy the next generate runs under, after which the
+    /// panel's choice goes back to the settings' default.
+    pub fn take_overwrite(&mut self, cx: &mut Context<Self>) -> OverwritePolicy {
+        let policy = self
+            .overwrite
+            .take()
+            .unwrap_or_else(|| app_settings::current(cx).overwrite_policy);
+        cx.notify();
+        policy
+    }
+
+    /// Whether `file` is one of this connection's templates, ticked or not.
+    pub fn lists_template(&self, file: &Path) -> bool {
+        let stored = store_template_path(file);
+        self.templates
+            .iter()
+            .any(|row| row.file == stored || resolve_template(&row.file) == file)
+    }
+
+    /// Appends `file` to the list, ticked, unless it is already in it: the
+    /// template tab's *Add to generation list*.
+    pub fn add_template_file(&mut self, file: PathBuf, cx: &mut Context<Self>) {
+        if self.profile_id.is_none() || self.lists_template(&file) {
+            return;
+        }
+        self.install_templates(vec![file], cx);
     }
 
     /// The profile as the widgets currently describe it.
@@ -481,7 +697,25 @@ impl GeneratePane {
             output_dir: Some(PathBuf::from(output)).filter(|dir| !dir.as_os_str().is_empty()),
             author: text(&self.author, cx),
             custom_vars: collect_vars(&rows),
+            selected_tables: self.ticks.clone(),
         }
+    }
+
+    /// The tables the explorer has ticked, for the profile to keep.
+    ///
+    /// Saved with the next debounce like any other edit — a tick is cheap to
+    /// make and the file is diffed, so a burst of them is one write.
+    pub fn set_ticks(&mut self, ticks: Vec<TableName>, cx: &mut Context<Self>) {
+        if self.ticks != ticks {
+            self.ticks = ticks;
+            self.schedule_save(cx);
+        }
+    }
+
+    /// The ticks the profile will be saved with.
+    #[cfg(test)]
+    pub fn ticks(&self) -> &[TableName] {
+        &self.ticks
     }
 
     /// The abbreviation rules, which a run needs and only this panel has read.
@@ -713,7 +947,34 @@ impl GeneratePane {
         if index >= self.templates.len() {
             return;
         }
+        let template = self.collect(cx).templates.remove(index);
         self.templates.remove(index);
+        self.undo = Some(Undo::Removed { index, template });
+        self.touch(cx);
+    }
+
+    /// Takes the last list change that lost rows back.
+    fn undo(&mut self, cx: &mut Context<Self>) {
+        let Some(undo) = self.undo.take() else {
+            return;
+        };
+        match undo {
+            Undo::Replaced {
+                templates, origin, ..
+            } => {
+                self.templates.clear();
+                for template in &templates {
+                    let row = self.new_template_row(template, cx);
+                    self.templates.push(row);
+                }
+                self.origin_set = origin;
+            }
+            Undo::Removed { index, template } => {
+                let row = self.new_template_row(&template, cx);
+                let at = index.min(self.templates.len());
+                self.templates.insert(at, row);
+            }
+        }
         self.touch(cx);
     }
 
@@ -721,10 +982,24 @@ impl GeneratePane {
     ///
     /// A replacement and not a merge, which is what jdbgen's presets do: a set
     /// is a description of a whole run, and half of one is not a set.
+    ///
+    /// What it replaces is kept for [`Undo`]: a list that was not already
+    /// this set — rows ticked, renamed, added by hand — is otherwise gone the
+    /// moment a set is picked from a list that was only being looked through.
     fn apply_set(&mut self, id: Uuid, cx: &mut Context<Self>) {
         let Some(set) = self.sets.get(id).cloned() else {
             return;
         };
+        let before = self.collect(cx).templates;
+        if before.is_empty() || before == set.templates {
+            self.undo = None;
+        } else {
+            self.undo = Some(Undo::Replaced {
+                templates: before,
+                origin: self.origin_set,
+                set: SharedString::from(set.name.clone()),
+            });
+        }
         self.templates.clear();
         for template in &set.templates {
             let row = self.new_template_row(template, cx);
@@ -736,7 +1011,7 @@ impl GeneratePane {
 
     /// Opens the "Save as set…" prompt on the name of the set the list came
     /// from, or empty when there is none.
-    fn open_set_prompt(&mut self, cx: &mut Context<Self>) {
+    pub fn open_set_prompt(&mut self, cx: &mut Context<Self>) {
         let name = self
             .origin_set
             .and_then(|id| self.sets.get(id))
@@ -807,24 +1082,303 @@ impl GeneratePane {
         }
     }
 
+    /// Opens the *Export set…* question for the set the list matches.
+    ///
+    /// The variables are ticked to go along whenever the connection has any:
+    /// a set's templates usually read them, and the question says how many
+    /// there are before anything is written.
+    fn open_export(&mut self, cx: &mut Context<Self>) {
+        let current = self.collect(cx);
+        let Some(set) = matching_set(&self.sets.sets, &current.templates) else {
+            return;
+        };
+        self.exporting = Some(ExportPrompt {
+            set,
+            with_vars: !current.custom_vars.is_empty(),
+            error: None,
+        });
+        cx.notify();
+    }
+
+    /// Packs the set and asks where the file goes.
+    ///
+    /// The templates are read before the save dialog opens, so one that
+    /// cannot be packed is named in the question, which stays up, rather than
+    /// after a file name has already been picked for nothing.
+    fn export_set(&mut self, cx: &mut Context<Self>) {
+        let Some((id, with_vars)) = self
+            .exporting
+            .as_ref()
+            .map(|prompt| (prompt.set, prompt.with_vars))
+        else {
+            return;
+        };
+        let Some(set) = self.sets.get(id).cloned() else {
+            self.exporting = None;
+            cx.notify();
+            return;
+        };
+        let variables = if with_vars {
+            self.collect(cx).custom_vars
+        } else {
+            Vec::new()
+        };
+        let bundle = match TemplateBundle::pack(&set, resolve_template, variables) {
+            Ok(bundle) => bundle,
+            Err(error) => {
+                log::warn!("the set {:?} could not be packed: {error}", set.name);
+                if let Some(prompt) = self.exporting.as_mut() {
+                    prompt.error = Some(bundle_failed(&error));
+                }
+                cx.notify();
+                return;
+            }
+        };
+        self.exporting = None;
+        cx.notify();
+
+        let directory = directories::UserDirs::new()
+            .map(|dirs| dirs.home_dir().to_path_buf())
+            .or_else(|| rudbgen_core::templates_dir().ok())
+            .unwrap_or_default();
+        let prompt = cx.prompt_for_new_path(&directory, Some(&bundle.suggested_file_name()));
+        cx.spawn(async move |pane, cx| {
+            let path = match prompt.await {
+                Ok(Ok(Some(path))) => path,
+                Ok(Ok(None)) | Err(_) => return,
+                Ok(Err(error)) => {
+                    log::warn!("the save dialog could not be opened: {error:#}");
+                    return;
+                }
+            };
+            let toast = match bundle.write(&path) {
+                Ok(()) => rugpui_shell::Toast::info(ts!(
+                    "generate.export_done",
+                    name = bundle.name.clone(),
+                    path = path.display().to_string()
+                )),
+                Err(error) => {
+                    log::error!("the set could not be exported: {error}");
+                    rugpui_shell::Toast::error(ts!(
+                        "generate.export_failed",
+                        error = bundle_failed(&error).to_string()
+                    ))
+                }
+            };
+            pane.update(cx, |_pane, cx| {
+                rugpui_shell::show_toast(toast, cx);
+            })
+            .ok();
+        })
+        .detach();
+    }
+
+    /// Asks the platform for a set file and opens the *Import set…* question
+    /// over it.
+    fn choose_import(&mut self, cx: &mut Context<Self>) {
+        let paths = cx.prompt_for_paths(PathPromptOptions {
+            files: true,
+            directories: false,
+            multiple: false,
+            prompt: Some(ts!("generate.import_select")),
+        });
+        cx.spawn(async move |pane, cx| {
+            let chosen = match paths.await {
+                Ok(Ok(Some(paths))) => paths,
+                Ok(Ok(None)) | Err(_) => return,
+                Ok(Err(error)) => {
+                    log::warn!("the file picker could not be opened: {error:#}");
+                    return;
+                }
+            };
+            let Some(file) = chosen.into_iter().next() else {
+                return;
+            };
+            pane.update(cx, |pane, cx| pane.open_import(&file, cx)).ok();
+        })
+        .detach();
+    }
+
+    /// Reads `file` and opens the import question over it, or says in a toast
+    /// why it is not a set that can be imported.
+    ///
+    /// The name starts as the bundle's own, or the file's when the bundle has
+    /// none; the variables are ticked to be added whenever the bundle has some
+    /// this connection lacks.
+    fn open_import(&mut self, file: &Path, cx: &mut Context<Self>) {
+        let bundle = match TemplateBundle::read(file) {
+            Ok(bundle) => bundle,
+            Err(error) => {
+                log::warn!("{} cannot be imported: {error}", file.display());
+                let shown = file
+                    .file_name()
+                    .map(|name| name.to_string_lossy().into_owned())
+                    .unwrap_or_else(|| file.display().to_string());
+                rugpui_shell::show_toast(
+                    rugpui_shell::Toast::error(ts!(
+                        "generate.import_failed",
+                        file = shown,
+                        error = bundle_failed(&error).to_string()
+                    )),
+                    cx,
+                );
+                return;
+            }
+        };
+        let name = if bundle.name.trim().is_empty() {
+            bundle_stem(file)
+        } else {
+            bundle.name.trim().to_string()
+        };
+        set_text(&self.import_name, name, cx);
+        let with_vars = self.profile_id.is_some()
+            && !bundle
+                .new_variables(&self.collect(cx).custom_vars)
+                .is_empty();
+        self.importing = Some(ImportPrompt {
+            bundle,
+            with_vars,
+            error: None,
+        });
+        cx.notify();
+    }
+
+    /// Writes the bundle's templates into a folder of their own, saves the set
+    /// under the prompt's name, and puts it on the list.
+    ///
+    /// Putting it on the list is [`GeneratePane::apply_set`], so a list it
+    /// replaces is one *Undo* away. A set file that cannot be written takes
+    /// the new folder away again: nothing would point at it.
+    fn import_set(&mut self, cx: &mut Context<Self>) {
+        let name = text(&self.import_name, cx).trim().to_string();
+        if name.is_empty() {
+            return;
+        }
+        let Some((bundle, with_vars)) = self
+            .importing
+            .as_ref()
+            .map(|prompt| (prompt.bundle.clone(), prompt.with_vars))
+        else {
+            return;
+        };
+        let installed = match rudbgen_core::templates_dir()
+            .map_err(|error| format!("{error:#}"))
+            .and_then(|root| {
+                bundle
+                    .install(&root)
+                    .map_err(|error| bundle_failed(&error).to_string())
+            }) {
+            Ok(installed) => installed,
+            Err(message) => {
+                log::error!("the set {name:?} could not be imported: {message}");
+                self.import_failed(ts!("generate.import_write_failed", error = message), cx);
+                return;
+            }
+        };
+        let templates: Vec<TemplateRef> = installed
+            .templates
+            .iter()
+            .map(|template| TemplateRef {
+                file: store_template_path(&template.file),
+                ..template.clone()
+            })
+            .collect();
+        let mut stored = None;
+        let written = read_modify_write(
+            TemplateSetStore::load,
+            |sets| {
+                stored = Some(store_set(sets, name.clone(), templates));
+                sets.builtins_seeded = true;
+            },
+            TemplateSetStore::save,
+        );
+        match written {
+            Ok(sets) => {
+                self.sets = sets;
+                self.sets_error = None;
+            }
+            Err(error) => {
+                log::error!("template-sets.json was not changed: {error:#}");
+                // Created by this import and holding only what it wrote.
+                let _ = std::fs::remove_dir_all(&installed.directory);
+                self.import_failed(sets_failed(&error), cx);
+                return;
+            }
+        }
+
+        self.importing = None;
+        if self.profile_id.is_some() {
+            if let Some(id) = stored {
+                self.apply_set(id, cx);
+            }
+            if with_vars {
+                let vars = bundle.new_variables(&self.collect(cx).custom_vars);
+                self.add_vars(&vars, cx);
+            }
+        }
+        rugpui_shell::show_toast(
+            rugpui_shell::Toast::info(ts!(
+                "generate.import_done",
+                name = name,
+                count = installed.templates.len().to_string(),
+                dir = installed.directory.display().to_string()
+            )),
+            cx,
+        );
+        cx.notify();
+    }
+
+    /// Leaves the import question up with `message` in it.
+    fn import_failed(&mut self, message: SharedString, cx: &mut Context<Self>) {
+        if let Some(prompt) = self.importing.as_mut() {
+            prompt.error = Some(message);
+        }
+        cx.notify();
+    }
+
+    /// Appends `vars` to the variable table, above its blank row.
+    fn add_vars(&mut self, vars: &[(String, String)], cx: &mut Context<Self>) {
+        if vars.is_empty() {
+            return;
+        }
+        let at = self
+            .vars
+            .iter()
+            .rposition(|row| {
+                !text(&row.key, cx).trim().is_empty() || !text(&row.value, cx).is_empty()
+            })
+            .map_or(0, |last| last + 1);
+        for (offset, (key, value)) in vars.iter().enumerate() {
+            let row = self.new_var_row(cx);
+            set_text(&row.key, key.clone(), cx);
+            set_text(&row.value, value.clone(), cx);
+            self.vars.insert(at + offset, row);
+        }
+        self.ensure_blank_var(cx);
+        self.touch(cx);
+    }
+
     /// Asks the platform for template files and appends what it hands back.
     ///
-    /// §4.4 asks for the picker to start in `<config>/templates`, which is
-    /// where the built-ins land. gpui's [`PathPromptOptions`] carries no
-    /// starting directory, so it starts wherever the platform last left it;
-    /// the day the option exists, `rudbgen_core::templates_dir` is what goes in it.
+    /// The picker starts in `<config>/templates` (§4.4), which is where the
+    /// built-ins land and where *New template…* puts a new one; a platform
+    /// that cannot be told so opens wherever it last left off.
     ///
     /// Nothing waits on the prompt: on X11 that call is the one gpui had to be
     /// patched around, so the click returns immediately and the answer is
     /// picked up on a task of its own — the shape `driver_manager` and the
     /// settings dialog both use.
     fn add_templates(&mut self, cx: &mut Context<Self>) {
-        let paths = cx.prompt_for_paths(PathPromptOptions {
+        let options = PathPromptOptions {
             files: true,
             directories: false,
             multiple: true,
             prompt: Some(ts!("generate.add_template_select")),
-        });
+        };
+        let paths = match rudbgen_core::templates_dir() {
+            Ok(directory) => cx.prompt_for_paths_in(options, &directory),
+            Err(_) => cx.prompt_for_paths(options),
+        };
         cx.spawn(async move |pane, cx| {
             let chosen = match paths.await {
                 Ok(Ok(Some(paths))) => paths,
@@ -847,6 +1401,10 @@ impl GeneratePane {
     /// template that renders to something plausible rather than to an empty
     /// string — the user then edits both in place.
     fn install_templates(&mut self, paths: Vec<PathBuf>, cx: &mut Context<Self>) {
+        // A row added after a replaced list would be lost to its undo.
+        if matches!(self.undo, Some(Undo::Replaced { .. })) {
+            self.undo = None;
+        }
         for path in paths {
             let stored = store_template_path(&path);
             if self.templates.iter().any(|row| row.file == stored) {
@@ -999,16 +1557,52 @@ impl GeneratePane {
         // the list there. The trigger shows it without the list offering it,
         // which `Select` allows — a selection outside the options just
         // highlights no row.
-        let selected = matched
-            .and_then(|id| self.sets.get(id))
-            .map(|set| SharedString::from(set.name.clone()))
-            .unwrap_or_else(|| ts!("generate.set_custom"));
+        //
+        // An empty list is not a custom one, though: there is nothing in it to
+        // be custom, and the word sent a new user looking for what they had
+        // customized. It shows as the question it is instead.
+        let selected = if current.is_empty() {
+            None
+        } else {
+            Some(
+                matched
+                    .and_then(|id| self.sets.get(id))
+                    .map(|set| SharedString::from(set.name.clone()))
+                    .unwrap_or_else(|| ts!("generate.set_custom")),
+            )
+        };
 
         let ids: Vec<Uuid> = self.sets.sets.iter().map(|set| set.id).collect();
         let this = cx.entity();
         let toggle = cx.entity();
         let naming = cx.entity();
         let deleting = cx.entity();
+        let menu_toggle = cx.entity();
+        let exporter = cx.entity();
+        let importer = cx.entity();
+        // Moving a set between machines is rarer than picking, saving or
+        // deleting one, so it waits behind a `⋯` rather than adding two more
+        // buttons to a row that already has to fit beside the explorer.
+        let more = MenuButton::new("generate-set-more")
+            .glyph("⋯")
+            .tooltip(ts!("generate.set_more"))
+            .open(self.set_menu_open)
+            .entries(vec![
+                MenuEntry::new(ts!("generate.export_set"))
+                    .disabled(matched.is_none())
+                    .on_activate(move |_window, cx| {
+                        exporter.update(cx, |pane, cx| pane.open_export(cx));
+                    }),
+                MenuEntry::new(ts!("generate.import_set")).on_activate(move |_window, cx| {
+                    importer.update(cx, |pane, cx| pane.choose_import(cx));
+                }),
+            ])
+            .on_open_change(move |open, _window, cx| {
+                menu_toggle.update(cx, |pane, cx| {
+                    pane.set_menu_open = open;
+                    cx.notify();
+                });
+            });
 
         div()
             .flex()
@@ -1021,10 +1615,11 @@ impl GeneratePane {
             .child(
                 Select::new("generate-set")
                     .chevron_icon(icons::CHEVRON_DOWN)
+                    .placeholder(ts!("generate.set_choose"))
                     .options(options)
-                    .selected(Some(selected))
+                    .selected(selected)
                     .open(self.set_open)
-                    .width(px(SET_WIDTH))
+                    .width(rugpui::scaled(SET_WIDTH, cx))
                     .on_select(move |index, _text, _window, cx| {
                         this.update(cx, |pane, cx| {
                             pane.set_open = false;
@@ -1045,10 +1640,8 @@ impl GeneratePane {
                 Button::new("generate-save-set", ts!("generate.save_as_set"))
                     .variant(ButtonVariant::Secondary)
                     .disabled(self.templates.is_empty())
-                    .on_click(move |_, window, cx| {
+                    .on_click(move |_, _window, cx| {
                         naming.update(cx, |pane, cx| pane.open_set_prompt(cx));
-                        let handle = naming.read(cx).set_name.read(cx).focus_handle(cx);
-                        window.focus(&handle, cx);
                     }),
             )
             .child(
@@ -1062,6 +1655,7 @@ impl GeneratePane {
                         });
                     }),
             )
+            .child(more)
     }
 
     /// The template list: one row per template, and the button that adds one.
@@ -1074,6 +1668,140 @@ impl GeneratePane {
             .collect();
         let this = cx.entity();
 
+        // An empty list says where the templates are: in the sets the
+        // selector above offers, one button per set, rather than only behind
+        // a file picker that opens wherever the platform last left it.
+        let empty = rows.is_empty().then(|| {
+            let sets: Vec<_> = self
+                .sets
+                .sets
+                .iter()
+                .enumerate()
+                .map(|(index, set)| {
+                    let (id, apply) = (set.id, cx.entity());
+                    Button::new(
+                        ("generate-use-set", index),
+                        ts!("generate.use_set", name = set.name.clone()),
+                    )
+                    .variant(ButtonVariant::Secondary)
+                    // A set's name is the user's, of any length.
+                    .truncate(true)
+                    .on_click(move |_, _window, cx| {
+                        apply.update(cx, |pane, cx| pane.apply_set(id, cx));
+                    })
+                })
+                .collect();
+            div()
+                .flex()
+                .flex_col()
+                .gap(px(8.))
+                .py(px(8.))
+                .child(
+                    div()
+                        .text_size(rugpui::TextSize::Sm.size(cx))
+                        .text_color(theme.text_muted)
+                        .child(if sets.is_empty() {
+                            ts!("generate.no_templates")
+                        } else {
+                            ts!("generate.no_templates_sets")
+                        }),
+                )
+                .when(!sets.is_empty(), |empty| {
+                    empty.child(
+                        div()
+                            .flex()
+                            .flex_row()
+                            .flex_wrap()
+                            .gap(px(6.))
+                            .children(sets),
+                    )
+                })
+        });
+
+        // The column headings, over the three fields a row is made of: the
+        // output name above all, whose field reads as one more name until
+        // the heading says what it is for.
+        let heading = |text: SharedString| {
+            div()
+                .text_size(rugpui::scaled(10., cx))
+                .text_color(theme.text_muted)
+                .truncate()
+                .child(text)
+        };
+        let headings = (!rows.is_empty()).then(|| {
+            div()
+                .flex()
+                .flex_row()
+                .items_center()
+                .gap(px(6.))
+                .w_full()
+                .min_w_0()
+                // The checkbox's column, and the two glyphs' at the end.
+                .child(div().flex_none().w(rugpui::scaled(16., cx)))
+                .child(
+                    heading(ts!("generate.column_name"))
+                        .w(rugpui::scaled(150., cx))
+                        .flex_none(),
+                )
+                .child(heading(ts!("generate.column_file")).flex_1().min_w_0())
+                .child(
+                    heading(ts!("generate.column_output"))
+                        .flex_1()
+                        .flex_grow(2.)
+                        .min_w(rugpui::scaled(OUT_MIN_WIDTH, cx)),
+                )
+                // Two glyph boxes and the gap between them.
+                .child(div().flex_none().w(rugpui::scaled(22., cx) * 2. + px(6.)))
+        });
+
+        let undo = self.undo.as_ref().map(|undo| {
+            let message = match undo {
+                Undo::Replaced { set, .. } => ts!("generate.undo_replaced", set = set.clone()),
+                Undo::Removed { template, .. } => {
+                    ts!("generate.undo_removed", name = template.name.clone())
+                }
+            };
+            let (take_back, forget) = (cx.entity(), cx.entity());
+            div()
+                .flex()
+                .flex_row()
+                .items_center()
+                .gap(px(8.))
+                .px(px(8.))
+                .py(px(4.))
+                .rounded_md()
+                .bg(theme.surface)
+                .debug_selector(|| "generate-undo".to_string())
+                .child(
+                    div()
+                        .flex_1()
+                        .min_w_0()
+                        .truncate()
+                        .text_size(rugpui::TextSize::Xs.size(cx))
+                        .text_color(theme.text_muted)
+                        .child(message),
+                )
+                .child(
+                    Button::new("generate-undo", ts!("generate.undo"))
+                        .variant(ButtonVariant::Secondary)
+                        .compact()
+                        .on_click(move |_, _window, cx| {
+                            take_back.update(cx, |pane, cx| pane.undo(cx));
+                        }),
+                )
+                .child(
+                    Button::new("generate-undo-dismiss", ts!("common.close"))
+                        .variant(ButtonVariant::Ghost)
+                        .compact()
+                        .on_click(move |_, _window, cx| {
+                            forget.update(cx, |pane, cx| {
+                                pane.undo = None;
+                                cx.notify();
+                            });
+                        }),
+                )
+        });
+
         div()
             .flex()
             .flex_col()
@@ -1081,15 +1809,9 @@ impl GeneratePane {
             .w_full()
             .min_w_0()
             .debug_selector(|| "generate-templates".to_string())
-            .when(rows.is_empty(), |list| {
-                list.child(
-                    div()
-                        .py(px(8.))
-                        .text_size(px(12.))
-                        .text_color(theme.text_muted)
-                        .child(ts!("generate.no_templates")),
-                )
-            })
+            .children(undo)
+            .children(empty)
+            .children(headings)
             .children(rows)
             .child(
                 div().pt(px(4.)).child(
@@ -1132,7 +1854,12 @@ impl GeneratePane {
                         tick.update(cx, |pane, cx| pane.toggle_template(index, checked, cx));
                     }),
             )
-            .child(div().w(px(150.)).flex_none().child(row.name.clone()))
+            .child(
+                div()
+                    .w(rugpui::scaled(150., cx))
+                    .flex_none()
+                    .child(row.name.clone()),
+            )
             .child(
                 // The file, and the second way into its tab: a double click on
                 // the row opens what the pencil beside it opens. A *single*
@@ -1145,7 +1872,7 @@ impl GeneratePane {
                     .min_w_0()
                     .truncate()
                     .cursor_pointer()
-                    .text_size(px(11.))
+                    .text_size(rugpui::TextSize::Xs.size(cx))
                     .text_color(theme.text_muted)
                     .tooltip(tooltip_label(ts!("generate.tip_open")))
                     .on_click({
@@ -1168,10 +1895,12 @@ impl GeneratePane {
                 // the row, the file the rest: a name that writes into a package
                 // tree is the longest thing a row holds, and the one typed in.
                 div()
+                    .id(("generate-out", index))
                     .debug_selector(move || format!("generate-out-{index}"))
                     .flex_1()
                     .flex_grow(2.)
-                    .min_w(px(OUT_MIN_WIDTH))
+                    .min_w(rugpui::scaled(OUT_MIN_WIDTH, cx))
+                    .tooltip(tooltip_label(ts!("generate.tip_output")))
                     .child(row.out.clone()),
             )
             .child(
@@ -1180,15 +1909,16 @@ impl GeneratePane {
                 // the configuration directory before opening it.
                 div()
                     .id(("generate-edit", index))
+                    .debug_selector(move || format!("generate-edit-{index}"))
                     .tab_index(0)
                     .focus(|style| style.bg(theme.surface_active).text_color(theme.accent))
                     .flex()
                     .flex_none()
                     .items_center()
                     .justify_center()
-                    .size(px(22.))
+                    .size(rugpui::scaled(22., cx))
                     .rounded_md()
-                    .text_size(px(12.))
+                    .text_size(rugpui::TextSize::Sm.size(cx))
                     .text_color(theme.icon)
                     .cursor_pointer()
                     .hover(|style| style.bg(theme.surface_hover).text_color(theme.text))
@@ -1210,9 +1940,9 @@ impl GeneratePane {
                     .flex_none()
                     .items_center()
                     .justify_center()
-                    .size(px(22.))
+                    .size(rugpui::scaled(22., cx))
                     .rounded_md()
-                    .text_size(px(12.))
+                    .text_size(rugpui::TextSize::Sm.size(cx))
                     .text_color(theme.icon)
                     .cursor_pointer()
                     .hover(|style| style.bg(theme.surface_hover).text_color(theme.danger))
@@ -1225,7 +1955,7 @@ impl GeneratePane {
     }
 
     /// The custom variable table.
-    fn render_vars(&self) -> impl IntoElement + use<> {
+    fn render_vars(&self, cx: &App) -> impl IntoElement + use<> {
         let rows: Vec<_> = self
             .vars
             .iter()
@@ -1239,7 +1969,12 @@ impl GeneratePane {
                     .gap(px(6.))
                     .w_full()
                     .min_w_0()
-                    .child(div().w(px(150.)).flex_none().child(row.key.clone()))
+                    .child(
+                        div()
+                            .w(rugpui::scaled(150., cx))
+                            .flex_none()
+                            .child(row.key.clone()),
+                    )
                     .child(div().flex_1().min_w_0().child(row.value.clone()))
             })
             .collect();
@@ -1269,6 +2004,16 @@ impl GeneratePane {
                     .on_toggle(move |checked, _window, cx| {
                         this.update(cx, |pane, cx| pane.toggle_abbreviations(checked, cx));
                     }),
+            )
+            // The one value on this tab that is not the connection's: the
+            // switch lives in `abbreviations.json`, beside the rules, and
+            // flipping it here flips it for every connection.
+            .child(
+                div()
+                    .flex_none()
+                    .text_size(rugpui::TextSize::Xs.size(cx))
+                    .text_color(theme(cx).text_muted)
+                    .child(ts!("generate.all_connections")),
             )
             .child(
                 Button::new("generate-rules", ts!("generate.rules"))
@@ -1305,7 +2050,7 @@ impl GeneratePane {
         modal(
             "generate-set-name",
             ts!("generate.save_as_set"),
-            px(360.),
+            rugpui::scaled(360., cx),
             div()
                 .flex()
                 .flex_col()
@@ -1314,7 +2059,7 @@ impl GeneratePane {
                 .children(overwritten.map(|name| {
                     div()
                         .debug_selector(|| "generate-set-overwrite".to_string())
-                        .text_size(px(12.))
+                        .text_size(rugpui::TextSize::Sm.size(cx))
                         .text_color(theme.text_muted)
                         .child(ts!("generate.overwrite_set_note", name = name))
                 }))
@@ -1325,15 +2070,17 @@ impl GeneratePane {
                         .justify_end()
                         .gap(px(8.))
                         .child(
-                            Button::new("generate-set-cancel", ts!("common.cancel")).on_click({
-                                let cancel = cancel.clone();
-                                move |_, _window, cx| {
-                                    cancel.update(cx, |pane, cx| {
-                                        pane.naming_set = false;
-                                        cx.notify();
-                                    });
-                                }
-                            }),
+                            Button::new("generate-set-cancel", ts!("common.cancel"))
+                                .variant(ButtonVariant::Secondary)
+                                .on_click({
+                                    let cancel = cancel.clone();
+                                    move |_, _window, cx| {
+                                        cancel.update(cx, |pane, cx| {
+                                            pane.naming_set = false;
+                                            cx.notify();
+                                        });
+                                    }
+                                }),
                         )
                         .child(
                             Button::new("generate-set-save", label)
@@ -1351,6 +2098,7 @@ impl GeneratePane {
                 });
             },
         )
+        .initial_focus(&gpui::Focusable::focus_handle(self.set_name.read(cx), cx))
     }
 
     /// The "Delete set" confirmation prompt.
@@ -1366,10 +2114,11 @@ impl GeneratePane {
             .unwrap_or_default();
         let cancel = cx.entity();
         let delete = cx.entity();
+        let default = cx.entity();
         modal(
             "generate-delete-set",
             ts!("generate.delete_set"),
-            px(360.),
+            rugpui::scaled(360., cx),
             div()
                 .flex()
                 .flex_col()
@@ -1383,6 +2132,8 @@ impl GeneratePane {
                         .gap(px(8.))
                         .child(
                             Button::new("generate-delete-set-cancel", ts!("common.cancel"))
+                                .variant(ButtonVariant::Secondary)
+                                .focus_handle(&self.prompt_focus)
                                 .on_click({
                                     let cancel = cancel.clone();
                                     move |_, _window, cx| {
@@ -1408,6 +2159,254 @@ impl GeneratePane {
                 });
             },
         )
+        // `Enter` keeps the set, as the focused Cancel does.
+        .initial_focus(&self.prompt_focus)
+        .on_confirm(move |_window, cx| {
+            default.update(cx, |pane, cx| {
+                pane.deleting_set = None;
+                cx.notify();
+            });
+        })
+    }
+
+    /// The *Export set…* question: what goes into the file, and whether this
+    /// connection's variables go with it.
+    fn render_export_prompt(
+        &self,
+        prompt: &ExportPrompt,
+        cx: &mut Context<Self>,
+    ) -> impl IntoElement + use<> {
+        let theme = theme(cx);
+        let (name, count) = self
+            .sets
+            .get(prompt.set)
+            .map(|set| (set.name.clone(), set.templates.len()))
+            .unwrap_or_default();
+        let vars = self.collect(cx).custom_vars.len();
+        let toggle = cx.entity();
+        let cancel = cx.entity();
+        let export = cx.entity();
+        let confirm = cx.entity();
+        let dismiss = cx.entity();
+        modal(
+            "generate-export-set",
+            ts!("generate.export_title"),
+            rugpui::scaled(420., cx),
+            div()
+                .flex()
+                .flex_col()
+                .gap(px(12.))
+                .child(ts!(
+                    "generate.export_summary",
+                    name = name,
+                    count = count.to_string()
+                ))
+                .children((vars > 0).then(|| {
+                    Checkbox::new(
+                        "generate-export-vars",
+                        ts!("generate.export_vars", count = vars.to_string()),
+                    )
+                    .checked(prompt.with_vars)
+                    .on_toggle(move |on, _window, cx| {
+                        toggle.update(cx, |pane, cx| {
+                            if let Some(prompt) = pane.exporting.as_mut() {
+                                prompt.with_vars = on;
+                            }
+                            cx.notify();
+                        });
+                    })
+                }))
+                .children(
+                    prompt
+                        .error
+                        .clone()
+                        .map(|message| error_line(message, &theme, cx)),
+                )
+                .child(
+                    div()
+                        .flex()
+                        .flex_row()
+                        .justify_end()
+                        .gap(px(8.))
+                        .child(
+                            Button::new("generate-export-cancel", ts!("common.cancel"))
+                                .variant(ButtonVariant::Secondary)
+                                .on_click(move |_, _window, cx| {
+                                    cancel.update(cx, |pane, cx| {
+                                        pane.exporting = None;
+                                        cx.notify();
+                                    });
+                                }),
+                        )
+                        .child(
+                            Button::new("generate-export-confirm", ts!("generate.export_button"))
+                                .variant(ButtonVariant::Primary)
+                                .focus_handle(&self.export_focus)
+                                .on_click(move |_, _window, cx| {
+                                    export.update(cx, |pane, cx| pane.export_set(cx));
+                                }),
+                        ),
+                ),
+            move |_window, cx| {
+                dismiss.update(cx, |pane, cx| {
+                    pane.exporting = None;
+                    cx.notify();
+                });
+            },
+        )
+        .initial_focus(&self.export_focus)
+        .on_confirm(move |_window, cx| {
+            confirm.update(cx, |pane, cx| pane.export_set(cx));
+        })
+    }
+
+    /// The *Import set…* question: the name the set is saved under, what the
+    /// file holds, where its templates go, and whether its variables are
+    /// added to this connection.
+    ///
+    /// While the name is a set's, the button reads Overwrite, as *Save as
+    /// set…* does — an import under that name replaces the set, though never
+    /// the template files the old one pointed at.
+    fn render_import_prompt(
+        &self,
+        prompt: &ImportPrompt,
+        cx: &mut Context<Self>,
+    ) -> impl IntoElement + use<> {
+        let theme = theme(cx);
+        let muted = |text: SharedString| {
+            div()
+                .text_size(rugpui::TextSize::Sm.size(cx))
+                .text_color(theme.text_muted)
+                .child(text)
+        };
+        let typed = text(&self.import_name, cx);
+        let overwritten = set_named(&self.sets.sets, &typed)
+            .and_then(|id| self.sets.get(id))
+            .map(|set| set.name.clone());
+        let (label, variant) = if overwritten.is_some() {
+            (ts!("generate.overwrite_set"), ButtonVariant::Danger)
+        } else {
+            (ts!("generate.import_button"), ButtonVariant::Primary)
+        };
+        let names = prompt
+            .bundle
+            .templates
+            .iter()
+            .map(|template| {
+                if template.name.trim().is_empty() {
+                    template.file.clone()
+                } else {
+                    template.name.clone()
+                }
+            })
+            .collect::<Vec<_>>()
+            .join(", ");
+        let folder = rudbgen_core::templates_dir()
+            .ok()
+            .map(|root| prompt.bundle.install_directory(&root));
+        let connected = self.profile_id.is_some();
+        let new_vars = if connected {
+            prompt
+                .bundle
+                .new_variables(&self.collect(cx).custom_vars)
+                .len()
+        } else {
+            0
+        };
+        let toggle = cx.entity();
+        let cancel = cx.entity();
+        let import = cx.entity();
+        let confirm = cx.entity();
+        let dismiss = cx.entity();
+        let summary = muted(ts!(
+            "generate.import_summary",
+            count = prompt.bundle.templates.len().to_string(),
+            names = names
+        ));
+        let folder = folder.map(|dir| {
+            muted(ts!(
+                "generate.import_folder",
+                dir = dir.display().to_string()
+            ))
+        });
+        let applies = connected.then(|| muted(ts!("generate.import_applies")));
+        let overwrite_note = overwritten.map(|name| {
+            muted(ts!("generate.import_overwrite_note", name = name))
+                .debug_selector(|| "generate-import-overwrite".to_string())
+        });
+        modal(
+            "generate-import-set",
+            ts!("generate.import_title"),
+            rugpui::scaled(440., cx),
+            div()
+                .flex()
+                .flex_col()
+                .gap(px(12.))
+                .child(form_row(ts!("generate.set_name"), self.import_name.clone()))
+                .children(overwrite_note)
+                .child(summary)
+                .children(folder)
+                .children(applies)
+                .children((new_vars > 0).then(|| {
+                    Checkbox::new(
+                        "generate-import-vars",
+                        ts!("generate.import_vars", count = new_vars.to_string()),
+                    )
+                    .checked(prompt.with_vars)
+                    .on_toggle(move |on, _window, cx| {
+                        toggle.update(cx, |pane, cx| {
+                            if let Some(prompt) = pane.importing.as_mut() {
+                                prompt.with_vars = on;
+                            }
+                            cx.notify();
+                        });
+                    })
+                }))
+                .children(
+                    prompt
+                        .error
+                        .clone()
+                        .map(|message| error_line(message, &theme, cx)),
+                )
+                .child(
+                    div()
+                        .flex()
+                        .flex_row()
+                        .justify_end()
+                        .gap(px(8.))
+                        .child(
+                            Button::new("generate-import-cancel", ts!("common.cancel"))
+                                .variant(ButtonVariant::Secondary)
+                                .on_click(move |_, _window, cx| {
+                                    cancel.update(cx, |pane, cx| {
+                                        pane.importing = None;
+                                        cx.notify();
+                                    });
+                                }),
+                        )
+                        .child(
+                            Button::new("generate-import-confirm", label)
+                                .variant(variant)
+                                .disabled(typed.trim().is_empty())
+                                .on_click(move |_, _window, cx| {
+                                    import.update(cx, |pane, cx| pane.import_set(cx));
+                                }),
+                        ),
+                ),
+            move |_window, cx| {
+                dismiss.update(cx, |pane, cx| {
+                    pane.importing = None;
+                    cx.notify();
+                });
+            },
+        )
+        .initial_focus(&gpui::Focusable::focus_handle(
+            self.import_name.read(cx),
+            cx,
+        ))
+        .on_confirm(move |_window, cx| {
+            confirm.update(cx, |pane, cx| pane.import_set(cx));
+        })
     }
 }
 
@@ -1423,6 +2422,55 @@ impl Render for GeneratePane {
     fn render(&mut self, _window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
         let theme = theme(cx);
         self.watch_scroll(cx);
+
+        // The overwrite policy of the next generate: the settings' default
+        // until something else is picked here, and that again once the run
+        // it was picked for has started.
+        let policy = self
+            .overwrite
+            .unwrap_or_else(|| app_settings::current(cx).overwrite_policy);
+        let pick = cx.entity();
+        let overwrite = div()
+            .flex()
+            .flex_col()
+            .gap(px(4.))
+            .w_full()
+            .min_w_0()
+            .child(
+                Segmented::new("generate-overwrite")
+                    .options([
+                        ("ask", ts!("settings.overwrite_ask")),
+                        ("overwrite", ts!("settings.overwrite_overwrite")),
+                        ("skip", ts!("settings.overwrite_skip")),
+                    ])
+                    .selected(match policy {
+                        OverwritePolicy::Ask => 0,
+                        OverwritePolicy::Overwrite => 1,
+                        OverwritePolicy::Skip => 2,
+                    })
+                    .on_select(move |index, _window, cx| {
+                        pick.update(cx, |pane, cx| {
+                            let chosen = match index {
+                                1 => OverwritePolicy::Overwrite,
+                                2 => OverwritePolicy::Skip,
+                                _ => OverwritePolicy::Ask,
+                            };
+                            let default = app_settings::current(cx).overwrite_policy;
+                            pane.overwrite = (chosen != default).then_some(chosen);
+                            cx.notify();
+                        });
+                    }),
+            )
+            .child(
+                div()
+                    .text_size(rugpui::TextSize::Xs.size(cx))
+                    .text_color(theme.text_muted)
+                    .child(if self.overwrite.is_some() {
+                        ts!("generate.overwrite_once")
+                    } else {
+                        ts!("generate.overwrite_default")
+                    }),
+            );
 
         let chooser = cx.entity();
         let output = div()
@@ -1442,9 +2490,10 @@ impl Render for GeneratePane {
                     }),
             );
 
+        let heading_size = rugpui::TextSize::Xs.size(cx);
         let heading = |text: SharedString| {
             div()
-                .text_size(px(11.))
+                .text_size(heading_size)
                 .text_color(theme.text_muted)
                 .child(text)
         };
@@ -1468,7 +2517,7 @@ impl Render for GeneratePane {
                     .children(
                         self.sets_error
                             .clone()
-                            .map(|message| error_line(message, &theme)),
+                            .map(|message| error_line(message, &theme, cx)),
                     ),
             )
             .child(
@@ -1489,14 +2538,15 @@ impl Render for GeneratePane {
                     .w_full()
                     .min_w_0()
                     .child(heading(ts!("generate.options")))
-                    .child(labeled(ts!("generate.output_dir"), output))
-                    .child(labeled(ts!("generate.author"), self.author.clone()))
-                    .child(labeled(ts!("generate.variables"), self.render_vars()))
+                    .child(labeled(ts!("generate.output_dir"), output, cx))
+                    .child(labeled(ts!("generate.author"), self.author.clone(), cx))
+                    .child(labeled(ts!("generate.variables"), self.render_vars(cx), cx))
+                    .child(labeled(ts!("generate.overwrite"), overwrite, cx))
                     .child(self.render_abbreviations(cx))
                     .children(
                         self.abbr_error
                             .clone()
-                            .map(|message| error_line(message, &theme)),
+                            .map(|message| error_line(message, &theme, cx)),
                     ),
             );
 
@@ -1509,6 +2559,14 @@ impl Render for GeneratePane {
         let delete_prompt = self
             .deleting_set
             .map(|id| self.render_delete_set_prompt(id, cx));
+        let export_prompt = self
+            .exporting
+            .as_ref()
+            .map(|prompt| self.render_export_prompt(prompt, cx));
+        let import_prompt = self
+            .importing
+            .as_ref()
+            .map(|prompt| self.render_import_prompt(prompt, cx));
 
         div()
             .key_context("GeneratePane")
@@ -1542,13 +2600,15 @@ impl Render for GeneratePane {
             .children(bar.render(&theme))
             .children(prompt)
             .children(delete_prompt)
+            .children(export_prompt)
+            .children(import_prompt)
     }
 }
 
 /// A line saying why a global store could not be changed.
-fn error_line(message: SharedString, theme: &Theme) -> impl IntoElement + use<> {
+fn error_line(message: SharedString, theme: &Theme, cx: &App) -> impl IntoElement + use<> {
     div()
-        .text_size(px(11.))
+        .text_size(rugpui::TextSize::Xs.size(cx))
         .text_color(theme.danger)
         .child(message)
 }
@@ -1563,12 +2623,64 @@ fn abbr_failed(error: &anyhow::Error) -> SharedString {
     ts!("generate.abbr_failed", error = format!("{error:#}"))
 }
 
+/// What a set file that could not be made, read or installed says about it.
+fn bundle_failed(error: &BundleError) -> SharedString {
+    match error {
+        BundleError::ReadTemplate {
+            template,
+            path,
+            message,
+        } => ts!(
+            "generate.bundle_read_template",
+            template = template.clone(),
+            path = path.display().to_string(),
+            error = message.clone()
+        ),
+        BundleError::NotUtf8 { template, path } => ts!(
+            "generate.bundle_not_utf8",
+            template = template.clone(),
+            path = path.display().to_string()
+        ),
+        BundleError::NotABundle => ts!("generate.bundle_not_a_set"),
+        BundleError::Newer { version } => {
+            ts!("generate.bundle_newer", version = version.to_string())
+        }
+        BundleError::Empty => ts!("generate.bundle_empty"),
+        BundleError::TooLarge => ts!(
+            "generate.bundle_too_large",
+            limit = (rudbgen_core::template_bundle::MAX_BUNDLE_BYTES / 1024 / 1024).to_string()
+        ),
+        BundleError::Io { path, message } => ts!(
+            "generate.bundle_io",
+            path = path.display().to_string(),
+            error = message.clone()
+        ),
+    }
+}
+
+/// The name a set file without one of its own is imported under: the file's,
+/// less the set file ending.
+fn bundle_stem(file: &Path) -> String {
+    let name = file
+        .file_name()
+        .map(|name| name.to_string_lossy().into_owned())
+        .unwrap_or_default();
+    let suffix = format!(".{}", rudbgen_core::BUNDLE_EXTENSION);
+    match name.strip_suffix(&suffix) {
+        Some(stem) if !stem.is_empty() => stem.to_string(),
+        _ => file
+            .file_stem()
+            .map(|stem| stem.to_string_lossy().into_owned())
+            .unwrap_or(name),
+    }
+}
+
 /// A labeled row of the options block.
 ///
 /// [`rugpui::form_row`]'s label column is sized for a dialog; the options
 /// here sit beside a template list and need a wider one, so the shape is
 /// repeated rather than the widget parameterized for one caller.
-fn labeled(label: SharedString, control: impl IntoElement) -> impl IntoElement {
+fn labeled(label: SharedString, control: impl IntoElement, cx: &App) -> impl IntoElement {
     div()
         .flex()
         .flex_row()
@@ -1579,9 +2691,9 @@ fn labeled(label: SharedString, control: impl IntoElement) -> impl IntoElement {
         .child(
             div()
                 .flex_none()
-                .w(px(LABEL_WIDTH))
+                .w(rugpui::scaled(LABEL_WIDTH, cx))
                 .pt(px(6.))
-                .text_size(px(12.))
+                .text_size(rugpui::TextSize::Sm.size(cx))
                 .child(label),
         )
         .child(div().flex_grow_1().min_w_0().child(control))
@@ -1608,6 +2720,74 @@ mod tests {
             out_template: "${name.suffix.pascal}.java".to_string(),
             selected,
         }
+    }
+
+    /// A removed row and a list a set replaced both come back with Undo; a
+    /// set picked over an empty list leaves nothing to undo.
+    #[gpui::test]
+    fn removing_a_row_and_replacing_the_list_can_be_undone(cx: &mut gpui::TestAppContext) {
+        cx.update(|cx| {
+            crate::app_settings::init(cx);
+            rugpui::init(cx);
+        });
+        let pane = cx.new(GeneratePane::new);
+        pane.update(cx, |pane, cx| {
+            let set = TemplateSet::new("Set".to_string(), vec![reference("from set", true)]);
+            let id = set.id;
+            pane.sets.upsert(set);
+
+            pane.apply_set(id, cx);
+            assert!(pane.undo.is_none(), "an empty list had something to undo");
+
+            pane.rebuild(
+                &GenerationProfile {
+                    templates: vec![reference("first", true), reference("second", false)],
+                    ..Default::default()
+                },
+                cx,
+            );
+            pane.remove_template(0, cx);
+            assert_eq!(pane.collect(cx).templates, vec![reference("second", false)]);
+            pane.undo(cx);
+            assert_eq!(
+                pane.collect(cx).templates,
+                vec![reference("first", true), reference("second", false)]
+            );
+
+            pane.apply_set(id, cx);
+            assert_eq!(
+                pane.collect(cx).templates,
+                vec![reference("from set", true)]
+            );
+            pane.undo(cx);
+            assert_eq!(
+                pane.collect(cx).templates,
+                vec![reference("first", true), reference("second", false)],
+                "the hand-made list did not come back"
+            );
+        });
+    }
+
+    /// The overwrite choice made on the tab lasts one run; the next one
+    /// starts from the settings again.
+    #[gpui::test]
+    fn the_overwrite_choice_is_for_one_run(cx: &mut gpui::TestAppContext) {
+        cx.update(|cx| {
+            crate::app_settings::init(cx);
+            rugpui::init(cx);
+        });
+        let pane = cx.new(GeneratePane::new);
+        pane.update(cx, |pane, cx| {
+            let default = crate::app_settings::current(cx).overwrite_policy;
+            let other = if default == OverwritePolicy::Skip {
+                OverwritePolicy::Overwrite
+            } else {
+                OverwritePolicy::Skip
+            };
+            pane.overwrite = Some(other);
+            assert_eq!(pane.take_overwrite(cx), other);
+            assert_eq!(pane.take_overwrite(cx), default);
+        });
     }
 
     #[gpui::test]
@@ -1849,6 +3029,189 @@ mod tests {
             .unwrap();
     }
 
+    #[gpui::test]
+    fn only_a_list_that_is_a_set_can_be_exported(cx: &mut gpui::TestAppContext) {
+        cx.update(|cx| {
+            crate::app_settings::init(cx);
+            rugpui::init(cx);
+        });
+        let set = TemplateSet::new("Java", vec![reference("a", true)]);
+        let window = cx.add_window(|_, cx| {
+            let mut pane = GeneratePane::new(cx);
+            pane.sets.upsert(set.clone());
+            pane
+        });
+        let mut cx = gpui::VisualTestContext::from_window(window.into(), cx);
+        window
+            .update(&mut cx, |pane, _, cx| {
+                // An edited list is no set's: there is nothing to export.
+                pane.apply_set(set.id, cx);
+                pane.toggle_template(0, false, cx);
+                pane.open_export(cx);
+                assert!(pane.exporting.is_none());
+
+                // Back to the set, with no variables to offer.
+                pane.toggle_template(0, true, cx);
+                pane.open_export(cx);
+                let prompt = pane.exporting.as_ref().expect("the question is up");
+                assert_eq!(prompt.set, set.id);
+                assert!(!prompt.with_vars);
+                assert!(pane.prompt_open());
+
+                // `Escape` takes it down like any other question.
+                assert!(pane.escape(cx));
+                assert!(pane.exporting.is_none());
+                assert!(!pane.prompt_open());
+            })
+            .unwrap();
+        cx.run_until_parked();
+
+        window
+            .update(&mut cx, |pane, _, cx| {
+                let row = pane.new_var_row(cx);
+                set_text(&row.key, "package", cx);
+                pane.vars.insert(0, row);
+                pane.open_export(cx);
+                assert!(
+                    pane.exporting.as_ref().unwrap().with_vars,
+                    "a connection with variables offers them"
+                );
+                pane.withdraw_prompts(cx);
+                assert!(pane.exporting.is_none());
+            })
+            .unwrap();
+    }
+
+    #[gpui::test]
+    fn a_set_file_opens_the_import_question_on_its_own_name(cx: &mut gpui::TestAppContext) {
+        cx.update(|cx| {
+            crate::app_settings::init(cx);
+            rugpui::init(cx);
+        });
+        let dir = tempfile::tempdir().unwrap();
+        let template = dir.path().join("model.java");
+        std::fs::write(&template, "class ${name} {}").unwrap();
+        let exported = TemplateSet::new(
+            "Java",
+            vec![TemplateRef {
+                name: "Model".into(),
+                file: template,
+                out_template: "${name}.java".into(),
+                selected: true,
+            }],
+        );
+        let file = dir.path().join("java.rudbgen-set.json");
+        TemplateBundle::pack(
+            &exported,
+            Path::to_path_buf,
+            vec![
+                ("package".into(), "com.example".into()),
+                ("module".into(), "core".into()),
+            ],
+        )
+        .unwrap()
+        .write(&file)
+        .unwrap();
+
+        let saved = TemplateSet::new("Java", vec![reference("old", true)]);
+        let window = cx.add_window(|_, cx| {
+            let mut pane = GeneratePane::new(cx);
+            pane.sets.upsert(saved.clone());
+            pane.profile_id = Some(Uuid::new_v4());
+            pane.rebuild(
+                &GenerationProfile {
+                    custom_vars: vec![("package".into(), "com.mine".into())],
+                    ..Default::default()
+                },
+                cx,
+            );
+            pane
+        });
+        let mut cx = gpui::VisualTestContext::from_window(window.into(), cx);
+        window
+            .update(&mut cx, |pane, _, cx| {
+                pane.open_import(&file, cx);
+                assert_eq!(text(&pane.import_name, cx), "Java");
+                let prompt = pane.importing.as_ref().expect("the question is up");
+                assert!(prompt.with_vars, "the bundle has a variable this lacks");
+                assert_eq!(
+                    prompt.bundle.new_variables(&pane.collect(cx).custom_vars),
+                    vec![("module".to_string(), "core".to_string())]
+                );
+                assert!(pane.prompt_open());
+            })
+            .unwrap();
+        cx.run_until_parked();
+        assert!(
+            cx.debug_bounds("generate-import-overwrite").is_some(),
+            "the question does not say the set of that name is replaced"
+        );
+
+        window
+            .update(&mut cx, |pane, _, cx| {
+                set_text(&pane.import_name, "Java (shared)", cx);
+            })
+            .unwrap();
+        cx.run_until_parked();
+        assert!(cx.debug_bounds("generate-import-overwrite").is_none());
+
+        // A file that is no set file leaves no question behind.
+        let theme = dir.path().join("theme.json");
+        std::fs::write(&theme, r#"{"name":"Dark"}"#).unwrap();
+        window
+            .update(&mut cx, |pane, _, cx| {
+                pane.importing = None;
+                pane.open_import(&theme, cx);
+                assert!(pane.importing.is_none());
+            })
+            .unwrap();
+    }
+
+    #[gpui::test]
+    fn imported_variables_go_above_the_blank_row(cx: &mut gpui::TestAppContext) {
+        cx.update(|cx| {
+            crate::app_settings::init(cx);
+            rugpui::init(cx);
+        });
+        let window = cx.add_window(|_, cx| {
+            let mut pane = GeneratePane::new(cx);
+            pane.rebuild(
+                &GenerationProfile {
+                    custom_vars: vec![("package".into(), "com.mine".into())],
+                    ..Default::default()
+                },
+                cx,
+            );
+            pane
+        });
+        let mut cx = gpui::VisualTestContext::from_window(window.into(), cx);
+        window
+            .update(&mut cx, |pane, _, cx| {
+                pane.add_vars(&[("module".into(), "core".into())], cx);
+                assert_eq!(
+                    pane.collect(cx).custom_vars,
+                    vec![
+                        ("package".to_string(), "com.mine".to_string()),
+                        ("module".to_string(), "core".to_string()),
+                    ]
+                );
+                let last = pane.vars.last().unwrap();
+                assert_eq!(text(&last.key, cx), "", "the blank row stays at the foot");
+                assert_eq!(pane.vars.len(), 3);
+            })
+            .unwrap();
+    }
+
+    #[test]
+    fn a_set_file_without_a_name_is_named_after_the_file() {
+        assert_eq!(
+            bundle_stem(Path::new("/tmp/Java beans.rudbgen-set.json")),
+            "Java beans"
+        );
+        assert_eq!(bundle_stem(Path::new("/tmp/shared.json")), "shared");
+        assert_eq!(bundle_stem(Path::new(".rudbgen-set.json")), ".rudbgen-set");
+    }
+
     #[test]
     fn a_blank_key_is_not_a_variable() {
         let rows = [
@@ -2003,6 +3366,7 @@ mod tests {
                         custom_vars: vec![("package".to_string(), "com.example".to_string())],
                         output_dir: Some(PathBuf::from("/tmp/out")),
                         author: "author".to_string(),
+                        ..Default::default()
                     },
                     cx,
                 );
@@ -2062,6 +3426,55 @@ mod tests {
     }
 
     #[gpui::test]
+    fn the_interface_size_grows_the_glyph_boxes_and_the_set_selector(
+        cx: &mut gpui::TestAppContext,
+    ) {
+        cx.update(|cx| {
+            crate::app_settings::init(cx);
+            rugpui::init(cx);
+        });
+        let window = cx.add_window(|_, cx| {
+            let mut pane = GeneratePane::new(cx);
+            pane.rebuild(
+                &GenerationProfile {
+                    templates: vec![reference("first", true)],
+                    ..Default::default()
+                },
+                cx,
+            );
+            pane
+        });
+        let mut cx = gpui::VisualTestContext::from_window(window.into(), cx);
+        cx.simulate_resize(gpui::size(px(1200.), px(800.)));
+        let measure = |scale: f32, cx: &mut gpui::VisualTestContext| {
+            cx.update(|_, cx| rugpui::set_ui_scale(scale, cx));
+            cx.run_until_parked();
+            let edit = cx
+                .debug_bounds("generate-edit-0")
+                .expect("the edit glyph is drawn")
+                .size;
+            let sets = cx
+                .debug_bounds("generate-sets")
+                .expect("the set row is drawn")
+                .size;
+            (edit, sets)
+        };
+
+        let (edit, sets) = measure(1.0, &mut cx);
+        assert_eq!(
+            edit,
+            gpui::size(px(22.), px(22.)),
+            "the default size is unchanged"
+        );
+        let (large, large_sets) = measure(1.5, &mut cx);
+        assert_eq!(large, gpui::size(px(33.), px(33.)));
+        assert!(
+            large_sets.height > sets.height,
+            "the set row grows with its selector: {sets:?} -> {large_sets:?}"
+        );
+    }
+
+    #[gpui::test]
     fn narrowing_the_window_narrows_the_generate_controls(cx: &mut gpui::TestAppContext) {
         cx.update(|cx| {
             crate::app_settings::init(cx);
@@ -2075,6 +3488,7 @@ mod tests {
                     custom_vars: vec![("package".to_string(), "com.example".to_string())],
                     output_dir: Some(PathBuf::from("/tmp/out")),
                     author: "author".to_string(),
+                    ..Default::default()
                 },
                 cx,
             );

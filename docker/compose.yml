@@ -40,6 +40,16 @@
 # The image tags are pinned, so that a metadata habit these tests pin down is
 # pinned against a known server rather than against whatever "latest" resolved
 # to on the day.
+#
+# The project name is set here rather than taken from this file's directory,
+# `docker`, which rudbman's compose file shares along with these service names:
+# `up` in one stack would otherwise replace the other's container of the same
+# service. The two still share host ports, so run them one at a time. A
+# container created before the name was set belongs to the project `docker`,
+# and its fixed `container_name` makes `up` fail with "is already in use" until
+# that container is removed (`docker rm rudbgen-test-postgres`, for example).
+
+name: rudbgen
 
 services:
   postgres:

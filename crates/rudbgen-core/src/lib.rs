@@ -1,15 +1,15 @@
 //! Platform-independent core of rudbgen: configuration paths, application
 //! settings, saved connection profiles with their generation options, JDBC
-//! driver definitions, template sets, abbreviation rules, OS keychain access,
-//! and the trusted host key database.
+//! driver definitions, template sets and their bundles, abbreviation rules, OS
+//! keychain access, and the trusted host key database.
 //!
 //! This crate owns everything rudbgen persists on disk or in the system
 //! credential store. It knows nothing about JNI, template rendering, SSH
 //! transport, or the GUI, so it can be exercised entirely from tests. In
 //! particular it stores the abbreviation rules without applying them and names
-//! the templates without reading them: matching and rendering belong to the
-//! template engine, which is the only place that knows how a name splits into
-//! words.
+//! the templates without interpreting them — a set bundle copies their bytes
+//! in and out, nothing more: matching and rendering belong to the template
+//! engine, which is the only place that knows how a name splits into words.
 //!
 //! Two rules run through all of it. Loading is forgiving — every file here is
 //! meant to be hand-editable, so a missing file is a first run, a UTF-8 byte
@@ -47,6 +47,7 @@ pub mod paths;
 pub mod profile;
 pub mod secrets;
 pub mod settings;
+pub mod template_bundle;
 pub mod template_sets;
 
 pub use abbreviations::{AbbreviationRule, AbbreviationStore};
@@ -57,8 +58,11 @@ pub use paths::{
 };
 pub use profile::{
     ConnectionProfile, ConnectionStore, CustomQueries, CustomQuery, CustomQueryKind, DriverDef,
-    DriverStore, GenerationProfile, KeepAlive, TemplateRef, TunnelAuth, TunnelConfig,
+    DriverStore, GenerationProfile, KeepAlive, TableName, TemplateRef, TunnelAuth, TunnelConfig,
 };
 pub use secrets::{SecretSlot, SecretStore, init as init_secrets};
 pub use settings::{AppSettings, OverwritePolicy, TitlebarStyle, WindowState};
+pub use template_bundle::{
+    BUNDLE_EXTENSION, BundleError, BundledTemplate, Installed, TemplateBundle,
+};
 pub use template_sets::{TemplateSet, TemplateSetStore};

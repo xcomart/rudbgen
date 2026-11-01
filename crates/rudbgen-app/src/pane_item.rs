@@ -63,6 +63,20 @@ pub enum PaneItem {
     },
 }
 
+impl PaneItem {
+    /// Whether `self` and `other` are the same tab, whatever has happened to
+    /// either's title or dirty marker since: the Generate tab, the preview,
+    /// or a template by its file.
+    pub fn same_tab(&self, other: &PaneItem) -> bool {
+        match (self, other) {
+            (PaneItem::Generate, PaneItem::Generate) => true,
+            (PaneItem::Preview { .. }, PaneItem::Preview { .. }) => true,
+            (PaneItem::Template { file: a, .. }, PaneItem::Template { file: b, .. }) => a == b,
+            _ => false,
+        }
+    }
+}
+
 /// The lookups rudbgen's own tabs answer to.
 ///
 /// An extension trait rather than inherent methods, because the strip itself is

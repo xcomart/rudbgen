@@ -55,6 +55,7 @@ use rugpui_shell::{
 use crate::app_settings;
 use crate::i18n::{self, ts};
 use crate::icons;
+use crate::{SaveDialog, prompt};
 
 /// Element id of the dialog body's overlay scroll indicator.
 ///
@@ -106,7 +107,7 @@ fn system_default() -> SharedString {
 ///
 /// `Tab` stays scoped here rather than bound globally: a global binding would
 /// take the key away from every text field in the window.
-const KEY_CONTEXT: &str = "SettingsDialog";
+pub(crate) const KEY_CONTEXT: &str = "SettingsDialog";
 
 /// Guards the one-time registration of the dialog's key bindings.
 static BIND_KEYS: Once = Once::new();
@@ -326,10 +327,19 @@ pub struct SettingsDialog {
     editor_events: Option<Subscription>,
     /// Message strip shown above the buttons.
     status: Option<SharedString>,
+    /// Width of the form's label column, the widest of its labels in the
+    /// language on screen; measured as each frame is drawn.
+    label_width: gpui::Pixels,
     /// Focus of the dialog root; also the anchor for the `Escape` handler.
     focus_handle: FocusHandle,
     /// Whether focus should move into the form on the next render.
     pending_focus: bool,
+    /// What the form held when it was filled; see [`SettingsDialog::is_dirty`].
+    opened: Option<FormValues>,
+    /// Whether "discard your changes?" is up over the form.
+    discarding: bool,
+    /// The question's *Keep editing*, which holds the keyboard while it is up.
+    prompt_focus: FocusHandle,
     /// Scroll position of the form body, so `Tab` can reveal the section it
     /// just moved into.
     body_scroll: ScrollHandle,
@@ -464,6 +474,10 @@ impl SettingsDialog {
             status: None,
             focus_handle: cx.focus_handle(),
             pending_focus: false,
+            opened: None,
+            label_width: px(rugpui::modal::FORM_LABEL_WIDTH),
+            discarding: false,
+            prompt_focus: cx.focus_handle(),
             body_scroll: ScrollHandle::new(),
             body_scrollbar: ScrollbarState::new(),
             visible_section: 0,
@@ -560,6 +574,8 @@ impl SettingsDialog {
         self.open = true;
         self.open_list = None;
         self.pending_focus = true;
+        self.discarding = false;
+        self.opened = Some(FormValues::of(&self.collect(cx)));
         self.visible_section = 0;
         self.body_scroll.scroll_to_item(0);
         cx.notify();
@@ -578,6 +594,8 @@ impl SettingsDialog {
         self.open = false;
         self.open_list = None;
         self.pending_focus = false;
+        self.discarding = false;
+        self.opened = None;
         self.status = None;
         self.editor = None;
         self.editor_events = None;
@@ -806,6 +824,36 @@ impl SettingsDialog {
         self.close(cx);
     }
 
+    /// Whether closing now would throw away a change made on the form.
+    ///
+    /// The fields the form edits, against what they were filled with: the
+    /// rest of the settings — the window's geometry above all, which moves
+    /// whenever the window does — is not the form's to have changed.
+    pub fn is_dirty(&self, cx: &App) -> bool {
+        self.open
+            && self
+                .opened
+                .as_ref()
+                .is_some_and(|opened| *opened != FormValues::of(&self.collect(cx)))
+    }
+
+    /// What Cancel, `Escape` and the backdrop mean: close without saving —
+    /// once the user has said the changes may go, when there are any.
+    fn request_close(&mut self, cx: &mut Context<Self>) {
+        if self.is_dirty(cx) {
+            self.discarding = true;
+            cx.notify();
+            return;
+        }
+        self.dismiss(cx);
+    }
+
+    /// Takes "discard your changes?" down and goes back to the form.
+    fn keep_editing(&mut self, cx: &mut Context<Self>) {
+        self.discarding = false;
+        cx.notify();
+    }
+
     /// `Tab`: move focus to the next control. gpui's tab ring wraps on its own.
     fn focus_next(&mut self, _: &FocusNext, window: &mut Window, cx: &mut Context<Self>) {
         self.close_lists(cx);
@@ -861,6 +909,10 @@ impl SettingsDialog {
     /// wins and calls this. [`SettingsDialog::on_key_down`] is the fallback for
     /// a dispatch that lets the key through instead.
     pub fn escape(&mut self, cx: &mut Context<Self>) {
+        if self.discarding {
+            self.keep_editing(cx);
+            return;
+        }
         if let Some(editor) = self.editor.clone() {
             editor.update(cx, |editor, cx| editor.cancel(cx));
             return;
@@ -876,7 +928,7 @@ impl SettingsDialog {
                 return;
             }
         }
-        self.dismiss(cx);
+        self.request_close(cx);
     }
 
     /// `Escape` dismisses the dialog from anywhere inside it.
@@ -1015,6 +1067,9 @@ impl SettingsDialog {
     /// field, and two views claiming the focus in one frame would leave it
     /// wherever the second one happened to run.
     fn apply_pending_focus(&mut self, window: &mut Window, cx: &mut Context<Self>) {
+        if self.discarding {
+            return;
+        }
         if !self.pending_focus || self.editor.is_some() {
             return;
         }
@@ -1190,7 +1245,8 @@ impl SettingsDialog {
                 .flex()
                 .flex_col()
                 .gap(px(10.))
-                .child(form_row(
+                .child(labeled_row(
+                    self.label_width,
                     ts!("settings.ui_theme"),
                     div()
                         .flex()
@@ -1199,8 +1255,9 @@ impl SettingsDialog {
                         .child(theme_picker)
                         .child(theme_actions),
                 ))
-                .child(form_row("", follows_ui))
-                .child(form_row(
+                .child(labeled_row(self.label_width, "", follows_ui))
+                .child(labeled_row(
+                    self.label_width,
                     ts!("settings.editor_theme"),
                     div()
                         .flex()
@@ -1209,7 +1266,8 @@ impl SettingsDialog {
                         .child(editor_theme)
                         .child(editor_theme_actions),
                 ))
-                .child(form_row(
+                .child(labeled_row(
+                    self.label_width,
                     ts!("settings.ui_font_size"),
                     suffixed(
                         self.ui_font_size_input.clone(),
@@ -1217,8 +1275,13 @@ impl SettingsDialog {
                         cx,
                     ),
                 ))
-                .child(form_row(ts!("settings.editor_font"), font))
-                .child(form_row(
+                .child(labeled_row(
+                    self.label_width,
+                    ts!("settings.editor_font"),
+                    font,
+                ))
+                .child(labeled_row(
+                    self.label_width,
                     ts!("settings.editor_font_size"),
                     suffixed(
                         self.editor_font_size_input.clone(),
@@ -1226,7 +1289,7 @@ impl SettingsDialog {
                         cx,
                     ),
                 ))
-                .child(form_row("", word_wrap)),
+                .child(labeled_row(self.label_width, "", word_wrap)),
         )
     }
 
@@ -1275,12 +1338,17 @@ impl SettingsDialog {
                 .flex()
                 .flex_col()
                 .gap(px(10.))
-                .child(form_row(
+                .child(labeled_row(
+                    self.label_width,
                     ts!("settings.opacity"),
                     suffixed(self.opacity_input.clone(), ts!("settings.opacity_hint"), cx),
                 ))
-                .child(form_row("", blur))
-                .child(form_row(ts!("settings.titlebar"), titlebar)),
+                .child(labeled_row(self.label_width, "", blur))
+                .child(labeled_row(
+                    self.label_width,
+                    ts!("settings.titlebar"),
+                    titlebar,
+                )),
         )
     }
 
@@ -1328,7 +1396,11 @@ impl SettingsDialog {
                 .flex()
                 .flex_col()
                 .gap(px(10.))
-                .child(form_row(ts!("settings.language"), language))
+                .child(labeled_row(
+                    self.label_width,
+                    ts!("settings.language"),
+                    language,
+                ))
                 .child(hint(ts!("settings.language_hint"), cx)),
         )
     }
@@ -1371,7 +1443,11 @@ impl SettingsDialog {
                 .flex()
                 .flex_col()
                 .gap(px(10.))
-                .child(form_row(ts!("settings.overwrite_policy"), policy))
+                .child(labeled_row(
+                    self.label_width,
+                    ts!("settings.overwrite_policy"),
+                    policy,
+                ))
                 .child(hint(ts!("settings.overwrite_hint"), cx)),
         )
     }
@@ -1385,7 +1461,8 @@ impl SettingsDialog {
                 .flex()
                 .flex_col()
                 .gap(px(10.))
-                .child(form_row(
+                .child(labeled_row(
+                    self.label_width,
                     ts!("settings.jvm_heap"),
                     suffixed(
                         self.jvm_heap_input.clone(),
@@ -1393,7 +1470,8 @@ impl SettingsDialog {
                         cx,
                     ),
                 ))
-                .child(form_row(
+                .child(labeled_row(
+                    self.label_width,
                     ts!("settings.jvm_args"),
                     self.jvm_args_input.clone(),
                 ))
@@ -1436,7 +1514,7 @@ impl SettingsDialog {
                             .flex_col()
                             .min_h_0()
                             .gap(px(14.))
-                            .max_h(px(BODY_MAX_HEIGHT))
+                            .max_h(rugpui::scaled(BODY_MAX_HEIGHT, cx))
                             .overflow_y_scroll()
                             .smooth_scroll(&self.body_scroll)
                             .restrict_scroll_to_axis()
@@ -1458,7 +1536,7 @@ impl SettingsDialog {
 
         let status = self.status.clone().map(|message| {
             div()
-                .text_size(px(12.))
+                .text_size(rugpui::TextSize::Sm.size(cx))
                 .text_color(StatusLevel::Error.color(&chrome))
                 .child(message)
         });
@@ -1483,7 +1561,7 @@ impl SettingsDialog {
                             .on_click({
                                 let this = this.clone();
                                 move |_, _window, cx| {
-                                    this.update(cx, |dialog, cx| dialog.dismiss(cx));
+                                    this.update(cx, |dialog, cx| dialog.request_close(cx));
                                 }
                             }),
                     )
@@ -1515,6 +1593,23 @@ impl Render for SettingsDialog {
         if !self.open {
             return div().id("settings-dialog");
         }
+        self.label_width = rugpui::fit_label_width(
+            [
+                ts!("settings.ui_theme"),
+                ts!("settings.editor_theme"),
+                ts!("settings.ui_font_size"),
+                ts!("settings.editor_font"),
+                ts!("settings.editor_font_size"),
+                ts!("settings.opacity"),
+                ts!("settings.titlebar"),
+                ts!("settings.language"),
+                ts!("settings.overwrite_policy"),
+                ts!("settings.jvm_heap"),
+                ts!("settings.jvm_args"),
+            ],
+            window,
+            cx,
+        );
 
         self.apply_pending_focus(window, cx);
         self.watch_scroll(cx);
@@ -1538,12 +1633,25 @@ impl Render for SettingsDialog {
         // A click on the backdrop backs out of whatever is in front: the editor
         // while one is open, otherwise the dialog itself. Anything else would
         // discard an unsaved palette by way of a stray click.
+        let dirty = self.is_dirty(cx);
+        let discard = self.discarding.then(|| {
+            let (keep, gone) = (cx.entity(), cx.entity());
+            prompt::discard(
+                "settings-discard",
+                &self.prompt_focus,
+                ts!("prompt.discard_settings"),
+                move |_window, cx| keep.update(cx, |dialog, cx| dialog.keep_editing(cx)),
+                move |_window, cx| gone.update(cx, |dialog, cx| dialog.dismiss(cx)),
+                cx,
+            )
+        });
         let on_dismiss = {
             let this = cx.entity();
             move |_window: &mut Window, cx: &mut App| {
                 this.update(cx, |dialog, cx| match dialog.editor.clone() {
                     Some(editor) => editor.update(cx, |editor, cx| editor.cancel(cx)),
-                    None => dialog.dismiss(cx),
+                    None if dialog.discarding => dialog.keep_editing(cx),
+                    None => dialog.request_close(cx),
                 });
             }
         };
@@ -1559,6 +1667,13 @@ impl Render for SettingsDialog {
             .track_focus(&self.focus_handle)
             .on_action(cx.listener(Self::focus_next))
             .on_action(cx.listener(Self::focus_prev))
+            // `Ctrl+S` here saves the settings, rather than the template tab
+            // the shell's own binding would have saved behind the backdrop.
+            .on_action(cx.listener(|dialog, _: &SaveDialog, _window, cx| {
+                if dialog.editor.is_none() && !dialog.discarding {
+                    dialog.save(cx);
+                }
+            }))
             .on_key_down(cx.listener(Self::on_key_down))
             // The body's bar is answered from here: gpui hands a drag move to
             // every listener of that type wherever it sits, and the body scrolls
@@ -1580,13 +1695,64 @@ impl Render for SettingsDialog {
                     dialog.release_scrollbar(cx);
                 }),
             )
-            .child(modal(
-                "settings-modal",
-                title,
-                px(DIALOG_WIDTH),
-                body,
-                on_dismiss,
-            ))
+            .child(
+                modal(
+                    "settings-modal",
+                    title,
+                    rugpui::scaled(DIALOG_WIDTH, cx),
+                    body,
+                    on_dismiss,
+                )
+                // With edits on the form a press beside the dialog is no answer:
+                // `Escape` and Cancel ask before the draft goes, a stray click
+                // does nothing.
+                .dismiss_guard(move |reason, _window, _cx| {
+                    !(dirty && matches!(reason, rugpui::DismissReason::Backdrop))
+                }),
+            )
+            .children(discard)
+    }
+}
+
+/// The settings the form edits, and nothing else — what
+/// [`SettingsDialog::is_dirty`] compares.
+#[derive(Clone, PartialEq)]
+struct FormValues {
+    theme: String,
+    editor_theme: String,
+    editor_theme_follows_ui: bool,
+    editor_word_wrap: bool,
+    language: Option<String>,
+    editor_font_family: Option<String>,
+    overwrite_policy: OverwritePolicy,
+    titlebar: TitlebarStyle,
+    background_blur: bool,
+    background_opacity: f32,
+    ui_font_size: f32,
+    editor_font_size: f32,
+    jvm_heap_mb: u32,
+    jvm_extra_args: Vec<String>,
+}
+
+impl FormValues {
+    /// The form's share of `settings`.
+    fn of(settings: &AppSettings) -> Self {
+        Self {
+            theme: settings.theme.clone(),
+            editor_theme: settings.editor_theme.clone(),
+            editor_theme_follows_ui: settings.editor_theme_follows_ui,
+            editor_word_wrap: settings.editor_word_wrap,
+            language: settings.language.clone(),
+            editor_font_family: settings.editor_font_family.clone(),
+            overwrite_policy: settings.overwrite_policy,
+            titlebar: settings.window.titlebar,
+            background_blur: settings.window.background_blur,
+            background_opacity: settings.window.background_opacity,
+            ui_font_size: settings.ui_font_size,
+            editor_font_size: settings.editor_font_size,
+            jvm_heap_mb: settings.jvm_heap_mb,
+            jvm_extra_args: settings.jvm_extra_args.clone(),
+        }
     }
 }
 
@@ -1615,6 +1781,18 @@ fn section_of(tab_index: isize) -> usize {
 /// on, since the JVM rejects an empty argument outright.
 fn split_arguments(value: &str) -> Vec<String> {
     value.split_whitespace().map(ToOwned::to_owned).collect()
+}
+
+/// A labeled form row with the label column at `width` — the widest label of
+/// the form, measured in the language on screen (see
+/// [`rugpui::fit_label_width`]), so that "Authentifizierung" is not broken in
+/// the middle of a word and every row of the form lines up with every other.
+fn labeled_row(
+    width: gpui::Pixels,
+    label: impl Into<SharedString>,
+    control: impl IntoElement,
+) -> rugpui::FormRow {
+    form_row(label, control).label_width(width)
 }
 
 #[cfg(test)]

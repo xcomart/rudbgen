@@ -108,6 +108,8 @@ fn answer_conflict(
     panic!("the run never asked about the file it was about to replace");
 }
 
+mod connections;
+mod dialogs;
 mod generation;
 mod settings;
 mod tabs;

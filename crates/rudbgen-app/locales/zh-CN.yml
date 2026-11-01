@@ -26,6 +26,7 @@ explorer:
   menu_invert: 反选
   menu_inspect: 在检查器中打开
   menu_refresh: 刷新
+  missing: "以下表已不在数据库中，已取消勾选：%{names}"
 
 inspector:
   title: 检查器
@@ -136,6 +137,10 @@ connect:
   # 或 JVM，不做翻译。
   could_not_open: "无法打开 %{name}。"
   tunnel_ended: "SSH 隧道已结束：%{reason}"
+  remember_password: "记住密码"
+  keychain_failed_connected: "已连接，但无法将密码保存到钥匙串：%{error}"
+  edit_connection: "编辑连接…"
+  retry: "重试"
 
 driver:
   title: 驱动
@@ -234,6 +239,13 @@ menu:
   mac:
     new_connection: 新建连接…
     quit: 退出 rudbgen
+  manage_connections: "管理连接…"
+  add_to_generation: "添加到生成列表"
+  close_tab: "关闭标签页"
+  next_tab: "下一个标签页"
+  prev_tab: "上一个标签页"
+  next_diagnostic: "下一个问题"
+  prev_diagnostic: "上一个问题"
 
 titlebar:
   no_connection: 无连接
@@ -241,6 +253,7 @@ titlebar:
   disconnect: 断开连接
   connecting: "%{name} — 正在连接…"
   tip_menu: 菜单
+  cancel_connecting: "取消连接"
 
 welcome:
   tagline: 指向一个数据库，选择表和模板，它就会生成代码。
@@ -313,6 +326,51 @@ generate:
   blocked_templates: 请至少勾选一个模板。
   blocked_output: 请先选择输出目录。
   blocked_running: 已有一次运行正在进行。
+  set_choose: "选择模板集…"
+  no_templates_sets: "还没有模板。可以从模板集开始，也可以自行添加："
+  use_set: "使用“%{name}”"
+  column_name: "名称"
+  column_file: "模板文件"
+  column_output: "输出文件名"
+  tip_output: "每张表写入输出目录下的哪个文件。也可以包含文件夹，例如 ${package.replace('.','/')}/${name.suffix.pascal}.java"
+  undo: "撤销"
+  undo_replaced: "列表已替换为模板集“%{set}”。"
+  undo_removed: "已从列表中移除“%{name}”。"
+  overwrite: "已有文件"
+  overwrite_default: "来自设置的默认值，每次运行都从这里开始。"
+  overwrite_once: "仅用于下一次运行，之后恢复为设置中的默认值。"
+  all_connections: "（所有连接）"
+  rendering: "正在渲染…"
+  dry_into: "将在 %{dir} 下写入 %{count} 个文件"
+  dry_no_output: "尚未选择输出目录：路径显示在临时目录下，因此所有文件都显示为新建。"
+  added_to_list: "已将“%{name}”添加到生成列表。"
+  set_more: "更多模板集操作"
+  export_set: "导出模板集…"
+  import_set: "导入模板集…"
+  export_title: "导出模板集"
+  export_summary: "将“%{name}”及其 %{count} 个模板的内容写入一个文件。"
+  export_vars: "包含此连接的自定义变量（%{count} 个）"
+  export_button: "导出…"
+  export_done: "已将“%{name}”导出到 %{path}。"
+  export_failed: "无法导出模板集：%{error}"
+  import_select: "选择模板集文件"
+  import_title: "导入模板集"
+  import_button: "导入"
+  import_summary: "%{count} 个模板：%{names}"
+  import_folder: "模板文件将写入新文件夹：%{dir}"
+  import_applies: "随后该模板集会替换此连接的模板列表；撤销可恢复原来的列表。"
+  import_vars: "添加此连接尚未有的自定义变量（%{count} 个）"
+  import_overwrite_note: "将用导入的模板集替换模板集“%{name}”。原模板集的模板文件保持不变。"
+  import_done: "已导入“%{name}”：%{count} 个模板，位于 %{dir}。"
+  import_failed: "无法导入“%{file}”：%{error}"
+  import_write_failed: "无法写入模板：%{error}"
+  bundle_read_template: "无法从 %{path} 读取模板“%{template}”：%{error}"
+  bundle_not_utf8: "模板“%{template}”（%{path}）不是 UTF-8 文本。"
+  bundle_not_a_set: "此文件不是 rudbgen 模板集。"
+  bundle_newer: "此模板集由更新版本的 rudbgen 创建（格式 %{version}）。请更新 rudbgen 后再导入。"
+  bundle_empty: "此模板集中没有模板。"
+  bundle_too_large: "文件超过 %{limit} MiB，不可能是模板集。"
+  bundle_io: "%{path}：%{error}"
 
 progress:
   title: 正在生成…
@@ -342,6 +400,7 @@ summary:
   skip: 跳过
   overwrite_all: 全部覆盖
   skip_all: 全部跳过
+  warnings: "警告"
 
 about:
   title: 关于 rudbgen
@@ -465,7 +524,7 @@ update:
   title: 有可用更新
   available: "%{app} %{version} 已发布。"
   installed: "当前运行的是 %{version}。"
-  update: 更新
+  update: "更新并重新启动"
   ignore: 忽略此版本
   checking: 正在检查更新…
   up_to_date: 已是最新版本。
@@ -498,6 +557,7 @@ template:
   close_title: 未保存的更改
   close_question: "%{file} 有尚未保存的更改。"
   discard: 不保存
+  add_to_generation: "添加到生成列表"
 
 diagnostics:
   title: 问题（%{count}）
@@ -682,7 +742,7 @@ import:
   written: "已导入 %{connections} 个连接、%{drivers} 个驱动、%{sets} 个模板集和 %{rules} 条缩写规则。"
   nothing_written: 没有导入任何内容。
   skipped: "名称被占用，已跳过：%{names}"
-  no_keychain: "以下连接因无法写入钥匙串而未保存密码：%{names}。打开时会再询问。"
+  no_keychain: "以下连接因无法写入钥匙串而未保存密码：%{names}。打开连接时，如果数据库拒绝无密码连接，rudbgen 会询问密码。"
   load_failed: "无法读取导入要写入的文件，因此没有导入任何内容：%{error}。请修复或移走该文件后重新导入。"
   not_saved: "无法写入文件，以下内容未保存：%{errors}"
   wrong_password: 这不是该配置的主密码。
@@ -700,3 +760,47 @@ import:
   path_jar: 驱动 JAR
   path_template: 模板文件
   path_output: 输出目录
+
+context:
+  connect: "连接"
+  edit: "编辑…"
+  delete: "删除…"
+  close_tab: "关闭标签页"
+  close_others: "关闭其他标签页"
+  close_right: "关闭右侧标签页"
+  copy_path: "复制路径"
+  path_copied: "已复制路径。"
+
+password:
+  title: "密码"
+  question: "请输入 %{name} 的密码。"
+  refused: "数据库拒绝了该密码。"
+
+prompt:
+  discard_title: "未保存的更改"
+  keep_editing: "继续编辑"
+  discard: "放弃更改"
+  discard_connections: "连接有尚未保存的更改。要放弃吗？"
+  discard_drivers: "驱动有尚未保存的更改。要放弃吗？"
+  discard_rules: "缩写规则有尚未保存的更改。要放弃吗？"
+  discard_settings: "设置有尚未保存的更改。要放弃吗？"
+
+unsaved:
+  title: "未保存的模板"
+  question: "以下模板有未保存的更改：%{names}。运行读取的是已保存的文件，而不是标签页中的内容。"
+  save_and_run: "保存并运行"
+  run_without_saving: "不保存直接运行"
+
+close_guard:
+  title_window: "有未保存的工作，要关闭窗口吗？"
+  title_quit: "有未保存的工作，要退出吗？"
+  title_restart: "有未保存的工作，要重新启动吗？"
+  message: "如果继续，以下内容将会丢失："
+  more: "…另外 %{count} 项"
+  close_anyway: "仍然关闭"
+  quit_anyway: "仍然退出"
+  restart_anyway: "仍然重新启动"
+  save_all: "全部保存"
+  item_template: "未保存的模板“%{name}”"
+  item_run: "仍在写入文件的生成任务"
+  item_draft: "已打开对话框中未保存的更改"

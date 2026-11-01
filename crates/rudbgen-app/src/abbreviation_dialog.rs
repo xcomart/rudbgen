@@ -36,8 +36,8 @@
 
 use gpui::{
     App, Context, DragMoveEvent, Entity, EventEmitter, FocusHandle, Focusable, IntoElement,
-    KeyDownEvent, MouseButton, MouseUpEvent, Render, ScrollHandle, SharedString, Subscription,
-    Window, div, prelude::*, px,
+    KeyDownEvent, MouseButton, MouseUpEvent, Pixels, Render, ScrollHandle, SharedString,
+    Subscription, Window, div, prelude::*, px,
 };
 use rudbgen_core::{AbbreviationRule, AbbreviationStore};
 use rugpui::SmoothScrollExt;
@@ -48,6 +48,7 @@ use rugpui::{
 
 use crate::i18n::ts;
 use crate::icons;
+use crate::{SaveDialog, prompt};
 
 /// Width of the dialog panel.
 const DIALOG_WIDTH: f32 = 720.;
@@ -69,6 +70,10 @@ const ABBR_WIDTH: f32 = 170.;
 
 /// Width of the table-name picker beside a whole-name row's abbreviation.
 const PICKER_WIDTH: f32 = 92.;
+
+/// Key context of the dialog's root, which `Ctrl+S` is bound in (see the
+/// workspace's `bind_shortcuts`).
+pub(crate) const KEY_CONTEXT: &str = "AbbreviationDialog";
 
 /// What the dialog tells the shell about.
 pub enum AbbreviationDialogEvent {
@@ -127,6 +132,10 @@ pub struct AbbreviationDialog {
     scroll: ScrollHandle,
     /// Whether the table's overlay scroll indicator is on screen.
     scrollbar: ScrollbarState,
+    /// Whether "discard your edits?" is up over the table.
+    discarding: bool,
+    /// The question's *Keep editing*, which holds the keyboard while it is up.
+    prompt_focus: FocusHandle,
 }
 
 impl AbbreviationDialog {
@@ -146,6 +155,8 @@ impl AbbreviationDialog {
             picker_scroll: ScrollHandle::new(),
             scroll: ScrollHandle::new(),
             scrollbar: ScrollbarState::new(),
+            discarding: false,
+            prompt_focus: cx.focus_handle(),
         }
     }
 
@@ -204,7 +215,41 @@ impl AbbreviationDialog {
         self.open = false;
         self.pending_focus = false;
         self.picker = None;
+        self.discarding = false;
         self.rows.clear();
+        cx.notify();
+    }
+
+    /// Whether closing now would throw away an edit: a rule typed, changed,
+    /// switched or removed, or the switch above them flipped.
+    ///
+    /// Against the store the draft was filled from, with the blank rows
+    /// dropped the way a save drops them — the trailing empty row is not an
+    /// edit, and neither is a rule typed and then cleared again.
+    pub fn is_dirty(&self, cx: &App) -> bool {
+        self.open && self.drafted_store(cx) != self.store
+    }
+
+    /// Whether "discard your edits?" is up.
+    #[cfg(test)]
+    pub fn is_discarding(&self) -> bool {
+        self.discarding
+    }
+
+    /// What Cancel, `Escape` and the backdrop mean: close — once the user has
+    /// said the edits may go, when there are any.
+    fn request_close(&mut self, cx: &mut Context<Self>) {
+        if self.is_dirty(cx) {
+            self.discarding = true;
+            cx.notify();
+            return;
+        }
+        self.dismiss(cx);
+    }
+
+    /// Takes "discard your edits?" down and goes back to the table.
+    fn keep_editing(&mut self, cx: &mut Context<Self>) {
+        self.discarding = false;
         cx.notify();
     }
 
@@ -216,11 +261,15 @@ impl AbbreviationDialog {
 
     /// `Escape` from anywhere inside: closes the picker first, the dialog next.
     pub fn escape(&mut self, cx: &mut Context<Self>) {
+        if self.discarding {
+            self.keep_editing(cx);
+            return;
+        }
         if self.picker.take().is_some() {
             cx.notify();
             return;
         }
-        self.dismiss(cx);
+        self.request_close(cx);
     }
 
     /// The table names the whole-name picker offers.
@@ -434,6 +483,9 @@ impl AbbreviationDialog {
 
     /// Moves focus into the dialog when it opens, so `Escape` reaches it.
     fn apply_pending_focus(&mut self, window: &mut Window, cx: &mut Context<Self>) {
+        if self.discarding {
+            return;
+        }
         if !self.pending_focus {
             return;
         }
@@ -510,14 +562,14 @@ impl AbbreviationDialog {
     // --- rendering --------------------------------------------------------
 
     /// The column headings of the table.
-    fn render_head(&self, chrome: &Theme) -> impl IntoElement + use<> {
-        let cell = |width: Option<f32>, label: SharedString| {
+    fn render_head(&self, chrome: &Theme, cx: &App) -> impl IntoElement + use<> {
+        let cell = |width: Option<Pixels>, label: SharedString| {
             let base = div()
                 .flex_none()
-                .text_size(px(11.))
+                .text_size(rugpui::TextSize::Xs.size(cx))
                 .text_color(chrome.text_muted);
             match width {
-                Some(width) => base.w(px(width)).child(label),
+                Some(width) => base.w(width).child(label),
                 None => base.flex_1().min_w_0().child(label),
             }
         };
@@ -526,15 +578,22 @@ impl AbbreviationDialog {
             .flex_row()
             .items_center()
             .gap(px(6.))
-            .child(cell(Some(APPLY_WIDTH), ts!("abbr.column_apply")))
-            .child(cell(Some(WHOLE_WIDTH), ts!("abbr.column_whole")))
             .child(cell(
-                Some(ABBR_WIDTH + PICKER_WIDTH + 6.),
+                Some(rugpui::scaled(APPLY_WIDTH, cx)),
+                ts!("abbr.column_apply"),
+            ))
+            .child(cell(
+                Some(rugpui::scaled(WHOLE_WIDTH, cx)),
+                ts!("abbr.column_whole"),
+            ))
+            // The field and its picker, and the gap between them.
+            .child(cell(
+                Some(rugpui::scaled(ABBR_WIDTH, cx) + rugpui::scaled(PICKER_WIDTH, cx) + px(6.)),
                 ts!("abbr.column_abbreviation"),
             ))
             .child(cell(None, ts!("abbr.column_replacement")))
             // The delete glyph's column, which has no heading of its own.
-            .child(div().flex_none().size(px(22.)))
+            .child(div().flex_none().size(rugpui::scaled(22., cx)))
     }
 
     /// One rule row.
@@ -582,7 +641,7 @@ impl AbbreviationDialog {
             .items_center()
             .gap(px(6.))
             .child(
-                div().w(px(APPLY_WIDTH)).flex_none().child(
+                div().w(rugpui::scaled(APPLY_WIDTH, cx)).flex_none().child(
                     Checkbox::new(("abbr-enabled", index), SharedString::default())
                         .checked(row.enabled)
                         .on_toggle({
@@ -594,7 +653,7 @@ impl AbbreviationDialog {
                 ),
             )
             .child(
-                div().w(px(WHOLE_WIDTH)).flex_none().child(
+                div().w(rugpui::scaled(WHOLE_WIDTH, cx)).flex_none().child(
                     Checkbox::new(("abbr-whole", index), SharedString::default())
                         .checked(row.whole_name)
                         .on_toggle({
@@ -612,7 +671,7 @@ impl AbbreviationDialog {
                     .flex_none()
                     .items_center()
                     .gap(px(6.))
-                    .w(px(ABBR_WIDTH + PICKER_WIDTH + 6.))
+                    .w(rugpui::scaled(ABBR_WIDTH, cx) + rugpui::scaled(PICKER_WIDTH, cx) + px(6.))
                     .child(
                         div()
                             .flex_1()
@@ -628,7 +687,7 @@ impl AbbreviationDialog {
                     .children(picker.map(|select| {
                         div()
                             .debug_selector(move || format!("abbr-picker-{index}"))
-                            .w(px(PICKER_WIDTH))
+                            .w(rugpui::scaled(PICKER_WIDTH, cx))
                             .flex_none()
                             .child(select)
                     })),
@@ -643,9 +702,9 @@ impl AbbreviationDialog {
                     .flex_none()
                     .items_center()
                     .justify_center()
-                    .size(px(22.))
+                    .size(rugpui::scaled(22., cx))
                     .rounded_md()
-                    .text_size(px(12.))
+                    .text_size(rugpui::TextSize::Sm.size(cx))
                     .text_color(chrome.icon)
                     .cursor_pointer()
                     .hover(|style| style.bg(chrome.surface_hover).text_color(chrome.danger))
@@ -715,7 +774,7 @@ impl Render for AbbreviationDialog {
                     .flex_col()
                     .gap(px(4.))
                     .min_h_0()
-                    .max_h(px(TABLE_MAX_HEIGHT))
+                    .max_h(rugpui::scaled(TABLE_MAX_HEIGHT, cx))
                     .overflow_y_scroll()
                     .smooth_scroll(&self.scroll)
                     .restrict_scroll_to_axis()
@@ -731,7 +790,7 @@ impl Render for AbbreviationDialog {
 
         let complaint = (!offenders.is_empty()).then(|| {
             div()
-                .text_size(px(11.))
+                .text_size(rugpui::TextSize::Xs.size(cx))
                 .text_color(chrome.danger)
                 .child(ts!(
                     "abbr.duplicate",
@@ -745,7 +804,7 @@ impl Render for AbbreviationDialog {
 
         let error = self.error.clone().map(|message| {
             div()
-                .text_size(px(11.))
+                .text_size(rugpui::TextSize::Xs.size(cx))
                 .text_color(chrome.danger)
                 .child(message)
         });
@@ -756,12 +815,16 @@ impl Render for AbbreviationDialog {
             .items_center()
             .justify_end()
             .gap(px(8.))
-            .child(Button::new("abbr-cancel", ts!("common.cancel")).on_click({
-                let this = this.clone();
-                move |_, _window, cx| {
-                    this.update(cx, |dialog, cx| dialog.dismiss(cx));
-                }
-            }))
+            .child(
+                Button::new("abbr-cancel", ts!("common.cancel"))
+                    .variant(ButtonVariant::Secondary)
+                    .on_click({
+                        let this = this.clone();
+                        move |_, _window, cx| {
+                            this.update(cx, |dialog, cx| dialog.request_close(cx));
+                        }
+                    }),
+            )
             .child(
                 Button::new("abbr-save", ts!("common.save"))
                     .variant(ButtonVariant::Primary)
@@ -782,11 +845,11 @@ impl Render for AbbreviationDialog {
             .child(apply)
             .child(
                 div()
-                    .text_size(px(11.))
+                    .text_size(rugpui::TextSize::Xs.size(cx))
                     .text_color(chrome.text_muted)
                     .child(ts!("abbr.how_it_works")),
             )
-            .child(self.render_head(&chrome))
+            .child(self.render_head(&chrome, cx))
             .child(table)
             .children(complaint)
             .children(error)
@@ -799,13 +862,34 @@ impl Render for AbbreviationDialog {
             }
         };
 
+        let dirty = self.is_dirty(cx);
+        let discard = self.discarding.then(|| {
+            let (keep, gone) = (cx.entity(), cx.entity());
+            prompt::discard(
+                "abbr-discard",
+                &self.prompt_focus,
+                ts!("prompt.discard_rules"),
+                move |_window, cx| keep.update(cx, |dialog, cx| dialog.keep_editing(cx)),
+                move |_window, cx| gone.update(cx, |dialog, cx| dialog.dismiss(cx)),
+                cx,
+            )
+        });
+
         div()
             .id("abbreviation-dialog")
+            .key_context(KEY_CONTEXT)
             .absolute()
             .inset_0()
             .size_full()
             .track_focus(&self.focus_handle)
             .on_key_down(cx.listener(Self::on_key_down))
+            // `Ctrl+S` here saves the rules, rather than the template tab the
+            // shell's own binding would have saved behind the backdrop.
+            .on_action(cx.listener(|dialog, _: &SaveDialog, _window, cx| {
+                if !dialog.discarding {
+                    dialog.save(cx);
+                }
+            }))
             .on_drag_move::<DraggedThumb>(cx.listener(
                 |dialog, event: &DragMoveEvent<DraggedThumb>, _window, cx| {
                     dialog.drag_scrollbar(event, cx);
@@ -823,13 +907,22 @@ impl Render for AbbreviationDialog {
                     dialog.release_scrollbar(cx);
                 }),
             )
-            .child(modal(
-                "abbr-modal",
-                ts!("abbr.title"),
-                px(DIALOG_WIDTH),
-                body,
-                on_dismiss,
-            ))
+            .child(
+                modal(
+                    "abbr-modal",
+                    ts!("abbr.title"),
+                    rugpui::scaled(DIALOG_WIDTH, cx),
+                    body,
+                    on_dismiss,
+                )
+                // With edits on the form a press beside the dialog is no answer:
+                // `Escape` and Cancel ask before the draft goes, a stray click
+                // does nothing.
+                .dismiss_guard(move |reason, _window, _cx| {
+                    !(dirty && matches!(reason, rugpui::DismissReason::Backdrop))
+                }),
+            )
+            .children(discard)
     }
 }
 

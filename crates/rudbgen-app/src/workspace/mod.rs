@@ -113,7 +113,7 @@ use crate::connection::{
     Closing, ConnectError, Connected, Credentials, SessionHandle, wait_for_closes,
 };
 use crate::connection_dialog::{self, ConnectionDialog, ConnectionDialogEvent};
-use crate::explorer::{Explorer, ExplorerEvent, SchemaKey, TableKey};
+use crate::explorer::{Explorer, ExplorerEvent, Landing, SchemaKey, TableKey};
 use crate::generate_job::{GenerationJob, JobEvent};
 use crate::generate_pane::{Blocker, GeneratePane, GeneratePaneEvent};
 use crate::i18n::ts;

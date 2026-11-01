@@ -13,6 +13,17 @@ impl Workspace {
     pub(super) fn reset_panels(&mut self, cx: &mut Context<Self>) {
         self.connection_epoch = self.connection_epoch.wrapping_add(1);
         self.explorer.update(cx, |explorer, cx| explorer.reset(cx));
+        // A session that has just opened has the tree open onto the database
+        // and schema it landed in — the ones its URL named, or the driver's
+        // default — once the schemas arrive.
+        if let ConnectionState::Open { session, .. } = &self.connection {
+            let landing = Landing {
+                catalog: session.info.catalog.clone(),
+                schema: session.info.schema.clone(),
+            };
+            self.explorer
+                .update(cx, |explorer, _cx| explorer.open_onto(landing));
+        }
         self.inspector.update(cx, |panel, cx| panel.reset(cx));
         self.run_tables.clear();
         self.preview.update(cx, |pane, cx| pane.reset(cx));

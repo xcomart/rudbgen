@@ -291,6 +291,63 @@ pub fn catalog_level(schemas: &[Schema]) -> bool {
     catalogs_of(schemas).len() > 1
 }
 
+/// Where a session landed: what `getCatalog` and `getSchema` answered.
+#[derive(Clone, Debug, Default, PartialEq, Eq)]
+pub struct Landing {
+    /// The catalog, when the driver names one.
+    pub catalog: Option<String>,
+    /// The schema, likewise.
+    pub schema: Option<String>,
+}
+
+/// The nodes from the root down to where the session landed, in the order they
+/// are opened: the catalog, when the tree draws that level, then the schema.
+///
+/// A catalog holding a single schema opens that one whatever the session said
+/// about schemas — MySQL's placeholder, SQLite's default schema — and one
+/// holding several with no match opens only the catalog. A catalog level with
+/// no match opens nothing, since there is no telling which of them was meant.
+pub fn landing_path(schemas: &[Schema], landing: &Landing) -> Vec<NodeId> {
+    let mut path = Vec::new();
+    let mut candidates: Vec<&Schema> = schemas.iter().collect();
+    if catalog_level(schemas) {
+        let catalogs = catalogs_of(schemas);
+        let Some(catalog) = landing
+            .catalog
+            .as_deref()
+            .and_then(|want| named(catalogs.iter(), String::as_str, want))
+        else {
+            return path;
+        };
+        candidates.retain(|schema| schema.catalog == *catalog);
+        path.push(NodeId::Catalog(catalog.clone()));
+    }
+    let schema = landing
+        .schema
+        .as_deref()
+        .and_then(|want| named(candidates.iter().copied(), |schema| &schema.schema, want))
+        .or_else(|| (candidates.len() == 1).then(|| candidates[0]));
+    path.extend(schema.map(|schema| NodeId::Schema(SchemaKey::of(schema))));
+    path
+}
+
+/// The first of `items` whose name is `want`, exactly or failing that in any
+/// case.
+///
+/// The session reports where it landed through `getCatalog`/`getSchema` and the
+/// tree lists through `getCatalogs`/`getSchemas`, and a driver is free to fold
+/// the case differently between the two.
+fn named<'a, T>(
+    mut items: impl Iterator<Item = &'a T> + Clone,
+    name: impl Fn(&T) -> &str,
+    want: &str,
+) -> Option<&'a T> {
+    items
+        .clone()
+        .find(|item| name(item) == want)
+        .or_else(|| items.find(|item| name(item).eq_ignore_ascii_case(want)))
+}
+
 /// Where the tree gets its nodes.
 ///
 /// Owned by the [`TreeView`], which is owned by the [`Explorer`]; the panel
@@ -727,6 +784,9 @@ pub struct Explorer {
     /// Ticks put back that turned out to name a table that is gone, for the
     /// line under the filter that says so.
     missing: Vec<TableKey>,
+    /// Where the session that has just opened landed, for the tree to open
+    /// onto once the schemas arrive; see [`Explorer::open_onto`].
+    landing: Option<Landing>,
     focus_handle: FocusHandle,
     /// Keeps the tree's subscription alive.
     _events: Subscription,
@@ -797,6 +857,7 @@ impl Explorer {
             pending_ticks: BTreeSet::new(),
             unverified: BTreeSet::new(),
             missing: Vec::new(),
+            landing: None,
             focus_handle: cx.focus_handle(),
             _events: events,
             _filter_events: filter_events,
@@ -844,6 +905,10 @@ impl Explorer {
                 .collect(),
             Err(_) => Vec::new(),
         };
+        let path = match (&outcome, self.landing.take()) {
+            (Ok(schemas), Some(landing)) => landing_path(schemas, &landing),
+            _ => Vec::new(),
+        };
         self.update_source(cx, |source| {
             source.schemas = match outcome {
                 Ok(schemas) => Fetch::Loaded(schemas),
@@ -859,6 +924,22 @@ impl Explorer {
                 self.request_tables(key, cx);
             }
         }
+        // The whole path in one go: the catalogs and schemas came together, so
+        // every node on it is already known. After the verification above, so
+        // that a schema it has already asked for is not asked for twice; the
+        // tables of any other are asked for by the expansion itself, as if it
+        // had been clicked open. The selection moves onto it so that a server
+        // with dozens of databases scrolls to the one the session is in.
+        // Nobody can have picked a row of this tree yet — it had none until
+        // now.
+        if let Some(last) = path.last().cloned() {
+            self.tree.update(cx, |tree, cx| {
+                for node in &path {
+                    tree.expand(node, cx);
+                }
+                tree.set_selected(Some(last), cx);
+            });
+        }
     }
 
     /// Ticks `keys` again — the tables ticked the last time this connection
@@ -869,6 +950,17 @@ impl Explorer {
         self.unverified = keys.clone();
         self.update_source(cx, |source| source.selection = keys);
         cx.emit(ExplorerEvent::SelectionChanged);
+    }
+
+    /// Opens the tree onto `landing` — the catalog and the schema the session
+    /// that has just opened landed in — once the schemas arrive.
+    ///
+    /// The database the profile's URL points at is the one the user is about
+    /// to generate from, so the tree opens onto its tables rather than leaving
+    /// it closed among the rest. Only the next schema fetch is affected: a
+    /// refresh later on leaves the tree as the user arranged it.
+    pub fn open_onto(&mut self, landing: Landing) {
+        self.landing = Some(landing);
     }
 
     /// The ticks put back that named a table that is gone.
@@ -933,6 +1025,7 @@ impl Explorer {
         self.pending_ticks.clear();
         self.unverified.clear();
         self.missing.clear();
+        self.landing = None;
         self.update_source(cx, ExplorerSource::clear);
         self.filter.update(cx, |input, cx| input.clear(cx));
         cx.emit(ExplorerEvent::SelectionChanged);
@@ -1589,6 +1682,116 @@ mod tests {
         });
         cx.run_until_parked();
         assert_eq!(rows(&explorer, &mut cx), vec!["PUBLIC", "T_ALBUM"]);
+    }
+
+    fn landed(catalog: Option<&str>, schema: Option<&str>) -> Landing {
+        Landing {
+            catalog: catalog.map(str::to_string),
+            schema: schema.map(str::to_string),
+        }
+    }
+
+    /// The path the tree opens onto, across the shapes `MetaReader::schemas`
+    /// answers in.
+    #[test]
+    fn the_landing_path_follows_the_levels_the_tree_draws() {
+        let schema_node =
+            |catalog: &str, name: &str| NodeId::Schema(SchemaKey::of(&schema(catalog, name)));
+
+        // SQL Server: catalogs and schemas both drawn.
+        let server = [
+            schema("other", "dbo"),
+            schema("app", "dbo"),
+            schema("app", "sales"),
+        ];
+        assert_eq!(
+            landing_path(&server, &landed(Some("app"), Some("dbo"))),
+            vec![NodeId::Catalog("app".into()), schema_node("app", "dbo")]
+        );
+        // A catalog no list carries opens nothing: there is no telling which
+        // of them was meant.
+        assert!(landing_path(&server, &landed(Some("gone"), Some("dbo"))).is_empty());
+        // A schema no list carries opens the catalog alone.
+        assert_eq!(
+            landing_path(&server, &landed(Some("app"), Some("gone"))),
+            vec![NodeId::Catalog("app".into())]
+        );
+
+        // MySQL: a catalog per database, each with its placeholder schema, and
+        // no schema reported at all.
+        let placeholder = |name: &str| Schema {
+            catalog: name.to_string(),
+            schema: String::new(),
+            name: name.to_string(),
+        };
+        let mysql = [placeholder("app"), placeholder("shop")];
+        assert_eq!(
+            landing_path(&mysql, &landed(Some("shop"), None)),
+            vec![
+                NodeId::Catalog("shop".into()),
+                NodeId::Schema(SchemaKey::of(&placeholder("shop")))
+            ]
+        );
+
+        // H2 and PostgreSQL: one catalog, so no level of its own, and the
+        // schema matched in any case when no name is exact.
+        let one_catalog = [
+            schema("TEST", "INFORMATION_SCHEMA"),
+            schema("TEST", "PUBLIC"),
+        ];
+        assert_eq!(
+            landing_path(&one_catalog, &landed(Some("test"), Some("public"))),
+            vec![schema_node("TEST", "PUBLIC")]
+        );
+        assert!(landing_path(&one_catalog, &landed(Some("TEST"), None)).is_empty());
+    }
+
+    /// A connection that opens has the tree open onto its schema, the tables
+    /// asked for and the row selected — once, so a refresh leaves the tree as
+    /// the user arranged it.
+    #[gpui::test]
+    fn a_new_connection_opens_onto_the_schema_it_landed_in(cx: &mut TestAppContext) {
+        let (explorer, events, mut cx) = open(cx);
+        drain(&events);
+        cx.update(|_, cx| {
+            explorer.update(cx, |explorer, cx| {
+                explorer.open_onto(landed(Some(""), Some("PUBLIC")));
+                explorer.deliver_schemas(
+                    Ok(vec![schema("", "INFORMATION_SCHEMA"), schema("", "PUBLIC")]),
+                    cx,
+                );
+            });
+        });
+        cx.run_until_parked();
+        assert_eq!(
+            rows(&explorer, &mut cx),
+            vec!["INFORMATION_SCHEMA", "PUBLIC", "…"]
+        );
+        assert_eq!(
+            drain(&events),
+            vec![Announced::Tables("PUBLIC".to_string())]
+        );
+        cx.update(|_, cx| {
+            let tree = explorer.read(cx).tree.read(cx);
+            assert_eq!(tree.selected(), Some(&NodeId::Schema(public())));
+        });
+
+        cx.update(|_, cx| {
+            explorer.update(cx, |explorer, cx| {
+                explorer.tree.update(cx, |tree, cx| {
+                    tree.collapse(&NodeId::Schema(public()), cx);
+                });
+                explorer.deliver_schemas(
+                    Ok(vec![schema("", "INFORMATION_SCHEMA"), schema("", "PUBLIC")]),
+                    cx,
+                );
+            });
+        });
+        cx.run_until_parked();
+        assert_eq!(
+            rows(&explorer, &mut cx),
+            vec!["INFORMATION_SCHEMA", "PUBLIC"]
+        );
     }
 
     #[gpui::test]

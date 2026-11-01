@@ -108,15 +108,9 @@ fn a_real_database_fills_the_tree_and_the_inspector(cx: &mut gpui::TestAppContex
         })
         .expect("the window is open");
 
-    window
-        .update(cx, |workspace, _window, cx| {
-            workspace.explorer.update(cx, |explorer, cx| {
-                explorer.expand(&explorer::NodeId::Schema(public.clone()), cx);
-            });
-        })
-        .expect("the window is open");
-    cx.run_until_parked();
-
+    // Nobody opened PUBLIC: the session landed in it, so the tree opened onto
+    // it by itself and asked for its tables.
+    //
     // Both tables, and only the tables. The keys come off the panel rather
     // than being spelled out here: H2 names the catalog after the URL, and
     // what a key *is* is the driver's answer and not this test's guess.

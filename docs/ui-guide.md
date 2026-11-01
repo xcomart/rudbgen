@@ -169,7 +169,9 @@ the work area, the verdict lives in the status bar.** The three never overlap.
 ![The explorer](screenshots/explorer.png)
 
 Catalog → schema → table, fetched lazily: a schema's tables are read the first
-time you expand it and cached after that.
+time you expand it and cached after that. A connection that opens has the tree
+opened onto the database and schema it landed in — the ones its URL names, or
+the driver's default — with that schema selected and its tables read.
 
 - **The filter box** is a contains match, case-insensitive — jdbgen's rule.
 - **The views toggle** shows or hides views. Both forms are fetched either way,

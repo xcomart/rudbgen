@@ -47,7 +47,8 @@ Written against jdbgen, because that is what most of this is for:
   nothing to lose — and where the keychain is not to be used, untick *Remember
   password* and rudbgen asks for it on every connect.
 - **A schema explorer with a checkbox on every row.** Catalog → schema → table,
-  fetched lazily, with jdbgen's contains-filter over it and a views toggle. The
+  fetched lazily and opened on connect onto the database and schema the
+  connection landed in, with jdbgen's contains-filter over it and a views toggle. The
   ticked set survives filtering, collapsing and refreshing, is kept with the
   connection and ticked again the next time it opens — a table that has gone in
   the meantime is unticked and named — and a schema's three-state box acts on

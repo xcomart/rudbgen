@@ -172,6 +172,55 @@ with `--ignored`; ordinary SSH tests use loopback servers.
 - Follow the surrounding style, use `cargo fmt --all`, and add focused tests for
   changed behavior. Update the relevant [documentation](docs/README.md).
 
+## Using AI coding agents
+
+Parts of rudbgen were generated with AI coding agents, and a contribution made
+with one is welcome on the same terms as any other. You are its author: read
+every line before submitting it and be ready to explain it in review. An agent
+does the typing; it does not take the responsibility.
+
+Start the agent from a checkout of `dev` and point it at this guide, the
+[README](README.md), the [architecture](docs/architecture.md) and the
+[template reference](docs/template-reference.md), so that it works from the
+documented design, the table in [Where changes belong](#where-changes-belong)
+and the checks above rather than from guesses. Ask for one focused change at a
+time and let it stop at a local commit you review. Pushing, opening or merging
+pull requests, moving tags and publishing releases stay with a person.
+
+- **Run the checks yourself.** An agent's report that the tests pass is not
+  validation. Rebuild the bridge and run the commands in
+  [Validate a change](#validate-a-change), plus the
+  [database-specific checks](#database-specific-checks) the change calls for.
+  For a UI change, launch the app and exercise the flow; an agent that cannot
+  see the window has not checked it.
+- **Do not let it rewrite expected output.** Asked to make a failing golden
+  test pass, an agent will often update the fixture instead of the code. A
+  changed fixture is a jdbgen compatibility question: investigate it as
+  [Validate a change](#validate-a-change) describes, and document an
+  intentional difference in the template reference.
+- **Give it disposable databases and directories only.** Tests and trial runs
+  create and drop objects and write generated files. Point the agent at the
+  Compose containers, in-memory H2 or a throwaway SQLite file, and at a
+  temporary output directory, never at a connection holding real data or a
+  source tree you care about.
+- **Keep secrets away from the agent.** Most agents send what they read to a
+  remote service. Do not give one your profiles, passwords, private keys,
+  keychain entries, real connection details, private schemas or code generated
+  from them, or an imported jdbgen configuration.
+- **Review the diff for what agents tend to get wrong:** edits outside the task,
+  reworded comments and reformatted code it had no reason to touch, tests
+  deleted, weakened or marked `#[ignore]` to reach a green run, invented APIs
+  or JDBC behavior, new dependencies, and a fix made in one platform's code but
+  not in its Windows, macOS or Linux counterpart. A new Cargo or Gradle
+  dependency needs the same discussion as any other, and
+  `cargo deny --locked check` must still pass.
+- **Hold it to the project's rules.** Java and Rust protocol changes land
+  together with both sides' tests and the protocol documentation, the rudbman
+  bridge is checked for the same fix, new strings go into all eight locale
+  files with matching keys and placeholders, and shared UI or connection fixes
+  go to [rugpui](https://github.com/xcomart/rugpui) or
+  [rudbkit](https://github.com/xcomart/rudbkit).
+
 ## Submit your contribution
 
 `dev` is the integration branch. Fork if necessary, branch from the latest

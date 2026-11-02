@@ -273,6 +273,15 @@ upstream has no answer for.
 The root [`Cargo.toml`](Cargo.toml) explains why the patch table here has to
 point at rugpui's copies rather than carry its own.
 
+## AI-assisted development
+
+Parts of the code in this repository were generated with AI coding agents. That
+code is held to the same tests and CI checks as code written by hand, and the
+maintainers are responsible for it in the same way. If you use an agent to
+contribute, first read
+[Using AI coding agents](CONTRIBUTING.md#using-ai-coding-agents) in the
+contribution guide.
+
 ## Contributing
 
 See the [contribution guide](CONTRIBUTING.md) for development setup, bridge and

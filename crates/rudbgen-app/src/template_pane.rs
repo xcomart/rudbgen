@@ -39,12 +39,13 @@ use std::time::Duration;
 
 use gpui::{
     Action, Anchor, AnchoredPositionMode, App, Axis, Bounds, Context, Entity, EventEmitter,
-    FocusHandle, Focusable, MouseButton, Pixels, Point, SharedString, Subscription, Task, Window,
-    anchored, deferred, div, point, prelude::*, px,
+    FocusHandle, Focusable, MouseButton, Pixels, Point, ScrollHandle, SharedString, Subscription,
+    Task, Window, anchored, deferred, div, point, prelude::*, px,
 };
 use rudbgen_template::{ParseError, Template, Warning};
 use rugpui::{
-    Button, ButtonVariant, ContextMenu, Select, Splitter, editor_theme, theme, tooltip_label,
+    Button, ButtonVariant, ContextMenu, ScrollbarExt as _, Select, Splitter, editor_theme, theme,
+    tooltip_label,
 };
 use rugpui_editor::editor::{CloseFind, Copy, Cut, Find, Paste, Redo, Replace, SelectAll, Undo};
 use rugpui_editor::{EditorEvent, EditorScrollEvent, EditorView, MarkKind, NavKey};
@@ -332,6 +333,8 @@ pub struct TemplatePane {
     preview_note: Option<SharedString>,
     /// Everything wrong with the template, parse errors first.
     diagnostics: Vec<Diagnostic>,
+    /// The list of them under the editor, which scrolls past a handful.
+    diagnostics_scroll: ScrollHandle,
     /// The palette, for the completion popup to filter.
     items: Vec<PaletteItem>,
     /// The popup, while it is up.
@@ -440,6 +443,7 @@ impl TemplatePane {
             preview_path: None,
             preview_note: None,
             diagnostics: Vec::new(),
+            diagnostics_scroll: ScrollHandle::new(),
             items: Vec::new(),
             completion: None,
             context_menu: None,
@@ -1443,28 +1447,36 @@ impl TemplatePane {
             .collect();
 
         div()
-            .id("template-diagnostics")
-            .flex()
-            .flex_col()
+            .relative()
             .flex_none()
             .w_full()
             .min_w_0()
             .h(rugpui::scaled(DIAGNOSTICS_HEIGHT, cx))
-            .gap(px(1.))
-            .py(px(4.))
-            .overflow_y_scroll()
-            .bg(theme.surface)
-            .border_t_1()
-            .border_color(theme.border)
             .child(
                 div()
-                    .px(px(8.))
-                    .pb(px(2.))
-                    .text_size(rugpui::scaled(10., cx))
-                    .text_color(theme.text_muted)
-                    .child(ts!("diagnostics.title", count = self.diagnostics.len())),
+                    .id("template-diagnostics")
+                    .track_scroll(&self.diagnostics_scroll)
+                    .flex()
+                    .flex_col()
+                    .size_full()
+                    .gap(px(1.))
+                    .py(px(4.))
+                    .overflow_y_scroll()
+                    .restrict_scroll_to_axis()
+                    .bg(theme.surface)
+                    .border_t_1()
+                    .border_color(theme.border)
+                    .child(
+                        div()
+                            .px(px(8.))
+                            .pb(px(2.))
+                            .text_size(rugpui::scaled(10., cx))
+                            .text_color(theme.text_muted)
+                            .child(ts!("diagnostics.title", count = self.diagnostics.len())),
+                    )
+                    .children(rows),
             )
-            .children(rows)
+            .with_scrollbar("template-diagnostics-scrollbar", &self.diagnostics_scroll)
     }
 
     /// The completion popup, hung off the caret.

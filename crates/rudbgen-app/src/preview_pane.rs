@@ -20,8 +20,9 @@ use gpui::{
     SharedString, Window, div, prelude::*, px,
 };
 use rugpui::{
-    Button, ButtonVariant, DraggedThumb, Scrollbar, ScrollbarAxis, ScrollbarState, Select, Spinner,
-    hide_later, hide_now, scroll_to, scrolled, theme, tooltip_label,
+    Button, ButtonVariant, DraggedThumb, Scrollbar, ScrollbarAxis, ScrollbarExt as _,
+    ScrollbarState, Select, Spinner, hide_later, hide_now, scroll_to, scrolled, theme,
+    tooltip_label,
 };
 use rugpui_editor::EditorView;
 
@@ -41,6 +42,10 @@ const CHOICE_WIDTH: f32 = 200.;
 
 /// Height of the file list a dry run shows above the text.
 const LIST_HEIGHT: f32 = 160.;
+
+/// Tallest the warnings above the text grow before they scroll: a dry run over
+/// many tables can warn once per table, and the text underneath must keep room.
+const DIAGNOSTICS_MAX_HEIGHT: f32 = 120.;
 
 /// What the panel asks the shell for.
 pub enum PreviewEvent {
@@ -99,6 +104,8 @@ pub struct PreviewPane {
     selected: usize,
     /// The engine's unknown-field warnings for the selected file.
     diagnostics: Vec<SharedString>,
+    /// Scroll of those warnings, once there are more than fit.
+    diagnostics_scroll: ScrollHandle,
     /// Why nothing could be rendered, when nothing could.
     error: Option<SharedString>,
     /// Where a dry run's files would go, which its list shows them under; or
@@ -134,6 +141,7 @@ impl PreviewPane {
             files: Vec::new(),
             selected: 0,
             diagnostics: Vec::new(),
+            diagnostics_scroll: ScrollHandle::new(),
             error: None,
             output_dir: None,
             rendering: false,
@@ -658,28 +666,43 @@ impl Render for PreviewPane {
 
         let diagnostics = (!self.diagnostics.is_empty()).then(|| {
             div()
+                .relative()
                 .flex()
                 .flex_col()
-                .gap(px(2.))
+                .flex_none()
                 .w_full()
                 .min_w_0()
-                .p(px(8.))
-                .rounded_md()
-                .bg(theme.surface)
-                .border_1()
-                .border_color(theme.accent)
-                .text_size(rugpui::TextSize::Xs.size(cx))
-                .text_color(theme.text_muted)
                 .child(
                     div()
-                        .text_color(theme.accent)
-                        .child(ts!("generate.diagnostics", count = self.diagnostics.len())),
+                        .id("preview-diagnostics")
+                        .track_scroll(&self.diagnostics_scroll)
+                        .flex()
+                        .flex_col()
+                        .gap(px(2.))
+                        .w_full()
+                        .min_w_0()
+                        .max_h(rugpui::scaled(DIAGNOSTICS_MAX_HEIGHT, cx))
+                        .p(px(8.))
+                        .overflow_y_scroll()
+                        .restrict_scroll_to_axis()
+                        .rounded_md()
+                        .bg(theme.surface)
+                        .border_1()
+                        .border_color(theme.accent)
+                        .text_size(rugpui::TextSize::Xs.size(cx))
+                        .text_color(theme.text_muted)
+                        .child(
+                            div()
+                                .text_color(theme.accent)
+                                .child(ts!("generate.diagnostics", count = self.diagnostics.len())),
+                        )
+                        .children(
+                            self.diagnostics
+                                .iter()
+                                .map(|line| div().child(line.clone())),
+                        ),
                 )
-                .children(
-                    self.diagnostics
-                        .iter()
-                        .map(|line| div().child(line.clone())),
-                )
+                .with_scrollbar("preview-diagnostics-scrollbar", &self.diagnostics_scroll)
         });
 
         let body = match (&self.error, self.files.get(self.selected)) {

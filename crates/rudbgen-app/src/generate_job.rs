@@ -28,7 +28,7 @@ use rudbgen_core::OverwritePolicy;
 use rudbgen_gen::{
     CancelHandle, CancelToken, Decision, FileStatus, Outcome, Overwrite, Plan, Progress, generate,
 };
-use rugpui::{Button, ButtonVariant, editor_theme, modal, theme};
+use rugpui::{Button, ButtonVariant, ScrollbarExt as _, editor_theme, modal, theme};
 
 use crate::i18n::ts;
 
@@ -507,21 +507,27 @@ impl GenerationJob {
                 )
                 .child(
                     div()
-                        .id("generation-log")
-                        .track_scroll(&self.scroll)
-                        .flex()
-                        .flex_col()
-                        .gap(px(2.))
-                        .h(rugpui::scaled(LOG_HEIGHT, cx))
-                        .p(px(8.))
-                        .overflow_y_scroll()
-                        .rounded_md()
-                        .bg(theme.surface)
-                        .border_1()
-                        .border_color(theme.border)
-                        .text_size(rugpui::TextSize::Xs.size(cx))
-                        .text_color(theme.text_muted)
-                        .children(lines.into_iter().map(|line| div().child(line))),
+                        .relative()
+                        .child(
+                            div()
+                                .id("generation-log")
+                                .track_scroll(&self.scroll)
+                                .flex()
+                                .flex_col()
+                                .gap(px(2.))
+                                .h(rugpui::scaled(LOG_HEIGHT, cx))
+                                .p(px(8.))
+                                .overflow_y_scroll()
+                                .restrict_scroll_to_axis()
+                                .rounded_md()
+                                .bg(theme.surface)
+                                .border_1()
+                                .border_color(theme.border)
+                                .text_size(rugpui::TextSize::Xs.size(cx))
+                                .text_color(theme.text_muted)
+                                .children(lines.into_iter().map(|line| div().child(line))),
+                        )
+                        .with_scrollbar("generation-log-scrollbar", &self.scroll),
                 )
                 .child(
                     div().flex().flex_row().justify_end().child(
@@ -749,18 +755,31 @@ impl GenerationJob {
                 )
                 .child(
                     div()
-                        .id("generation-summary-lists")
-                        .track_scroll(&self.scroll)
+                        .relative()
                         .flex()
                         .flex_col()
-                        .gap(px(8.))
                         .min_h_0()
-                        .max_h(rugpui::scaled(240., cx))
-                        .overflow_y_scroll()
-                        .children(section(ts!("summary.written"), written, theme.success))
-                        .children(section(ts!("summary.skipped"), skipped, theme.text_muted))
-                        .children(section(ts!("summary.failed"), failed, theme.danger))
-                        .children(section(ts!("summary.warnings"), warnings, warning)),
+                        .child(
+                            div()
+                                .id("generation-summary-lists")
+                                .track_scroll(&self.scroll)
+                                .flex()
+                                .flex_col()
+                                .gap(px(8.))
+                                .min_h_0()
+                                .max_h(rugpui::scaled(240., cx))
+                                .overflow_y_scroll()
+                                .restrict_scroll_to_axis()
+                                .children(section(ts!("summary.written"), written, theme.success))
+                                .children(section(
+                                    ts!("summary.skipped"),
+                                    skipped,
+                                    theme.text_muted,
+                                ))
+                                .children(section(ts!("summary.failed"), failed, theme.danger))
+                                .children(section(ts!("summary.warnings"), warnings, warning)),
+                        )
+                        .with_scrollbar("generation-summary-scrollbar", &self.scroll),
                 )
                 .child(
                     div()

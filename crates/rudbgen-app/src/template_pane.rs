@@ -298,6 +298,9 @@ struct Completion {
     selected: usize,
     /// Where the caret was, for the popup to hang off.
     anchor: Option<Bounds<Pixels>>,
+    /// The byte offset the word being completed starts at. A caret that
+    /// moves keeps the popup only while its own word still starts here.
+    start: usize,
 }
 
 /// One open template file.
@@ -911,9 +914,25 @@ impl TemplatePane {
 
     /// The caret moved: a popup that was opened somewhere else is no longer
     /// about where the caret is.
+    ///
+    /// Walking inside the word being completed narrows or widens the list, as
+    /// typing would. Anywhere else — another word, another statement, the text
+    /// between statements, a selection — takes it down: reopening it there
+    /// would make the popup chase the caret round the buffer.
     fn moved(&mut self, cx: &mut Context<Self>) {
-        if self.completion.is_some() {
+        let Some(open) = &self.completion else {
+            return;
+        };
+        let editor = self.editor.read(cx);
+        let caret = editor.caret();
+        let on_the_word = !editor.has_selection()
+            && self
+                .caret_request(cx)
+                .is_some_and(|request| caret.checked_sub(request.prefix.len()) == Some(open.start));
+        if on_the_word {
             self.refresh_completion(cx);
+        } else {
+            self.close_completion(cx);
         }
     }
 
@@ -1067,7 +1086,9 @@ impl TemplatePane {
             self.close_completion(cx);
             return;
         }
-        let anchor = self.editor.read(cx).caret_bounds();
+        let editor = self.editor.read(cx);
+        let anchor = editor.caret_bounds();
+        let start = editor.caret().saturating_sub(request.prefix.len());
         let selected = match &self.completion {
             // Keep the highlighted row while the same list is being narrowed,
             // so that typing one more character does not move the choice out
@@ -1084,6 +1105,7 @@ impl TemplatePane {
             matches,
             selected,
             anchor,
+            start,
         });
         self.editor
             .update(cx, |editor, _cx| editor.set_intercept(true));
@@ -1869,6 +1891,71 @@ mod tests {
             (delta - px(300.)).abs() < px(2.),
             "the editor did not track the window: tall {tall:?}, short {short:?}"
         );
+    }
+
+    /// The popup stays with the word it was opened for: walking inside that
+    /// word re-filters it, and putting the caret anywhere else takes it down
+    /// instead of reopening it there.
+    #[gpui::test]
+    fn the_completion_popup_does_not_follow_the_caret_away(cx: &mut TestAppContext) {
+        let (_dir, pane, mut cx) = open_pane("${name}\nclass X {\n}\n", cx);
+        let typed_at = "${name}\nclass X {\n".len();
+        cx.update(|window, cx| {
+            pane.update(cx, |pane, cx| {
+                pane.set_items(palette::items(None, &[]), cx);
+                pane.editor
+                    .update(cx, |editor, cx| editor.move_to(typed_at, cx));
+                pane.insert("${na", window, cx);
+            });
+        });
+        cx.run_until_parked();
+        cx.update(|_, cx| assert!(pane.read(cx).completion_open(), "typing offered nothing"));
+
+        // One step back is still the same word, one letter shorter.
+        cx.simulate_keystrokes("left");
+        cx.run_until_parked();
+        cx.update(|_, cx| {
+            let pane = pane.read(cx);
+            assert!(pane.completion_open(), "walking inside the word closed it");
+            assert!(pane.completion_names().iter().any(|name| name == "name"));
+        });
+
+        // Into another statement, where a fresh popup would have something to
+        // offer: the old one must not reappear there.
+        cx.update(|_, cx| {
+            pane.update(cx, |pane, cx| {
+                pane.editor.update(cx, |editor, cx| editor.move_to(2, cx));
+            });
+        });
+        cx.run_until_parked();
+        cx.update(|_, cx| {
+            assert!(
+                !pane.read(cx).completion_open(),
+                "the popup followed the caret"
+            )
+        });
+
+        // The same past the statement's `}`, at the head of the buffer, and
+        // for a selection over the word itself.
+        let end = typed_at + "${na".len();
+        for selection in [end + 1..end + 1, 0..0, typed_at..end] {
+            cx.update(|_, cx| {
+                pane.update(cx, |pane, cx| {
+                    pane.editor.update(cx, |editor, cx| editor.move_to(end, cx));
+                    pane.trigger_completion(cx);
+                    assert!(pane.completion_open(), "Alt+/ offered nothing");
+                    pane.editor
+                        .update(cx, |editor, cx| editor.select_range(selection.clone(), cx));
+                });
+            });
+            cx.run_until_parked();
+            cx.update(|_, cx| {
+                assert!(
+                    !pane.read(cx).completion_open(),
+                    "the popup survived {selection:?}"
+                )
+            });
+        }
     }
 
     #[gpui::test]

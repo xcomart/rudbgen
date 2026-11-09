@@ -312,6 +312,8 @@ menu:
   # dialog it opens — so no trailing ellipsis, which would read oddly as a
   # heading.
   check_updates: Check for updates
+  shortcuts: "Keyboard shortcuts"
+  user_guide: "User guide"
   quit: Quit
   # Name of the macOS menu bar's second menu, the one holding the commands that
   # act on connections.
@@ -343,6 +345,8 @@ menu:
   mac:
     new_connection: New Connection…
     quit: Quit rudbgen
+    shortcuts: "Keyboard Shortcuts"
+    user_guide: "rudbgen User Guide"
   manage_connections: "Manage connections…"
   add_to_generation: "Add to generation list"
   close_tab: "Close tab"
@@ -1061,3 +1065,16 @@ close_guard:
   item_template: "Unsaved template “%{name}”"
   item_run: "A generation run that is still writing files"
   item_draft: "Unsaved changes in an open dialog"
+
+# The keyboard shortcut sheet the application menu opens: the headings of
+# the groups the menus have no name for, and the rows the menus have no
+# words of their own for.
+shortcuts:
+  group_window: "Window"
+  group_tabs: "Tabs"
+  open_menu: "Open the ☰ menu"
+  context_menu: "Open the context menu of what has the keyboard"
+  default_answer: "In a question: its default answer"
+  dismiss: "Close the topmost dialog or menu"
+  select_tab: "Switch to tab n"
+  focus_tabs: "Put the keyboard on the tab strip"

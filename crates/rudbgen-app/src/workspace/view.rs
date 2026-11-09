@@ -115,6 +115,7 @@ impl Render for Workspace {
         let deleting = self
             .render_delete_profile_prompt(cx)
             .map(|prompt| div().absolute().inset_0().child(prompt));
+        let shortcuts = self.render_shortcuts(cx);
         let tab_menu = self.render_tab_menu(cx);
         let profile_menu = self.render_profile_menu(cx);
         // The dry run tab's Generate follows the run buttons' rule.
@@ -208,6 +209,8 @@ impl Render for Workspace {
             .on_action(cx.listener(Self::open_settings_action))
             .on_action(cx.listener(Self::show_about_action))
             .on_action(cx.listener(Self::check_updates_action))
+            .on_action(cx.listener(Self::show_shortcuts_action))
+            .on_action(cx.listener(Self::open_user_guide_action))
             .on_action(cx.listener(Self::toggle_explorer_action))
             .on_action(cx.listener(Self::toggle_inspector_action))
             .on_action(cx.listener(Self::generate_action))
@@ -237,6 +240,7 @@ impl Render for Workspace {
             .children(unsaved_run)
             .children(password)
             .children(deleting)
+            .children(shortcuts)
             // The right-click menus paint over everything, dialogs included,
             // and dismiss themselves on the next press.
             .children(tab_menu)
@@ -448,6 +452,10 @@ impl Workspace {
             // every other desktop application look for it.
             MenuEntry::new(ts!("menu.check_updates"))
                 .on_activate(|window, cx| window.dispatch_action(Box::new(CheckUpdates), cx)),
+            MenuEntry::new(ts!("menu.shortcuts"))
+                .on_activate(|window, cx| window.dispatch_action(Box::new(ShowShortcuts), cx)),
+            MenuEntry::new(ts!("menu.user_guide"))
+                .on_activate(|window, cx| window.dispatch_action(Box::new(OpenUserGuide), cx)),
             MenuEntry::new(ts!("menu.about"))
                 .on_activate(|window, cx| window.dispatch_action(Box::new(ShowAbout), cx)),
             MenuEntry::separator(),

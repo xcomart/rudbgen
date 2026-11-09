@@ -221,6 +221,8 @@ menu:
   toggle_inspector: Inspecteur
   about: À propos de rudbgen
   check_updates: Rechercher les mises à jour
+  shortcuts: "Raccourcis clavier"
+  user_guide: "Guide de l’utilisateur"
   quit: Quitter
   connection: Connexion
   view: Affichage
@@ -240,6 +242,8 @@ menu:
   mac:
     new_connection: Nouvelle connexion…
     quit: Quitter rudbgen
+    shortcuts: "Raccourcis clavier"
+    user_guide: "Guide de l’utilisateur de rudbgen"
   manage_connections: "Gérer les connexions…"
   add_to_generation: "Ajouter à la liste de génération"
   close_tab: "Fermer l’onglet"
@@ -807,3 +811,13 @@ close_guard:
   item_template: "Modèle non enregistré « %{name} »"
   item_run: "Une génération qui écrit encore des fichiers"
   item_draft: "Modifications non enregistrées dans une boîte de dialogue ouverte"
+
+shortcuts:
+  group_window: "Fenêtre"
+  group_tabs: "Onglets"
+  open_menu: "Ouvrir le menu ☰"
+  context_menu: "Ouvrir le menu contextuel de l’élément qui a le clavier"
+  default_answer: "Dans une question : sa réponse par défaut"
+  dismiss: "Fermer la boîte de dialogue ou le menu au premier plan"
+  select_tab: "Aller à l’onglet n"
+  focus_tabs: "Placer le clavier sur la barre d’onglets"

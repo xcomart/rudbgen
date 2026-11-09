@@ -164,6 +164,29 @@ impl Workspace {
         self.open_import(window, cx);
     }
 
+    /// Handles *Keyboard shortcuts*, from either menu.
+    pub(super) fn show_shortcuts_action(
+        &mut self,
+        _: &ShowShortcuts,
+        window: &mut Window,
+        cx: &mut Context<Self>,
+    ) {
+        if self.shortcut_blocked(cx) {
+            return;
+        }
+        self.show_shortcuts(window, cx);
+    }
+
+    /// Handles *User guide*, from either menu.
+    pub(super) fn open_user_guide_action(
+        &mut self,
+        _: &OpenUserGuide,
+        _window: &mut Window,
+        cx: &mut Context<Self>,
+    ) {
+        self.open_user_guide(cx);
+    }
+
     /// Opens the about box.
     pub(super) fn show_about_action(
         &mut self,
@@ -331,6 +354,10 @@ impl Workspace {
             if !self.job.read(cx).is_busy() {
                 self.job.update(cx, |job, cx| job.close(cx));
             }
+            return;
+        }
+        if self.shortcuts_open {
+            self.close_shortcuts(window, cx);
             return;
         }
         if self.about.read(cx).is_open() {

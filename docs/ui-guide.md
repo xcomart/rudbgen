@@ -535,6 +535,10 @@ On macOS, read <kbd>Cmd</kbd> for <kbd>Ctrl</kbd> — except in
 <kbd>Ctrl</kbd>+<kbd>Space</kbd>, <kbd>Ctrl</kbd>+<kbd>PageDown</kbd>/<kbd>PageUp</kbd>
 and <kbd>Ctrl</kbd>+<kbd>Tab</kbd>, which are <kbd>Ctrl</kbd> on every platform.
 
+The ☰ menu's **Keyboard shortcuts** (in the rudbgen menu on macOS) shows this
+table in the app, with the chords the platform it runs on uses; its
+**User guide** opens this page.
+
 | Shortcut | Action |
 |:---|:---|
 | <kbd>Ctrl</kbd>+<kbd>N</kbd> | New connection (inside the connection dialog: a new profile) |

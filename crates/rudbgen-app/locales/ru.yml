@@ -221,6 +221,8 @@ menu:
   toggle_inspector: Инспектор
   about: О программе rudbgen
   check_updates: Проверить обновления
+  shortcuts: "Сочетания клавиш"
+  user_guide: "Руководство пользователя"
   quit: Выход
   connection: Подключение
   view: Вид
@@ -240,6 +242,8 @@ menu:
   mac:
     new_connection: Новое подключение…
     quit: Завершить rudbgen
+    shortcuts: "Сочетания клавиш"
+    user_guide: "Руководство пользователя rudbgen"
   manage_connections: "Управление подключениями…"
   add_to_generation: "Добавить в список генерации"
   close_tab: "Закрыть вкладку"
@@ -807,3 +811,13 @@ close_guard:
   item_template: "Несохранённый шаблон «%{name}»"
   item_run: "Генерация, которая ещё записывает файлы"
   item_draft: "Несохранённые изменения в открытом диалоге"
+
+shortcuts:
+  group_window: "Окно"
+  group_tabs: "Вкладки"
+  open_menu: "Открыть меню ☰"
+  context_menu: "Открыть контекстное меню элемента с фокусом клавиатуры"
+  default_answer: "В вопросе: ответ по умолчанию"
+  dismiss: "Закрыть верхний диалог или меню"
+  select_tab: "Перейти на вкладку n"
+  focus_tabs: "Перевести фокус клавиатуры на панель вкладок"

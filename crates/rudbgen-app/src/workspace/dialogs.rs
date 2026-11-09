@@ -46,6 +46,7 @@ impl Workspace {
             || self.unsaved_run.is_some()
             || self.deleting_profile.is_some()
             || self.password_prompt.is_some()
+            || self.shortcuts_open
             || self.generate.read(cx).prompt_open()
             || self.about.read(cx).is_open()
             || self.settings.read(cx).is_open()
@@ -89,6 +90,7 @@ impl Workspace {
         self.unsaved_run = None;
         self.deleting_profile = None;
         self.password_prompt = None;
+        self.shortcuts_open = false;
         self.generate
             .update(cx, |pane, cx| pane.withdraw_prompts(cx));
         if self.about.read(cx).is_open() {

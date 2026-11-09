@@ -62,10 +62,10 @@ pub(crate) use bootstrap::editor_theme_for;
 use crate::{
     AddToGeneration, CheckUpdates, CloseTab, DismissDialog, DryRun, EditAbbreviations, FocusTabs,
     Generate, ImportJdbgen, ManageConnections, NewConnection, NewProfile, NewTemplate,
-    NextDiagnostic, NextTab, OpenSettings, OpenTemplate, PrevDiagnostic, PrevTab, Preview, Quit,
-    SaveDialog, SaveTemplate, SelectTab, ShowAbout, ToggleExplorer, ToggleInspector,
-    ToggleLivePreview, TriggerCompletion, app_settings, builtin_templates, connection,
-    generate_pane, i18n, icons, palette, sample_db,
+    NextDiagnostic, NextTab, OpenSettings, OpenTemplate, OpenUserGuide, PrevDiagnostic, PrevTab,
+    Preview, Quit, SaveDialog, SaveTemplate, SelectTab, ShowAbout, ShowShortcuts, ToggleExplorer,
+    ToggleInspector, ToggleLivePreview, TriggerCompletion, app_settings, builtin_templates,
+    connection, generate_pane, i18n, icons, palette, sample_db,
 };
 
 mod actions;
@@ -78,6 +78,7 @@ mod dialogs;
 mod generation;
 mod layout;
 mod profiles;
+mod shortcuts;
 mod templates;
 mod view;
 #[cfg(test)]
@@ -668,6 +669,10 @@ struct Workspace {
     /// closing, *Save and run*, Cancel before deleting a connection. One
     /// handle, because only one of them is ever up.
     prompt_focus: FocusHandle,
+    /// Whether the keyboard shortcut sheet is showing.
+    shortcuts_open: bool,
+    /// Scroll of the shortcut sheet's list.
+    shortcuts_scroll: ScrollHandle,
     /// The work area's tab strip, for the keyboard to reach it by
     /// ([`FocusTabs`]); see [`TabBar::focus_handle`].
     tabs_focus: FocusHandle,
@@ -936,6 +941,8 @@ impl Workspace {
             password_prompt: None,
             connection_notice: None,
             prompt_focus: cx.focus_handle(),
+            shortcuts_open: false,
+            shortcuts_scroll: ScrollHandle::new(),
             tabs_focus: cx.focus_handle(),
             tab_menu: None,
             profile_menu: None,

@@ -515,7 +515,9 @@ impl ImportDialog {
     pub fn new(cx: &mut Context<Self>) -> Self {
         // `Enter` in the password field is *Next*: it is the only thing the
         // step can do, and reaching for the mouse to say so is a step nobody
-        // wants twice after a wrong password.
+        // wants twice after a wrong password. Deferred, because the field is
+        // still leased while its own submit runs, and `unlock` reads the
+        // password back out of it and clears it.
         let this = cx.weak_entity();
         let password = cx.new(|cx| {
             TextInput::new(cx)
@@ -523,7 +525,10 @@ impl ImportDialog {
                 .placeholder(ts!("import.password_placeholder"))
                 .tab_index(FIRST_TAB + 1)
                 .on_submit(move |_, _window, cx| {
-                    this.update(cx, |dialog, cx| dialog.unlock(cx)).ok();
+                    let this = this.clone();
+                    cx.defer(move |cx| {
+                        this.update(cx, |dialog, cx| dialog.unlock(cx)).ok();
+                    });
                 })
         });
         Self {
@@ -2496,6 +2501,43 @@ mod tests {
                 assert_eq!(dialog.selection.drivers.len(), mapped.drivers.len());
             });
         });
+    }
+
+    /// `Enter` in the password field is *Next*, pressed for real: the key goes
+    /// through the field's binding, so its submit fires while the field is
+    /// still being updated — and reading the password back from there was a
+    /// panic that took the whole app down on the first `Enter`.
+    #[gpui::test]
+    fn enter_in_the_password_field_is_next(cx: &mut gpui::TestAppContext) {
+        let dir = TempDir::new().expect("a temporary jdbgen data directory");
+        let path = dir.path().join("config.json");
+        fs::write(&path, CONFIG).unwrap();
+        cx.executor().allow_parking();
+        let (_dialog, window) = wizard(cx, &path);
+        let mut cx = gpui::VisualTestContext::from_window(window.into(), cx);
+        cx.run_until_parked();
+        window
+            .update(&mut cx, |dialog, window, cx| {
+                dialog
+                    .password
+                    .update(cx, |input, cx| input.set_content(MASTER, cx));
+                dialog.password.read(cx).focus_handle(cx).focus(window, cx);
+            })
+            .expect("the window is open");
+
+        cx.simulate_keystrokes("enter");
+        cx.run_until_parked();
+        window
+            .update(&mut cx, |dialog, _window, cx| {
+                assert!(
+                    matches!(dialog.stage, Stage::Review { error: None }),
+                    "Enter did not open the file"
+                );
+                // The same way out as *Next*: the field is emptied, and the
+                // task held the only copy.
+                assert!(dialog.password.read(cx).content().is_empty());
+            })
+            .expect("the window is open");
     }
 
     /// A file that is not a jdbgen configuration says so rather than asking for

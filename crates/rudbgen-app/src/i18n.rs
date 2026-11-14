@@ -128,7 +128,7 @@ mod tests {
 
     /// One key per top-level namespace of `en.yml`, chosen so that no
     /// translation of it legitimately coincides with the English wording.
-    const PROBES: [&str; 22] = [
+    const PROBES: [&str; 23] = [
         "language.name",
         "common.close",
         "menu.new_connection",
@@ -165,6 +165,7 @@ mod tests {
         "abbr.column_replacement",
         "import.master_password",
         "update.ignore",
+        "shortcuts.focus_tabs",
     ];
 
     #[test]

@@ -220,6 +220,8 @@ menu:
   toggle_inspector: インスペクター
   about: rudbgen について
   check_updates: 更新を確認
+  shortcuts: "キーボードショートカット"
+  user_guide: "ユーザーガイド"
   quit: 終了
   connection: 接続
   view: 表示
@@ -239,6 +241,8 @@ menu:
   mac:
     new_connection: 新規接続…
     quit: rudbgen を終了
+    shortcuts: "キーボードショートカット"
+    user_guide: "rudbgen ユーザーガイド"
   manage_connections: "接続の管理…"
   add_to_generation: "生成リストに追加"
   close_tab: "タブを閉じる"
@@ -805,3 +809,13 @@ close_guard:
   item_template: "未保存のテンプレート「%{name}」"
   item_run: "まだファイルを書き込んでいる生成処理"
   item_draft: "開いているダイアログの未保存の変更"
+
+shortcuts:
+  group_window: "ウィンドウ"
+  group_tabs: "タブ"
+  open_menu: "☰ メニューを開く"
+  context_menu: "キーボードフォーカスのある要素のコンテキストメニューを開く"
+  default_answer: "確認ダイアログで: 既定の応答"
+  dismiss: "最前面のダイアログやメニューを閉じる"
+  select_tab: "n 番目のタブに切り替え"
+  focus_tabs: "キーボードフォーカスをタブバーへ移動"

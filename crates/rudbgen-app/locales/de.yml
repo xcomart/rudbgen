@@ -221,6 +221,8 @@ menu:
   toggle_inspector: Inspektor
   about: Über rudbgen
   check_updates: Nach Updates suchen
+  shortcuts: "Tastenkürzel"
+  user_guide: "Benutzerhandbuch"
   quit: Beenden
   connection: Verbindung
   view: Ansicht
@@ -240,6 +242,8 @@ menu:
   mac:
     new_connection: Neue Verbindung…
     quit: rudbgen beenden
+    shortcuts: "Tastenkürzel"
+    user_guide: "rudbgen-Benutzerhandbuch"
   manage_connections: "Verbindungen verwalten…"
   add_to_generation: "Zur Erzeugungsliste hinzufügen"
   close_tab: "Tab schließen"
@@ -807,3 +811,13 @@ close_guard:
   item_template: "Nicht gespeicherte Vorlage „%{name}“"
   item_run: "Ein Erzeugungslauf, der noch Dateien schreibt"
   item_draft: "Nicht gespeicherte Änderungen in einem offenen Dialog"
+
+shortcuts:
+  group_window: "Fenster"
+  group_tabs: "Tabs"
+  open_menu: "Das ☰-Menü öffnen"
+  context_menu: "Das Kontextmenü des Elements mit Tastaturfokus öffnen"
+  default_answer: "In einer Frage: die vorgegebene Antwort"
+  dismiss: "Obersten Dialog oder oberstes Menü schließen"
+  select_tab: "Zu Tab n wechseln"
+  focus_tabs: "Tastaturfokus auf die Tableiste setzen"

@@ -374,3 +374,51 @@ fn f10_opens_the_app_menu(cx: &mut gpui::TestAppContext) {
         })
         .expect("the window is open");
 }
+
+/// The shortcut sheet is written from the binding constants, and every one of
+/// its descriptions is a looked-up sentence rather than a key.
+#[test]
+fn the_shortcut_sheet_names_the_chords_the_bindings_use() {
+    let groups = crate::workspace::shortcuts::shortcut_groups();
+    assert_eq!(groups.len(), 4);
+    let rows: Vec<_> = groups.iter().flat_map(|(_, rows)| rows).collect();
+    assert!(
+        rows.iter().any(|(key, _)| key.as_ref() == GENERATE_HINT),
+        "the generate chord is missing"
+    );
+    assert!(
+        rows.iter().any(|(key, _)| key.as_ref() == COMPLETION_HINT),
+        "the second completion chord is missing"
+    );
+    for (key, action) in rows {
+        assert!(!key.is_empty());
+        assert!(
+            !action.contains('.') || action.contains(' '),
+            "untranslated {action}"
+        );
+    }
+}
+
+/// The sheet is a dialog like the rest: it holds the window's chords back
+/// while it is up, and `Escape` puts it away.
+#[gpui::test]
+fn the_shortcut_sheet_opens_and_escape_closes_it(cx: &mut gpui::TestAppContext) {
+    let window = bound_window(cx);
+    window
+        .update(cx, |workspace, window, cx| {
+            workspace.show_shortcuts_action(&ShowShortcuts, window, cx);
+            assert!(workspace.shortcuts_open);
+            assert!(workspace.dialog_open(cx));
+
+            workspace.open_settings_action(&OpenSettings, window, cx);
+            assert!(
+                !workspace.settings.read(cx).is_open(),
+                "Ctrl+, opened a second dialog over the sheet"
+            );
+
+            workspace.dismiss_dialog_action(&DismissDialog, window, cx);
+            assert!(!workspace.shortcuts_open);
+            assert!(!workspace.dialog_open(cx));
+        })
+        .expect("the window is open");
+}

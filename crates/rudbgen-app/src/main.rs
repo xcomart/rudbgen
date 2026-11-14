@@ -51,6 +51,10 @@ actions!(
         ShowAbout,
         /// Asks GitHub whether there is a newer release.
         CheckUpdates,
+        /// Shows the sheet of keyboard shortcuts.
+        ShowShortcuts,
+        /// Opens the user guide in the browser.
+        OpenUserGuide,
         /// Closes whatever overlay is on top, innermost first.
         DismissDialog,
         /// Shows and hides the explorer sidebar.

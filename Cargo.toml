@@ -47,13 +47,13 @@ members = ["crates/*"]
 # gpui crates below can be overridden by path the same way if they, too, are
 # being edited locally.
 [patch."https://github.com/zed-industries/zed"]
-gpui = { git = "https://github.com/xcomart/rugpui", rev = "3d3fb681d9517eae1cb3c72255b6f1ad3952a61b" }
-gpui_linux = { git = "https://github.com/xcomart/rugpui", rev = "3d3fb681d9517eae1cb3c72255b6f1ad3952a61b" }
-gpui_macos = { git = "https://github.com/xcomart/rugpui", rev = "3d3fb681d9517eae1cb3c72255b6f1ad3952a61b" }
-gpui_windows = { git = "https://github.com/xcomart/rugpui", rev = "3d3fb681d9517eae1cb3c72255b6f1ad3952a61b" }
+gpui = { git = "https://github.com/xcomart/rugpui", rev = "ea4632686fe2c43c3fdd6b9dcbf0ca136ed0d37c" }
+gpui_linux = { git = "https://github.com/xcomart/rugpui", rev = "ea4632686fe2c43c3fdd6b9dcbf0ca136ed0d37c" }
+gpui_macos = { git = "https://github.com/xcomart/rugpui", rev = "ea4632686fe2c43c3fdd6b9dcbf0ca136ed0d37c" }
+gpui_windows = { git = "https://github.com/xcomart/rugpui", rev = "ea4632686fe2c43c3fdd6b9dcbf0ca136ed0d37c" }
 
 [workspace.package]
-version = "0.2.7"
+version = "0.2.8"
 edition = "2024"
 license = "MIT"
 authors = ["rudbgen contributors"]
@@ -61,9 +61,9 @@ repository = "https://github.com/xcomart/rudbgen"
 
 [workspace.dependencies]
 # Shared database infrastructure; keep all three crates on the same revision.
-rudbkit-core = { git = "https://github.com/xcomart/rudbkit", rev = "98570125053e93291b4d46cb6f24320c003f0b18" }
-rudbkit-ssh = { git = "https://github.com/xcomart/rudbkit", rev = "98570125053e93291b4d46cb6f24320c003f0b18" }
-rudbkit-jdbc = { git = "https://github.com/xcomart/rudbkit", rev = "98570125053e93291b4d46cb6f24320c003f0b18" }
+rudbkit-core = { git = "https://github.com/xcomart/rudbkit", rev = "5d7ddeb2ef2e0e2e4c7c48139b83a76881c8573c" }
+rudbkit-ssh = { git = "https://github.com/xcomart/rudbkit", rev = "5d7ddeb2ef2e0e2e4c7c48139b83a76881c8573c" }
+rudbkit-jdbc = { git = "https://github.com/xcomart/rudbkit", rev = "5d7ddeb2ef2e0e2e4c7c48139b83a76881c8573c" }
 
 # --- shared utilities ---
 anyhow = "1"
@@ -201,7 +201,7 @@ async-trait = "0.1"
 
 # --- SSH.  NOTE: default features pull in `aws-lc-rs`, whose build requires
 # NASM on Windows.  The `ring` backend builds everywhere with no extra tooling. ---
-russh = { version = "0.62", default-features = false, features = [
+russh = { version = "0.65", default-features = false, features = [
     "ring",
     "flate2",
     "rsa",
@@ -226,10 +226,10 @@ jni = { version = "0.22", features = ["invocation"] }
 #
 # All four are built on `rugpui` and taken at one revision along with the gpui the
 # patch table at the top of this file points at.
-rugpui = { git = "https://github.com/xcomart/rugpui", rev = "3d3fb681d9517eae1cb3c72255b6f1ad3952a61b" }
-rugpui-grid = { git = "https://github.com/xcomart/rugpui", rev = "3d3fb681d9517eae1cb3c72255b6f1ad3952a61b" }
-rugpui-editor = { git = "https://github.com/xcomart/rugpui", rev = "3d3fb681d9517eae1cb3c72255b6f1ad3952a61b" }
-rugpui-shell = { git = "https://github.com/xcomart/rugpui", rev = "3d3fb681d9517eae1cb3c72255b6f1ad3952a61b" }
+rugpui = { git = "https://github.com/xcomart/rugpui", rev = "ea4632686fe2c43c3fdd6b9dcbf0ca136ed0d37c" }
+rugpui-grid = { git = "https://github.com/xcomart/rugpui", rev = "ea4632686fe2c43c3fdd6b9dcbf0ca136ed0d37c" }
+rugpui-editor = { git = "https://github.com/xcomart/rugpui", rev = "ea4632686fe2c43c3fdd6b9dcbf0ca136ed0d37c" }
+rugpui-shell = { git = "https://github.com/xcomart/rugpui", rev = "ea4632686fe2c43c3fdd6b9dcbf0ca136ed0d37c" }
 
 # --- internal crates ---
 rudbgen-core = { path = "crates/rudbgen-core" }

@@ -28,98 +28,35 @@ file per pair.
 
 ## What works today
 
-Written against jdbgen, because that is what most of this is for:
+- **One window** — a welcome screen lists saved connections; one click connects, with no stack of dialogs.
+- **Connection folders** — saved connections grouped into folders that fold away.
+- **No master password** — passwords and SSH passphrases live in the OS keychain, or are asked on every connect.
+- **Schema explorer** — a checkbox on every table, and the ticked set remembered per connection.
+- **Table inspector** — columns, primary key in key order, foreign keys both ways, and indexes.
+- **Richer template model** — foreign keys, indexes, precision, scale and auto-increment available to templates.
+- **Preview and dry run** — render one pair into a tab, or list every file a run would write.
+- **Cancellable runs** — templates checked before writing, overwrite prompts, atomic writes and a summary.
+- **Any JDBC driver** — downloaded from Maven Central or picked from disk, each in its own class loader.
+- **Custom metadata queries** — jdbgen's four queries, with a Test button that names a missing label.
+- **SSH tunnels** — agent, password or key auth through a bastion, `nologin` jump hosts included.
+- **Template editor** — highlighting, live preview against a table, unknown-field marks and completion.
+- **Portable template sets** — a set and its templates exported to one file and imported elsewhere.
+- **Abbreviation rules** — table and word rules in an editor, matched whatever the case.
+- **jdbgen import** — connections, drivers, template sets and rules read once from jdbgen's `config.json`.
+- **Themes and languages** — UI and editor themes with live preview, and eight interface languages.
 
-- **One window, and nothing to get past.** jdbgen opened a login dialog, then a
-  connection manager, then a generator window, each on top of the last. rudbgen
-  opens on a welcome screen listing your saved connections; one click connects,
-  and the explorer, the work area and the inspector are the same frame from then
-  on. Nothing modal stands between you and the first click.
-  ![The welcome screen](docs/screenshots/welcome.png)
-- **Connection folders.** Group saved connections by folder in the connection
-  dialog. Click a folder heading to collapse or expand it, or focus it with
-  <kbd>Tab</kbd> and press <kbd>Space</kbd> or <kbd>Enter</kbd>. Folded folders
-  stay folded when you reopen the dialog during the same app session.
-- **No master password.** jdbgen encrypted the URL, the user name and the
-  password with a master password you had to type at every start. rudbgen puts
-  the password — and an SSH key passphrase — in the operating system's own
-  keychain, and stores nothing secret on disk. There is nothing to remember and
-  nothing to lose — and where the keychain is not to be used, untick *Remember
-  password* and rudbgen asks for it on every connect.
-- **A schema explorer with a checkbox on every row.** Catalog → schema → table,
-  fetched lazily and opened on connect onto the database and schema the
-  connection landed in, with jdbgen's contains-filter over it and a views toggle. The
-  ticked set survives filtering, collapsing and refreshing, is kept with the
-  connection and ticked again the next time it opens — a table that has gone in
-  the meantime is unticked and named — and a schema's three-state box acts on
-  the rows you can actually see.
-- **A table inspector**: columns, the primary key **in key order**, foreign keys
-  in *both* directions, and indexes. jdbgen had a Table View modal and neither
-  foreign keys nor indexes at all.
-- **Foreign keys and indexes in the model the templates see.** `imports`,
-  `exports`, `indexes` on a table; `precision`, `scale`, `autoIncrement`,
-  `keySeq` and a single-column `fk` on a column. All new, all additions — every
-  field jdbgen had answers exactly as it did, but for `javaType`, which follows a
-  `DECIMAL`'s precision and scale (`Integer`, `Long` or `BigDecimal` where
-  jdbgen said `Integer` for all of them) and calls a `FLOAT` a `Double`.
-- **Preview before you write.** The status bar does the arithmetic — *n* tables ·
-  *m* templates → *n*×*m* files — **Preview** renders one pair into a tab, and
-  **Dry run** renders all of them without writing anything, listing every path,
-  whether it replaces something, and how big it would be.
-- **A cancellable run with a verdict.** Every template is parsed before any file
-  is written, so a syntax error costs nothing and names the template, the half
-  and the line. The run has a progress bar, a log and a Cancel that takes effect
-  at the next file boundary; an existing file asks Overwrite / Skip / Overwrite
-  all / Skip all / Cancel; and it ends in a summary of every file written,
-  skipped and failed, with a button to open the output directory. Files are
-  written atomically — a crash cannot truncate one.
-  ![The overwrite question, mid-run](docs/screenshots/overwrite.png)
-- **Any JDBC driver.** Drivers are downloaded from Maven Central by coordinate
-  or picked from disk, the driver class is detected from the JAR without running
-  a static initializer, and each set of driver JARs gets its own isolated class
-  loader.
-- **jdbgen's four custom queries, with a Test button.** For a driver whose
-  `DatabaseMetaData` is wrong or missing, supply your own SQL for the table list,
-  the column list and the two comment queries. Test runs the statement on a live
-  session and tells you *which required label is missing*, instead of letting you
-  discover it halfway through a run.
-  ![The driver editor's custom queries](docs/screenshots/driver-custom-queries.png)
-- **SSH tunnels** with SSH-agent, password or private-key auth, loopback binds
-  only, and no PTY on the bastion — `nologin` jump hosts work.
-- **Templates are documents, not file paths.** A template opens in a tab of its
-  own: the editor with template-language highlighting layered over the output
-  file's own language, a live preview that follows the *buffer* against a table
-  you pick, gutter marks for parse errors and for **unknown fields** — jdbgen's
-  way of finding a typo like `${nmae}` was to read the generated file — a
-  clickable variable palette of every field the model offers, and completion on
-  <kbd>Ctrl</kbd>+<kbd>Space</kbd> (or <kbd>Alt</kbd>+<kbd>/</kbd> where an input
-  method takes that). `${ENDIF}`, `${Else}` and the rest of the
-  block keywords work in any case, as every other statement name always did —
-  jdbgen took only lower case and silently read `${ELSE}` as a field.
-  ![The template editor with its live preview](docs/screenshots/template-editor.png)
-  ![Completion offering the model's fields, each with what it renders to](docs/screenshots/completion.png)
-- **Template sets travel as one file.** jdbgen's presets named template files
-  by path, which meant nothing on the next computer. *Export set…* writes a set
-  together with its templates' contents — and, if you like, the connection's
-  custom variables — into a single `*.rudbgen-set.json`; *Import set…* puts the
-  templates in a new folder of their own, never over an existing file, saves
-  the set and puts it on the list.
-- **An abbreviation rules editor.** The four-column table jdbgen kept in its
-  configuration window, with a trailing empty row, a table-name picker for
-  whole-name rules, and a refusal to save two rules that would silently become
-  one. Word rules now match **whatever the case**, a deliberate behavioral
-  break from jdbgen — where they only ever matched lower-case segments and so
-  never fired on `TB_USR`.
-  ![The abbreviation rules editor](docs/screenshots/abbreviations.png)
-- **A one-time import from jdbgen.** Point it at a `config.json`, type the
-  master password once, and it reads both of jdbgen's encryption formats, shows
-  what it found with a checkbox each, and writes your connections, drivers,
-  template sets and abbreviation rules — passwords into the OS keychain. Your
-  jdbgen configuration is opened read-only and left exactly as it was.
-  ![The import wizard's checklist](docs/screenshots/import.png)
-- **Themes and languages**: UI and editor theme registries with live preview,
-  import/export and a user theme directory; eight interface languages (en, ko,
-  ja, zh-CN, de, es, fr, ru), switched live.
+<details>
+<summary>More screenshots</summary>
+
+![The welcome screen](docs/screenshots/welcome.png)
+![The overwrite question, mid-run](docs/screenshots/overwrite.png)
+![The driver editor's custom queries](docs/screenshots/driver-custom-queries.png)
+![The template editor with its live preview](docs/screenshots/template-editor.png)
+![Completion offering the model's fields, each with a one-line description](docs/screenshots/completion.png)
+![The abbreviation rules editor](docs/screenshots/abbreviations.png)
+![The import wizard's checklist](docs/screenshots/import.png)
+
+</details>
 
 ## Installing
 
@@ -246,13 +183,6 @@ Git revision in the root Cargo manifest. Cargo fetches it automatically. The
 application keeps its own settings, keychain, Java bridge protocol and dialog
 layout; its SSH crate is a compatibility facade over the shared transport.
 
-
-The design document — the decisions, the crate layout, the JNI bridge, the
-template engine and its compatibility canary, the metadata model, the generation
-job and the milestone plan — lives in
-[docs/architecture.md](docs/architecture.md). Current progress and open items are
-tracked in [docs/status.md](docs/status.md).
-
 Everything rudbgen draws with comes from **rugpui** — the gpui widget kit, the
 virtualized grid, the code editor and **rugpui-shell**, the layer above them,
 extracted so that the three applications that had been carrying byte-identical
@@ -272,6 +202,53 @@ it for the live title-bar switch, three X11 fixes and a macOS 26 blur fix
 upstream has no answer for.
 The root [`Cargo.toml`](Cargo.toml) explains why the patch table here has to
 point at rugpui's copies rather than carry its own.
+
+### Third-party libraries
+
+The heavy lifting is done by these projects:
+
+| Library | Role |
+| --- | --- |
+| [gpui](https://github.com/zed-industries/zed/tree/main/crates/gpui) | GPU-accelerated UI framework, from the Zed editor (a pinned git revision, partly vendored and patched in rugpui) |
+| [jni](https://github.com/jni-rs/jni-rs) | Starts the embedded JVM and calls into the JDBC bridge |
+| [Gson](https://github.com/google/gson) | The bridge's one Java dependency: JSON for metadata and requests |
+| [russh](https://github.com/warp-tech/russh) | Pure-Rust SSH client behind the tunnels, through rudbkit |
+| [tokio](https://github.com/tokio-rs/tokio) | Async runtime for the SSH tunnel |
+| [keyring](https://github.com/open-source-cooperative/keyring-rs) | OS credential store: Windows Credential Manager, macOS Keychain, Secret Service |
+| [RustCrypto](https://github.com/RustCrypto) | `aes`, `aes-gcm`, `cbc`, `pbkdf2` and `sha2`: reading jdbgen's two encryption formats on import |
+| [directories](https://github.com/soc/directories-rs) | Per-platform configuration paths, and where jdbgen keeps its own |
+| [ureq](https://github.com/algesten/ureq) | The one HTTPS client: driver downloads from Maven Central, and the update check |
+
+Supporting crates:
+[serde](https://github.com/serde-rs/serde) /
+[serde_json](https://github.com/serde-rs/json) (connections, settings, template
+sets and the bridge's metadata),
+[uuid](https://github.com/uuid-rs/uuid) (connection and driver identity),
+[anyhow](https://github.com/dtolnay/anyhow) /
+[thiserror](https://github.com/dtolnay/thiserror) (errors),
+[log](https://github.com/rust-lang/log) /
+[env_logger](https://github.com/rust-cli/env_logger) (logging),
+[futures](https://github.com/rust-lang/futures-rs) /
+[async-trait](https://github.com/dtolnay/async-trait) (async glue),
+[parking_lot](https://github.com/Amanieu/parking_lot),
+[chrono](https://github.com/chronotope/chrono) (`${date}` formatting),
+[regex](https://github.com/rust-lang/regex) (the template language's
+`matches` conditions),
+[unicode-width](https://github.com/unicode-rs/unicode-width) (padding by display
+width),
+[base64](https://github.com/marshallpierce/rust-base64) /
+[zeroize](https://github.com/RustCrypto/utils/tree/master/zeroize) (jdbgen's
+encrypted values, and wiping the master password),
+[rust-i18n](https://github.com/longbridge/rust-i18n) /
+[sys-locale](https://github.com/1Password/sys-locale) (localization).
+
+Linux only: [secret-service](https://github.com/hwchen/secret-service-rs)
+(creating a default keyring when there is none). Windows only:
+[windows-rs](https://github.com/microsoft/windows-rs) (the parent console for
+`--version`), [winresource](https://github.com/BenjaminRi/winresource) (icon
+embedding). Tests additionally use [tempfile](https://github.com/Stebalien/tempfile),
+and [H2](https://github.com/h2database/h2database) and
+[JUnit](https://github.com/junit-team/junit5) on the bridge side.
 
 ## AI-assisted development
 

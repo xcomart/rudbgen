@@ -274,8 +274,8 @@ shared halves from rugpui 877d8ac are wired in: the close guard on window close,
 quit and the update's restart; the modal dismiss guard and initial focus; `F10`
 and `Shift+F10` menus; middle-click tab close; toasts; the interface size as
 the UI scale; fitted form labels; and the template pickers starting in
-`<config>/templates`. The screenshots predate this
-round and were not recaptured: doing so needs the GUI on a display.
+`<config>/templates`. The screenshots were recaptured
+afterwards, on 2026-11-13, from v0.2.7.
 
 Decisions taken along the way, written down so they are not mistaken for
 oversights:
@@ -330,13 +330,15 @@ Two things a first tag will want that no milestone owns:
   key the shell's updater reads must agree; the release workflow's installer
   smoke test checks that an install leaves that key, but the round trip — install, then self-update — has only been walked on Linux.
 - The screenshots in `docs/screenshots/` are captures of the whole window
-  *surface*, which under client-side decorations carries a 12 px transparent
-  band for the drop shadow all round. Every one of them is now cropped to the
+  *surface*, which under client-side decorations carries a band for the drop
+  shadow all round (12 px at first; 36 px, grabbed as black, under the headless
+  KWin/Xwayland used for the 2026-11-13 set). Every one of them is now cropped to the
   window's own frame — the fully opaque part of an RGBA capture, which is
   exactly the window — and a new capture has to be cropped the same way, or a
   strip of whatever was behind the window composites into the edge. All twelve
   were re-taken together after M5 — in the **English** interface, where earlier
-  captures were of the Korean one — and every one now carries that crop,
+  captures were of the Korean one — and again on 2026-11-13 from v0.2.7, in
+  the default theme at 1440x900; every one now carries that crop,
   `connection-dialog.png` included, which used to owe it. `import.png` is staged
   from `crates/rudbgen-import/tests/vectors/config.json` (the synthetic fixture)
   rather than from a real jdbgen configuration, so its checklist has something

@@ -221,6 +221,8 @@ menu:
   toggle_inspector: Inspector
   about: Acerca de rudbgen
   check_updates: Buscar actualizaciones
+  shortcuts: "Atajos de teclado"
+  user_guide: "Guía del usuario"
   quit: Salir
   connection: Conexión
   view: Ver
@@ -240,6 +242,8 @@ menu:
   mac:
     new_connection: Nueva conexión…
     quit: Salir de rudbgen
+    shortcuts: "Atajos de teclado"
+    user_guide: "Guía del usuario de rudbgen"
   manage_connections: "Gestionar conexiones…"
   add_to_generation: "Añadir a la lista de generación"
   close_tab: "Cerrar la pestaña"
@@ -807,3 +811,13 @@ close_guard:
   item_template: "Plantilla sin guardar «%{name}»"
   item_run: "Una generación que todavía está escribiendo archivos"
   item_draft: "Cambios sin guardar en un cuadro de diálogo abierto"
+
+shortcuts:
+  group_window: "Ventana"
+  group_tabs: "Pestañas"
+  open_menu: "Abrir el menú ☰"
+  context_menu: "Abrir el menú contextual de lo que tiene el foco del teclado"
+  default_answer: "En una pregunta: su respuesta predeterminada"
+  dismiss: "Cerrar el diálogo o menú superior"
+  select_tab: "Ir a la pestaña n"
+  focus_tabs: "Llevar el teclado a la barra de pestañas"

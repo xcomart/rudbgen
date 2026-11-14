@@ -220,6 +220,8 @@ menu:
   toggle_inspector: 인스펙터
   about: rudbgen 정보
   check_updates: 업데이트 확인
+  shortcuts: "키보드 단축키"
+  user_guide: "사용자 가이드"
   quit: 종료
   connection: 연결
   view: 보기
@@ -239,6 +241,8 @@ menu:
   mac:
     new_connection: 새 연결…
     quit: rudbgen 종료
+    shortcuts: "키보드 단축키"
+    user_guide: "rudbgen 사용자 가이드"
   manage_connections: "연결 관리…"
   add_to_generation: "생성 목록에 추가"
   close_tab: "탭 닫기"
@@ -805,3 +809,13 @@ close_guard:
   item_template: "저장하지 않은 템플릿 “%{name}”"
   item_run: "아직 파일을 쓰고 있는 생성 작업"
   item_draft: "열린 대화상자의 저장하지 않은 변경 사항"
+
+shortcuts:
+  group_window: "창"
+  group_tabs: "탭"
+  open_menu: "☰ 메뉴 열기"
+  context_menu: "키보드 포커스가 있는 항목의 컨텍스트 메뉴 열기"
+  default_answer: "확인 대화상자에서: 기본 응답"
+  dismiss: "맨 위의 대화상자나 메뉴 닫기"
+  select_tab: "n번째 탭으로 전환"
+  focus_tabs: "키보드 포커스를 탭 줄로 이동"

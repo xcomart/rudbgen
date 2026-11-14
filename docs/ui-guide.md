@@ -137,7 +137,7 @@ handed to every connection that uses it.
 Once connected the window is three columns over a status bar:
 
 ```
-┌ [⌂ rudbgen] [☰] [● Sample H2 ▾]                              ─ □ ✕ ┐
+┌ [⌂ rudbgen] [☰] [● Sample H2 Embedded ▾]                     ─ □ ✕ ┐
 ├──────────────┬─────────────────────────────────┬─────────────────┤
 │ EXPLORER     │ WORK AREA (tabs)                │ INSPECTOR       │
 │ 🔍 filter    │ ┌ Generate ┐┌ Preview ┐         │ T_SAMPLE_ALBUM  │
@@ -147,7 +147,7 @@ Once connected the window is three columns over a status bar:
 │   ☑ T_ARTIST │ │  ☑ Mapper XML  ${…}-mapper.xml │ 2 NAME  VARCHAR  │
 │   ☐ T_TRACK  │ │  ☐ PHP CI      …               │ …               │
 │ ▸ INFO_SCHEMA│ │  Output   ~/out/src      [...]  │                 │
-│              │ │  Author   comart                │                 │
+│              │ │  Author   dev                   │                 │
 │              │ │  Variables  package=com.abc.x   │                 │
 │              │ │ [Preview] [Dry run] [Generate] │                 │
 ├──────────────┴─────────────────────────────────┴─────────────────┤
@@ -349,7 +349,7 @@ the right, and the [variable palette](#the-inspector) in place of the inspector.
 - <kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>P</kbd> shows and hides the preview
   half.
 
-![Completion inside a statement](screenshots/completion.png)
+![Completion offering the model's fields at the caret](screenshots/completion.png)
 
 <kbd>Ctrl</kbd>+<kbd>Space</kbd> — and typing `${` — offers what may be written
 where the caret is: the statement names at the start of one, the option names
@@ -534,6 +534,10 @@ Spanish, French and Russian.
 On macOS, read <kbd>Cmd</kbd> for <kbd>Ctrl</kbd> — except in
 <kbd>Ctrl</kbd>+<kbd>Space</kbd>, <kbd>Ctrl</kbd>+<kbd>PageDown</kbd>/<kbd>PageUp</kbd>
 and <kbd>Ctrl</kbd>+<kbd>Tab</kbd>, which are <kbd>Ctrl</kbd> on every platform.
+
+The ☰ menu's **Keyboard shortcuts** (in the rudbgen menu on macOS) shows this
+table in the app, with the chords the platform it runs on uses; its
+**User guide** opens this page.
 
 | Shortcut | Action |
 |:---|:---|

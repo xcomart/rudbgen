@@ -220,6 +220,8 @@ menu:
   toggle_inspector: 检查器
   about: 关于 rudbgen
   check_updates: 检查更新
+  shortcuts: "键盘快捷键"
+  user_guide: "用户指南"
   quit: 退出
   connection: 连接
   view: 视图
@@ -239,6 +241,8 @@ menu:
   mac:
     new_connection: 新建连接…
     quit: 退出 rudbgen
+    shortcuts: "键盘快捷键"
+    user_guide: "rudbgen 用户指南"
   manage_connections: "管理连接…"
   add_to_generation: "添加到生成列表"
   close_tab: "关闭标签页"
@@ -804,3 +808,13 @@ close_guard:
   item_template: "未保存的模板“%{name}”"
   item_run: "仍在写入文件的生成任务"
   item_draft: "已打开对话框中未保存的更改"
+
+shortcuts:
+  group_window: "窗口"
+  group_tabs: "标签页"
+  open_menu: "打开 ☰ 菜单"
+  context_menu: "打开拥有键盘焦点的项目的上下文菜单"
+  default_answer: "在询问对话框中：默认回答"
+  dismiss: "关闭最上层的对话框或菜单"
+  select_tab: "切换到第 n 个标签页"
+  focus_tabs: "将键盘焦点移到标签栏"

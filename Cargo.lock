@@ -2506,7 +2506,7 @@ dependencies = [
 [[package]]
 name = "gpui"
 version = "0.2.2"
-source = "git+https://github.com/xcomart/rugpui?rev=73c32ddabaaf0a907a98ab2db1c7089363661846#73c32ddabaaf0a907a98ab2db1c7089363661846"
+source = "git+https://github.com/xcomart/rugpui?rev=ea4632686fe2c43c3fdd6b9dcbf0ca136ed0d37c#ea4632686fe2c43c3fdd6b9dcbf0ca136ed0d37c"
 dependencies = [
  "accesskit",
  "anyhow",
@@ -2636,7 +2636,7 @@ dependencies = [
 [[package]]
 name = "gpui_linux"
 version = "0.1.0"
-source = "git+https://github.com/xcomart/rugpui?rev=73c32ddabaaf0a907a98ab2db1c7089363661846#73c32ddabaaf0a907a98ab2db1c7089363661846"
+source = "git+https://github.com/xcomart/rugpui?rev=ea4632686fe2c43c3fdd6b9dcbf0ca136ed0d37c#ea4632686fe2c43c3fdd6b9dcbf0ca136ed0d37c"
 dependencies = [
  "accesskit",
  "accesskit_unix",
@@ -2680,7 +2680,7 @@ dependencies = [
 [[package]]
 name = "gpui_macos"
 version = "0.1.0"
-source = "git+https://github.com/xcomart/rugpui?rev=73c32ddabaaf0a907a98ab2db1c7089363661846#73c32ddabaaf0a907a98ab2db1c7089363661846"
+source = "git+https://github.com/xcomart/rugpui?rev=ea4632686fe2c43c3fdd6b9dcbf0ca136ed0d37c#ea4632686fe2c43c3fdd6b9dcbf0ca136ed0d37c"
 dependencies = [
  "accesskit",
  "accesskit_macos",
@@ -2820,7 +2820,7 @@ dependencies = [
 [[package]]
 name = "gpui_windows"
 version = "0.1.0"
-source = "git+https://github.com/xcomart/rugpui?rev=73c32ddabaaf0a907a98ab2db1c7089363661846#73c32ddabaaf0a907a98ab2db1c7089363661846"
+source = "git+https://github.com/xcomart/rugpui?rev=ea4632686fe2c43c3fdd6b9dcbf0ca136ed0d37c#ea4632686fe2c43c3fdd6b9dcbf0ca136ed0d37c"
 dependencies = [
  "accesskit",
  "accesskit_windows",
@@ -5551,7 +5551,7 @@ dependencies = [
 
 [[package]]
 name = "rudbgen-app"
-version = "0.2.7"
+version = "0.2.8"
 dependencies = [
  "anyhow",
  "async-trait",
@@ -5587,7 +5587,7 @@ dependencies = [
 
 [[package]]
 name = "rudbgen-core"
-version = "0.2.7"
+version = "0.2.8"
 dependencies = [
  "anyhow",
  "directories",
@@ -5603,7 +5603,7 @@ dependencies = [
 
 [[package]]
 name = "rudbgen-gen"
-version = "0.2.7"
+version = "0.2.8"
 dependencies = [
  "log",
  "rudbgen-core",
@@ -5615,7 +5615,7 @@ dependencies = [
 
 [[package]]
 name = "rudbgen-import"
-version = "0.2.7"
+version = "0.2.8"
 dependencies = [
  "aes 0.9.2",
  "aes-gcm",
@@ -5636,7 +5636,7 @@ dependencies = [
 
 [[package]]
 name = "rudbgen-jdbc"
-version = "0.2.7"
+version = "0.2.8"
 dependencies = [
  "anyhow",
  "jni",
@@ -5651,7 +5651,7 @@ dependencies = [
 
 [[package]]
 name = "rudbgen-meta"
-version = "0.2.7"
+version = "0.2.8"
 dependencies = [
  "log",
  "rudbgen-core",
@@ -5663,7 +5663,7 @@ dependencies = [
 
 [[package]]
 name = "rudbgen-ssh"
-version = "0.2.7"
+version = "0.2.8"
 dependencies = [
  "async-trait",
  "futures",
@@ -5684,8 +5684,8 @@ dependencies = [
 
 [[package]]
 name = "rudbkit-core"
-version = "0.1.6"
-source = "git+https://github.com/xcomart/rudbkit?rev=1efa30ae86bc3db1e47f958942ea72f5da834a33#1efa30ae86bc3db1e47f958942ea72f5da834a33"
+version = "0.1.7"
+source = "git+https://github.com/xcomart/rudbkit?rev=5d7ddeb2ef2e0e2e4c7c48139b83a76881c8573c#5d7ddeb2ef2e0e2e4c7c48139b83a76881c8573c"
 dependencies = [
  "log",
  "serde",
@@ -5694,8 +5694,8 @@ dependencies = [
 
 [[package]]
 name = "rudbkit-jdbc"
-version = "0.1.6"
-source = "git+https://github.com/xcomart/rudbkit?rev=1efa30ae86bc3db1e47f958942ea72f5da834a33#1efa30ae86bc3db1e47f958942ea72f5da834a33"
+version = "0.1.7"
+source = "git+https://github.com/xcomart/rudbkit?rev=5d7ddeb2ef2e0e2e4c7c48139b83a76881c8573c#5d7ddeb2ef2e0e2e4c7c48139b83a76881c8573c"
 dependencies = [
  "jni",
  "log",
@@ -5705,8 +5705,8 @@ dependencies = [
 
 [[package]]
 name = "rudbkit-ssh"
-version = "0.1.6"
-source = "git+https://github.com/xcomart/rudbkit?rev=1efa30ae86bc3db1e47f958942ea72f5da834a33#1efa30ae86bc3db1e47f958942ea72f5da834a33"
+version = "0.1.7"
+source = "git+https://github.com/xcomart/rudbkit?rev=5d7ddeb2ef2e0e2e4c7c48139b83a76881c8573c#5d7ddeb2ef2e0e2e4c7c48139b83a76881c8573c"
 dependencies = [
  "async-trait",
  "futures",
@@ -5719,8 +5719,8 @@ dependencies = [
 
 [[package]]
 name = "rugpui"
-version = "0.1.16"
-source = "git+https://github.com/xcomart/rugpui?rev=73c32ddabaaf0a907a98ab2db1c7089363661846#73c32ddabaaf0a907a98ab2db1c7089363661846"
+version = "0.1.17"
+source = "git+https://github.com/xcomart/rugpui?rev=ea4632686fe2c43c3fdd6b9dcbf0ca136ed0d37c#ea4632686fe2c43c3fdd6b9dcbf0ca136ed0d37c"
 dependencies = [
  "anyhow",
  "gpui",
@@ -5732,8 +5732,8 @@ dependencies = [
 
 [[package]]
 name = "rugpui-editor"
-version = "0.1.16"
-source = "git+https://github.com/xcomart/rugpui?rev=73c32ddabaaf0a907a98ab2db1c7089363661846#73c32ddabaaf0a907a98ab2db1c7089363661846"
+version = "0.1.17"
+source = "git+https://github.com/xcomart/rugpui?rev=ea4632686fe2c43c3fdd6b9dcbf0ca136ed0d37c#ea4632686fe2c43c3fdd6b9dcbf0ca136ed0d37c"
 dependencies = [
  "gpui",
  "log",
@@ -5745,8 +5745,8 @@ dependencies = [
 
 [[package]]
 name = "rugpui-grid"
-version = "0.1.16"
-source = "git+https://github.com/xcomart/rugpui?rev=73c32ddabaaf0a907a98ab2db1c7089363661846#73c32ddabaaf0a907a98ab2db1c7089363661846"
+version = "0.1.17"
+source = "git+https://github.com/xcomart/rugpui?rev=ea4632686fe2c43c3fdd6b9dcbf0ca136ed0d37c#ea4632686fe2c43c3fdd6b9dcbf0ca136ed0d37c"
 dependencies = [
  "gpui",
  "rugpui",
@@ -5755,8 +5755,8 @@ dependencies = [
 
 [[package]]
 name = "rugpui-shell"
-version = "0.1.16"
-source = "git+https://github.com/xcomart/rugpui?rev=73c32ddabaaf0a907a98ab2db1c7089363661846#73c32ddabaaf0a907a98ab2db1c7089363661846"
+version = "0.1.17"
+source = "git+https://github.com/xcomart/rugpui?rev=ea4632686fe2c43c3fdd6b9dcbf0ca136ed0d37c#ea4632686fe2c43c3fdd6b9dcbf0ca136ed0d37c"
 dependencies = [
  "anyhow",
  "futures",

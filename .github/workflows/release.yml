@@ -766,16 +766,65 @@ jobs:
     runs-on: windows-latest
     timeout-minutes: 20
     steps:
-      - name: Submit the installer to winget-pkgs
+      # wingetcreate does not look for a pull request that is already open for
+      # the version, and opens another one regardless. That happens: a
+      # third-party bot (pl4nty's winget-recipes) picks up GitHub releases and
+      # submitted rudbman 0.3.7 on its own, and a rerun of this job would
+      # meet its own earlier pull request. So skip the version when
+      # winget-pkgs already has it, merged or in an open pull request whose
+      # title names it — wingetcreate's and the bots' titles all carry the
+      # identifier and the version as separate words.
+      - name: Check what winget-pkgs already has
+        id: check
+        shell: bash
+        env:
+          GH_TOKEN: ${{ secrets.WINGET_PAT }}
+        run: |
+          set -euo pipefail
+          if [ -z "${GH_TOKEN}" ]; then
+            echo "::warning title=winget::winget submission skipped (no WINGET_PAT secret)"
+            exit 0
+          fi
+
+          id=Xcomart.Rudbgen
+          export VERSION="${GITHUB_REF_NAME#v}"
+
+          published=$(gh api repos/microsoft/winget-pkgs/contents/manifests/x/Xcomart/Rudbgen --jq '.[].name')
+          if grep -qxF "$VERSION" <<<"$published"; then
+            echo "$id $VERSION is already in winget-pkgs; nothing to submit"
+            exit 0
+          fi
+
+          pending=$(gh pr list --repo microsoft/winget-pkgs --state open --search "$id in:title" --limit 100 \
+            --json title,url --jq '.[] | select(.title | split(" ") | any(. == env.VERSION)) | .url')
+          if [ -n "$pending" ]; then
+            echo "$id $VERSION is already waiting in winget-pkgs; nothing to submit:"
+            echo "$pending"
+            exit 0
+          fi
+
+          echo "submit=true" >> "$GITHUB_OUTPUT"
+
+      # The manifests are written here and submitted two steps further on,
+      # rather than in one `wingetcreate update --submit`, because of
+      # ReleaseNotes. wingetcreate copies the published version's manifests
+      # and clears what belongs to one release (ReleaseNotes, ReleaseNotesUrl,
+      # ReleaseDate) before it fills the new ones in, and it never fills
+      # ReleaseNotes back in. winget-pkgs' validator compares a submission with
+      # the published version and labels the pull request
+      # Manifest-Metadata-Consistency when a field that version had is missing:
+      # rudbman 0.3.7 went in through the bot above with the release body as
+      # its notes, and rudbman's 0.3.8 pull request was held until they were
+      # added by hand. Rudbgen's published manifests carry no notes yet, but
+      # one bot submission would put it in the same place, so every
+      # submission carries the release body as its notes.
+      - name: Write the winget manifests
+        if: steps.check.outputs.submit == 'true'
         shell: pwsh
         env:
           WINGET_PAT: ${{ secrets.WINGET_PAT }}
+          GH_TOKEN: ${{ github.token }}
         run: |
-          if ([string]::IsNullOrWhiteSpace($env:WINGET_PAT)) {
-            Write-Host "winget submission skipped (no WINGET_PAT secret)"
-            exit 0
-          }
-
           $tag = "${{ github.ref_name }}"
           $version = $tag -replace '^v', ''
           $url = "https://github.com/xcomart/rudbgen/releases/download/$tag/rudbgen-$tag-x86_64-pc-windows-msvc-setup.exe"
@@ -798,9 +847,123 @@ jobs:
             throw "wingetcreate.exe $wingetcreateVersion has SHA256 $actual, expected $wingetcreateSha256"
           }
 
-          # --submit opens (or updates) the pull request against
-          # microsoft/winget-pkgs from the token's fork; wingetcreate
-          # downloads the installer from $url itself to compute its SHA256, so
-          # the release assets must already be attached — hence needs: publish.
-          & $exe update Xcomart.Rudbgen --version $version --urls $url --submit --token $env:WINGET_PAT
+          # wingetcreate downloads the installer from $url itself to compute
+          # its SHA256, so the release assets must already be attached — hence
+          # needs: publish. ReleaseNotesUrl and ReleaseDate are given rather
+          # than left to its own lookup of the GitHub release, so neither can
+          # go missing the way ReleaseNotes did; the date is the day the
+          # release was published, in UTC. The token reads the published
+          # manifests from winget-pkgs.
+          $released = gh release view $tag --repo $env:GITHUB_REPOSITORY --json publishedAt --jq '.publishedAt[0:10]'
+          if ($LASTEXITCODE -ne 0) { throw "gh release view exited $LASTEXITCODE" }
+          & $exe update Xcomart.Rudbgen --version $version --urls $url `
+            --release-notes-url "https://github.com/xcomart/rudbgen/releases/tag/$tag" --release-date $released `
+            --out (Join-Path $env:RUNNER_TEMP "winget") --token $env:WINGET_PAT
+          if ($LASTEXITCODE -ne 0) { throw "wingetcreate exited $LASTEXITCODE" }
+
+      - name: Add the release notes to the manifest
+        if: steps.check.outputs.submit == 'true'
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          id=Xcomart.Rudbgen
+          gh release view "$GITHUB_REF_NAME" --repo "$GITHUB_REPOSITORY" --json body --jq .body > "$RUNNER_TEMP/release-body.md"
+
+          # Markdown to the plain text winget shows: no emphasis or code marks,
+          # links as their text, "*" bullets as "-", this repository's pull
+          # request links as #N, headings as plain lines with a blank line
+          # before them, no other blank lines and no "Full Changelog" line.
+          # Whole lines are kept while the notes fit winget's 10,000-character
+          # limit (counted in bytes, never fewer); ReleaseNotesUrl links the
+          # full text.
+          LC_ALL=C awk -v pulls="https://github.com/$GITHUB_REPOSITORY/pull/" '
+            { sub(/\r$/, ""); line = $0 }
+            line ~ /^\*\*Full Changelog\*\*/ { next }
+            {
+              heading = sub(/^#+[ \t]+/, "", line)
+              sub(/^\*[ \t]+/, "- ", line)
+              gsub(/\*\*|`/, "", line)
+              while (match(line, /\[[^]]*\]\([^)]*\)/)) {
+                text = substr(line, RSTART + 1, RLENGTH - 1); sub(/\]\(.*$/, "", text)
+                line = substr(line, 1, RSTART - 1) text substr(line, RSTART + RLENGTH)
+              }
+              while ((i = index(line, pulls)) > 0) {
+                rest = substr(line, i + length(pulls)); match(rest, /^[0-9]+/)
+                line = substr(line, 1, i - 1) "#" substr(rest, 1, RLENGTH) substr(rest, RLENGTH + 1)
+              }
+              sub(/^[ \t]+/, "", line); sub(/[ \t]+$/, "", line)
+              if (line == "") next
+              if (heading && n > 0) out[n++] = ""
+              out[n++] = line
+            }
+            END {
+              for (k = 0; k < n; k++) {
+                size += length(out[k]) + (k > 0)
+                if (size > 10000) break
+                print out[k]
+              }
+            }
+          ' "$RUNNER_TEMP/release-body.md" > "$RUNNER_TEMP/release-notes.txt"
+
+          # Empty notes would go out as ReleaseNotes: "", which the validator
+          # holds just as it holds a missing field.
+          if ! grep -q '[^[:space:]]' "$RUNNER_TEMP/release-notes.txt"; then
+            echo "::error title=winget::the release body of $GITHUB_REF_NAME gave no release notes"
+            exit 1
+          fi
+
+          locale=$(find "$RUNNER_TEMP/winget" -name "$id.locale.en-US.yaml")
+          test -f "$locale"
+
+          # A literal block just before ReleaseNotesUrl, where the schema
+          # lists it, in the file's own line endings. Any ReleaseNotes
+          # wingetcreate wrote is dropped first, since what it carries over
+          # from the published version is an empty string at best. The submit
+          # step reads the manifests back, validates them and writes them out
+          # again.
+          #
+          # The notes file is named through the environment rather than with
+          # -v, because awk expands backslash escapes in a -v value. On the
+          # Windows runner RUNNER_TEMP is D:\a\_temp: the \a became a bell,
+          # getline found no such file, and rudbman 0.3.9 and rulogman 0.6.6
+          # went out with ReleaseNotes: "". The END rule fails the step when
+          # no line of notes went in, rather than submitting an empty block.
+          NOTES="$RUNNER_TEMP/release-notes.txt" awk '
+            BEGIN { notes = ENVIRON["NOTES"] }
+            { eol = sub(/\r$/, "") ? "\r\n" : "\n" }
+            skip && /^([ \t]|$)/ { next }
+            { skip = 0 }
+            /^ReleaseNotes:/ { skip = 1; next }
+            !done && /^(ReleaseNotesUrl|ManifestType):/ {
+              printf "ReleaseNotes: |-%s", eol
+              while ((getline l < notes) > 0) {
+                printf "%s%s", (l == "" ? "" : "  " l), eol
+                if (l != "") lines++
+              }
+              done = 1
+            }
+            { printf "%s%s", $0, eol }
+            END { if (!done || !lines) exit 1 }
+          ' "$locale" > "$locale.new"
+          mv -f "$locale.new" "$locale"
+          sed -n '/^ReleaseNotes:/,/^ReleaseNotesUrl:/p' "$locale"
+
+      # --prtitle is the title `update --submit` gave, which the check above
+      # and the bots' titles agree on. --no-open because there is no browser on
+      # a runner to show the pull request in.
+      - name: Submit the manifests to winget-pkgs
+        if: steps.check.outputs.submit == 'true'
+        shell: pwsh
+        env:
+          WINGET_PAT: ${{ secrets.WINGET_PAT }}
+        run: |
+          $version = "${{ github.ref_name }}" -replace '^v', ''
+          $exe = Join-Path $env:RUNNER_TEMP "wingetcreate.exe"
+          $dir = Get-ChildItem -Path (Join-Path $env:RUNNER_TEMP "winget") -Recurse -Directory |
+            Where-Object { Test-Path (Join-Path $_.FullName "Xcomart.Rudbgen.locale.en-US.yaml") } |
+            Select-Object -First 1
+          if (-not $dir) { throw "no Xcomart.Rudbgen manifests under $env:RUNNER_TEMP\winget" }
+          & $exe submit --prtitle "New version: Xcomart.Rudbgen version $version" --no-open --token $env:WINGET_PAT $dir.FullName
           if ($LASTEXITCODE -ne 0) { throw "wingetcreate exited $LASTEXITCODE" }

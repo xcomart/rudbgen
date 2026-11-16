@@ -100,7 +100,21 @@ that either.
 
 ## macOS
 
-Unpack the `.tar.gz` and drag `rudbgen.app` to Applications.
+On an Apple Silicon Mac, the project's Homebrew tap installs rudbgen with one
+command:
+
+```sh
+brew install --cask xcomart/tap/rudbgen
+```
+
+Homebrew checks the download against the SHA256 recorded in the cask, moves
+`rudbgen.app` into `/Applications` and clears the quarantine flag described
+below, so the first launch opens normally. The release workflow updates the
+cask as soon as a release is published. rudbgen [updates itself](#updating),
+so `brew upgrade` skips it unless run with `--greedy`. There is no Intel build.
+
+To install by hand instead, unpack the `.tar.gz` and drag `rudbgen.app` to
+Applications.
 
 The bundle is ad-hoc signed rather than notarized, so Gatekeeper quarantines it
 on arrival: the first launch needs **right-click → Open** instead of a
@@ -322,13 +336,16 @@ Your templates, connections, drivers and themes are untouched by an update.
 - **Windows, installed** — *Apps & features → rudbgen → Uninstall*, or
   `winget uninstall Xcomart.Rudbgen`.
 - **Windows, portable** — delete the folder.
-- **macOS** — drag `rudbgen.app` to the Trash.
+- **macOS** — drag `rudbgen.app` to the Trash, or
+  `brew uninstall --cask rudbgen` for a copy Homebrew installed. Adding
+  `--zap` also removes the configuration directory, though not the keychain
+  entries.
 - **Linux** — `rm -rf ~/.local/share/rudbgen ~/.local/bin/rudbgen` plus the
   desktop entry at `~/.local/share/applications/com.aihouse.rudbgen.desktop`
   and the icons named `rudbgen.*` under `~/.local/share/icons/hicolor`.
 
-None of these removes your configuration directory or your keychain entries.
-That is deliberate — some upgrade paths uninstall and reinstall — so to remove
+Apart from `--zap`, none of these removes your configuration directory, and
+none removes your keychain entries. That is deliberate — some upgrade paths uninstall and reinstall — so to remove
 every trace, delete the [configuration
 directory](#where-rudbgen-keeps-your-data) yourself and remove the `rudbgen`
 entries from your credential store.

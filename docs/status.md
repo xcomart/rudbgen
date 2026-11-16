@@ -56,7 +56,7 @@ deliberate change, not a port artifact:
   rather than failing the file.
 - **`profile`** — `DriverDef`, `DriverStore`, `ConnectionProfile`,
   `ConnectionStore` and the `Redacted` / `MaskedUrl` / `MaskedProps` `Debug`
-  impls are carried over; `TunnelConfig` and `TunnelAuth` are re-exported from
+  impls are carried over; `TunnelConfig` and `TunnelAuth` come from
   `rudbkit-core` (architecture D14). `ConnectionProfile` gains
   `generation: GenerationProfile` — templates, output directory, author and
   custom variables, per connection (§4.4, §5) — which a `connections.json`

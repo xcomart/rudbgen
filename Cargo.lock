@@ -5605,7 +5605,6 @@ dependencies = [
 name = "rudbgen-gen"
 version = "0.2.8"
 dependencies = [
- "log",
  "rudbgen-core",
  "rudbgen-meta",
  "rudbgen-template",

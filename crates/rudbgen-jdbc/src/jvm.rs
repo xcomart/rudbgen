@@ -8,9 +8,9 @@ use rudbgen_core::AppSettings;
 use std::path::{Path, PathBuf};
 use std::sync::OnceLock;
 /// Java runtime environment override.
-pub const JAVA_HOME_ENV: &str = "RUDBGEN_JAVA_HOME";
+const JAVA_HOME_ENV: &str = "RUDBGEN_JAVA_HOME";
 /// Bridge JAR environment override.
-pub const BRIDGE_JAR_ENV: &str = "RUDBGEN_BRIDGE_JAR";
+const BRIDGE_JAR_ENV: &str = "RUDBGEN_BRIDGE_JAR";
 const IDENTITY: rudbkit_jdbc::RuntimeIdentity = rudbkit_jdbc::RuntimeIdentity {
     name: "rudbgen",
     bridge_class: "comart/rudbgen/bridge/Bridge",

@@ -5567,9 +5567,9 @@ dependencies = [
  "rudbgen-import",
  "rudbgen-jdbc",
  "rudbgen-meta",
- "rudbgen-ssh",
  "rudbgen-template",
  "rudbkit-core",
+ "rudbkit-ssh",
  "rugpui",
  "rugpui-editor",
  "rugpui-grid",
@@ -5659,18 +5659,6 @@ dependencies = [
  "rudbgen-template",
  "serde_json",
  "thiserror 2.0.20",
-]
-
-[[package]]
-name = "rudbgen-ssh"
-version = "0.2.8"
-dependencies = [
- "async-trait",
- "futures",
- "rudbgen-core",
- "rudbkit-ssh",
- "russh",
- "tokio",
 ]
 
 [[package]]

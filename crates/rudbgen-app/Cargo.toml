@@ -64,7 +64,7 @@ rudbgen-import.workspace = true
 # Local port forwarding through a bastion, for the connection dialog's tunnel
 # block. Set up before the session opens and taken down after it closes; see
 # `src/connection.rs`.
-rudbgen-ssh.workspace = true
+rudbkit-ssh.workspace = true
 # The widget kit everything here is drawn with: the palettes and their file
 # store, the text field, the buttons, tabs, menus, selects, trees and modals.
 rugpui.workspace = true
@@ -81,7 +81,7 @@ rugpui-shell.workspace = true
 # background threads, and a panic while a tunnel is being opened must not make
 # every other one unreachable — which is what `std`'s poisoning would do.
 parking_lot.workspace = true
-# `rudbgen-ssh`'s `HostKeyVerifier` is an async trait, and `src/connection.rs`
+# `rudbkit-ssh`'s `HostKeyVerifier` is an async trait, and `src/connection.rs`
 # implements it for the verifier that reads `known_hosts`.
 async-trait.workspace = true
 

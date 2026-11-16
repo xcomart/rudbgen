@@ -27,7 +27,6 @@ Last updated: 2026-10-18 (this document checked against the code: the database p
 | `rugpui`, `rugpui-grid`, `rugpui-editor` | Not in this tree at all (D13). The widget kit, the virtualized grid and the code editor live in [rugpui](https://github.com/xcomart/rugpui), together with the four patched gpui crates they are written against — `RULOGMAN PATCH` markers and all — because rulogman, rudbman and rudbgen were carrying byte-identical copies of every one of them. They come back as dependencies at one pinned revision, and the `[patch."https://github.com/zed-industries/zed"]` table has to name that same revision or two gpui crates end up in one binary. Nothing in rugpui is rudbgen-specific and nothing in it may become so: the theme store is handed a `ThemeDirs` rather than knowing a configuration directory, and the editor composes an `Overlay` the host supplies rather than knowing a template grammar |
 | `Cargo.toml` | The workspace, the `[patch."https://github.com/zed-industries/zed"]` table pinning gpui to one revision of Zed's monorepo — pointed at rugpui's vendored copies (D13) — `[workspace.dependencies]` for what the crates use — `rudbkit-core`, `rudbkit-ssh` and `rudbkit-jdbc` among them, at one pinned revision of [rudbkit](https://github.com/xcomart/rudbkit) — and rudbman's profile tables. Every dependency still carries its "why" comment, rewritten where the reason differs. `rudbgen-app` pulls in `gpui_platform`, so all five patches are live |
 | `crates/rudbgen-core` | rudbman's core with the fields rudbgen does not have removed and the ones it needs added — see the next table |
-| `crates/rudbgen-ssh` | A single `pub use rudbkit_ssh::*` (architecture D14): the tunnel itself — russh, a bastion without a PTY, loopback binds, the trusted-host-key check — lives in `rudbkit-ssh`. The crate keeps the tunnel's integration tests, `tests/tunnel.rs` for the paths that fail before a handshake and `tests/e2e.rs` for the ones that need a bastion, stood up in-process with russh's server side. Tunnels are already wired into the connection dialog rudbgen inherits, so removing them would cost more than keeping them (§2.1) |
 | `crates/rudbgen-app` | The binary, `rudbgen`. rudbman's bootstrap sequence, `actions!`, `bind_shortcuts`, menus and window-chrome helpers; its `app_settings`, `caption`, `icons`, `about_dialog`, `theme_editor`, `settings_dialog`, `update` and `update_dialog` with the names, URLs and settings that changed; `i18n.rs` and eight locale files trimmed to rudbgen's keys; a `Workspace` written from scratch around §4.2's sketch. Most of that shell has since gone to `rugpui-shell` (D13a); see the third table below for what diverged and what is left |
 | `bridge/` | rudbman's JDBC bridge, package `comart.rudbgen.bridge`, artifact `rudbgen-bridge.jar`, **trimmed per D3** — see the table below for what went. 58 JUnit tests against in-memory H2; `cd bridge && ./gradlew build` runs them |
 | `crates/rudbgen-jdbc` | rudbman's JNI crate against that JAR: `jvm`, `session`, `protocol`, `codec`, `error`, `response`, `spec`, minus the data plane (D3). JVM discovery and start-up are `rudbkit-jdbc`'s (architecture D14): `jvm.rs` wraps `rudbkit_jdbc::Jvm` and `JvmConfig` with rudbgen's `RuntimeIdentity`. Env names are `RUDBGEN_JAVA_HOME`, `RUDBGEN_BRIDGE_JAR`, `RUDBGEN_TEST_H2_JAR`. 43 unit tests, 22 H2 integration tests that boot a real JVM, and two opt-in suites (six servers, SQLite) |
@@ -229,13 +228,12 @@ runs the suite green. Run them by hand with:
 cargo test -p rudbgen-core -- --ignored
 ```
 
-Test count as of this entry: **803 passing** plus the 9 ignored ones, across
-`rudbgen-core` (103), `rudbgen-ssh` (25: the hermetic `tunnel.rs` and the
-in-process russh server suite `e2e.rs`), `rudbgen-template` (142),
+Test count as of this entry: **778 passing** plus the ignored ones, across
+`rudbgen-core` (103), `rudbgen-template` (142),
 `rudbgen-meta` (50), `rudbgen-jdbc` (72), `rudbgen-gen` (64),
 `rudbgen-import` (71) and `rudbgen-app` (276), doc tests included. The ones
 that need a JVM run against a real H2 and are counted above; the ones that need
-a real SSH server, a keychain or the network, and two manual frame benchmarks,
+a keychain or the network (the real-bastion SSH test lives in rudbkit now), and two manual frame benchmarks,
 are `#[ignore]`d. The widget layer's own tests — some 350 of them — moved to rugpui
 with the code (D13) and run in that workspace; the 95 that covered the
 application shell followed them there with `rugpui-shell` (D13a), the updater's

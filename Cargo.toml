@@ -101,9 +101,10 @@ parking_lot = "0.12"
 # so a synchronous client is the right shape and an async runtime would be a
 # second one beside the tunnel's. `ureq` is the smallest such client that still
 # speaks TLS. `rustls` is pinned to the `ring` provider for the same reason
-# `russh` is: `aws-lc-rs` needs NASM to build on Windows. `gzip` is kept because
-# the shell's own `ureq` resolves to the union of the features named across the
-# graph, and the GitHub API answers with compressed JSON.
+# rudbkit pins `russh` to it: `aws-lc-rs` needs NASM to build on Windows.
+# `gzip` is kept because the shell's own `ureq` resolves to the union of the
+# features named across the graph, and the GitHub API answers with compressed
+# JSON.
 ureq = { version = "3", default-features = false, features = [
     "rustls",
     "_ring",
@@ -184,28 +185,9 @@ gpui_platform = { git = "https://github.com/zed-industries/zed", rev = "56934ec0
     "x11",
 ] }
 
-# --- async runtime (SSH tunnel only) ---
-# The tunnel is the only thing here that speaks a network protocol of its own.
-# `net` and `io-util` carry the forwarded sockets, `sync` the shutdown signal;
-# there is no `fs`, because nothing this transport does touches a file.
-tokio = { version = "1", features = [
-    "rt-multi-thread",
-    "macros",
-    "net",
-    "io-util",
-    "sync",
-    "time",
-] }
+# --- async plumbing: background channels and the tunnel's host-key verifier ---
 futures = "0.3"
 async-trait = "0.1"
-
-# --- SSH.  NOTE: default features pull in `aws-lc-rs`, whose build requires
-# NASM on Windows.  The `ring` backend builds everywhere with no extra tooling. ---
-russh = { version = "0.65", default-features = false, features = [
-    "ring",
-    "flate2",
-    "rsa",
-] }
 
 # --- JNI: the JDBC bridge.  `invocation` is what lets the process create its
 # own JVM rather than be loaded into one. ---
@@ -233,7 +215,6 @@ rugpui-shell = { git = "https://github.com/xcomart/rugpui", rev = "ea4632686fe2c
 
 # --- internal crates ---
 rudbgen-core = { path = "crates/rudbgen-core" }
-rudbgen-ssh = { path = "crates/rudbgen-ssh" }
 rudbgen-jdbc = { path = "crates/rudbgen-jdbc" }
 rudbgen-meta = { path = "crates/rudbgen-meta" }
 rudbgen-template = { path = "crates/rudbgen-template" }

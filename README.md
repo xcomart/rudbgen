@@ -3,6 +3,7 @@
 [![CI](https://github.com/xcomart/rudbgen/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/xcomart/rudbgen/actions/workflows/ci.yml)
 [![License](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 ![Platforms](https://img.shields.io/badge/platform-Windows%20%7C%20macOS%20%7C%20Linux-informational)
+[![Website](https://img.shields.io/badge/website-xcomart.github.io%2Frudbgen-7fc3f8)](https://xcomart.github.io/rudbgen/)
 
 A multi-platform source-code generator written in Rust, built on
 [gpui](https://gpui.rs) — the GPU-accelerated UI framework behind the Zed editor

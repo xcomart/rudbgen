@@ -274,8 +274,8 @@ const ARP_KEY: &str = concat!(
 pub(crate) const IDENTITY: AppIdentity = AppIdentity {
     name: APP_NAME,
     version: env!("CARGO_PKG_VERSION"),
-    repository_url: "https://github.com/xcomart/rudbgen",
-    repository_label: "github.com/xcomart/rudbgen",
+    repository_url: "https://xcomart.github.io/rudbgen/",
+    repository_label: "xcomart.github.io/rudbgen",
     latest_release_api: "https://api.github.com/repos/xcomart/rudbgen/releases/latest",
     releases_page: "https://github.com/xcomart/rudbgen/releases",
     fallback_archive: "rudbgen-update",

@@ -47,8 +47,9 @@ use gpui::{
 };
 use rudbgen_core::{
     ConnectionProfile, ConnectionStore, DriverDef, DriverStore, KeepAlive, SecretSlot, SecretStore,
-    TunnelAuth, TunnelConfig,
 };
+use rudbkit_core::url::{CATALOG_PLACEHOLDERS, placeholders_of, substitute};
+use rudbkit_core::{TunnelAuth, TunnelConfig};
 use rugpui::{
     Button, ButtonVariant, Checkbox, Collapsible, DraggedThumb, Scrollbar, ScrollbarAxis,
     ScrollbarState, Segmented, Select, TextInput, Theme, form_row, hide_later, hide_now, modal,
@@ -58,9 +59,7 @@ use uuid::Uuid;
 
 use crate::app_settings;
 use crate::connection::SessionHandle;
-use crate::connection::{
-    self, CATALOG_PLACEHOLDERS, ConnectError, Credentials, placeholders_of, substitute,
-};
+use crate::connection::{self, ConnectError, Credentials};
 use crate::driver_manager::{DriverManager, DriverManagerEvent, TestTarget};
 use crate::generate_pane::read_modify_write;
 use crate::i18n::ts;

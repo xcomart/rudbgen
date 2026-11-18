@@ -22,9 +22,3 @@ parking_lot.workspace = true
 serde.workspace = true
 serde_json.workspace = true
 thiserror.workspace = true
-
-[dev-dependencies]
-# The container tests write nothing and the extraction tests are gone with the
-# job layer, so the only dev dependency left is the one the H2 suite uses to
-# read a raw response envelope that has no typed accessor.
-serde_json.workspace = true

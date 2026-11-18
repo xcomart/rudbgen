@@ -26,7 +26,6 @@ rudbgen-meta.workspace = true
 # its own (see its manifest), so its consumers name the path.
 rudbgen-template = { path = "../rudbgen-template" }
 
-log.workspace = true
 thiserror.workspace = true
 
 [dev-dependencies]

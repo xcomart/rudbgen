@@ -30,6 +30,7 @@ use std::fs;
 use std::path::{Path, PathBuf};
 
 use anyhow::{Context, Result};
+use rudbkit_core::TunnelConfig;
 use serde::de::Error as _;
 use serde::{Deserialize, Deserializer, Serialize};
 use uuid::Uuid;
@@ -243,8 +244,6 @@ impl Default for KeepAlive {
         }
     }
 }
-
-pub use rudbkit_core::{TunnelAuth, TunnelConfig};
 
 /// One template in a generation run: the file, and what it writes to.
 ///
@@ -1505,6 +1504,7 @@ fn read_optional(path: &Path) -> Result<Option<Vec<u8>>> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use rudbkit_core::TunnelAuth;
 
     fn sample(name: &str) -> ConnectionProfile {
         ConnectionProfile::new(

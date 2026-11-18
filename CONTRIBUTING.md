@@ -65,7 +65,6 @@ SDK shader compiler `fxc.exe`; `GPUI_FXC_PATH` can select it explicitly.
 | `crates/rudbgen-gen` | Generation jobs, output paths, overwrite handling and cancellation |
 | `crates/rudbgen-import` | Importing jdbgen configuration and encrypted data |
 | `crates/rudbgen-jdbc` and `bridge` | Rust/Java protocol, JDBC sessions and metadata reads |
-| `crates/rudbgen-ssh` | Compatibility facade over shared SSH transport |
 | `templates` and `crates/rudbgen-app/locales` | Shipped templates and interface translations |
 
 Shared widgets, editor and shell belong in

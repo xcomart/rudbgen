@@ -1,0 +1,167 @@
+<!doctype html>
+<html lang="en" data-repo="xcomart/rudbgen">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>rudbgen — source code from database metadata</title>
+  <meta name="description" content="A multi-platform source-code generator written in Rust on gpui. Reads the metadata of any database with a JDBC driver and renders it through templates, one file per table and template.">
+  <meta name="theme-color" content="#0b0e13">
+  <link rel="icon" href="icon.svg" type="image/svg+xml">
+  <meta property="og:type" content="website">
+  <meta property="og:title" content="rudbgen — source code from database metadata">
+  <meta property="og:description" content="Tick tables, tick templates, get one file per pair. jdbgen-compatible templates for any JDBC database. Windows, macOS and Linux.">
+  <meta property="og:url" content="https://xcomart.github.io/rudbgen/">
+  <meta property="og:image" content="https://xcomart.github.io/rudbgen/screenshots/generate.png">
+  <meta name="twitter:card" content="summary_large_image">
+  <link rel="stylesheet" href="style.css">
+  <style>:root { --a1: #7fc3f8; --a2: #b48ef0; --a1-ink: #1f5f9e; --a2-ink: #6d3fc0; }</style>
+</head>
+<body>
+  <header class="nav">
+    <div class="wrap">
+      <a class="brand" href="./"><img src="icon.svg" alt="" width="28" height="28">rudbgen</a>
+      <nav class="links" aria-label="Main">
+        <a class="opt" href="#features">Features</a>
+        <a href="#install">Install</a>
+        <a href="https://github.com/xcomart/rudbgen/blob/main/docs/template-reference.md">Templates</a>
+        <a href="https://github.com/xcomart/rudbgen" aria-label="rudbgen on GitHub"><svg viewBox="0 0 16 16" aria-hidden="true"><path d="M8 0a8 8 0 0 0-2.53 15.59c.4.07.55-.17.55-.38v-1.33c-2.23.48-2.7-1.07-2.7-1.07-.36-.92-.89-1.17-.89-1.17-.73-.5.06-.49.06-.49.8.06 1.23.83 1.23.83.71 1.23 1.87.87 2.33.67.07-.52.28-.87.5-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82a7.6 7.6 0 0 1 4 0c1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48v2.2c0 .21.15.46.55.38A8 8 0 0 0 8 0Z"/></svg></a>
+      </nav>
+    </div>
+  </header>
+
+  <main>
+    <div class="hero">
+      <div class="wrap">
+        <span class="pill"><i></i>Pre-release · Written in Rust</span>
+        <h1>Tick tables. Tick templates.<br> <span class="grad">Get code.</span></h1>
+        <p class="lead">A source-code generator that reads the metadata of any database with a JDBC driver and renders it through templates — one file per table and template.</p>
+        <div class="cta">
+          <a class="btn primary" href="https://github.com/xcomart/rudbgen/releases/latest">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3v12M7 10l5 5 5-5M5 21h14"/></svg>
+            Download <span class="ver" data-version hidden></span>
+          </a>
+          <a class="btn" href="https://github.com/xcomart/rudbgen">
+            <svg class="gh" viewBox="0 0 16 16" aria-hidden="true"><path d="M8 0a8 8 0 0 0-2.53 15.59c.4.07.55-.17.55-.38v-1.33c-2.23.48-2.7-1.07-2.7-1.07-.36-.92-.89-1.17-.89-1.17-.73-.5.06-.49.06-.49.8.06 1.23.83 1.23.83.71 1.23 1.87.87 2.33.67.07-.52.28-.87.5-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82a7.6 7.6 0 0 1 4 0c1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48v2.2c0 .21.15.46.55.38A8 8 0 0 0 8 0Z"/></svg>
+            View on GitHub
+          </a>
+        </div>
+        <p class="meta">Free and open source (MIT) · Windows, macOS and Linux</p>
+        <img class="shot" src="screenshots/generate.png" width="1440" height="900" fetchpriority="high"
+          alt="The Generate tab with ticked tables in the explorer, a template set and the run options">
+      </div>
+    </div>
+
+    <section id="features">
+      <div class="wrap">
+        <div class="head">
+          <span class="kicker">Features</span>
+          <h2>Your schema in, your boilerplate out.</h2>
+          <p>Models, mappers, DAOs — whatever your templates describe, for as many tables as you tick.</p>
+        </div>
+        <div class="features">
+          <article class="card">
+            <div class="ic"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="3" width="18" height="18" rx="3"/><path d="M8 12l3 3 5-6"/></svg></div>
+            <h3>Pick what to generate</h3>
+            <p>A checkbox on every table, remembered per connection, and an inspector for keys, foreign keys and indexes.</p>
+          </article>
+          <article class="card">
+            <div class="ic"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M14 3H6a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9z"/><path d="M14 3v6h6M10 13l-2 2 2 2M14 13l2 2-2 2"/></svg></div>
+            <h3>jdbgen templates, unchanged</h3>
+            <p>The same placeholders, conditions, loops and decorators as jdbgen, so its templates render here as they are.</p>
+          </article>
+          <article class="card">
+            <div class="ic"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 20h9M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4z"/></svg></div>
+            <h3>Template editor</h3>
+            <p>Highlighting, completion of the model's fields and a live preview against a real table as you type.</p>
+          </article>
+          <article class="card">
+            <div class="ic"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7S2 12 2 12z"/><circle cx="12" cy="12" r="3"/></svg></div>
+            <h3>Preview and dry run</h3>
+            <p>Render one pair into a tab, or list every file a run would write. Runs are cancellable and writes atomic.</p>
+          </article>
+          <article class="card">
+            <div class="ic"><svg viewBox="0 0 24 24" aria-hidden="true"><ellipse cx="12" cy="5" rx="8" ry="3"/><path d="M4 5v14c0 1.66 3.58 3 8 3s8-1.34 8-3V5M4 12c0 1.66 3.58 3 8 3s8-1.34 8-3"/></svg></div>
+            <h3>Any JDBC driver</h3>
+            <p>From Maven Central or disk, each in its own class loader, with custom metadata queries when a driver gets it wrong.</p>
+          </article>
+          <article class="card">
+            <div class="ic"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="4" y="11" width="16" height="10" rx="2"/><path d="M8 11V7a4 4 0 0 1 8 0v4"/></svg></div>
+            <h3>Tunnels, no master password</h3>
+            <p>SSH through a bastion with agent, password or key. Secrets live in the OS keychain, or are asked on connect.</p>
+          </article>
+        </div>
+      </div>
+    </section>
+
+    <section aria-label="Screenshots">
+      <div class="wrap gallery">
+        <figure>
+          <a href="screenshots/template-editor.png"><img src="screenshots/template-editor.png" width="1440" height="900" loading="lazy" alt="The template editor with its live preview"></a>
+          <figcaption>Edit templates with a live preview</figcaption>
+        </figure>
+        <figure>
+          <a href="screenshots/completion.png"><img src="screenshots/completion.png" width="1440" height="900" loading="lazy" alt="Completion offering the model's fields, each with a one-line description"></a>
+          <figcaption>Completion knows every field of the model</figcaption>
+        </figure>
+        <figure>
+          <a href="screenshots/summary.png"><img src="screenshots/summary.png" width="1440" height="900" loading="lazy" alt="The result summary of a generation run"></a>
+          <figcaption>A summary of every file a run wrote</figcaption>
+        </figure>
+      </div>
+    </section>
+
+    <section id="install">
+      <div class="wrap install">
+        <div class="head">
+          <span class="kicker">Install</span>
+          <h2>Up and running in a minute.</h2>
+          <p>Every download carries its own Java runtime and a sample H2 database, so there is something to connect to right away.</p>
+          <div class="more">
+            <a href="https://github.com/xcomart/rudbgen/releases">All releases →</a>
+            <a href="https://github.com/xcomart/rudbgen/blob/main/docs/ui-guide.md">User guide →</a>
+            <a href="https://github.com/xcomart/rudbgen/blob/main/docs/template-reference.md">Template reference →</a>
+          </div>
+        </div>
+        <div>
+          <div class="tabs" role="tablist" aria-label="Platform">
+            <button role="tab" id="tab-windows" aria-controls="panel-windows" aria-selected="true">Windows</button>
+            <button role="tab" id="tab-macos" aria-controls="panel-macos" aria-selected="false" tabindex="-1">macOS</button>
+            <button role="tab" id="tab-linux" aria-controls="panel-linux" aria-selected="false" tabindex="-1">Linux</button>
+          </div>
+          <div class="panel" id="panel-windows" role="tabpanel" aria-labelledby="tab-windows">
+            <div class="download">
+              <p><strong>Installer or portable zip</strong>The <code>-setup.exe</code> installs for the current user, with no administrator rights.</p>
+              <a class="btn primary" href="https://github.com/xcomart/rudbgen/releases/latest">Latest release</a>
+            </div>
+            <p class="note">Windows 10 and 11. If SmartScreen objects, choose <em>More info → Run anyway</em>.</p>
+          </div>
+          <div class="panel" id="panel-macos" role="tabpanel" aria-labelledby="tab-macos" hidden>
+            <div class="term"><pre><span class="p">$ </span><span class="c">brew install --cask xcomart/tap/rudbgen</span></pre><button class="copy" type="button">Copy</button></div>
+            <p class="note">Apple Silicon. The cask clears the quarantine flag, so the first launch just opens.</p>
+          </div>
+          <div class="panel" id="panel-linux" role="tabpanel" aria-labelledby="tab-linux" hidden>
+            <div class="term"><pre><span class="cm"># the x86_64 linux-gnu archive from the latest release</span>
+<span class="p">$ </span><span class="c">tar xzf rudbgen-v*-x86_64-unknown-linux-gnu.tar.gz</span>
+<span class="p">$ </span><span class="c">cd rudbgen-v*/ &amp;&amp; ./install.sh</span></pre><button class="copy" type="button">Copy</button></div>
+            <p class="note">Installs under <code>~/.local</code> with no root. Needs glibc 2.35 or newer — Ubuntu 22.04, Debian 12 and later.</p>
+          </div>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <footer>
+    <div class="wrap">
+      <span>rudbgen · MIT License</span>
+      <nav aria-label="Related projects">
+        <a href="https://xcomart.github.io/rulogman/">rulogman</a>
+        <a href="https://xcomart.github.io/rudbman/">rudbman</a>
+        <a href="https://xcomart.github.io/rudbgen/" aria-current="page">rudbgen</a>
+        <a href="https://github.com/xcomart/rudbgen/issues">Issues</a>
+      </nav>
+    </div>
+  </footer>
+
+  <script src="main.js" defer></script>
+</body>
+</html>

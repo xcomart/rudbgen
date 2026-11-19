@@ -62,7 +62,8 @@ file per pair.
 ## Installing
 
 Download the build for your platform from
-[Releases](https://github.com/xcomart/rudbgen/releases). **No JDK needed** —
+[Releases](https://github.com/xcomart/rudbgen/releases): Windows, macOS and
+Linux, each for x86-64 (`x86_64-…`) and ARM64 (`aarch64-…`). **No JDK needed** —
 every download carries a Java runtime built with `jlink`, and rudbgen uses the
 one next to its executable.
 
@@ -78,8 +79,8 @@ one next to its executable.
 
   Either way the executable is self-signed at best, so SmartScreen may say
   "Windows protected your PC"; choose **More info → Run anyway**.
-- **macOS** — on an Apple Silicon Mac, the project's Homebrew tap installs it
-  with one command:
+- **macOS** — on a Mac, Apple Silicon or Intel, the project's Homebrew tap
+  installs it with one command:
 
   ```sh
   brew install --cask xcomart/tap/rudbgen
@@ -132,6 +133,16 @@ one next to its executable.
   MX Linux 23 among them. The script checks for it and for the system
   libraries rudbgen needs — libxcb, xkbcommon with its X11 half and an EGL or
   Vulkan loader — and prints the command that installs any that are missing.
+
+  Each release also carries an AppImage,
+  `rudbgen-v<version>-<arch>-unknown-linux-gnu.AppImage`: the same program in
+  one file that runs where it is, with nothing to install. Make it
+  executable and start it. It needs the same glibc and system libraries as
+  the archive, plus FUSE to mount itself — the `fuse3` package, which desktop
+  installs of those distributions include; without FUSE, start it with
+  `--appimage-extract-and-run`. It adds no launcher to the application
+  menu; a tool such as Gear Lever or AppImageLauncher does that. When rudbgen updates itself it replaces the AppImage
+  file, so keep the file somewhere you can write to.
 
 Each archive also carries a sample H2 database under `sample/`, so there is
 something to connect to before there is anything to connect to.

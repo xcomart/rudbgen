@@ -93,6 +93,10 @@ Two downloads, the same program inside.
 - **`….zip`** — the same tree, portable. Unzip it wherever you like and run
   `rudbgen.exe` from inside the folder. Keep the folder together.
 
+Both come as `x86_64-pc-windows-msvc` for x64 PCs and `aarch64-pc-windows-msvc`
+for ARM64 ones; the x64 build runs on ARM64 too, emulated. winget picks the
+native one.
+
 Either way the executable is self-signed at best, so SmartScreen may say
 "Windows protected your PC"; choose **More info → Run anyway**. A signature from
 an untrusted root is a tamper seal, not a reputation — winget does not change
@@ -100,8 +104,8 @@ that either.
 
 ## macOS
 
-On an Apple Silicon Mac, the project's Homebrew tap installs rudbgen with one
-command:
+On a Mac, Apple Silicon or Intel, the project's Homebrew tap installs rudbgen
+with one command:
 
 ```sh
 brew install --cask xcomart/tap/rudbgen
@@ -111,7 +115,8 @@ Homebrew checks the download against the SHA256 recorded in the cask, moves
 `rudbgen.app` into `/Applications` and clears the quarantine flag described
 below, so the first launch opens normally. The release workflow updates the
 cask as soon as a release is published. rudbgen [updates itself](#updating),
-so `brew upgrade` skips it unless run with `--greedy`. There is no Intel build.
+so `brew upgrade` skips it unless run with `--greedy`. The cask picks the
+`aarch64-apple-darwin` or the `x86_64-apple-darwin` build to match the Mac.
 
 To install by hand instead, unpack the `.tar.gz` and drag `rudbgen.app` to
 Applications.
@@ -147,7 +152,8 @@ signature it may or may not ask.
 
 ## Linux
 
-Unpack the `.tar.gz` and run `./install.sh`. It needs no root:
+Unpack the `.tar.gz` and run `./install.sh`. It needs no root. Take the
+`x86_64` or the `aarch64` archive, whichever `uname -m` names:
 
 ```sh
 tar xzf rudbgen-vX.Y.Z-x86_64-unknown-linux-gnu.tar.gz
@@ -170,6 +176,23 @@ symlinks when it looks for itself, so it still finds `lib/` and `runtime/` in
 
 Running rudbgen from an unpacked archive without installing works too — the tree
 is self-contained.
+
+### AppImage
+
+Each release also carries an AppImage,
+`rudbgen-vX.Y.Z-<arch>-unknown-linux-gnu.AppImage`: the same tree in one file
+that runs where it is, with nothing to install:
+
+```sh
+chmod +x rudbgen-vX.Y.Z-x86_64-unknown-linux-gnu.AppImage
+./rudbgen-vX.Y.Z-x86_64-unknown-linux-gnu.AppImage
+```
+
+It needs the same glibc and system libraries as the archive, plus FUSE to
+mount itself: the `fuse3` package, which desktop installs of those
+distributions include. Without FUSE, start it with
+`--appimage-extract-and-run`. The image adds no launcher to the application
+menu; a tool such as Gear Lever or AppImageLauncher does that.
 
 ### Runtime dependencies
 
@@ -311,7 +334,9 @@ verifies it against the checksum the release API reported, unpacks it beside the
 installed copy and moves the new tree into the old one's place — the executable,
 `lib/` and `runtime/` together, because a new binary beside an old bridge JAR is
 a mismatch that only shows up at the first connection. rudbgen then restarts
-into the build it just wrote.
+into the build it just wrote. A copy started from an AppImage downloads the
+release's AppImage instead and renames it over the image file, so keep that
+file somewhere you can write to.
 
 Two things it deliberately does not do: it never asks for administrator rights,
 and it never touches your configuration directory. A copy you cannot overwrite —

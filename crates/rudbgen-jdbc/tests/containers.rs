@@ -586,6 +586,42 @@ macro_rules! server {
     };
 }
 
+/// One test per product for a suite that runs against each of them, named
+/// `<name>::<product>`, so that a filter on the product's name still selects
+/// every test of its server, the way CI runs Db2's on their own.
+///
+/// The list here is the one list of products a shared suite runs on: a
+/// product added to [`Product`] is added here, and every shared suite then
+/// runs against it.
+macro_rules! on_every_product {
+    ($name:ident => $suite:ident) => {
+        on_products!($name => $suite:
+            postgres Postgres,
+            mysql MySql,
+            mariadb MariaDb,
+            mssql MsSql,
+            oracle Oracle,
+            db2 Db2,
+        );
+    };
+}
+
+/// [`on_every_product`] for a suite only some products run: the ones listed.
+macro_rules! on_products {
+    ($name:ident => $suite:ident: $($test:ident $product:ident),+ $(,)?) => {
+        mod $name {
+            use super::*;
+            $(
+                #[test]
+                fn $test() {
+                    let server = server!(Product::$product);
+                    $suite(&server);
+                }
+            )+
+        }
+    };
+}
+
 // --- the fixture -----------------------------------------------------------
 
 /// A parent, a child that references it, and a unique index — spelled in the
@@ -731,41 +767,7 @@ fn metadata_round_trip(server: &Server) {
 
 // --- one test per product --------------------------------------------------
 
-#[test]
-fn postgres_answers_every_metadata_kind_the_model_needs() {
-    let server = server!(Product::Postgres);
-    metadata_round_trip(&server);
-}
-
-#[test]
-fn mysql_answers_every_metadata_kind_the_model_needs() {
-    let server = server!(Product::MySql);
-    metadata_round_trip(&server);
-}
-
-#[test]
-fn mariadb_answers_every_metadata_kind_the_model_needs() {
-    let server = server!(Product::MariaDb);
-    metadata_round_trip(&server);
-}
-
-#[test]
-fn mssql_answers_every_metadata_kind_the_model_needs() {
-    let server = server!(Product::MsSql);
-    metadata_round_trip(&server);
-}
-
-#[test]
-fn oracle_answers_every_metadata_kind_the_model_needs() {
-    let server = server!(Product::Oracle);
-    metadata_round_trip(&server);
-}
-
-#[test]
-fn db2_answers_every_metadata_kind_the_model_needs() {
-    let server = server!(Product::Db2);
-    metadata_round_trip(&server);
-}
+on_every_product!(answers_every_metadata_kind_the_model_needs => metadata_round_trip);
 
 /// Db2's comments reach the model through the driver alone.
 ///

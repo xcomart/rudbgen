@@ -156,6 +156,11 @@ with `--ignored`; ordinary SSH tests use loopback servers.
 
 ## Adding a database product
 
+A product supported from now on ships as a profile — YAML, and Groovy where
+the bridge needs it — rather than as new code; see
+[the profile design](https://github.com/xcomart/rudbman/blob/dev/docs/dialect-profiles.md), §12. The steps below are what changing one of
+the built-in products takes, and what a product took before profiles.
+
 The product's facts come from rudbkit and its SQL dialect from rudbman, so a
 product new to both starts there: rudbman's contribution guide lists those
 steps. In this repository:

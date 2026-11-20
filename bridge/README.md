@@ -383,7 +383,9 @@ src/main/java/comart/rudbgen/bridge/
 └── meta/
     ├── Describe.java      DESCRIBE dispatch, the DatabaseMetaData kinds
     ├── Comments.java      table and column comments from the vendor catalog
-    ├── Dialect.java       product name → the vendor paths that apply
+    ├── Dialect.java       product name → the product's Vendor
+    ├── Vendor.java        what is done differently per product, OTHER's way by default
+    ├── *Vendor.java       one product each, as in rudbman's bridge
     ├── Ident.java         identifier quoting, only where it is needed
     ├── Attempt.java       savepoint-fenced query that is allowed to fail
     ├── RsView.java        reader for metadata result sets with optional columns

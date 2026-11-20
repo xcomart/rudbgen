@@ -129,7 +129,7 @@ These examples use a POSIX shell; PowerShell environment variables use
 MariaDB, SQL Server, Oracle and Db2 URLs and credentials, and
 [CI](.github/workflows/ci.yml) for the complete database matrix. Db2's first
 start creates its database and takes several minutes before it reports healthy;
-its tests are the ones named `db2_*`. Use disposable test databases: the suites
+its tests are the ones whose names contain `db2`. Use disposable test databases: the suites
 create and drop objects. rudbgen and rudbman use the same local test ports, so
 run their Compose environments one at a time. Both compose files sit in a
 `docker/` directory and share service names, so each sets its own project name
@@ -153,6 +153,29 @@ Driver discovery can be overridden with `RUDBGEN_TEST_PG_JAR`,
 Tests that access the OS keychain, Maven Central or a real SSH bastion are
 ignored by default. Read each test's setup requirements before selecting it
 with `--ignored`; ordinary SSH tests use loopback servers.
+
+## Adding a database product
+
+The product's facts come from rudbkit and its SQL dialect from rudbman, so a
+product new to both starts there: rudbman's contribution guide lists those
+steps. In this repository:
+
+1. **rudbkit** — move every `rudbkit-*` entry in the root `Cargo.toml` to the
+   rudbkit commit that adds the product to `rudbkit_core::products`.
+2. **Bridge** — write `bridge/src/main/java/comart/rudbgen/bridge/meta/<Product>Vendor.java`,
+   overriding what differs from the portable path (here, how its comments are
+   read), and give it a `Dialect` constant and a place in the detection order.
+3. **Built-in driver** — add a `BuiltinDriver` at the end of
+   `BUILTIN_DRIVERS` in `crates/rudbgen-core/src/profile.rs`: its id, its
+   product, an icon from `assets/drivers/` (`generic` where there is none),
+   the driver version, and whatever else it needs — `no_auth`, connection
+   properties, custom-query seeds. Leave `FIRST_BUILTINS` alone. A jdbgen
+   import learns the product's driver class and URL scheme in `dialect_of` in
+   `crates/rudbgen-import/src/map.rs`.
+4. **Container checks** — a service in `docker/compose.yml`, a `Product`
+   variant and a line in `on_every_product!` in
+   `crates/rudbgen-jdbc/tests/containers.rs`, its driver in
+   `bridge/build.gradle`'s `drivers`, and its URL in `.github/workflows/ci.yml`.
 
 ## Change guidelines
 

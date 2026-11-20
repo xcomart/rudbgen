@@ -196,18 +196,18 @@ menu; a tool such as Gear Lever or AppImageLauncher does that.
 
 ### Runtime dependencies
 
-The Rust half draws through gpui, which links against the system's
-`libxkbcommon` (with its X11 half), `wayland-client` and `fontconfig`. Every
-mainstream desktop install already has them; a minimal container does not. On
-Debian and Ubuntu:
+The Rust half draws through gpui. xkbcommon, which handles the keyboard, is
+built into the binary; what it still needs from the system is libxcb, an EGL or
+Vulkan loader and, in a Wayland session, `wayland-client`. Every mainstream
+desktop install already has them; a minimal container does not. On Debian and
+Ubuntu:
 
 ```sh
-sudo apt-get install -y libxkbcommon0 libxkbcommon-x11-0 libwayland-client0 libfontconfig1
+sudo apt-get install -y libxcb1 libegl1 libegl-mesa0 libwayland-client0
 ```
 
-`install.sh` checks for them when it runs, together with glibc and an EGL or
-Vulkan loader, and prints the command that installs whatever is missing with
-apt, dnf, pacman or zypper.
+`install.sh` checks for them when it runs, together with glibc, and prints the
+command that installs whatever is missing with apt, dnf, pacman or zypper.
 
 ## Using your own JDK
 

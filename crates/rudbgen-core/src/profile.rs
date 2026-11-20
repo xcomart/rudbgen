@@ -31,6 +31,7 @@ use std::path::{Path, PathBuf};
 
 use anyhow::{Context, Result};
 use rudbkit_core::TunnelConfig;
+use rudbkit_core::products::{self, Product};
 use serde::de::Error as _;
 use serde::{Deserialize, Deserializer, Serialize};
 use uuid::Uuid;
@@ -977,29 +978,24 @@ impl Seed {
     }
 }
 
-/// One built-in driver definition, in the shape the table below is written in.
+/// One built-in driver definition: a product of [`rudbkit_core::products`],
+/// with what this application chooses for it.
 ///
-/// A struct rather than a tuple so that a dozen string columns cannot be
-/// transposed by accident. There is no column for
-/// [`CustomQueries::columns`]: no stock driver overrides the column list, and
-/// a column of `Seed::Absent` would say nothing.
+/// A struct rather than a tuple so that a dozen columns cannot be transposed by
+/// accident. There is no column for [`CustomQueries::columns`]: no stock
+/// driver overrides the column list, and a column of `Seed::Absent` would say
+/// nothing.
 struct BuiltinDriver {
     /// Value of [`DriverDef::id`].
     id: &'static str,
-    /// Value of [`DriverDef::name`].
-    name: &'static str,
+    /// The product: the name, class, Maven artifact, URL template, default
+    /// port and dialect it is defined with.
+    product: Product,
     /// Value of [`DriverDef::icon`]; every built-in has one.
     icon: &'static str,
-    /// Value of [`DriverDef::class`].
-    class: &'static str,
-    /// Value of [`DriverDef::maven`]; every built-in is downloadable.
-    maven: &'static str,
-    /// Value of [`DriverDef::url_template`].
-    url_template: &'static str,
-    /// Value of [`DriverDef::default_port`].
-    default_port: Option<u16>,
-    /// Value of [`DriverDef::dialect`].
-    dialect: &'static str,
+    /// The driver version [`DriverDef::maven`] names; every built-in is
+    /// downloadable.
+    version: &'static str,
     /// Value of [`DriverDef::no_auth`].
     no_auth: bool,
     /// Value of [`DriverDef::props`].
@@ -1058,14 +1054,9 @@ const MSSQL_COLUMN_COMMENTS_SQL: &str = "SELECT OBJNAME, cast(value as varchar(8
 const BUILTIN_DRIVERS: &[BuiltinDriver] = &[
     BuiltinDriver {
         id: "oracle-thin",
-        name: "Oracle Thin",
+        product: products::ORACLE_THIN,
         icon: "oracle",
-        class: "oracle.jdbc.OracleDriver",
-        maven: "com.oracle.database.jdbc:ojdbc11:23.26.3.0.0",
-        // The service-name form; the older SID form is `@//{host}:{port}:{sid}`.
-        url_template: "jdbc:oracle:thin:@//{host}:{port}/{service}",
-        default_port: Some(1521),
-        dialect: "oracle",
+        version: "23.26.3.0.0",
         no_auth: false,
         // Without it the thin driver reports no `REMARKS` at all: Oracle's
         // comments live in `ALL_TAB_COMMENTS`, and this is the switch that
@@ -1077,13 +1068,9 @@ const BUILTIN_DRIVERS: &[BuiltinDriver] = &[
     },
     BuiltinDriver {
         id: "postgresql",
-        name: "PostgreSQL",
+        product: products::POSTGRESQL,
         icon: "postgresql",
-        class: "org.postgresql.Driver",
-        maven: "org.postgresql:postgresql:42.7.13",
-        url_template: "jdbc:postgresql://{host}:{port}/{database}",
-        default_port: Some(5432),
-        dialect: "postgres",
+        version: "42.7.13",
         no_auth: false,
         props: &[],
         tables: Seed::Absent,
@@ -1092,13 +1079,9 @@ const BUILTIN_DRIVERS: &[BuiltinDriver] = &[
     },
     BuiltinDriver {
         id: "mysql",
-        name: "MySQL",
+        product: products::MYSQL,
         icon: "mysql",
-        class: "com.mysql.cj.jdbc.Driver",
-        maven: "com.mysql:mysql-connector-j:26.7.0",
-        url_template: "jdbc:mysql://{host}:{port}/{database}",
-        default_port: Some(3306),
-        dialect: "mysql",
+        version: "26.7.0",
         no_auth: false,
         // Connector/J's own `SHOW`-based metadata path answers a truncated
         // `REMARKS` and no `COLUMN_DEF` for several types; the information
@@ -1110,14 +1093,9 @@ const BUILTIN_DRIVERS: &[BuiltinDriver] = &[
     },
     BuiltinDriver {
         id: "sqlite",
-        name: "SQLite",
+        product: products::SQLITE,
         icon: "sqlite",
-        class: "org.sqlite.JDBC",
-        maven: "org.xerial:sqlite-jdbc:3.53.2.1",
-        // SQLite is a file, not a service: no host, no port.
-        url_template: "jdbc:sqlite:{file}",
-        default_port: None,
-        dialect: "sqlite",
+        version: "3.53.2.1",
         no_auth: true,
         props: &[],
         tables: Seed::Absent,
@@ -1126,15 +1104,9 @@ const BUILTIN_DRIVERS: &[BuiltinDriver] = &[
     },
     BuiltinDriver {
         id: "h2-embedded",
-        name: "H2 Embedded",
+        product: products::H2_EMBEDDED,
         icon: "h2",
-        class: "org.h2.Driver",
-        maven: "com.h2database:h2:2.4.240",
-        // A file opened in this process. It takes an exclusive lock, so the
-        // same database cannot be open in a running H2 server at the time.
-        url_template: "jdbc:h2:{file}",
-        default_port: None,
-        dialect: "h2",
+        version: "2.4.240",
         no_auth: true,
         props: &[],
         tables: Seed::On(H2_TABLES_SQL),
@@ -1143,13 +1115,9 @@ const BUILTIN_DRIVERS: &[BuiltinDriver] = &[
     },
     BuiltinDriver {
         id: "h2-server",
-        name: "H2 Server",
+        product: products::H2_SERVER,
         icon: "h2",
-        class: "org.h2.Driver",
-        maven: "com.h2database:h2:2.4.240",
-        url_template: "jdbc:h2:tcp://{host}:{port}/{database}",
-        default_port: Some(9092),
-        dialect: "h2",
+        version: "2.4.240",
         no_auth: false,
         props: &[],
         tables: Seed::On(H2_TABLES_SQL),
@@ -1158,15 +1126,9 @@ const BUILTIN_DRIVERS: &[BuiltinDriver] = &[
     },
     BuiltinDriver {
         id: "mssql",
-        name: "Microsoft SQL Server",
+        product: products::MSSQL,
         icon: "mssql",
-        class: "com.microsoft.sqlserver.jdbc.SQLServerDriver",
-        maven: "com.microsoft.sqlserver:mssql-jdbc:13.4.0.jre11",
-        // Semicolon-separated properties, not a path: that is this driver's URL
-        // grammar, not a typo.
-        url_template: "jdbc:sqlserver://{host}:{port};databaseName={database}",
-        default_port: Some(1433),
-        dialect: "mssql",
+        version: "13.4.0.jre11",
         no_auth: false,
         // From 10.2 the driver encrypts by default and then refuses the
         // self-signed certificate a development server presents, which reads as
@@ -1179,17 +1141,9 @@ const BUILTIN_DRIVERS: &[BuiltinDriver] = &[
     },
     BuiltinDriver {
         id: "mariadb",
-        name: "MariaDB",
+        product: products::MARIADB,
         icon: "mariadb",
-        class: "org.mariadb.jdbc.Driver",
-        maven: "org.mariadb.jdbc:mariadb-java-client:3.5.10",
-        url_template: "jdbc:mariadb://{host}:{port}/{database}",
-        default_port: Some(3306),
-        // MariaDB read as `mysql` until a server disagreed: the fork spells a
-        // check-constraint drop `DROP CONSTRAINT` where MySQL spells it
-        // `DROP CHECK`, and answers a syntax error for MySQL's. It has a
-        // dialect of its own now, which is MySQL's in every other spelling.
-        dialect: "mariadb",
+        version: "3.5.10",
         no_auth: false,
         props: &[],
         tables: Seed::Absent,
@@ -1198,15 +1152,11 @@ const BUILTIN_DRIVERS: &[BuiltinDriver] = &[
     },
     BuiltinDriver {
         id: "mongodb",
-        name: "MongoDB",
+        // jdbgen's stock entry gives 3306, MySQL's port, a copy-paste in the
+        // file it came from.
+        product: products::MONGODB,
         icon: "mongodb",
-        class: "com.mongodb.jdbc.MongoDriver",
-        maven: "org.mongodb:mongodb-jdbc:3.0.8",
-        url_template: "jdbc:mongodb://{host}:{port}/{database}",
-        // 27017, the port mongod listens on. jdbgen's stock entry says 3306,
-        // which is MySQL's and is a copy-paste in the file it came from.
-        default_port: Some(27017),
-        dialect: DIALECT_GENERIC,
+        version: "3.0.8",
         no_auth: false,
         props: &[],
         tables: Seed::Absent,
@@ -1215,15 +1165,9 @@ const BUILTIN_DRIVERS: &[BuiltinDriver] = &[
     },
     BuiltinDriver {
         id: "cubrid",
-        name: "CUBRID",
+        product: products::CUBRID,
         icon: "cubrid",
-        class: "cubrid.jdbc.driver.CUBRIDDriver",
-        maven: "org.cubrid:cubrid-jdbc:11.3.2.0053",
-        // Colon-separated, and the trailing empty user and password fields are
-        // part of the grammar: `host:port:database:user:password:`.
-        url_template: "jdbc:cubrid:{host}:{port}:{database}:::",
-        default_port: Some(33000),
-        dialect: DIALECT_GENERIC,
+        version: "11.3.2.0053",
         no_auth: false,
         props: &[],
         tables: Seed::Absent,
@@ -1232,18 +1176,10 @@ const BUILTIN_DRIVERS: &[BuiltinDriver] = &[
     },
     BuiltinDriver {
         id: "db2",
-        name: "IBM Db2",
+        product: products::DB2,
         // jdbgen's icon set, which `assets/drivers` is, has no Db2 mark.
         icon: "generic",
-        class: "com.ibm.db2.jcc.DB2Driver",
-        // IBM's JCC, the type 4 driver: the one Maven Central carries, and the
-        // same JAR for Db2 on Linux, UNIX and Windows, z/OS and IBM i.
-        maven: "com.ibm.db2:jcc:12.1.5.0",
-        // The database is the one the server catalogs, not a schema: a schema
-        // is picked after connecting, like everywhere else.
-        url_template: "jdbc:db2://{host}:{port}/{database}",
-        default_port: Some(50000),
-        dialect: "db2",
+        version: "12.1.5.0",
         no_auth: false,
         // JCC reports `REMARKS` from `SYSCAT` itself, and the one property
         // every session wants — the server's text for a failed statement — is
@@ -1286,14 +1222,14 @@ impl DriverDef {
             .iter()
             .map(|builtin| Self {
                 id: builtin.id.to_string(),
-                name: builtin.name.to_string(),
+                name: builtin.product.name.to_string(),
                 icon: Some(builtin.icon.to_string()),
-                class: builtin.class.to_string(),
+                class: builtin.product.class.to_string(),
                 jars: Vec::new(),
-                maven: Some(builtin.maven.to_string()),
-                url_template: builtin.url_template.to_string(),
-                default_port: builtin.default_port,
-                dialect: builtin.dialect.to_string(),
+                maven: Some(builtin.product.maven(builtin.version)),
+                url_template: builtin.product.url_template.to_string(),
+                default_port: builtin.product.default_port,
+                dialect: builtin.product.dialect.to_string(),
                 no_auth: builtin.no_auth,
                 props: builtin
                     .props

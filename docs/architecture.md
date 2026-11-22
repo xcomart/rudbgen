@@ -36,6 +36,7 @@ this document.
 | D15 | **The block keywords `endif`, `endfor`, `else` and `elif:` match ignoring case**, like every other statement name, and an `elif` may have white space before its `:` as `if` always could | jdbgen compared them in lower case only, so `${ENDIF}` left its `if` open and `${ELSE}` was silently a lookup of a field called `ELSE` that wrote both branches. No template relies on that on purpose, and one written in lower case renders exactly as before. Supersedes the appendix A pitfall that asked for it to be reproduced |
 | D16 | **`javaType` follows the precision where jdbgen's type could not hold the column's values.** `DECIMAL`/`NUMERIC` are `Integer` up to 9 whole digits, `Long` up to 18, and `BigDecimal` for a fraction, for more digits, or for a precision the driver does not report; `FLOAT` is `Double`, as JDBC defines it. Every other row of jdbgen's table is unchanged, and a custom column query may answer an optional `DECIMAL_DIGITS` — without it a `DECIMAL` is a `BigDecimal` | jdbgen's `Integer` silently dropped a `NUMERIC(18,2)`'s fraction and overflowed on a `NUMBER(12)`, and `Float` kept seven of a `FLOAT`'s fifteen digits — wrong code, not a matter of taste. Decides open question 2 by changing `javaType` in place rather than adding a second field: a second field would leave the broken one as the default the shipped templates use |
 | D17 | **The template language gains numeric comparisons and a numeric processor**: the `if` conditions `gt`, `ge`, `lt` and `le`, and the key-chain processor `clamp(min, max)`, with `eq` and `ne` as short names of `equals` and `notEquals` beside them. The five numeric ones read whole numbers; a value that is not one fails the four conditions and passes `clamp` unchanged, and a bound that is not one is a parse error | jdbgen could only compare text, so a template could not tell a `VARCHAR(40)` from a `VARCHAR(4000)` or hold a `CLOB`'s reported length of `2147483647` to what a DDL accepts — the numeric fields D8 added (`precision`, `scale`, `keySeq`) made the gap wider. Every one of the seven names was a parse error in jdbgen (unknown condition, unknown processor), so no jdbgen template changes its output; a template that uses them does not render in jdbgen |
+| D18 | **Dialect profiles are rudbkit's, and rudbgen reads what its bridge answers** — a profile of `<config>/dialects` (rudbman's `docs/dialect-profiles.md`) brings its driver definition, offered to `drivers.json` once like a built-in released later, and its `bridge` half's `detect`, `catalog_is_schema` and `comments`, which `meta/ProfileVendor.java` answers over the built-in its chain of bases ends in. The `sql` half is read unchecked and a script is not run | A product added for rudbman is a file rather than code, and the same file is the one rudbgen needs: the format, the directory's rules and the shipped profiles live in `rudbkit_core::dialects` so that neither application keeps a copy. rudbgen writes no SQL and has no Groovy hooks, so it takes only the part of a profile its metadata reading uses |
 
 ---
 
@@ -83,8 +84,9 @@ rudbgen/
 ├── templates/                  built-in template set (copied to the config dir on first run)
 ├── packaging/
 └── crates/
-    ├── rudbgen-core/           settings, profiles, drivers, secrets, paths, known_hosts;
-    │                            the tunnel block is rudbkit-core's
+    ├── rudbgen-core/           settings, profiles, drivers, dialect profiles, secrets,
+    │                            paths, known_hosts; the tunnel block and the profile
+    │                            format are rudbkit-core's
     ├── rudbgen-jdbc/           JNI: session worker, DESCRIBE, EXECUTE; the JVM bootstrap
     │                            is rudbkit-jdbc's, under rudbgen's name
     ├── rudbgen-template/       the template engine — pure, no gpui, no JNI
@@ -216,6 +218,7 @@ template-sets.json     TemplateSetStore (jdbgen's presets)
 abbreviations.json     AbbreviationStore
 templates/             template files (built-ins copied here on first run, never overwritten)
 drivers/               downloaded JDBC JARs
+dialects/              dialect profiles (D18): the shipped ones, kept by shipped.json, and the user's
 themes/, editor-themes/
 known_hosts
 ```

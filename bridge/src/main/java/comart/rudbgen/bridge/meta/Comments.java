@@ -7,7 +7,6 @@ import com.google.gson.JsonObject;
 import comart.rudbgen.bridge.Json;
 
 import java.sql.Connection;
-import java.sql.DatabaseMetaData;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
@@ -197,14 +196,13 @@ final class Comments {
      * Clears the placeholder comment, then fills in the missing ones, in place.
      *
      * @param conn   the live connection
-     * @param dbm    the connection metadata, for the product name
+     * @param vendor the session's vendor: its profile's, or its product's
      * @param req    the request body, for the filters to scope the query with
      * @param items  the rows built from {@code getTables}
      * @param custom the session's {@code table_comments_sql}, or {@code null}
      */
-    static void tables(Connection conn, DatabaseMetaData dbm, JsonObject req, JsonArray items,
+    static void tables(Connection conn, Vendor vendor, JsonObject req, JsonArray items,
                        String custom) {
-        Vendor vendor = Dialect.of(dbm).vendor();
         if (vendor.marksViewsInRemarks()) {
             unmarkViews(items);
         }
@@ -235,14 +233,13 @@ final class Comments {
      * Fills in missing column comments, in place.
      *
      * @param conn   the live connection
-     * @param dbm    the connection metadata, for the product name
+     * @param vendor the session's vendor: its profile's, or its product's
      * @param req    the request body, for the filters to scope the query with
      * @param items  the rows built from {@code getColumns}
      * @param custom the session's {@code column_comments_sql}, or {@code null}
      */
-    static void columns(Connection conn, DatabaseMetaData dbm, JsonObject req, JsonArray items,
+    static void columns(Connection conn, Vendor vendor, JsonObject req, JsonArray items,
                         String custom) {
-        Vendor vendor = Dialect.of(dbm).vendor();
         if (!anyMissing(items)) {
             return;
         }

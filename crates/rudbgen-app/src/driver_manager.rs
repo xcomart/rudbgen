@@ -468,6 +468,9 @@ pub struct DriverManager {
     port_input: Entity<TextInput>,
     /// SQL dialect id.
     dialect_input: Entity<TextInput>,
+    /// The dialect profiles of the configuration directory, as last read:
+    /// what the note under the dialect says of the profile it names.
+    profiles: Arc<rudbgen_core::dialects::Report>,
     /// Maven coordinate, `group:artifact:version`.
     maven_input: Entity<TextInput>,
     /// The four custom-query statements, in [`CustomQueryKind::ALL`] order.
@@ -534,6 +537,7 @@ impl DriverManager {
         // driver actually uses; none of them is a word, so none is translated.
         let saved = store.drivers().to_vec();
         let mut manager = Self {
+            profiles: rudbgen_core::dialects::reload(),
             saved,
             discarding: false,
             label_width: px(rugpui::modal::FORM_LABEL_WIDTH),
@@ -1357,6 +1361,29 @@ impl DriverManager {
             .child(hint(ts!("driver.class_hint"), cx))
     }
 
+    /// The dialect field, and under it what the dialect is when it names a
+    /// dialect profile.
+    fn dialect_row(&self, chrome: &Theme, cx: &App) -> impl IntoElement + use<> {
+        let notes = dialect_notes(&text(&self.dialect_input, cx), &self.profiles)
+            .into_iter()
+            .map(|(note, problem)| {
+                div()
+                    .text_size(rugpui::TextSize::Xs.size(cx))
+                    .text_color(if problem {
+                        chrome.danger
+                    } else {
+                        chrome.text_muted
+                    })
+                    .child(note)
+            });
+        div()
+            .flex()
+            .flex_col()
+            .gap(px(4.))
+            .child(self.dialect_input.clone())
+            .children(notes)
+    }
+
     /// Asks the bridge which `java.sql.Driver` implementations the selected
     /// driver's JARs hold.
     ///
@@ -1956,7 +1983,7 @@ impl DriverManager {
                     .child(labeled_row(
                         self.label_width,
                         ts!("driver.dialect"),
-                        self.dialect_input.clone(),
+                        self.dialect_row(chrome, cx),
                     ))
                     .child(labeled_row(self.label_width, ts!("driver.maven"), maven))
                     .child(labeled_row(self.label_width, ts!("driver.jars"), jars))
@@ -2231,6 +2258,57 @@ fn hint(text: SharedString, cx: &App) -> impl IntoElement + use<> {
         .text_size(rugpui::TextSize::Xs.size(cx))
         .text_color(chrome.text_muted)
         .child(text)
+}
+
+/// What the note under the dialect says, each line with whether it is a
+/// problem: what a profile `dialect` names stands on and where it was read
+/// from, or why it did not load; that its script is not run here; and a newer
+/// shipped version waiting beside it. A problem reading the profiles at all
+/// comes first, whatever the dialect.
+fn dialect_notes(
+    dialect: &str,
+    profiles: &rudbgen_core::dialects::Report,
+) -> Vec<(SharedString, bool)> {
+    let mut notes: Vec<(SharedString, bool)> = profiles
+        .problems
+        .iter()
+        .map(|error| (ts!("driver.dialect_profiles_problem", error = error), true))
+        .collect();
+    let Some(entry) = profiles.entry_for(dialect) else {
+        return notes;
+    };
+    let path = entry.path.display().to_string();
+    match entry.failure() {
+        Some(error) => notes.push((
+            ts!(
+                "driver.dialect_profile_failed_hint",
+                path = path,
+                error = error
+            ),
+            true,
+        )),
+        None => {
+            let base = entry.base.clone().unwrap_or_default();
+            notes.push((
+                ts!("driver.dialect_profile_hint", base = base, path = path),
+                false,
+            ));
+            if let Some(script) = &entry.script {
+                notes.push((ts!("driver.dialect_profile_script", file = script), false));
+            }
+        }
+    }
+    if !entry.pending.is_empty() {
+        let files = entry
+            .pending
+            .iter()
+            .filter_map(|path| path.file_name())
+            .map(|name| name.to_string_lossy().into_owned())
+            .collect::<Vec<_>>()
+            .join(", ");
+        notes.push((ts!("driver.dialect_profile_pending", files = files), false));
+    }
+    notes
 }
 
 /// Trimmed content of `input`.
@@ -2764,6 +2842,15 @@ mod tests {
             ts!("driver.url_template"),
             ts!("driver.default_port"),
             ts!("driver.dialect"),
+            ts!("driver.dialect_profile_hint", base = "mysql", path = "p"),
+            ts!(
+                "driver.dialect_profile_failed_hint",
+                path = "p",
+                error = "e"
+            ),
+            ts!("driver.dialect_profile_script", file = "f"),
+            ts!("driver.dialect_profile_pending", files = "f"),
+            ts!("driver.dialect_profiles_problem", error = "e"),
             ts!("driver.maven"),
             ts!("driver.jars"),
             ts!("driver.add_jar"),

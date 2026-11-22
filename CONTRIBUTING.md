@@ -157,9 +157,16 @@ with `--ignored`; ordinary SSH tests use loopback servers.
 ## Adding a database product
 
 A product supported from now on ships as a profile — YAML, and Groovy where
-the bridge needs it — rather than as new code; see
-[the profile design](https://github.com/xcomart/rudbman/blob/dev/docs/dialect-profiles.md), §12. The steps below are what changing one of
-the built-in products takes, and what a product took before profiles.
+rudbman's bridge needs it — rather than as new code: a `<id>.yml` in rudbkit's
+[`dialects/`](https://github.com/xcomart/rudbkit/tree/dev/dialects), which
+both applications ship; see
+[the profile design](https://github.com/xcomart/rudbman/blob/dev/docs/dialect-profiles.md),
+§4 for the format and §12 for how it reaches users. rudbgen takes its
+`driver` section and, of its `bridge` half, `detect`, `catalog_is_schema`
+and `comments` (`rudbgen_core::dialects`, `meta/ProfileVendor.java`), and
+runs no script. Moving rudbkit to the commit that adds the profile brings it
+in. The steps below are what changing one of the built-in products takes, and
+what a product took before profiles.
 
 The product's facts come from rudbkit and its SQL dialect from rudbman, so a
 product new to both starts there: rudbman's contribution guide lists those

@@ -458,6 +458,22 @@ pub fn build_spec(
     // bridge's own comment enrichment is an internal detail of `DESCRIBE` and
     // answers a differently shaped result, so sending a jdbgen statement into
     // it would read the comment out of a column that is not there.
+    //
+    // What the bridge's enrichment does read is the dialect profile the
+    // driver names: its comment queries and its namespace rule, over the
+    // built-in it stands on. A driver on generic SQL, or on a profile that did
+    // not load, lets the bridge find one by the server's product name instead.
+    let profiles = rudbgen_core::dialects::current();
+    match profiles.session_profile(&driver.dialect) {
+        Some(profile) => spec.profile = Some(profile),
+        None => {
+            if rudbkit_core::dialects::built_in(&driver.dialect)
+                .is_none_or(|dialect| dialect == rudbkit_core::products::GENERIC_DIALECT)
+            {
+                spec.detect_profiles = profiles.detect_profiles();
+            }
+        }
+    }
     spec
 }
 

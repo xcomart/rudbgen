@@ -1,8 +1,9 @@
-# The six servers the opt-in container tests run against.
+# The servers the opt-in container tests run against.
 #
 # `crates/rudbgen-jdbc/tests/containers.rs` reads the catalog of a real
-# PostgreSQL, MySQL, MariaDB, SQL Server, Oracle and Db2 through the bridge's
-# DESCRIBE, which is the one thing about this layer that H2 cannot answer: a
+# PostgreSQL, MySQL, MariaDB, SQL Server, Oracle and Db2 — and of TiDB,
+# CockroachDB and Firebird, through the dialect profiles rudbkit ships — through
+# the bridge's DESCRIBE, which is the one thing about this layer that H2 cannot answer: a
 # driver's metadata habits are per product. Nothing in the workspace needs these
 # to be up:
 # with the environment variables below unset every one of those tests passes
@@ -21,13 +22,17 @@
 #     export RUDBGEN_TEST_MSSQL_URL='jdbc:sqlserver://127.0.0.1:51433;encrypt=false'
 #     export RUDBGEN_TEST_ORACLE_URL='jdbc:oracle:thin:@//127.0.0.1:51521/FREEPDB1'
 #     export RUDBGEN_TEST_DB2_URL='jdbc:db2://127.0.0.1:55000/RUDBGEN'
+#     export RUDBGEN_TEST_TIDB_URL='jdbc:mysql://127.0.0.1:54000/test?useSSL=false'
+#     export RUDBGEN_TEST_COCKROACH_URL='jdbc:postgresql://127.0.0.1:56257/defaultdb?sslmode=disable'
+#     export RUDBGEN_TEST_FIREBIRD_URL='jdbc:firebird://127.0.0.1:53050//var/lib/firebird/data/rudbgen.fdb?encoding=UTF8'
 #     cargo test -p rudbgen-jdbc --test containers
 #
 # The user and the password default to `rudbgen`/`rudbgen`, matching this
 # file, for every service except SQL Server; RUDBGEN_TEST_PG_USER,
 # RUDBGEN_TEST_PG_PASSWORD, RUDBGEN_TEST_MYSQL_USER,
-# RUDBGEN_TEST_MYSQL_PASSWORD, and their MARIADB/ORACLE/DB2 counterparts override
-# them. SQL Server has no `rudbgen` login of its own: the `sa` password
+# RUDBGEN_TEST_MYSQL_PASSWORD, and their MARIADB/ORACLE/DB2/TIDB/COCKROACH/
+# FIREBIRD counterparts override them. TiDB and CockroachDB are `root` with no
+# password, as their images come. SQL Server has no `rudbgen` login of its own: the `sa` password
 # complexity requirement rules out `rudbgen`, so its account is
 # `sa` / `Rudbgen!Passw0rd`, and its image does not create a `rudbgen`
 # database — a test that needs one creates it, or connects to `master`.
@@ -166,3 +171,49 @@ services:
       timeout: 30s
       start_period: 300s
       retries: 60
+
+  # TiDB, on MySQL's wire protocol: one node, `root` with no password, and a
+  # `test` database. Its image has no client to ask with, so the SQL port
+  # answering is the server being up.
+  tidb:
+    image: pingcap/tidb:v8.5.8
+    container_name: rudbgen-test-tidb
+    ports:
+      - "127.0.0.1:54000:4000"
+
+  # CockroachDB, on PostgreSQL's wire protocol: one node, without TLS, `root`
+  # with no password, and a `defaultdb` database.
+  cockroach:
+    image: cockroachdb/cockroach:v25.4.21
+    container_name: rudbgen-test-cockroach
+    command: start-single-node --insecure
+    ports:
+      - "127.0.0.1:56257:26257"
+    healthcheck:
+      test: ["CMD", "/cockroach/cockroach", "sql", "--insecure", "-e", "select 1"]
+      interval: 3s
+      timeout: 10s
+      retries: 40
+
+  # Firebird, which no built-in reads: its profile stands on `generic`. The
+  # image creates the database and its `rudbgen` user on the first start.
+  firebird:
+    image: firebirdsql/firebird:5.0.4
+    container_name: rudbgen-test-firebird
+    environment:
+      FIREBIRD_ROOT_PASSWORD: rudbgen
+      FIREBIRD_USER: rudbgen
+      FIREBIRD_PASSWORD: rudbgen
+      FIREBIRD_DATABASE: rudbgen.fdb
+      FIREBIRD_DATABASE_DEFAULT_CHARSET: UTF8
+    ports:
+      - "127.0.0.1:53050:3050"
+    healthcheck:
+      test:
+        [
+          "CMD-SHELL",
+          "echo 'select 1 from rdb$$database;' | /opt/firebird/bin/isql -q -u rudbgen -p rudbgen localhost:/var/lib/firebird/data/rudbgen.fdb",
+        ]
+      interval: 3s
+      timeout: 10s
+      retries: 40

@@ -69,12 +69,12 @@ public final class Describe {
                 case "schemas":        items = schemas(dbm, req); break;
                 case "tables":
                     items = tables(dbm, req);
-                    Comments.tables(session.connection(), dbm, req, items,
+                    Comments.tables(session.connection(), session.vendor(), req, items,
                             session.tableCommentsSql());
                     break;
                 case "columns":
                     items = columns(dbm, req);
-                    Comments.columns(session.connection(), dbm, req, items,
+                    Comments.columns(session.connection(), session.vendor(), req, items,
                             session.columnCommentsSql());
                     break;
                 case "primary_keys":   items = primaryKeys(dbm, req); break;

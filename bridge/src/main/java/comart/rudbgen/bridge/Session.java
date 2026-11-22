@@ -1,6 +1,8 @@
 package comart.rudbgen.bridge;
 
 import com.google.gson.JsonObject;
+import comart.rudbgen.bridge.meta.ProfileVendor;
+import comart.rudbgen.bridge.meta.Vendor;
 
 import java.sql.Connection;
 import java.sql.DatabaseMetaData;
@@ -44,6 +46,13 @@ public final class Session implements AutoCloseable {
     private final String tableCommentsSql;
     private final String columnCommentsSql;
 
+    /**
+     * What this session reads comments with: the dialect profile its driver
+     * names, the first detecting profile its product name matches, or the
+     * built-in its product name names. See {@link ProfileVendor#forSession}.
+     */
+    private final Vendor vendor;
+
     /** Attached after construction, because the timer task needs the session. */
     private ScheduledExecutorService keepAliveExec;
 
@@ -64,8 +73,10 @@ public final class Session implements AutoCloseable {
     private volatile long handle;
 
     private Session(Connection conn, Loaders.Lease lease, String url, String driverClass,
-                    String keepAliveQuery, String tableCommentsSql, String columnCommentsSql) {
+                    String keepAliveQuery, String tableCommentsSql, String columnCommentsSql,
+                    Vendor vendor) {
         this.conn = conn;
+        this.vendor = vendor;
         this.lease = lease;
         this.url = url;
         this.driverClass = driverClass;
@@ -81,13 +92,18 @@ public final class Session implements AutoCloseable {
      * (required), {@code jars[]}, {@code username}, {@code password},
      * {@code props{}}, {@code read_only}, {@code auto_commit},
      * {@code login_timeout_s}, {@code keep_alive{enabled, interval_s, query}},
-     * {@code table_comments_sql} and {@code column_comments_sql}.
+     * {@code table_comments_sql}, {@code column_comments_sql}, {@code profile}
+     * and {@code detect_profiles}.
      *
      * <p>The last two belong to the driver definition rather than to the
      * connection: they are the queries this product answers comments with, for
      * a product whose driver does not, and they are carried on the session
      * because {@code DESCRIBE} is where they are used. See
      * {@code comart.rudbgen.bridge.meta.Comments}.
+     *
+     * <p>{@code profile} is the dialect profile the driver names, and
+     * {@code detect_profiles} the profiles to find one among by the server's
+     * product name where it names none; see {@link ProfileVendor}.
      *
      * @param req the parsed request body
      * @return a live session, already registered in the {@link Registry}
@@ -172,8 +188,10 @@ public final class Session implements AutoCloseable {
                 }
             }
 
+            Vendor vendor = ProfileVendor.forSession(Json.obj(req, "profile"),
+                    Json.arr(req, "detect_profiles"), conn.getMetaData());
             Session s = new Session(conn, lease, url, driverClass, kaQuery,
-                    sql(req, "table_comments_sql"), sql(req, "column_comments_sql"));
+                    sql(req, "table_comments_sql"), sql(req, "column_comments_sql"), vendor);
             s.handle = Registry.put(s);
             if (kaInterval > 0) {
                 try {
@@ -298,6 +316,14 @@ public final class Session implements AutoCloseable {
      */
     public String columnCommentsSql() {
         return columnCommentsSql;
+    }
+
+    /**
+     * @return what this session reads comments with: its profile's vendor, or
+     *         its product's
+     */
+    public Vendor vendor() {
+        return vendor;
     }
 
     /**

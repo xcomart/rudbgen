@@ -1,5 +1,6 @@
 //! Opt-in metadata tests against real PostgreSQL, MySQL, MariaDB, SQL Server,
-//! Oracle and Db2 servers.
+//! Oracle and Db2 servers, and TiDB, CockroachDB and Firebird through the
+//! dialect profiles rudbkit ships.
 //!
 //! `tests/h2.rs` proves that Rust reads what Java wrote. It cannot prove the
 //! other half of what rudbgen depends on: that `DESCRIBE` answers the *same
@@ -40,8 +41,18 @@
 //! export RUDBGEN_TEST_MSSQL_URL='jdbc:sqlserver://127.0.0.1:51433;encrypt=false'
 //! export RUDBGEN_TEST_ORACLE_URL='jdbc:oracle:thin:@//127.0.0.1:51521/FREEPDB1'
 //! export RUDBGEN_TEST_DB2_URL='jdbc:db2://127.0.0.1:55000/RUDBGEN'
+//! export RUDBGEN_TEST_TIDB_URL='jdbc:mysql://127.0.0.1:54000/test?useSSL=false'
+//! export RUDBGEN_TEST_COCKROACH_URL='jdbc:postgresql://127.0.0.1:56257/defaultdb?sslmode=disable'
+//! export RUDBGEN_TEST_FIREBIRD_URL='jdbc:firebird://127.0.0.1:53050//var/lib/firebird/data/rudbgen.fdb?encoding=UTF8'
 //! cargo test -p rudbgen-jdbc --test containers
 //! ```
+//!
+//! TiDB, CockroachDB and Firebird have no built-in: their sessions open with
+//! the shipped profile the application would hand the bridge, brought into a
+//! folder of the test's own and read by `rudbgen_core::dialects`. TiDB and
+//! CockroachDB log in as `root` with no password; TiDB takes MySQL's driver
+//! JAR and CockroachDB PostgreSQL's, and `RUDBGEN_TEST_FIREBIRD_JAR` overrides
+//! the search for Jaybird.
 //!
 //! The user and password default to `rudbgen`/`rudbgen`, which is what
 //! `docker/compose.yml` sets up for five of the six; `RUDBGEN_TEST_PG_USER`,
@@ -84,6 +95,7 @@
 use std::cell::RefCell;
 use std::path::PathBuf;
 use std::sync::atomic::{AtomicU32, Ordering};
+use std::sync::{Mutex, MutexGuard, OnceLock};
 
 use rudbgen_jdbc::{
     Batch, ConnectionSpec, DescribeRequest, Jvm, JvmConfig, Session, StatementSpec, Value,
@@ -174,6 +186,13 @@ enum Product {
     Oracle,
     /// Db2 for Linux, UNIX and Windows, through IBM's JCC.
     Db2,
+    /// TiDB, through MySQL's driver and the shipped profile `tidb`.
+    TiDb,
+    /// CockroachDB, through PostgreSQL's driver and the shipped profile
+    /// `cockroachdb`.
+    Cockroach,
+    /// Firebird, through Jaybird and the shipped profile `firebird`.
+    Firebird,
 }
 
 impl Product {
@@ -187,6 +206,9 @@ impl Product {
             Product::MsSql => "RUDBGEN_TEST_MSSQL_URL",
             Product::Oracle => "RUDBGEN_TEST_ORACLE_URL",
             Product::Db2 => "RUDBGEN_TEST_DB2_URL",
+            Product::TiDb => "RUDBGEN_TEST_TIDB_URL",
+            Product::Cockroach => "RUDBGEN_TEST_COCKROACH_URL",
+            Product::Firebird => "RUDBGEN_TEST_FIREBIRD_URL",
         }
     }
 
@@ -198,6 +220,9 @@ impl Product {
             Product::MsSql => "com.microsoft.sqlserver.jdbc.SQLServerDriver",
             Product::Oracle => "oracle.jdbc.OracleDriver",
             Product::Db2 => "com.ibm.db2.jcc.DB2Driver",
+            Product::TiDb => Product::MySql.driver_class(),
+            Product::Cockroach => Product::Postgres.driver_class(),
+            Product::Firebird => "org.firebirdsql.jdbc.FBDriver",
         }
     }
 
@@ -223,12 +248,42 @@ impl Product {
                 "ojdbc11",
             ),
             Product::Db2 => driver_jar("RUDBGEN_TEST_DB2_JAR", "com.ibm.db2", "jcc"),
+            Product::TiDb => Product::MySql.jar(),
+            Product::Cockroach => Product::Postgres.jar(),
+            Product::Firebird => driver_jar(
+                "RUDBGEN_TEST_FIREBIRD_JAR",
+                "org.firebirdsql.jdbc",
+                "jaybird",
+            ),
         }
+    }
+
+    /// The shipped dialect profile a session of this product opens with, as
+    /// the application would hand it the bridge; `None` for a built-in.
+    fn profile(self) -> Option<serde_json::Value> {
+        let id = match self {
+            Product::TiDb => "tidb",
+            Product::Cockroach => "cockroachdb",
+            Product::Firebird => "firebird",
+            _ => return None,
+        };
+        static PROFILES: OnceLock<rudbgen_core::dialects::Report> = OnceLock::new();
+        let report = PROFILES.get_or_init(|| {
+            let dir = tempfile::tempdir().expect("a folder for the profiles");
+            rudbgen_core::dialects::sync_shipped(dir.path(), rudbgen_core::dialects::SHIPPED)
+                .expect("the shipped profiles are written");
+            rudbgen_core::dialects::load_from(dir.path())
+        });
+        Some(
+            report
+                .session_profile(id)
+                .unwrap_or_else(|| panic!("the shipped profile {id} loads")),
+        )
     }
 
     /// Whether this product folds an unquoted identifier to upper case.
     fn folds_upper(self) -> bool {
-        matches!(self, Product::Oracle | Product::Db2)
+        matches!(self, Product::Oracle | Product::Db2 | Product::Firebird)
     }
 
     /// `(user, password)`, from the environment or the compose file's defaults.
@@ -240,12 +295,23 @@ impl Product {
             Product::MsSql => ("RUDBGEN_TEST_MSSQL_USER", "RUDBGEN_TEST_MSSQL_PASSWORD"),
             Product::Oracle => ("RUDBGEN_TEST_ORACLE_USER", "RUDBGEN_TEST_ORACLE_PASSWORD"),
             Product::Db2 => ("RUDBGEN_TEST_DB2_USER", "RUDBGEN_TEST_DB2_PASSWORD"),
+            Product::TiDb => ("RUDBGEN_TEST_TIDB_USER", "RUDBGEN_TEST_TIDB_PASSWORD"),
+            Product::Cockroach => (
+                "RUDBGEN_TEST_COCKROACH_USER",
+                "RUDBGEN_TEST_COCKROACH_PASSWORD",
+            ),
+            Product::Firebird => (
+                "RUDBGEN_TEST_FIREBIRD_USER",
+                "RUDBGEN_TEST_FIREBIRD_PASSWORD",
+            ),
         };
         // SQL Server's `sa` password has a complexity rule `rudbgen` fails, so
         // that one image gets a login of its own; `docker/compose.yml` says the
         // same thing in its header.
+        // TiDB's and CockroachDB's images come with `root` and no password.
         let (user, password) = match self {
             Product::MsSql => ("sa", "Rudbgen!Passw0rd"),
+            Product::TiDb | Product::Cockroach => ("root", ""),
             _ => ("rudbgen", "rudbgen"),
         };
         (
@@ -270,6 +336,10 @@ struct Server {
     schema: Option<String>,
     /// Tables to drop when the test ends, in creation order.
     tables: RefCell<Vec<String>>,
+    /// Firebird's turn: its DDL takes turns between sessions, and two
+    /// changing the catalog at once fail with an update conflict. Held for
+    /// the whole test, and released after the tables are dropped.
+    _turn: Option<MutexGuard<'static, ()>>,
 }
 
 impl Drop for Server {
@@ -278,10 +348,17 @@ impl Drop for Server {
         // drop is `IF EXISTS` and every failure is ignored: this runs on the way
         // out of a panicking test too, and a cleanup that panicked would replace
         // the real failure with its own.
+        // Firebird 5 has no `IF EXISTS`; a table that is not there fails, and
+        // the failure is ignored like any other.
+        let drop = if self.product == Product::Firebird {
+            "DROP TABLE"
+        } else {
+            "DROP TABLE IF EXISTS"
+        };
         for table in self.tables.borrow().iter().rev() {
             let _ = self
                 .session
-                .execute(&StatementSpec::new(format!("DROP TABLE IF EXISTS {table}")));
+                .execute(&StatementSpec::new(format!("{drop} {table}")));
         }
     }
 }
@@ -298,14 +375,25 @@ impl Server {
             );
             return None;
         };
+        static FIREBIRD: Mutex<()> = Mutex::new(());
+        let turn = (product == Product::Firebird).then(|| {
+            FIREBIRD
+                .lock()
+                .unwrap_or_else(|poisoned| poisoned.into_inner())
+        });
         let session = connect(product, &url);
 
         // Asked of the server rather than parsed out of the URL: the URL may
         // leave the database to the driver's default, and a catalog request
         // has to name the one the session really landed in.
         let (catalog, schema) = match product {
-            Product::Postgres => (None, Some(scalar(&session, "select current_schema()"))),
-            Product::MySql | Product::MariaDb => {
+            Product::Postgres | Product::Cockroach => {
+                (None, Some(scalar(&session, "select current_schema()")))
+            }
+            // A Firebird database has no catalogs or schemas: every name is a
+            // table's own.
+            Product::Firebird => (None, None),
+            Product::MySql | Product::MariaDb | Product::TiDb => {
                 (Some(scalar(&session, "select database()")), None)
             }
             // The one product here that has both, and the only URL that names
@@ -344,6 +432,7 @@ impl Server {
             catalog,
             schema,
             tables: RefCell::new(Vec::new()),
+            _turn: turn,
         })
     }
 
@@ -520,9 +609,10 @@ impl Server {
 /// Opens one connection to `product` at `url`.
 fn connect(product: Product, url: &str) -> Session {
     let (user, password) = product.credentials();
-    let spec = ConnectionSpec::new(url.to_string(), product.driver_class())
+    let mut spec = ConnectionSpec::new(url.to_string(), product.driver_class())
         .with_credentials(user, password)
         .with_jars([product.jar()]);
+    spec.profile = product.profile();
     Session::open(jvm(), &spec).unwrap_or_else(|error| {
         panic!("{} is set but does not connect: {error}", product.url_var())
     })
@@ -602,6 +692,9 @@ macro_rules! on_every_product {
             mssql MsSql,
             oracle Oracle,
             db2 Db2,
+            tidb TiDb,
+            cockroach Cockroach,
+            firebird Firebird,
         );
     };
 }
@@ -825,3 +918,52 @@ fn db2_errors_carry_the_servers_own_message() {
     assert!(text.contains("42704"), "{text}");
     assert!(text.contains("is an undefined name"), "{text}");
 }
+
+/// The products a shipped profile describes, their comments read back through
+/// the session the profile opened: TiDB's from `information_schema` by the
+/// MySQL vendor its profile stands on, CockroachDB's and Firebird's from what
+/// their drivers report. Not ASCII, so that a connection character set that
+/// loses them shows.
+fn profiled_comments(server: &Server) {
+    let t = server.table("comment");
+    let note = server.name("note");
+    match server.product {
+        Product::TiDb => server.exec(&format!(
+            "create table {t} (id integer not null, note varchar(40) comment '메모 / the note') \
+             comment = '주문 / orders'"
+        )),
+        _ => {
+            server.exec(&format!(
+                "create table {t} (id integer not null, note varchar(40))"
+            ));
+            server.exec(&format!("comment on table {t} is '주문 / orders'"));
+            server.exec(&format!(
+                "comment on column {t}.{note} is '메모 / the note'"
+            ));
+        }
+    }
+    let item = server.table_item(&t);
+    assert_eq!(
+        item.get("remarks").and_then(serde_json::Value::as_str),
+        Some("주문 / orders"),
+        "{:?}: {item:?}",
+        server.product
+    );
+    let columns = server.describe_table("columns", &t);
+    let column = columns
+        .iter()
+        .find(|item| string(item, "name") == note)
+        .unwrap_or_else(|| panic!("no {note} in {columns:?}"));
+    assert_eq!(
+        column.get("remarks").and_then(serde_json::Value::as_str),
+        Some("메모 / the note"),
+        "{:?}: {column:?}",
+        server.product
+    );
+}
+
+on_products!(profiled_products_read_their_comments => profiled_comments:
+    tidb TiDb,
+    cockroach Cockroach,
+    firebird Firebird,
+);

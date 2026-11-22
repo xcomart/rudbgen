@@ -391,6 +391,13 @@ pub(super) fn run() {
         return;
     }
 
+    // The dialect profiles of the configuration directory, the ones this build
+    // ships brought into it first, read before anything reads the driver
+    // definitions: a profile brings one of its own. A handful of small files;
+    // a profile that fails is reported and skipped, never fatal. See
+    // `rudbgen_core::dialects`.
+    rudbgen_core::dialects::start_up();
+
     // The icon set has to be installed before the app runs: `svg()` resolves
     // every path through this source, and the default one answers `None`.
     // `LastWindowClosed` rather than the default, which is this only away from

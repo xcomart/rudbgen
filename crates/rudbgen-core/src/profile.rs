@@ -1249,6 +1249,27 @@ impl DriverDef {
             .collect()
     }
 
+    /// The definition a dialect profile's `driver` section brings: the
+    /// profile `id`'s own, on its dialect, named as the section names it or
+    /// after the profile, and with nothing else a built-in carries.
+    pub fn of_profile(
+        driver: &rudbkit_core::dialects::ProfileDriver,
+        id: &str,
+        profile_name: &str,
+    ) -> Self {
+        Self {
+            id: id.to_string(),
+            name: driver.name_or(profile_name).to_string(),
+            icon: driver.icon.clone(),
+            class: driver.class.clone(),
+            maven: driver.maven.clone(),
+            url_template: driver.url_template.clone(),
+            default_port: driver.default_port,
+            dialect: id.to_string(),
+            ..Self::default()
+        }
+    }
+
     /// The table-list query to send, or `None` when the driver's own list is
     /// what gets used.
     pub fn tables_query(&self) -> Option<&str> {
@@ -1297,10 +1318,15 @@ fn first_builtins() -> Vec<String> {
 }
 
 impl Default for DriverStore {
-    /// The built-in definitions, which is what a machine without a
-    /// `drivers.json` starts from.
+    /// The built-in definitions and those of the loaded dialect profiles,
+    /// which is what a machine without a `drivers.json` starts from.
     fn default() -> Self {
-        let drivers = DriverDef::builtins();
+        let mut drivers = DriverDef::builtins();
+        for driver in crate::dialects::current().drivers() {
+            if !drivers.iter().any(|known| known.id == driver.id) {
+                drivers.push(driver);
+            }
+        }
         Self {
             offered_builtins: drivers.iter().map(|driver| driver.id.clone()).collect(),
             drivers,
@@ -1339,26 +1365,29 @@ impl DriverStore {
         };
         let mut store: Self = serde_json::from_slice(strip_bom(&data))
             .with_context(|| format!("failed to parse drivers from {}", path.display()))?;
-        store.offer_new_builtins();
+        let mut offer = DriverDef::builtins();
+        offer.extend(crate::dialects::current().drivers());
+        store.offer(offer);
         Ok(store)
     }
 
-    /// Appends every built-in this store has not been offered, and records
-    /// that it has been.
+    /// Appends every definition of `offer` this store has not been offered,
+    /// and records that it has been: the built-ins, and the definitions the
+    /// loaded dialect profiles bring.
     ///
     /// Nothing is written back here: the next save records it, and until then
-    /// every load offers the same built-ins again and arrives at the same list.
-    /// A definition of the user's own that already took a built-in's id keeps
-    /// it — the id is what a connection profile refers to, and the user's is
-    /// the definition those profiles were made with.
-    fn offer_new_builtins(&mut self) {
-        for builtin in DriverDef::builtins() {
-            if self.offered_builtins.contains(&builtin.id) {
+    /// every load offers the same definitions again and arrives at the same
+    /// list. A definition of the user's own that already took an offered id
+    /// keeps it — the id is what a connection profile refers to, and the
+    /// user's is the definition those profiles were made with.
+    fn offer(&mut self, offer: Vec<DriverDef>) {
+        for driver in offer {
+            if self.offered_builtins.contains(&driver.id) {
                 continue;
             }
-            self.offered_builtins.push(builtin.id.clone());
-            if self.get(&builtin.id).is_none() {
-                self.drivers.push(builtin);
+            self.offered_builtins.push(driver.id.clone());
+            if self.get(&driver.id).is_none() {
+                self.drivers.push(driver);
             }
         }
     }
@@ -1974,6 +2003,47 @@ mod tests {
         let store = DriverStore::load_from(&dir.path().join("absent.json")).expect("load");
         assert_eq!(store.drivers(), DriverDef::builtins());
         assert!(store.get("postgresql").is_some());
+    }
+
+    /// A dialect profile's definition is offered once, the way a built-in
+    /// released later is: added to a file that has not had it, kept off one
+    /// whose user deleted it, and never over a definition of the user's own
+    /// that took its id.
+    #[test]
+    fn a_profiles_driver_is_offered_once() {
+        let profile = DriverDef {
+            id: "tidb".to_string(),
+            name: "TiDB".to_string(),
+            class: "com.mysql.cj.jdbc.Driver".to_string(),
+            url_template: "jdbc:mysql://{host}:{port}/{database}".to_string(),
+            dialect: "tidb".to_string(),
+            ..DriverDef::default()
+        };
+        let mut store = DriverStore {
+            drivers: Vec::new(),
+            offered_builtins: Vec::new(),
+        };
+        store.offer(vec![profile.clone()]);
+        assert_eq!(store.get("tidb"), Some(&profile));
+
+        store.drivers.clear();
+        store.offer(vec![profile.clone()]);
+        assert_eq!(store.get("tidb"), None, "deleted stays deleted");
+
+        let mine = DriverDef {
+            name: "My TiDB".to_string(),
+            ..profile.clone()
+        };
+        let mut store = DriverStore {
+            drivers: vec![mine.clone()],
+            offered_builtins: Vec::new(),
+        };
+        store.offer(vec![profile]);
+        assert_eq!(
+            store.drivers(),
+            [mine],
+            "the user's definition keeps its id"
+        );
     }
 
     #[test]

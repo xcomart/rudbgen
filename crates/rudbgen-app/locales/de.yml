@@ -161,6 +161,11 @@ driver:
   url_template: URL-Vorlage
   default_port: Standardport
   dialect: Dialekt
+  dialect_profile_hint: "Ein Profil auf Basis von %{base}, gelesen aus %{path}."
+  dialect_profile_failed_hint: "%{path} wurde nicht geladen, daher lesen die Sitzungen dieses Treibers die Metadaten ohne das Profil: %{error}"
+  dialect_profile_script: "Sein Skript %{file} gehört zu rudbman: rudbgen führt keine Profilskripte aus und nutzt den Rest des Profils."
+  dialect_profile_pending: "Eine neuere Version dieses Profils wurde mit rudbgen ausgeliefert und liegt daneben als %{files}. Übernehmen Sie daraus, was Sie brauchen, und löschen Sie sie dann."
+  dialect_profiles_problem: "Die Dialektprofile konnten nicht alle gelesen werden: %{error}"
   maven: Maven-Koordinate
   jars: JAR-Dateien
   add_jar: JAR hinzufügen…

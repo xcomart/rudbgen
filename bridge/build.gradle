@@ -59,6 +59,8 @@ dependencies {
     drivers 'com.microsoft.sqlserver:mssql-jdbc:12.8.1.jre11'
     drivers 'org.xerial:sqlite-jdbc:3.47.1.0'
     drivers 'com.ibm.db2:jcc:12.1.5.0'
+    // Firebird's, for the shipped profile of a product no built-in reads.
+    drivers 'org.firebirdsql.jdbc:jaybird:6.0.7'
 }
 
 // Resolution *is* the work: a file in the cache is all the Rust tests want.

@@ -233,6 +233,14 @@ driver:
   url_template: URL template
   default_port: Default port
   dialect: Dialect
+  # The note under the dialect when it names a dialect profile of
+  # <config>/dialects, the YAML files rudbman reads too. %{base} is the dialect
+  # the profile stands on; a profile's script is for rudbman, and is not run here.
+  dialect_profile_hint: "A profile on %{base}, read from %{path}."
+  dialect_profile_failed_hint: "%{path} did not load, so this driver's sessions read metadata without it: %{error}"
+  dialect_profile_script: "Its script %{file} is rudbman's: rudbgen runs no profile scripts and uses the rest of the profile."
+  dialect_profile_pending: "A newer version of this profile came with rudbgen and waits beside it as %{files}. Take what you want of it into the profile, then delete it."
+  dialect_profiles_problem: "The dialect profiles could not all be read: %{error}"
   maven: Maven coordinate
   jars: JAR files
   add_jar: Add a JAR…

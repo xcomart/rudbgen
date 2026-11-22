@@ -22,3 +22,9 @@ parking_lot.workspace = true
 serde.workspace = true
 serde_json.workspace = true
 thiserror.workspace = true
+
+[dev-dependencies]
+# The container suite opens TiDB, CockroachDB and Firebird with rudbkit's
+# shipped dialect profiles, written into a folder of its own and read by
+# `rudbgen-core` the way the application reads them.
+tempfile.workspace = true

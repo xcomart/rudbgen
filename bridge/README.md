@@ -163,6 +163,16 @@ rudbgen itself always leaves both unset: the four custom queries of
 architecture.md D9 have jdbgen's contract, so `rudbgen-meta` runs them through
 `EXECUTE` on the Rust side.
 
+`profile` is the dialect profile the driver names (architecture.md D18), as
+`rudbgen-core` merges it: `{"id", "base", "bridge"}`, `base` being the
+built-in its chain of bases ends in and `bridge` its `bridge` half. Without
+one, `detect_profiles` lists the profiles to find one among: the first whose
+`bridge.detect` words are in the server's product name is the session's.
+`meta/ProfileVendor.java` reads `detect`, `catalog_is_schema` and
+`comments` — the flags and the two comment queries, filtered on the columns
+the profile names — and the built-in answers the rest. A session with neither
+reads with the built-in its product name names, as before.
+
 ### `EXECUTE`
 
 ```json

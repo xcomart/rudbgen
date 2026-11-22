@@ -160,6 +160,11 @@ driver:
   url_template: URL 서식
   default_port: 기본 포트
   dialect: 방언
+  dialect_profile_hint: "%{base} 기반 프로필이며, %{path}에서 읽었습니다."
+  dialect_profile_failed_hint: "%{path}을(를) 불러오지 못해 이 드라이버의 세션은 프로필 없이 메타데이터를 읽습니다: %{error}"
+  dialect_profile_script: "스크립트 %{file}은(는) rudbman용입니다. rudbgen은 프로필 스크립트를 실행하지 않고 프로필의 나머지를 사용합니다."
+  dialect_profile_pending: "rudbgen과 함께 배포된 이 프로필의 새 버전이 %{files}(으)로 옆에 있습니다. 필요한 내용을 프로필에 옮긴 뒤 삭제하세요."
+  dialect_profiles_problem: "방언 프로필을 모두 읽지 못했습니다: %{error}"
   maven: 메이븐 좌표
   jars: JAR 파일
   add_jar: JAR 추가…

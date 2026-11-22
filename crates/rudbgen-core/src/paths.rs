@@ -17,8 +17,8 @@
 //! [`settings_file`], [`connections_file`], [`drivers_file`],
 //! [`template_sets_file`], [`abbreviations_file`], [`known_hosts_file`]. What
 //! has no fixed number of members gets a subdirectory instead:
-//! [`templates_dir`], [`ui_themes_dir`], [`editor_themes_dir`] and
-//! [`drivers_dir`].
+//! [`templates_dir`], [`ui_themes_dir`], [`editor_themes_dir`],
+//! [`drivers_dir`] and [`dialects_dir`].
 
 use std::ffi::OsString;
 use std::fs;
@@ -61,6 +61,9 @@ const DRIVERS_DIR_NAME: &str = "drivers";
 
 /// Name of the directory holding the template files.
 const TEMPLATES_DIR_NAME: &str = "templates";
+
+/// Name of the directory holding the dialect profiles.
+const DIALECTS_DIR_NAME: &str = "dialects";
 
 /// Byte order mark that Windows editors readily prepend to UTF-8 files.
 const UTF8_BOM: &[u8] = b"\xEF\xBB\xBF";
@@ -208,6 +211,21 @@ pub fn drivers_dir() -> Result<PathBuf> {
 /// Fails when no home directory can be determined for the current user.
 pub fn templates_dir() -> Result<PathBuf> {
     Ok(config_dir()?.join(TEMPLATES_DIR_NAME))
+}
+
+/// Directory holding dialect profiles (`dialects`).
+///
+/// One `<id>.yml` per profile, with any script it names beside it, and the
+/// record of the files the application ships there (`shipped.json`); see
+/// [`crate::dialects`].
+///
+/// Like [`config_dir`], the directory is not created by this call.
+///
+/// # Errors
+///
+/// Fails when no home directory can be determined for the current user.
+pub fn dialects_dir() -> Result<PathBuf> {
+    Ok(config_dir()?.join(DIALECTS_DIR_NAME))
 }
 
 /// Build a unique temporary path next to `path`.

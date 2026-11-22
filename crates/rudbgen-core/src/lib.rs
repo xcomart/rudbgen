@@ -1,7 +1,8 @@
 //! Platform-independent core of rudbgen: configuration paths, application
 //! settings, saved connection profiles with their generation options, JDBC
-//! driver definitions, template sets and their bundles, abbreviation rules, OS
-//! keychain access, and the trusted host key database.
+//! driver definitions, the dialect profiles of the configuration directory,
+//! template sets and their bundles, abbreviation rules, OS keychain access, and
+//! the trusted host key database.
 //!
 //! This crate owns everything rudbgen persists on disk or in the system
 //! credential store. It knows nothing about JNI, template rendering, SSH
@@ -42,6 +43,7 @@
 #![warn(missing_docs)]
 
 pub mod abbreviations;
+pub mod dialects;
 pub mod known_hosts;
 pub mod paths;
 pub mod profile;
@@ -53,8 +55,9 @@ pub mod template_sets;
 pub use abbreviations::{AbbreviationRule, AbbreviationStore};
 pub use known_hosts::{HostKeyStatus, KnownHosts};
 pub use paths::{
-    abbreviations_file, config_dir, connections_file, drivers_dir, drivers_file, editor_themes_dir,
-    known_hosts_file, settings_file, template_sets_file, templates_dir, ui_themes_dir,
+    abbreviations_file, config_dir, connections_file, dialects_dir, drivers_dir, drivers_file,
+    editor_themes_dir, known_hosts_file, settings_file, template_sets_file, templates_dir,
+    ui_themes_dir,
 };
 pub use profile::{
     ConnectionProfile, ConnectionStore, CustomQueries, CustomQuery, CustomQueryKind, DriverDef,

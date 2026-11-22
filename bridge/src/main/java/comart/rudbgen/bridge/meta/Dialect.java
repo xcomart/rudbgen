@@ -62,6 +62,31 @@ public enum Dialect {
     }
 
     /**
+     * The built-in a dialect profile's chain of bases ends in, as rudbman's SQL
+     * layer and rudbkit name it ({@code base} of a session's profile).
+     *
+     * @param id the built-in's id, such as {@code mysql}; may be {@code null}
+     * @return its product, or {@link #OTHER} for {@code generic} and anything
+     *         this bridge has no vendor for
+     */
+    public static Dialect byId(String id) {
+        if (id == null) {
+            return OTHER;
+        }
+        switch (id.toLowerCase(Locale.ROOT)) {
+            case "h2":       return H2;
+            case "postgres": return POSTGRESQL;
+            case "mysql":    return MYSQL;
+            case "mariadb":  return MARIADB;
+            case "oracle":   return ORACLE;
+            case "mssql":    return SQLSERVER;
+            case "sqlite":   return SQLITE;
+            case "db2":      return DB2;
+            default:         return OTHER;
+        }
+    }
+
+    /**
      * Identifies the product behind a connection.
      *
      * <p>Never throws: a driver that fails to answer what it is still deserves

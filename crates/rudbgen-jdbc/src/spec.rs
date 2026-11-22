@@ -73,6 +73,17 @@ pub struct ConnectionSpec {
     /// columns positionally — table name, column name, comment.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub column_comments_sql: Option<String>,
+    /// The dialect profile the connection's driver names, for the bridge to
+    /// read comments with: its `id`, the built-in its chain of bases ends in
+    /// (`base`), and its `bridge` half merged along that chain — what
+    /// `rudbgen_core::dialects::Report::session_profile` gives.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub profile: Option<serde_json::Value>,
+    /// For a connection with no profile of its own: the profiles that name
+    /// their products by the server's product name (`bridge.detect`), the
+    /// first of which that matches the server the bridge reads it with.
+    #[serde(skip_serializing_if = "Vec::is_empty")]
+    pub detect_profiles: Vec<serde_json::Value>,
 }
 
 impl ConnectionSpec {
@@ -91,6 +102,8 @@ impl ConnectionSpec {
             keep_alive: None,
             table_comments_sql: None,
             column_comments_sql: None,
+            profile: None,
+            detect_profiles: Vec::new(),
         }
     }
 
@@ -143,6 +156,13 @@ impl fmt::Debug for ConnectionSpec {
             .field("keep_alive", &self.keep_alive)
             .field("table_comments_sql", &self.table_comments_sql)
             .field("column_comments_sql", &self.column_comments_sql)
+            // A profile holds queries, not secrets; its id is what a log
+            // needs.
+            .field(
+                "profile",
+                &self.profile.as_ref().map(|profile| &profile["id"]),
+            )
+            .field("detect_profiles", &self.detect_profiles.len())
             .finish()
     }
 }
@@ -567,6 +587,29 @@ mod tests {
         assert!(
             json.contains(r#""column_comments_sql":"select t, c, m from cols""#),
             "{json}"
+        );
+    }
+
+    /// A connection whose driver names no profile sends neither member; one
+    /// that does sends the profile as `rudbgen-core` merged it.
+    #[test]
+    fn the_profile_appears_only_once_set() {
+        let plain = serde_json::to_value(ConnectionSpec::new("jdbc:h2:mem:t", "org.h2.Driver"))
+            .expect("serializes");
+        assert!(plain.get("profile").is_none(), "{plain}");
+        assert!(plain.get("detect_profiles").is_none(), "{plain}");
+
+        let mut spec = ConnectionSpec::new("jdbc:mysql://db/app", "com.mysql.cj.jdbc.Driver");
+        spec.profile = Some(serde_json::json!({
+            "id": "tidb",
+            "base": "mysql",
+            "bridge": { "detect": ["tidb"] },
+        }));
+        let json = serde_json::to_value(&spec).expect("serializes");
+        assert_eq!(json["profile"]["base"], "mysql");
+        assert!(
+            format!("{spec:?}").contains(r#"profile: Some(String("tidb"))"#),
+            "{spec:?}"
         );
     }
 

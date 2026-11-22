@@ -161,6 +161,11 @@ driver:
   url_template: Modèle d’URL
   default_port: Port par défaut
   dialect: Dialecte
+  dialect_profile_hint: "Un profil fondé sur %{base}, lu depuis %{path}."
+  dialect_profile_failed_hint: "%{path} n’a pas pu être chargé : les sessions de ce pilote lisent donc les métadonnées sans le profil. %{error}"
+  dialect_profile_script: "Son script %{file} est destiné à rudbman : rudbgen n’exécute aucun script de profil et utilise le reste du profil."
+  dialect_profile_pending: "Une version plus récente de ce profil est arrivée avec rudbgen et attend à côté sous le nom %{files}. Reportez-en ce qui vous intéresse dans le profil, puis supprimez-la."
+  dialect_profiles_problem: "Les profils de dialecte n’ont pas tous pu être lus : %{error}"
   maven: Coordonnée Maven
   jars: Fichiers JAR
   add_jar: Ajouter un JAR…

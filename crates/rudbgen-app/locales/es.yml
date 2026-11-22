@@ -166,6 +166,7 @@ driver:
   dialect_profile_script: "Su script %{file} es de rudbman: rudbgen no ejecuta scripts de perfil y usa el resto del perfil."
   dialect_profile_pending: "Una versión más reciente de este perfil llegó con rudbgen y espera a su lado como %{files}. Incorpore al perfil lo que necesite y luego elimínela."
   dialect_profiles_problem: "No se pudieron leer todos los perfiles de dialecto: %{error}"
+  icon_unreadable: "No se pudo leer el icono %{path} como imagen; se muestra otro en su lugar."
   maven: Coordenada Maven
   jars: Archivos JAR
   add_jar: Añadir un JAR…

@@ -165,6 +165,7 @@ driver:
   dialect_profile_script: "脚本 %{file} 供 rudbman 使用：rudbgen 不运行配置文件脚本，只使用配置文件的其余部分。"
   dialect_profile_pending: "rudbgen 附带的此配置文件的新版本以 %{files} 放在它旁边。请把需要的内容合并到配置文件中，然后删除它。"
   dialect_profiles_problem: "未能读取全部方言配置文件：%{error}"
+  icon_unreadable: "无法将图标 %{path} 读取为图像，改为显示其他标记。"
   maven: Maven 坐标
   jars: JAR 文件
   add_jar: 添加 JAR…

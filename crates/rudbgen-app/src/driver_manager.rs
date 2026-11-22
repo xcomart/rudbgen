@@ -1197,12 +1197,9 @@ impl DriverManager {
                 // Resampled to the pixels it covers: drawn from its 64 px file by
                 // the GPU, it would come out stepped (see `rugpui::scaled_image`).
                 let mark_size = rugpui::scaled(DRIVER_MARK_SIZE, cx);
-                let mark = rugpui::scaled_image(
-                    &SharedString::new_static(icons::driver_icon(driver)),
-                    mark_size,
-                    window,
-                    cx,
-                );
+                let mark =
+                    rugpui::scaled_image(&icons::driver_icon(driver, cx), mark_size, window, cx)
+                        .unwrap_or_else(|| SharedString::new_static(icons::GENERIC_DRIVER).into());
                 div()
                     .id(("driver-row", index))
                     .flex()
@@ -1392,19 +1389,28 @@ impl DriverManager {
 
     /// The dialect field, and under it what the dialect is when it names a
     /// dialect profile.
-    fn dialect_row(&self, chrome: &Theme, cx: &App) -> impl IntoElement + use<> {
-        let notes = dialect_notes(&text(&self.dialect_input, cx), &self.profiles)
-            .into_iter()
-            .map(|(note, problem)| {
-                div()
-                    .text_size(rugpui::TextSize::Xs.size(cx))
-                    .text_color(if problem {
-                        chrome.danger
-                    } else {
-                        chrome.text_muted
-                    })
-                    .child(note)
-            });
+    fn dialect_row(&self, chrome: &Theme, cx: &mut App) -> impl IntoElement + use<> {
+        // An icon file that is no image is drawn as another mark, which says
+        // nothing of why; the note does.
+        let unreadable = self
+            .form_driver(cx)
+            .and_then(|driver| icons::unreadable_icon(&driver, cx));
+        let notes = dialect_notes(
+            &text(&self.dialect_input, cx),
+            &self.profiles,
+            unreadable.as_deref(),
+        )
+        .into_iter()
+        .map(|(note, problem)| {
+            div()
+                .text_size(rugpui::TextSize::Xs.size(cx))
+                .text_color(if problem {
+                    chrome.danger
+                } else {
+                    chrome.text_muted
+                })
+                .child(note)
+        });
         div()
             .flex()
             .flex_col()
@@ -2297,12 +2303,19 @@ fn hint(text: SharedString, cx: &App) -> impl IntoElement + use<> {
 fn dialect_notes(
     dialect: &str,
     profiles: &rudbgen_core::dialects::Report,
+    unreadable_icon: Option<&std::path::Path>,
 ) -> Vec<(SharedString, bool)> {
     let mut notes: Vec<(SharedString, bool)> = profiles
         .problems
         .iter()
         .map(|error| (ts!("driver.dialect_profiles_problem", error = error), true))
         .collect();
+    if let Some(path) = unreadable_icon {
+        notes.push((
+            ts!("driver.icon_unreadable", path = path.display().to_string()),
+            true,
+        ));
+    }
     let Some(entry) = profiles.entry_for(dialect) else {
         return notes;
     };
@@ -2880,6 +2893,7 @@ mod tests {
             ts!("driver.dialect_profile_script", file = "f"),
             ts!("driver.dialect_profile_pending", files = "f"),
             ts!("driver.dialect_profiles_problem", error = "e"),
+            ts!("driver.icon_unreadable", path = "p"),
             ts!("driver.maven"),
             ts!("driver.jars"),
             ts!("driver.add_jar"),

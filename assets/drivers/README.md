@@ -4,8 +4,10 @@ The products' logos drawn beside each driver in the connection dialog's
 picker and the driver manager's list (`crates/rudbgen-app/src/icons.rs`,
 `DRIVER_MARKS`). A driver definition names its mark by stem in its `icon`;
 one without a mark of its own gets its dialect's, and one with neither gets
-`generic.png`. jdbgen's import maps its `stock:<name>.png` icons onto these
-stems.
+`generic.png`. An `icon` may instead name an image file of the user's — see
+`rudbkit_core::dialects::icon_ref` — which is read from disk and falls back the
+same way when it cannot be read. jdbgen's import maps its `stock:<name>.png`
+icons onto these stems.
 
 | File | Product | Source |
 | --- | --- | --- |

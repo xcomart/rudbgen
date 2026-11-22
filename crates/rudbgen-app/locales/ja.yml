@@ -165,6 +165,7 @@ driver:
   dialect_profile_script: "スクリプト %{file} は rudbman 用です。rudbgen はプロファイルのスクリプトを実行せず、プロファイルの残りを使います。"
   dialect_profile_pending: "rudbgen に同梱された新しい版のプロファイルが %{files} として隣にあります。必要な内容をプロファイルに取り込んでから削除してください。"
   dialect_profiles_problem: "方言プロファイルをすべては読み込めませんでした: %{error}"
+  icon_unreadable: "アイコン %{path} を画像として読み込めなかったため、代わりに別のマークを表示しています。"
   maven: Maven 座標
   jars: JAR ファイル
   add_jar: JAR を追加…

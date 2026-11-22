@@ -241,6 +241,9 @@ driver:
   dialect_profile_script: "Its script %{file} is rudbman's: rudbgen runs no profile scripts and uses the rest of the profile."
   dialect_profile_pending: "A newer version of this profile came with rudbgen and waits beside it as %{files}. Take what you want of it into the profile, then delete it."
   dialect_profiles_problem: "The dialect profiles could not all be read: %{error}"
+  # A driver's icon names an image file that cannot be read; %{path} is the
+  # file, and the driver is drawn with its dialect's mark or the generic one.
+  icon_unreadable: "The icon %{path} could not be read as an image; another mark is shown in its place."
   maven: Maven coordinate
   jars: JAR files
   add_jar: Add a JAR…

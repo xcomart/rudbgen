@@ -12,6 +12,7 @@ every surface the [architecture document](architecture.md) §4 describes.
 - [The welcome screen](#the-welcome-screen)
 - [Connecting](#connecting)
 - [The driver editor](#the-driver-editor)
+  - [Dialect profiles](#dialect-profiles)
 - [The window](#the-window)
 - [The explorer](#the-explorer)
 - [The inspector](#the-inspector)
@@ -131,6 +132,40 @@ handed to every connection that uses it.
   reference; the short version is that Test runs the statement on a session
   using this driver and tells you which required label is missing, rather than
   letting you find out in the middle of a generation run.
+- **Each driver wears its product's logo**, in the editor's list and in the
+  connection dialog's driver picker.
+
+### Dialect profiles
+
+A dialect profile describes a database product on top of one the application
+knows: a YAML file, `<id>.yml`, in the `dialects` folder of the
+[configuration directory](installation.md#where-rudbgen-keeps-your-data). It is
+the same file rudbman reads — rudbman uses all of it; rudbgen takes two parts:
+
+- **The driver definition it brings.** rudbgen ships profiles for **TiDB**,
+  **CockroachDB** and **Firebird**, and their drivers join the list the first
+  time rudbgen starts with them. One you delete is not offered again.
+- **How it reads comments.** A connection whose driver's **Dialect** names a
+  profile reads table and column comments the profile's way, over the product
+  it stands on; a driver on generic SQL whose server a profile recognizes by
+  its product name uses that profile. A driver's own custom comment queries
+  still come first.
+
+When **Dialect** names a profile, a line under it says what the profile stands
+on and where it was read from, or why it did not load — its drivers then read
+comments as though it were not there. It also says when a newer version of a
+shipped profile is waiting beside yours as `<file>.new` (a file you have not
+changed is simply replaced), and that a profile's Groovy script is rudbman's:
+rudbgen runs none.
+
+A profile's `driver.icon` names a logo rudbgen ships (`tidb`, `mysql`, …) or
+an image file — PNG, JPEG, WebP, GIF, BMP, ICO or SVG, by an absolute path or
+one relative to the `dialects` folder. A file that cannot be read as an image
+gives way to the dialect's logo, and the note under **Dialect** says so.
+
+The format, and how to write a profile of your own, is rudbman's
+[profile format](https://github.com/xcomart/rudbman/blob/dev/docs/dialect-profiles.md#4-the-profile-format)
+— a file written for one application works in the other.
 
 ## The window
 

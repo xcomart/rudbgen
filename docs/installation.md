@@ -262,6 +262,7 @@ Inside it:
 | `abbreviations.json` | The abbreviation rules |
 | `templates/` | Your template files. The three shipped ones are written here on first run and **never overwritten afterwards**, so an edit survives an update |
 | `drivers/` | JDBC driver JARs: the bundled H2 one, copied here on first run, and whatever you download from Maven Central |
+| `dialects/` | Dialect profiles — the shipped ones and your own — and their images; `shipped.json` records what rudbgen wrote there (see [the UI guide](ui-guide.md#dialect-profiles)) |
 | `themes/`, `editor-themes/` | User theme files |
 | `known_hosts` | SSH host keys you have accepted |
 | `sample_h2.db.mv.db` | The copy of the sample database the first run made, which **Sample H2 Embedded** opens |

@@ -1166,7 +1166,12 @@ impl DriverManager {
     }
 
     /// The list of driver definitions.
-    fn render_list(&self, chrome: &Theme, cx: &mut Context<Self>) -> impl IntoElement + use<> {
+    fn render_list(
+        &self,
+        chrome: &Theme,
+        window: &mut Window,
+        cx: &mut Context<Self>,
+    ) -> impl IntoElement + use<> {
         let this = cx.entity();
         let rows: Vec<_> = self
             .store
@@ -1189,7 +1194,15 @@ impl DriverManager {
                     ts!("driver.jar_count", count = driver.jars.len())
                 };
                 let this = this.clone();
-                let mark = icons::driver_icon(driver);
+                // Resampled to the pixels it covers: drawn from its 64 px file by
+                // the GPU, it would come out stepped (see `rugpui::scaled_image`).
+                let mark_size = rugpui::scaled(DRIVER_MARK_SIZE, cx);
+                let mark = rugpui::scaled_image(
+                    &SharedString::new_static(icons::driver_icon(driver)),
+                    mark_size,
+                    window,
+                    cx,
+                );
                 div()
                     .id(("driver-row", index))
                     .flex()
@@ -1205,11 +1218,7 @@ impl DriverManager {
                     .when(!selected, |row| {
                         row.hover(|row| row.bg(chrome.surface_hover))
                     })
-                    .child(
-                        img(mark)
-                            .size(rugpui::scaled(DRIVER_MARK_SIZE, cx))
-                            .flex_none(),
-                    )
+                    .child(img(mark).size(mark_size).flex_none())
                     .child(
                         div()
                             .flex()
@@ -2176,7 +2185,7 @@ impl Render for DriverManager {
         );
         self.watch_scroll(cx);
         let chrome = theme(cx);
-        let list = self.render_list(&chrome, cx);
+        let list = self.render_list(&chrome, window, cx);
         let details = self.render_details(&chrome, cx);
         let footer = self.render_footer(&chrome, cx);
 

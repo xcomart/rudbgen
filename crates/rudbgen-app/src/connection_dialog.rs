@@ -52,8 +52,8 @@ use rudbkit_core::url::{CATALOG_PLACEHOLDERS, placeholders_of, substitute};
 use rudbkit_core::{TunnelAuth, TunnelConfig};
 use rugpui::{
     Button, ButtonVariant, Checkbox, Collapsible, DraggedThumb, Scrollbar, ScrollbarAxis,
-    ScrollbarState, Segmented, Select, TextInput, Theme, form_row, hide_later, hide_now, modal,
-    scroll_to, scrolled, theme,
+    ScrollbarState, Segmented, Select, SelectOption, TextInput, Theme, form_row, hide_later,
+    hide_now, modal, scroll_to, scrolled, theme,
 };
 use uuid::Uuid;
 
@@ -1673,11 +1673,13 @@ impl ConnectionDialog {
     /// The driver picker and the button that opens the driver manager.
     fn render_driver(&self, chrome: &Theme, cx: &mut Context<Self>) -> impl IntoElement + use<> {
         let this = cx.entity();
-        let options: Vec<SharedString> = self
+        // Each driver beside its product's logo, which picks a product out of
+        // the list faster than its name does.
+        let options: Vec<SelectOption> = self
             .drivers
             .drivers()
             .iter()
-            .map(|driver| SharedString::from(driver.name.clone()))
+            .map(|driver| SelectOption::new(driver.name.clone()).image(icons::driver_icon(driver)))
             .collect();
         let selected = self
             .current_driver()

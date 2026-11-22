@@ -118,6 +118,116 @@ pub const CHEVRON_RIGHT: &str = "icons/chevron-right.svg";
 /// rather than as a different mark.
 pub const CHEVRON_DOWN: &str = "icons/chevron-down.svg";
 
+// --- driver marks ------------------------------------------------------------
+
+/// The mark of a driver whose product this build has no logo for: a database
+/// cylinder.
+pub const GENERIC_DRIVER: &str = "icons/drivers/generic.png";
+
+/// The products' own logos, by the stem a driver definition's `icon` names,
+/// drawn beside a driver in the connection dialog's picker and the driver
+/// manager's list. Unlike the glyphs above they are color images, drawn with
+/// [`img`](gpui::img) as they are: a tinted `svg` would make every product's
+/// mark the same gray shape. Each is a 64 px square with the logo trimmed and
+/// centered; `../../../assets/drivers/README.md` says where each came from.
+const DRIVER_MARKS: &[(&str, &[u8])] = &[
+    (
+        "icons/drivers/altibase.png",
+        include_bytes!("../../../assets/drivers/altibase.png"),
+    ),
+    (
+        "icons/drivers/cockroachdb.png",
+        include_bytes!("../../../assets/drivers/cockroachdb.png"),
+    ),
+    (
+        "icons/drivers/cubrid.png",
+        include_bytes!("../../../assets/drivers/cubrid.png"),
+    ),
+    (
+        "icons/drivers/db2.png",
+        include_bytes!("../../../assets/drivers/db2.png"),
+    ),
+    (
+        "icons/drivers/firebird.png",
+        include_bytes!("../../../assets/drivers/firebird.png"),
+    ),
+    (
+        "icons/drivers/generic.png",
+        include_bytes!("../../../assets/drivers/generic.png"),
+    ),
+    (
+        "icons/drivers/h2.png",
+        include_bytes!("../../../assets/drivers/h2.png"),
+    ),
+    (
+        "icons/drivers/mariadb.png",
+        include_bytes!("../../../assets/drivers/mariadb.png"),
+    ),
+    (
+        "icons/drivers/mongodb.png",
+        include_bytes!("../../../assets/drivers/mongodb.png"),
+    ),
+    (
+        "icons/drivers/mssql.png",
+        include_bytes!("../../../assets/drivers/mssql.png"),
+    ),
+    (
+        "icons/drivers/mysql.png",
+        include_bytes!("../../../assets/drivers/mysql.png"),
+    ),
+    (
+        "icons/drivers/oracle.png",
+        include_bytes!("../../../assets/drivers/oracle.png"),
+    ),
+    (
+        "icons/drivers/postgresql.png",
+        include_bytes!("../../../assets/drivers/postgresql.png"),
+    ),
+    (
+        "icons/drivers/sqlite.png",
+        include_bytes!("../../../assets/drivers/sqlite.png"),
+    ),
+    (
+        "icons/drivers/tidb.png",
+        include_bytes!("../../../assets/drivers/tidb.png"),
+    ),
+];
+
+/// The logo drawn for `driver`.
+///
+/// A driver on a dialect profile wears the mark the profile's `driver`
+/// section names, so that a definition offered by an older version of the
+/// profile follows the newer's; then the definition's own `icon`; then the
+/// mark of the built-in dialect it names; and failing all three,
+/// [`GENERIC_DRIVER`]. An `icon` of `generic` names no product, so it gives way
+/// to the dialect's: a Db2 definition from before Db2 had a mark gets it.
+pub fn driver_icon(driver: &rudbgen_core::DriverDef) -> &'static str {
+    let profiles = rudbgen_core::dialects::current();
+    let profile = profiles
+        .entry_for(&driver.dialect)
+        .filter(|entry| entry.failure().is_none())
+        .and_then(|entry| entry.driver.as_ref()?.icon.clone());
+    let dialect = rudbkit_core::dialects::built_in(&driver.dialect).map(|dialect| match dialect {
+        "postgres" => "postgresql",
+        other => other,
+    });
+    [profile.as_deref(), driver.icon.as_deref(), dialect]
+        .into_iter()
+        .flatten()
+        .filter(|stem| *stem != "generic")
+        .find_map(driver_mark)
+        .unwrap_or(GENERIC_DRIVER)
+}
+
+/// The asset path of the mark whose stem is `stem`, if this build has it.
+fn driver_mark(stem: &str) -> Option<&'static str> {
+    DRIVER_MARKS.iter().map(|(path, _)| *path).find(|path| {
+        path.strip_prefix("icons/drivers/")
+            .and_then(|file| file.strip_suffix(".png"))
+            == Some(stem)
+    })
+}
+
 /// rudbgen's own icons, paired with the bytes [`ICONS`] hands back for them.
 const APP_ICONS: &[(&str, &[u8])] = &[
     (APP_ICON, include_bytes!("../../../assets/icon-128.png")),
@@ -152,8 +262,12 @@ const APP_ICONS: &[(&str, &[u8])] = &[
 /// gpui's default source answers every path with `None` and the icons paint as
 /// nothing at all — and leaving [`rugpui::ICONS`] out of the chain does the
 /// same to the arrows alone, which is what `rugpui::init` warns about.
-pub const ICONS: IconSet =
-    IconSet::new(&[rugpui_shell::WINDOW_CONTROL_ICONS, rugpui::ICONS, APP_ICONS]);
+pub const ICONS: IconSet = IconSet::new(&[
+    rugpui_shell::WINDOW_CONTROL_ICONS,
+    rugpui::ICONS,
+    APP_ICONS,
+    DRIVER_MARKS,
+]);
 
 #[cfg(test)]
 mod tests {
@@ -187,6 +301,50 @@ mod tests {
     }
 
     #[test]
+    fn every_driver_mark_is_a_png_and_every_built_in_has_one() {
+        for (name, bytes) in DRIVER_MARKS {
+            assert!(
+                bytes.starts_with(b"\x89PNG\r\n\x1a\n"),
+                "{name} is not a PNG"
+            );
+        }
+        for driver in rudbgen_core::DriverDef::builtins() {
+            let icon = driver
+                .icon
+                .as_deref()
+                .expect("every built-in names an icon");
+            assert!(driver_mark(icon).is_some(), "{}: no mark {icon}", driver.id);
+        }
+    }
+
+    #[test]
+    fn a_driver_without_a_mark_of_its_own_takes_its_dialects_or_the_generic_one() {
+        let driver = |icon: Option<&str>, dialect: &str| rudbgen_core::DriverDef {
+            icon: icon.map(str::to_string),
+            dialect: dialect.to_string(),
+            ..rudbgen_core::DriverDef::default()
+        };
+        assert_eq!(
+            driver_icon(&driver(Some("oracle"), "generic")),
+            "icons/drivers/oracle.png"
+        );
+        assert_eq!(
+            driver_icon(&driver(None, "PostgreSQL")),
+            "icons/drivers/postgresql.png"
+        );
+        assert_eq!(
+            driver_icon(&driver(Some("nothing"), "mssql")),
+            "icons/drivers/mssql.png"
+        );
+        assert_eq!(driver_icon(&driver(None, "generic")), GENERIC_DRIVER);
+        assert_eq!(driver_icon(&driver(None, "nosuch")), GENERIC_DRIVER);
+        assert_eq!(
+            driver_icon(&driver(Some("generic"), "db2")),
+            "icons/drivers/db2.png"
+        );
+    }
+
+    #[test]
     fn an_unknown_path_is_not_an_error() {
         assert!(
             ICONS
@@ -199,9 +357,12 @@ mod tests {
     #[test]
     fn listing_returns_both_tables() {
         assert_eq!(ICONS.list("icons/").unwrap().len(), ICONS.len());
-        // rudbgen's own marks, the four caption glyphs the shell owns, and the
-        // widget kit's two disclosure carets.
-        assert_eq!(ICONS.len(), APP_ICONS.len() + 4 + rugpui::ICONS.len());
+        // rudbgen's own marks, the products' logos, the four caption glyphs the
+        // shell owns, and the widget kit's two disclosure carets.
+        assert_eq!(
+            ICONS.len(),
+            APP_ICONS.len() + DRIVER_MARKS.len() + 4 + rugpui::ICONS.len()
+        );
     }
 
     /// The widget kit resolves its default arrows through the host's asset

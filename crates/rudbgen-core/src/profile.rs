@@ -1177,8 +1177,7 @@ const BUILTIN_DRIVERS: &[BuiltinDriver] = &[
     BuiltinDriver {
         id: "db2",
         product: products::DB2,
-        // jdbgen's icon set, which `assets/drivers` is, has no Db2 mark.
-        icon: "generic",
+        icon: "db2",
         version: "12.1.5.0",
         no_auth: false,
         // JCC reports `REMARKS` from `SYSCAT` itself, and the one property

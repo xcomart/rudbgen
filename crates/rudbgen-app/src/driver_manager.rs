@@ -63,7 +63,7 @@ use futures::channel::mpsc;
 use gpui::{
     App, Context, DragMoveEvent, Entity, EventEmitter, FocusHandle, Focusable, IntoElement,
     MouseButton, MouseUpEvent, PathPromptOptions, Render, ScrollHandle, SharedString, Task, Window,
-    div, prelude::*, px,
+    div, img, prelude::*, px,
 };
 use rudbgen_core::{ConnectionProfile, CustomQueryKind, DriverDef, DriverStore, drivers_dir};
 use rudbgen_jdbc::{BridgeErrorKind, DriverProbe, Error as JdbcError, StatementSpec};
@@ -76,6 +76,7 @@ use rugpui_editor::{EditorView, SqlHighlighter};
 use crate::app_settings;
 use crate::connection::{self, ConnectError, Connected, Credentials, SessionHandle};
 use crate::i18n::ts;
+use crate::icons;
 use crate::maven::{self, Cancel, Coordinate, DownloadError, Progress};
 
 /// Element id of the driver list's overlay scroll indicator.
@@ -86,6 +87,10 @@ const BODY_SCROLLBAR: &str = "driver-body-scrollbar";
 
 /// Width of the driver list column.
 const LIST_WIDTH: f32 = 200.;
+
+/// Edge length of the product logo beside each driver of the list: as tall as
+/// the row's two lines of text are, so it stands beside both.
+const DRIVER_MARK_SIZE: f32 = 20.;
 
 /// Height at which the two columns start scrolling.
 const BODY_MAX_HEIGHT: f32 = 460.;
@@ -1184,11 +1189,13 @@ impl DriverManager {
                     ts!("driver.jar_count", count = driver.jars.len())
                 };
                 let this = this.clone();
+                let mark = icons::driver_icon(driver);
                 div()
                     .id(("driver-row", index))
                     .flex()
-                    .flex_col()
-                    .gap(px(1.))
+                    .flex_row()
+                    .items_center()
+                    .gap(px(8.))
                     .px(px(8.))
                     .py(px(5.))
                     .rounded_md()
@@ -1199,22 +1206,35 @@ impl DriverManager {
                         row.hover(|row| row.bg(chrome.surface_hover))
                     })
                     .child(
-                        div()
-                            .text_size(rugpui::TextSize::Sm.size(cx))
-                            .text_color(chrome.text)
-                            .truncate()
-                            .child(name),
+                        img(mark)
+                            .size(rugpui::scaled(DRIVER_MARK_SIZE, cx))
+                            .flex_none(),
                     )
                     .child(
                         div()
-                            .text_size(rugpui::scaled(10., cx))
-                            .text_color(if driver.jars.is_empty() {
-                                chrome.danger
-                            } else {
-                                chrome.text_muted
-                            })
-                            .truncate()
-                            .child(subtitle),
+                            .flex()
+                            .flex_col()
+                            .gap(px(1.))
+                            .flex_1()
+                            .min_w_0()
+                            .child(
+                                div()
+                                    .text_size(rugpui::TextSize::Sm.size(cx))
+                                    .text_color(chrome.text)
+                                    .truncate()
+                                    .child(name),
+                            )
+                            .child(
+                                div()
+                                    .text_size(rugpui::scaled(10., cx))
+                                    .text_color(if driver.jars.is_empty() {
+                                        chrome.danger
+                                    } else {
+                                        chrome.text_muted
+                                    })
+                                    .truncate()
+                                    .child(subtitle),
+                            ),
                     )
                     .on_click(move |_, _window, cx| {
                         this.update(cx, |manager, cx| manager.select(id.clone(), cx));

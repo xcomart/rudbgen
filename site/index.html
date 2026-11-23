@@ -130,10 +130,13 @@
           </div>
           <div class="panel" id="panel-windows" role="tabpanel" aria-labelledby="tab-windows">
             <div class="download">
-              <p><strong>Installer or portable zip</strong>The <code>-setup.exe</code> installs for the current user, with no administrator rights.</p>
-              <a class="btn primary" href="https://github.com/xcomart/rudbgen/releases/latest">Latest release</a>
+              <p><strong>Installer</strong>The <code>-setup.exe</code> installs for the current user, with no administrator rights.</p>
+              <div class="btns">
+                <a class="btn primary" href="https://github.com/xcomart/rudbgen/releases/latest" data-asset="x86_64-pc-windows-msvc-setup.exe">x64</a>
+                <a class="btn" href="https://github.com/xcomart/rudbgen/releases/latest" data-asset="aarch64-pc-windows-msvc-setup.exe">ARM64</a>
+              </div>
             </div>
-            <p class="note">Windows 10 and 11, x64 and ARM64. If SmartScreen objects, choose <em>More info → Run anyway</em>.</p>
+            <p class="note">Windows 10 and 11. If SmartScreen objects, choose <em>More info → Run anyway</em>. A portable zip is on the <a href="https://github.com/xcomart/rudbgen/releases/latest">release page</a>.</p>
           </div>
           <div class="panel" id="panel-macos" role="tabpanel" aria-labelledby="tab-macos" hidden>
             <div class="term"><pre><span class="p">$ </span><span class="c">brew install --cask xcomart/tap/rudbgen</span></pre><button class="copy" type="button">Copy</button></div>

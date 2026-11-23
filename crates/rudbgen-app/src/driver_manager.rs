@@ -542,7 +542,7 @@ impl DriverManager {
         // driver actually uses; none of them is a word, so none is translated.
         let saved = store.drivers().to_vec();
         let mut manager = Self {
-            profiles: rudbgen_core::dialects::reload(),
+            profiles: profiles_now(),
             saved,
             discarding: false,
             label_width: px(rugpui::modal::FORM_LABEL_WIDTH),
@@ -2293,6 +2293,21 @@ fn hint(text: SharedString, cx: &App) -> impl IntoElement + use<> {
         .text_size(rugpui::TextSize::Xs.size(cx))
         .text_color(chrome.text_muted)
         .child(text)
+}
+
+/// The dialect profiles of the configuration directory, read again: what the
+/// manager shows when it opens.
+///
+/// A test reads none. `reload` reads the user's real `<config>/dialects` and
+/// makes it what `DriverStore` offers drivers from for the rest of the test
+/// binary, so a test that opened a manager would hand every test after it the
+/// profiles of whoever ran it.
+fn profiles_now() -> Arc<rudbgen_core::dialects::Report> {
+    if cfg!(test) {
+        rudbgen_core::dialects::current()
+    } else {
+        rudbgen_core::dialects::reload()
+    }
 }
 
 /// What the note under the dialect says, each line with whether it is a

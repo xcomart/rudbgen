@@ -27,7 +27,7 @@
 //! with `NoDriverJar` before it reaches JDBC at all. Every other driver rudbgen
 //! knows about is downloaded from Maven Central on demand, but H2 is dual
 //! licensed under MPL 2.0 and EPL 1.0 and may be redistributed, so the release
-//! ships `h2-2.4.240.jar` beside the executable — jdbgen bundled it for the
+//! ships `h2-2.5.252.jar` beside the executable — jdbgen bundled it for the
 //! same reason. [`seed_driver`] copies it into
 //! [`drivers_dir`](rudbgen_core::drivers_dir) and puts the copy on the
 //! `h2-embedded` class path, so the seeded connection opens on a first run with
@@ -78,7 +78,7 @@ const DRIVERS_DIR: &str = "drivers";
 /// put it, so a later download finds the file already there rather than
 /// fetching a second copy. `the_bundled_jar_matches_the_builtin_coordinate`
 /// is what keeps the two in step when the version moves.
-const BUNDLED_DRIVER_JAR: &str = "h2-2.4.240.jar";
+const BUNDLED_DRIVER_JAR: &str = "h2-2.5.252.jar";
 
 /// The `sample/` directory of a checkout, for `cargo run` and `cargo test`.
 ///

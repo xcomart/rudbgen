@@ -468,7 +468,7 @@ pub fn build_spec(
         Some(profile) => spec.profile = Some(profile),
         None => {
             if rudbkit_core::dialects::built_in(&driver.dialect)
-                .is_none_or(|dialect| dialect == rudbkit_core::products::GENERIC_DIALECT)
+                .is_none_or(|dialect| dialect == rudbkit_core::builtins::GENERIC_DIALECT)
             {
                 spec.detect_profiles = profiles.detect_profiles();
             }

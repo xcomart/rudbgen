@@ -31,7 +31,7 @@ use std::path::{Path, PathBuf};
 
 use anyhow::{Context, Result};
 use rudbkit_core::TunnelConfig;
-use rudbkit_core::products::{self, Product};
+use rudbkit_core::builtins::{self, App};
 use serde::de::Error as _;
 use serde::{Deserialize, Deserializer, Serialize};
 use uuid::Uuid;
@@ -952,251 +952,13 @@ fn fold_legacy(current: CustomQuery, enabled: Option<bool>, sql: Option<String>)
 /// Dialect id for a database the SQL layer has no special knowledge of.
 const DIALECT_GENERIC: &str = "generic";
 
-/// One of the four queries as a built-in ships it.
-///
-/// The third case is the one worth having a name for: a statement that is the
-/// right answer for a user who needs it, kept in the definition so the driver
-/// editor can offer it, but switched off because the bridge already answers
-/// the same question better for that product.
-enum Seed {
-    /// No statement at all.
-    Absent,
-    /// A statement that ships switched on.
-    On(&'static str),
-    /// A statement that ships switched off, text and all.
-    Off(&'static str),
-}
-
-impl Seed {
-    /// The query this seed makes.
-    fn query(&self) -> CustomQuery {
-        match self {
-            Self::Absent => CustomQuery::default(),
-            Self::On(sql) => CustomQuery::on(*sql),
-            Self::Off(sql) => CustomQuery::off(*sql),
-        }
-    }
-}
-
-/// One built-in driver definition: a product of [`rudbkit_core::products`],
-/// with what this application chooses for it.
-///
-/// A struct rather than a tuple so that a dozen columns cannot be transposed by
-/// accident. There is no column for [`CustomQueries::columns`]: no stock
-/// driver overrides the column list, and a column of `Seed::Absent` would say
-/// nothing.
-struct BuiltinDriver {
-    /// Value of [`DriverDef::id`].
-    id: &'static str,
-    /// The product: the name, class, Maven artifact, URL template, default
-    /// port and dialect it is defined with.
-    product: Product,
-    /// Value of [`DriverDef::icon`]; every built-in has one.
-    icon: &'static str,
-    /// The driver version [`DriverDef::maven`] names; every built-in is
-    /// downloadable.
-    version: &'static str,
-    /// Value of [`DriverDef::no_auth`].
-    no_auth: bool,
-    /// Value of [`DriverDef::props`].
-    props: &'static [(&'static str, &'static str)],
-    /// Seed for [`CustomQueries::tables`].
-    tables: Seed,
-    /// Seed for [`CustomQueries::table_comments`].
-    table_comments: Seed,
-    /// Seed for [`CustomQueries::column_comments`].
-    column_comments: Seed,
-}
-
-/// H2's table list, from jdbgen's stock configuration.
-///
-/// H2 2.x answers `getTables` with the SQL standard's `BASE TABLE` where every
-/// other product — and every consumer of the label contract — says `TABLE`.
-/// The `CASE` is what translates it; the rest is the five labels
-/// [`CustomQueries::tables`] requires, spelled with the quoted aliases H2 needs
-/// to keep them upper-case.
-const H2_TABLES_SQL: &str = "select TABLE_CATALOG as \"TABLE_CAT\", TABLE_SCHEMA as \"TABLE_SCHEM\", TABLE_NAME, CASE WHEN TABLE_TYPE='BASE TABLE' THEN 'TABLE' ELSE TABLE_TYPE END AS \"TABLE_TYPE\", REMARKS\nfrom information_schema.tables\nwhere TABLE_CATALOG='${catalog}' and TABLE_SCHEMA='${schema}'";
-
-/// SQL Server's table comments, from jdbgen's stock configuration.
-///
-/// Extended properties are where SQL Server keeps what every other product
-/// calls a comment, and no version of the driver reports them in `REMARKS`.
-/// It ships **off**: the bridge asks the same question itself for this
-/// product, over the whole schema in one statement rather than one table at a
-/// time, and a built-in that switched this on would take that path away. It is
-/// carried anyway because a user whose server disagrees with the bridge needs
-/// somewhere to start from, and because it is what jdbgen sent.
-const MSSQL_TABLE_COMMENTS_SQL: &str = "SELECT OBJNAME, cast(value as varchar(8000)) as VALUE \nFROM fn_listextendedproperty ('MS_DESCRIPTION','schema','${schema}','table',null,null,null)";
-
-/// SQL Server's column comments, from jdbgen's stock configuration.
-///
-/// Off for the reason [`MSSQL_TABLE_COMMENTS_SQL`] is. Its shape is the one
-/// [`CustomQueryKind::ColumnComments`] reads — the column name and the
-/// comment, re-run per table with `${table}` filled in — so it works unedited
-/// the moment a user switches it on.
-const MSSQL_COLUMN_COMMENTS_SQL: &str = "SELECT OBJNAME, cast(value as varchar(8000)) as VALUE \nFROM fn_listextendedproperty ('MS_DESCRIPTION','schema','${schema}','table','${table}','column',null)";
-
-/// Built-in driver definitions, in the order the picker shows them.
-///
-/// The ten products jdbgen ships as stock drivers, merged with the seven
-/// rudbman knew: one entry per product, jdbgen's properties and custom queries
-/// carried over, rudbman's `{host}`/`{port}`/`{database}` URL placeholders kept
-/// (jdbgen's `<databaseHost>` spelling does not survive the merge), and H2 split
-/// into the embedded and the server form because they are two different URLs
-/// and only one of them has a port. Db2 came after the merge, from rudbman's
-/// list again, and sits last so that a picker an older file offers it to grows
-/// at the end — see [`FIRST_BUILTINS`].
-///
-/// The Maven coordinates pin a version that was current when this list was
-/// written and that Central was asked for by name; they are a starting point
-/// for the downloader, not a requirement. Users edit `drivers.json` to move to
-/// another version or to add a driver that is not here.
-const BUILTIN_DRIVERS: &[BuiltinDriver] = &[
-    BuiltinDriver {
-        id: "oracle-thin",
-        product: products::ORACLE_THIN,
-        icon: "oracle",
-        version: "23.26.3.0.0",
-        no_auth: false,
-        // Without it the thin driver reports no `REMARKS` at all: Oracle's
-        // comments live in `ALL_TAB_COMMENTS`, and this is the switch that
-        // makes the driver read them.
-        props: &[("remarksReporting", "true")],
-        tables: Seed::Absent,
-        table_comments: Seed::Absent,
-        column_comments: Seed::Absent,
-    },
-    BuiltinDriver {
-        id: "postgresql",
-        product: products::POSTGRESQL,
-        icon: "postgresql",
-        version: "42.7.13",
-        no_auth: false,
-        props: &[],
-        tables: Seed::Absent,
-        table_comments: Seed::Absent,
-        column_comments: Seed::Absent,
-    },
-    BuiltinDriver {
-        id: "mysql",
-        product: products::MYSQL,
-        icon: "mysql",
-        version: "26.7.0",
-        no_auth: false,
-        // Connector/J's own `SHOW`-based metadata path answers a truncated
-        // `REMARKS` and no `COLUMN_DEF` for several types; the information
-        // schema answers both.
-        props: &[("useInformationSchema", "true")],
-        tables: Seed::Absent,
-        table_comments: Seed::Absent,
-        column_comments: Seed::Absent,
-    },
-    BuiltinDriver {
-        id: "sqlite",
-        product: products::SQLITE,
-        icon: "sqlite",
-        version: "3.53.2.1",
-        no_auth: true,
-        props: &[],
-        tables: Seed::Absent,
-        table_comments: Seed::Absent,
-        column_comments: Seed::Absent,
-    },
-    BuiltinDriver {
-        id: "h2-embedded",
-        product: products::H2_EMBEDDED,
-        icon: "h2",
-        version: "2.4.240",
-        no_auth: true,
-        props: &[],
-        tables: Seed::On(H2_TABLES_SQL),
-        table_comments: Seed::Absent,
-        column_comments: Seed::Absent,
-    },
-    BuiltinDriver {
-        id: "h2-server",
-        product: products::H2_SERVER,
-        icon: "h2",
-        version: "2.4.240",
-        no_auth: false,
-        props: &[],
-        tables: Seed::On(H2_TABLES_SQL),
-        table_comments: Seed::Absent,
-        column_comments: Seed::Absent,
-    },
-    BuiltinDriver {
-        id: "mssql",
-        product: products::MSSQL,
-        icon: "mssql",
-        version: "13.4.0.jre11",
-        no_auth: false,
-        // From 10.2 the driver encrypts by default and then refuses the
-        // self-signed certificate a development server presents, which reads as
-        // "the driver cannot reach the server". The pair is jdbgen's, and it is
-        // the reason a first connection succeeds at all.
-        props: &[("encrypt", "true"), ("trustServerCertificate", "true")],
-        tables: Seed::Absent,
-        table_comments: Seed::Off(MSSQL_TABLE_COMMENTS_SQL),
-        column_comments: Seed::Off(MSSQL_COLUMN_COMMENTS_SQL),
-    },
-    BuiltinDriver {
-        id: "mariadb",
-        product: products::MARIADB,
-        icon: "mariadb",
-        version: "3.5.10",
-        no_auth: false,
-        props: &[],
-        tables: Seed::Absent,
-        table_comments: Seed::Absent,
-        column_comments: Seed::Absent,
-    },
-    BuiltinDriver {
-        id: "mongodb",
-        // jdbgen's stock entry gives 3306, MySQL's port, a copy-paste in the
-        // file it came from.
-        product: products::MONGODB,
-        icon: "mongodb",
-        version: "3.0.8",
-        no_auth: false,
-        props: &[],
-        tables: Seed::Absent,
-        table_comments: Seed::Absent,
-        column_comments: Seed::Absent,
-    },
-    BuiltinDriver {
-        id: "cubrid",
-        product: products::CUBRID,
-        icon: "cubrid",
-        version: "11.3.2.0053",
-        no_auth: false,
-        props: &[],
-        tables: Seed::Absent,
-        table_comments: Seed::Absent,
-        column_comments: Seed::Absent,
-    },
-    BuiltinDriver {
-        id: "db2",
-        product: products::DB2,
-        icon: "db2",
-        version: "12.1.5.0",
-        no_auth: false,
-        // JCC reports `REMARKS` from `SYSCAT` itself, and the one property
-        // every session wants — the server's text for a failed statement — is
-        // set by the bridge for any JCC driver, built-in or not.
-        props: &[],
-        tables: Seed::Absent,
-        table_comments: Seed::Absent,
-        column_comments: Seed::Absent,
-    },
-];
-
-/// The ids [`BUILTIN_DRIVERS`] held before `drivers.json` began recording
+/// The ids the built-ins held before `drivers.json` began recording
 /// which built-ins it had been offered — see [`DriverStore::offered_builtins`].
 ///
 /// Frozen: this is what a file written before then is read as having been
 /// offered, so a built-in added since appears in it once, and a built-in its
-/// user deleted from it stays deleted. A built-in added later belongs in the
-/// table above and never here.
+/// user deleted from it stays deleted. A built-in added later belongs in
+/// rudbkit's `drivers.yml` and never here.
 const FIRST_BUILTINS: &[&str] = &[
     "oracle-thin",
     "postgresql",
@@ -1217,33 +979,34 @@ impl DriverDef {
     /// empty [`DriverDef::jars`]: the definition says what a driver *is*, the
     /// user still has to supply the JAR.
     pub fn builtins() -> Vec<Self> {
-        BUILTIN_DRIVERS
-            .iter()
-            .map(|builtin| Self {
-                id: builtin.id.to_string(),
-                name: builtin.product.name.to_string(),
-                icon: Some(builtin.icon.to_string()),
-                class: builtin.product.class.to_string(),
-                jars: Vec::new(),
-                maven: Some(builtin.product.maven(builtin.version)),
-                url_template: builtin.product.url_template.to_string(),
-                default_port: builtin.product.default_port,
-                dialect: builtin.product.dialect.to_string(),
-                no_auth: builtin.no_auth,
-                props: builtin
-                    .props
-                    .iter()
-                    .map(|(key, value)| ((*key).to_string(), (*value).to_string()))
-                    .collect(),
-                custom_queries: CustomQueries {
-                    tables: builtin.tables.query(),
-                    // No stock driver replaces the column list: every product
-                    // here answers `getColumns` with the eleven values the
-                    // label contract asks for.
-                    columns: CustomQuery::default(),
-                    table_comments: builtin.table_comments.query(),
-                    column_comments: builtin.column_comments.query(),
-                },
+        builtins::builtins(App::Rudbgen)
+            .into_iter()
+            .map(|builtin| {
+                let query = |query: Option<builtins::Query>| {
+                    query.map_or_else(CustomQuery::default, |query| CustomQuery {
+                        enabled: query.enabled,
+                        sql: query.sql,
+                    })
+                };
+                Self {
+                    id: builtin.id,
+                    name: builtin.name,
+                    icon: Some(builtin.icon),
+                    class: builtin.class,
+                    jars: Vec::new(),
+                    maven: Some(builtin.maven),
+                    url_template: builtin.url_template,
+                    default_port: builtin.default_port,
+                    dialect: builtin.dialect,
+                    no_auth: builtin.no_auth,
+                    props: builtin.props,
+                    custom_queries: CustomQueries {
+                        tables: query(builtin.queries.tables),
+                        columns: query(builtin.queries.columns),
+                        table_comments: query(builtin.queries.table_comments),
+                        column_comments: query(builtin.queries.column_comments),
+                    },
+                }
             })
             .collect()
     }

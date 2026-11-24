@@ -516,7 +516,7 @@ impl DriverManager {
         let weak = cx.weak_entity();
         let maven_input = cx.new(move |cx| {
             TextInput::new(cx)
-                .placeholder(SharedString::from("org.postgresql:postgresql:42.7.4"))
+                .placeholder(SharedString::from("org.postgresql:postgresql:42.7.15"))
                 .tab_index(tab::MAVEN)
                 .on_submit(move |_, _window, cx| {
                     let weak = weak.clone();

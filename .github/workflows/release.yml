@@ -410,13 +410,13 @@ jobs:
       # transfer and nothing more, where a digest written down here also says
       # the release ships the bytes that were reviewed. It was taken from the
       # artefact at this URL and cross-checked against that published `.sha1`
-      # (686180ad33981ad943fdc0ab381e619b2c2fdfe5).
+      # (993ba74eafa574df15f4809f8082a12f67cad34b).
       - name: Fetch the bundled H2 driver JAR
         shell: bash
         env:
-          H2_JAR: h2-2.4.240.jar
-          H2_URL: https://repo1.maven.org/maven2/com/h2database/h2/2.4.240/h2-2.4.240.jar
-          H2_SHA256: 29b70e427cc1c40cdc376283adbb0cc62853073797bb5fe5761f81fe73d57ce0
+          H2_JAR: h2-2.5.252.jar
+          H2_URL: https://repo1.maven.org/maven2/com/h2database/h2/2.5.252/h2-2.5.252.jar
+          H2_SHA256: 90b11dc413da82070ef15fc943282c1408e6ffd34fa68998335fea8603b5ff20
         run: |
           mkdir -p drivers
           curl --fail --silent --show-error --location --retry 3 \
@@ -614,7 +614,7 @@ jobs:
           test -f "$sample/sample_h2.db.mv.db" || { echo "no sample database under $sample"; exit 1; }
           # Without the driver JAR the seeded sample connection is a NoDriverJar
           # error on a first run with no network.
-          test -f "$drivers/h2-2.4.240.jar" || { echo "no H2 driver JAR under $drivers"; exit 1; }
+          test -f "$drivers/h2-2.5.252.jar" || { echo "no H2 driver JAR under $drivers"; exit 1; }
           modules=$("$runtime/bin/java" --list-modules)
           for module in jdk.charsets jdk.unsupported; do
             if ! printf '%s\n' "$modules" | grep -q "^${module}@"; then

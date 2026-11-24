@@ -29,7 +29,7 @@ rudbgen-vX.Y.Z-<target>/          Windows (zip and installer) and Linux
 ├── runtime/                      the jlink Java runtime
 ├── templates/                    the three shipped templates, for reference
 ├── sample/sample_h2.db.mv.db     a sample H2 database to try a connection on
-├── drivers/h2-2.4.240.jar        the H2 JDBC driver, so that sample opens offline
+├── drivers/h2-2.5.252.jar        the H2 JDBC driver, so that sample opens offline
 └── README.md
                                   Linux also: install.sh, the .desktop file, icons/
 
@@ -63,7 +63,7 @@ bundle will not allow. Neither the copy nor the connection is ever made twice: a
 and a `connections.json` that exists — even one listing nothing, because you
 deleted the sample — is never seeded again.
 
-`drivers/h2-2.4.240.jar` is installed by that same first run: the JAR is copied
+`drivers/h2-2.5.252.jar` is installed by that same first run: the JAR is copied
 into `drivers/` in your configuration directory and put on the **H2 Embedded**
 driver's class path, so the sample connection opens straight away with no
 network. It is the only driver rudbgen ships. Every other one is downloaded from
